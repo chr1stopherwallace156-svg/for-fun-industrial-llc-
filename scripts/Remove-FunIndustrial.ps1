@@ -3,17 +3,19 @@ param([switch]$DeleteRepository,[switch]$RemoveGhidra)
 $ErrorActionPreference="Stop"
 $RepoRoot=(Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $port=8787
-try{
- $response=Invoke-RestMethod -Uri "http://127.0.0.1:$port/api/shutdown" -Method Post -ContentType "application/json" -Body "{}" -TimeoutSec 8
- Write-Host "PLATFORM_SHUTDOWN=PASS"
-}catch{
- $listeners=Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue
- foreach($listener in $listeners){
-  $process=Get-CimInstance Win32_Process -Filter ("ProcessId="+$listener.OwningProcess) -ErrorAction SilentlyContinue
-  if($process -and $process.CommandLine -like "*$RepoRoot*src\server.mjs*"){
-   if($PSCmdlet.ShouldProcess("Fun Industrial server PID $($process.ProcessId)","Stop exact repository-owned process")){Stop-Process -Id $process.ProcessId -Force}
-  }else{throw "Port $port is occupied by a process not proven to belong to this repository. Refusing to stop it."}
- }
+if($PSCmdlet.ShouldProcess("http://127.0.0.1:$port","Stop Fun Industrial services and local controller")){
+ try{
+  $response=Invoke-RestMethod -Uri "http://127.0.0.1:$port/api/shutdown" -Method Post -ContentType "application/json" -Body "{}" -TimeoutSec 8
+  Write-Host "PLATFORM_SHUTDOWN=PASS"
+ }catch{
+  $listeners=Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue
+  foreach($listener in $listeners){
+   $process=Get-CimInstance Win32_Process -Filter ("ProcessId="+$listener.OwningProcess) -ErrorAction SilentlyContinue
+   if($process -and $process.CommandLine -like "*$RepoRoot*src\server.mjs*"){
+    if($PSCmdlet.ShouldProcess("Fun Industrial server PID $($process.ProcessId)","Stop exact repository-owned process")){Stop-Process -Id $process.ProcessId -Force}
+   }else{throw "Port $port is occupied by a process not proven to belong to this repository. Refusing to stop it."}
+  }
+ } 
 }
 Start-Sleep -Seconds 2
 $venvPrefix=(Join-Path $RepoRoot ".venv").TrimEnd("\")+"\" 
