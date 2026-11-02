@@ -48,7 +48,7 @@ const server=http.createServer(async(req,res)=>{try{
   if(!localRequest(req,res))return;
   if(!await requireVpnGate(res))return;
   const body=await readBody(req,1000000);
-  if(typeof body.name!=="string"||body.name.length>128)return json(res,400,{error:"invalid tool name"});
+  if(typeof body.name!=="string"||body.name.length>128||!body.arguments||typeof body.arguments!=="object"||Array.isArray(body.arguments))return json(res,400,{error:"invalid tool name or arguments"});
   try{
    if(body.name.startsWith("rea__"))return json(res,200,await platform.callReaTool(body.name.slice(5),body.arguments||{}));
    const tool=getPlatformTool(body.name);if(!tool)return json(res,403,{error:"tool is not in the fixed Fun Industrial tool registry"});
