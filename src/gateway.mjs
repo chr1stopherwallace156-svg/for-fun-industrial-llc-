@@ -15,8 +15,8 @@ export function createGatewayConfig(env=process.env){
  if(!Number.isInteger(port)||port<1||port>65535||!Number.isInteger(backendPort)||backendPort<1||backendPort>65535)throw new Error("Invalid gateway/backend TCP port.");
  if(!allowed.size||allowed.has("*")||clientList.some(ip=>isIP(ip)!==4||ip.startsWith("127.")||ip==="0.0.0.0"))throw new Error("Explicit valid IPv4 VPN client allowlist required; wildcards and non-client addresses are forbidden.");
  if(!/^[a-zA-Z0-9._-]{1,64}$/.test(username)||password.length<24)throw new Error("Gateway username must be simple and password must be at least 24 characters.");
- const hostOnly=publicHost.replace(/:\\d+$/,"");
- if(!(isIP(hostOnly)===4||/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(hostOnly)))throw new Error("FI_GATEWAY_PUBLIC_HOST must be the exact public VPN DNS name or IPv4 address with optional port.");
+ const hostOnly=publicHost.replace(/:\d+$/,"");
+ if(!(isIP(hostOnly)===4||/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(hostOnly)))throw new Error("FI_GATEWAY_PUBLIC_HOST must be the exact public VPN DNS name or IPv4 address with optional port.");
  return Object.freeze({bindIp,allowed,port,backendPort,username,password,keyPath,certPath,publicHost,origin:"https://"+publicHost});
 }
 export function createGatewayServer(config,{readFileImpl=readFile,clock=()=>Date.now()}={}){
