@@ -1,19 +1,20 @@
 # Fun Industrial — Host Activation and Six-Stage Qualification Runbook (v1)
 
-**Status:** execution runbook; host preflight evidence received 2026-11-02.  
+**Status:** execution runbook; host preflight, Stage 2 dependency installation and first qualification attempt recorded 2026-11-02.
+**Current source HEAD:** `7165d91a23d537c9390e18505c5040eef1c0c589`.  
 **Repository:** `feature/open-source-ai-multi-universe-v1`  
 **Reported host HEAD:** `67d0a0d2b068e58480036dd9ba8f0900914c8b2f`  
 **Windows clone:** `C:\\Users\\alxar\\FunIndustrial`  
 **NetBird Windows peer:** `100.109.4.20` (`oxytalkin.netbird.cloud`)  
 **NetBird iPhone peer:** `100.109.87.100` (confirmed in prior operator testing)  
 **NetBird:** CLI/daemon 0.82.0, management and signal connected, 1/1 peer connected.  
-**Preflight:** no Fun Industrial ports listening; `scripts/Remove-FunIndustrial.ps1` exists; gateway installer, gateway/supervisor source and successor deployment doc are absent on the reported checkout. No changes were made by the supplied preflight.
+**Preflight:** no Fun Industrial ports listening; `scripts/Remove-FunIndustrial.ps1` exists; gateway installer, gateway/supervisor source and successor deployment doc are absent on the reported checkout. Stage 2 later installed Python/Node dependencies and passed the Python suite, but the first Node suite stopped activation (details below).
 
 ## Safety boundary and current truth
 
 This feature branch is the current integrated platform path. It is **not** the older successor gateway branch. The current app is designed to bind only to `127.0.0.1:8787`; compute is loopback-only on `127.0.0.1:8790`. Do not change HOST to a NetBird address, create a broad firewall rule, or expose the dashboard directly.
 
-The existing NetBird peer connection and Termius-over-NetBird SSH route are confirmed operator results. They do not prove an approved NetBird exit-node/default route. The activation script sets `VPN_REQUIRE_EXIT_NODE=true`; AI, compute and REA remain blocked until the platform's VPN policy sees the required route. A connected peer alone is not sufficient.
+The existing NetBird peer connection and Termius-over-NetBird SSH route are confirmed operator results. They do not prove an approved NetBird exit-node/default route. The activation script sets `VPN_REQUIRE_EXIT_NODE=true`; AI, compute and REA remain blocked until the platform's VPN policy sees the required route. A connected peer alone is not sufficient. Startup is observation-only: adapter startup reads NetBird status and does not issue `netbird up`. VPN connection changes require the explicit Connect VPN action. A new `.env` defaults `NETBIRD_AUTOCONNECT=false`.
 
 **Safari access is not yet implemented by this checkout.** No `src/gateway.mjs`, `src/supervisor.mjs`, or `scripts/Install-FunIndustrialGateway.ps1` was present in the reported host preflight. Do not attempt a direct Safari connection to port 8787. A separately reviewed HTTPS gateway, trusted iPhone certificate, exact peer allowlist and reboot recovery qualification must be completed before remote browser access.
 
@@ -24,7 +25,7 @@ No command in this runbook stops, edits, or reconfigures Elektron, Ollama, Tails
 Run from PowerShell/Termius:
 
 ```powershell
-Set-Location C:\Users\alxar\FunIndustrial; $ErrorActionPreference='Stop'; $expected='67d0a0d2b068e58480036dd9ba8f0900914c8b2f'; $branch=(git branch --show-current).Trim(); $head=(git rev-parse HEAD).Trim(); Write-Host "BRANCH=$branch"; Write-Host "HEAD=$head"; if($head -ne $expected){throw "HEAD mismatch; stop and reconcile the checkout before activation."}; if($branch -ne 'feature/open-source-ai-multi-universe-v1'){throw "Unexpected branch; stop."}; if(-not (Test-Path .\scripts\Activate-FunIndustrial.ps1)){throw 'Activation script missing.'}; if(-not (Test-Path .\scripts\Qualify-FunIndustrial.ps1)){throw 'Qualification script missing.'}; if(-not (Test-Path .\docs\WINDOWS_ACTIVATION.md)){throw 'Activation documentation missing.'}; git status --short; Write-Host 'SOURCE_PREFLIGHT=PASS'
+Set-Location C:\Users\alxar\FunIndustrial; $ErrorActionPreference='Stop'; $expected='7165d91a23d537c9390e18505c5040eef1c0c589'; $branch=(git branch --show-current).Trim(); $head=(git rev-parse HEAD).Trim(); Write-Host "BRANCH=$branch"; Write-Host "HEAD=$head"; if($head -ne $expected){throw "HEAD mismatch; stop and reconcile the checkout before activation."}; if($branch -ne 'feature/open-source-ai-multi-universe-v1'){throw "Unexpected branch; stop."}; if(-not (Test-Path .\scripts\Activate-FunIndustrial.ps1)){throw 'Activation script missing.'}; if(-not (Test-Path .\scripts\Qualify-FunIndustrial.ps1)){throw 'Qualification script missing.'}; if(-not (Test-Path .\docs\WINDOWS_ACTIVATION.md)){throw 'Activation documentation missing.'}; git status --short; Write-Host 'SOURCE_PREFLIGHT=PASS'
 ```
 
 **Expected:** exact branch and HEAD above, required scripts/docs present, `SOURCE_PREFLIGHT=PASS`. If HEAD differs, do not force-reset or overwrite local work. Record actual branch, HEAD and status.
@@ -37,9 +38,13 @@ Only proceed after Stage 1 passes. Keep NetBird connected. The script installs m
 Set-Location C:\Users\alxar\FunIndustrial; $ErrorActionPreference='Stop'; Set-ExecutionPolicy -Scope Process RemoteSigned -Force; .\scripts\Activate-FunIndustrial.ps1 -SkipNetBirdInstall -SkipNetBirdLogin; if($LASTEXITCODE -ne 0){throw 'ACTIVATION_FAILED: preserve the complete terminal output and reports; do not continue.'}
 ```
 
-The two Skip switches are intentional: NetBird 0.82.0 is already installed and authenticated on this host. This avoids rerunning SSO or a package installation. It does **not** bypass the app's VPN/exit-node policy.
+The two Skip switches are intentional: NetBird 0.82.0 is already installed and authenticated on this host. This avoids rerunning SSO or a package installation. It does **not** bypass the app's VPN/exit-node policy. Startup does not invoke `netbird up`; if the required exit-node route is absent, all functional services remain blocked until the operator explicitly connects/configures the approved route.
 
-**Expected:** prerequisite, compute, Node, REA package and configuration steps PASS; Python tests and Node tests complete; platform API returns the Fun Industrial identity; dashboard opens locally. Final report should be `READY` or `READY_WITH_ACTIONS_REQUIRED`. A warning for missing exit-node route, optional local model, or empty REA allowlist is not a full-ready result. `FAILED` means stop and preserve report/logs.
+**Observed first attempt (2026-11-02 09:00):** source update to `56fd15720a199274ea139a4054f606ebf6aba06c` passed. Node `v26.13.0`, Python `3.12.10`, Python dependency installation, CPU-only PyTorch `2.7.0+cpu`, and Python tests passed (`22 passed`, one Starlette/httpx deprecation warning). Node syntax checks passed. Initial Node suite reported 11 passed / 4 failed; activation stopped before REA installation, `.env` creation, server startup, or service activation. Report: `reports\\windows-activation-20261102-090025.json`.
+
+**Repair qualification changes committed after that attempt:** stale tests were aligned with the current VPN fail-closed defaults and exact REA allowlist error; disabled-integration fixtures now disable every integration explicitly; the NetBird connect test now begins disconnected. Platform lifecycle reports `idle` when no integration is enabled. A new test asserts that NetBird startup only reads status and never issues `up`. Platform activation no longer attempts a VPN connection automatically. These changes preserve the VPN/exit-node gate and do not disable it.
+
+**Expected on rerun:** prerequisite, compute, Node, REA package and configuration steps PASS; Python tests should remain `22 passed`; Node suite should pass after the targeted test/code corrections. Platform API returns the Fun Industrial identity; dashboard opens locally. Final report should be `READY` or `READY_WITH_ACTIONS_REQUIRED`. A warning for missing exit-node route, optional local model, or empty REA allowlist is not a full-ready result. `FAILED` means stop and preserve report/logs.
 
 ## Stage 3 — Verify local dashboard, ownership and VPN gate (read-only)
 
