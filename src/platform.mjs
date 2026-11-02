@@ -41,6 +41,7 @@ export function createPlatform(config,overrides={}){
    const secure=services[0].state==="connected"&&(!config.vpnRequireExitNode||services[0].exitNodeRoute===true);lastVpnGate=secure?"connected":"blocked";gateDetail=secure?services[0].detail:(services[0].state==="connected"&&config.vpnRequireExitNode?"NetBird connected but no IPv4 default exit-node route was detected.":services[0].detail);
    if(!secure&&services[0].state==="connected")services[0]={...services[0],state:"blocked",detail:gateDetail};
    if(config.vpnRequired&&!secure&&services[1].state==="running"){await compute.stop();services[1]={state:"blocked",detail:"VPN or exit-node route lost; compute service stopped by fail-closed platform policy."};}
+   if(config.vpnRequired&&!secure&&services[1].state==="stopped")services[1]={state:"blocked",detail:"VPN_REQUIRED is enabled; compute service remains stopped until NetBird and the exit-node route are ready."};
    if(config.vpnRequired&&!secure&&services[2].state==="ready"){await ai.stop();services[2]={state:"blocked",detail:"VPN or exit-node route lost; local AI runtime stopped by fail-closed platform policy."};}
    if(config.vpnRequired&&!secure&&services[3].state==="ready"){await rea.stop();services[3]={state:"blocked",detail:"VPN or exit-node route lost; REA MCP stopped by fail-closed policy."};}
    if(config.vpnRequired&&!secure&&config.rea.enabled&&services[3].state==="stopped")services[3]={state:"blocked",detail:"VPN_REQUIRED is enabled; REA MCP unavailable while VPN or exit-node route is disconnected."};
