@@ -17,8 +17,8 @@ test("defaults are loopback and VPN-gated integrations fail closed",()=>{
 });
 test("rejects wildcard binding",()=>assert.throws(()=>loadConfig({HOST:"0.0.0.0"}),/loopback-only/));
 test("rejects invalid port values",()=>assert.throws(()=>loadConfig({PORT:"70000"}),/valid TCP port/));
-test("disabled integrations do not imply platform readiness",async()=>{
- const platform=createPlatform(loadConfig({}));
+test("disabled integrations remain idle and do not imply readiness",async()=>{
+ const platform=createPlatform(loadConfig({NETBIRD_ENABLED:"false",NETBIRD_AUTOCONNECT:"false",COMPUTE_ENABLED:"false",AI_ENABLED:"false",REA_ENABLED:"false"}));
  const started=await platform.start();
  assert.equal(started.status.lifecycle,"idle");
  assert.ok(started.status.services.every(service=>service.state==="disabled"));
