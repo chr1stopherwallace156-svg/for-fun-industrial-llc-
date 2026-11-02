@@ -126,7 +126,7 @@ AI_AUTOSTART=true
   $reaEntry=Join-Path $RepoRoot ".runtime\rea\node_modules\rea-agents\scripts\rea.mjs"
   $oldReaCommand=Get-Content $envFile | Where-Object { $_ -match "^REA_COMMAND=" } | Select-Object -Last 1
   $oldReaArgs=Get-Content $envFile | Where-Object { $_ -match "^REA_ARGS=" } | Select-Object -Last 1
-  if(-not $oldReaCommand -or $oldReaCommand -eq "REA_COMMAND=rea"){
+  if(((-not $oldReaCommand) -or $oldReaCommand -eq "REA_COMMAND=rea") -and ((-not $oldReaArgs) -or $oldReaArgs -eq "REA_ARGS=mcp")){
    $newCommand="REA_COMMAND=$Node"
    if($oldReaCommand){(Get-Content $envFile) -replace "^REA_COMMAND=.*$",$newCommand | Set-Content -Encoding UTF8 $envFile}else{Add-Content -Encoding UTF8 $envFile $newCommand}
    $newArgs="REA_ARGS=$reaEntry,mcp"
