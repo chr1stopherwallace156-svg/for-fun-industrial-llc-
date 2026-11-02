@@ -2,8 +2,8 @@ import {createReaAdapter} from "./adapters/rea.mjs";
 import {createNetbirdAdapter} from "./adapters/netbird.mjs";
 import {createComputeAdapter} from "./adapters/compute.mjs";
 import {createAiAdapter} from "./adapters/ai.mjs";
-export function createPlatform(config){
- const vpn=createNetbirdAdapter(config.netbird),compute=createComputeAdapter(config.compute),ai=createAiAdapter(config.ai),rea=createReaAdapter(config.rea);
+export function createPlatform(config,overrides={}){
+ const vpn=overrides.vpn||createNetbirdAdapter(config.netbird),compute=overrides.compute||createComputeAdapter(config.compute),ai=overrides.ai||createAiAdapter(config.ai),rea=overrides.rea||createReaAdapter(config.rea);
  let started=false,lastAction="idle",lastVpnGate="not-checked",gateDetail="VPN has not yet been checked.";
  async function vpnConnected(){const state=await vpn.health();const ok=state.state==="connected"&&(!config.vpnRequireExitNode||state.exitNodeRoute===true);lastVpnGate=ok?"connected":"blocked";gateDetail=ok?state.detail:(state.state==="connected"&&config.vpnRequireExitNode?"NetBird is connected but its IPv4 default route (0.0.0.0/0) is missing. Configure an approved exit node.":state.detail);return ok;}
  return {
