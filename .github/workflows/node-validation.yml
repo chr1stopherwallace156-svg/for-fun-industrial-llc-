@@ -23,3 +23,11 @@ jobs:
           node-version: "22"
       - run: npm run check
       - run: npm test
+      - name: Validate Windows activation script syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("${{ github.workspace }}/scripts/Activate-FunIndustrial.ps1", [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { $errors | Out-String | Write-Error }
