@@ -45,3 +45,14 @@ def test_api_trains_and_predicts_inside_own_universe_only():
  assert prediction.status_code==200 and len(prediction.json()["predictions"])==1
  denied=client.post("/ai/universes/api-net-b/neural/predict",json={"features":[[.5,.5]]})
  assert denied.status_code==422
+
+def test_local_chat_reports_not_configured_without_model():
+    status=client.get("/ai/runtime/llama-cpp")
+    assert status.status_code==200
+    assert status.json()["state"] in ("not-configured","stopped","exited","loading","ready")
+
+def test_local_chat_refuses_when_model_is_not_ready():
+    from ai_ml.api import llama
+    if llama.status()["state"]=="not-configured":
+        response=client.post("/ai/chat",json={"messages":[{"role":"user","content":"hello"}]})
+        assert response.status_code==422
