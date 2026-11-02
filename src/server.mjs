@@ -36,11 +36,12 @@ const server=http.createServer(async(req,res)=>{try{
  if(req.method==="POST"&&req.url==="/api/rea/call"){if(!localRequest(req,res))return;const body=await readBody(req,65536);if(typeof body.name!=="string"||body.name.length>128)return json(res,400,{error:"invalid tool name"});try{return json(res,200,await platform.callReaTool(body.name,body.arguments||{}));}catch(e){return json(res,403,{error:e.message});}}
  if(req.method==="POST"&&computeRoutes[req.url]){if(!localRequest(req,res))return;const body=await readBody(req);return proxyCompute(req,res,computeRoutes[req.url],"POST",body);}
  if(aiRoutes[req.url]&&req.method===aiRoutes[req.url].method){if(!localRequest(req,res))return;const route=aiRoutes[req.url];const body=route.method==="POST"?await readBody(req,1000000):null;return proxyCompute(req,res,route.path,route.method,body);}
- const actions=["/api/start","/api/activate","/api/stop","/api/vpn/connect","/api/vpn/disconnect"];
+ const actions=["/api/start","/api/activate","/api/stop","/api/vpn/connect","/api/vpn/disconnect","/api/shutdown"];
  if(req.method==="POST"&&actions.includes(req.url)){
   if(!localRequest(req,res))return;await readBody(req,1024);
   if(req.url==="/api/start"||req.url==="/api/activate")return json(res,200,await platform.start());
   if(req.url==="/api/stop")return json(res,200,await platform.stop());
+  if(req.url==="/api/shutdown"){const result=await platform.stop();json(res,200,{state:"shutting-down",result});setTimeout(()=>server.close(()=>process.exit(0)),250);return;}
   if(req.url==="/api/vpn/connect")return json(res,200,{result:await platform.connectVpn(),status:await platform.status()});
   return json(res,200,{result:await platform.disconnectVpn(),status:await platform.status()});
  }
