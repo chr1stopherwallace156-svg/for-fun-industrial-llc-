@@ -22,7 +22,20 @@ function start(target){
  return entry;
 }
 for(const t of targets)start(t);
-await manifest("running");
+async function activateDashboard(){
+ for(let attempt=0;attempt<30;attempt++){
+  try{
+   const response=await fetch("http://127.0.0.1:8787/api/start",{method:"POST",headers:{"content-type":"application/json"},body:"{}",signal:AbortSignal.timeout(5000)});
+   if(response.ok){const body=await response.text();await writeFile(path.join(logs,"supervisor-activation.json"),body);return;}
+  }catch{}
+  await new Promise(r=>setTimeout(r,1000));
+ }
+ throw new Error("Dashboard did not become ready within 30 seconds; see dashboard logs.");
+}
+await manifest("starting");
+try{await activateDashboard();await manifest("running");}
+catch(error){await writeFile(path.join(logs,"supervisor-startup-error.log"),String(error.stack||error));for(const e of children.values())try{e.child.kill();}catch{};process.exit(1);}
+
 const shutdown=async()=>{if(stopping)return;stopping=true;await manifest("stopping");for(const e of children.values())try{e.child.kill();}catch{};setTimeout(()=>process.exit(0),1500).unref();};
 process.on("SIGINT",shutdown);process.on("SIGTERM",shutdown);
 while(!stopping){
@@ -31,6 +44,6 @@ while(!stopping){
  for(const t of targets){
   if(children.has(t.name))continue;
   if(restarts.length>=3){await manifest("restart-budget-exhausted");await shutdown();process.exitCode=1;process.exit(); }
-  restarts.push(now);start(t);await manifest("restarted");
+  restarts.push(now);start(t);if(t.name==="dashboard"){try{await activateDashboard();}catch(error){await writeFile(path.join(logs,"supervisor-startup-error.log"),String(error.stack||error));await shutdown();process.exitCode=1;process.exit();}}await manifest("restarted");
  }
 }
