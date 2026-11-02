@@ -94,8 +94,10 @@ try {
  if(-not(Test-Path $reaEntry)){throw "Pinned REA package entrypoint missing: $reaEntry"}
  Add-Result "REA package" "PASS" "rea-agents 6.8.0 installed privately under .runtime\rea; no global client configuration modified."
  $envFile=Join-Path $RepoRoot ".env"
+ function Write-EnvLines([string[]]$Lines){[System.IO.File]::WriteAllLines($envFile,$Lines,[System.Text.UTF8Encoding]::new($false))}
+ function Append-EnvLine([string]$Line){[System.IO.File]::AppendAllText($envFile,$Line+[Environment]::NewLine,[System.Text.UTF8Encoding]::new($false))}
  if(-not(Test-Path $envFile)){
- @"
+ $envContent=@"
 HOST=127.0.0.1
 PORT=8787
 REA_ENABLED=true
@@ -118,9 +120,12 @@ LLAMA_CPP_THREADS=4
 LLAMA_CPP_CONTEXT=4096
 AI_ENABLED=true
 AI_AUTOSTART=true
-"@ | Set-Content -Encoding UTF8 $envFile
+"@
+  [System.IO.File]::WriteAllText($envFile,$envContent,[System.Text.UTF8Encoding]::new($false))
   Add-Result "Configuration" "PASS" "Created loopback-only .env with VPN-required REA and local AI defaults. REA tools remain deny-by-default until explicitly allowlisted."
  }else{
+  $rawEnv=[System.IO.File]::ReadAllText($envFile)
+  if($rawEnv.Length -gt 0 -and $rawEnv[0] -eq [char]0xFEFF){$rawEnv=$rawEnv.TrimStart([char]0xFEFF);[System.IO.File]::WriteAllText($envFile,$rawEnv,[System.Text.UTF8Encoding]::new($false))}
   $existing=Get-Content $envFile -Raw
   if($existing -notmatch "(?m)^HOST=127\.0\.0\.1\s*$"){throw ".env must retain HOST=127.0.0.1. Unsafe binding refused."}
   $reaEntry=Join-Path $RepoRoot ".runtime\rea\node_modules\rea-agents\scripts\rea.mjs"
@@ -128,13 +133,13 @@ AI_AUTOSTART=true
   $oldReaArgs=Get-Content $envFile | Where-Object { $_ -match "^REA_ARGS=" } | Select-Object -Last 1
   if(((-not $oldReaCommand) -or $oldReaCommand -eq "REA_COMMAND=rea") -and ((-not $oldReaArgs) -or $oldReaArgs -eq "REA_ARGS=mcp")){
    $newCommand="REA_COMMAND=$Node"
-   if($oldReaCommand){(Get-Content $envFile) -replace "^REA_COMMAND=.*$",$newCommand | Set-Content -Encoding UTF8 $envFile}else{Add-Content -Encoding UTF8 $envFile $newCommand}
+   if($oldReaCommand){$envLines=(Get-Content $envFile) -replace "^REA_COMMAND=.*$",$newCommand;Write-EnvLines $envLines}else{Append-EnvLine $newCommand}
    $newArgs="REA_ARGS=$reaEntry,mcp"
-   if(-not $oldReaArgs -or $oldReaArgs -eq "REA_ARGS=mcp"){if($oldReaArgs){(Get-Content $envFile) -replace "^REA_ARGS=mcp$",$newArgs | Set-Content -Encoding UTF8 $envFile}else{Add-Content -Encoding UTF8 $envFile $newArgs}}
+   if(-not $oldReaArgs -or $oldReaArgs -eq "REA_ARGS=mcp"){if($oldReaArgs){$envLines=(Get-Content $envFile) -replace "^REA_ARGS=mcp$",$newArgs;Write-EnvLines $envLines}else{Append-EnvLine $newArgs}}
   }
   $existing=Get-Content $envFile -Raw
   $required = @("COMPUTE_ENABLED=true","COMPUTE_COMMAND=$pythonExe","COMPUTE_PORT=8790","NETBIRD_ENABLED=true","VPN_REQUIRED=true","VPN_REQUIRE_EXIT_NODE=true","REA_ENABLED=true","REA_REQUIRES_VPN=true","REA_ALLOWED_TOOLS=","FUN_INDUSTRIAL_RUNTIME=$(Join-Path $RepoRoot '.runtime')","LLAMA_CPP_SERVER=","LLAMA_CPP_MODEL=","LLAMA_CPP_THREADS=4","LLAMA_CPP_CONTEXT=4096","AI_ENABLED=true","AI_AUTOSTART=true")
-  foreach($line in $required){$key=$line.Split("=")[0];if($existing -notmatch ("(?m)^"+[regex]::Escape($key)+"=")){Add-Content -Encoding UTF8 $envFile $line}}
+  foreach($line in $required){$key=$line.Split("=")[0];if($existing -notmatch ("(?m)^"+[regex]::Escape($key)+"=")){Append-EnvLine $line;$existing+=[Environment]::NewLine+$line}}
   Add-Result "Configuration" "PASS" "Existing .env preserved; missing compute, VPN, REA and local AI settings appended without overwriting existing values."
  }
  if(-not $SkipNetBirdInstall){
