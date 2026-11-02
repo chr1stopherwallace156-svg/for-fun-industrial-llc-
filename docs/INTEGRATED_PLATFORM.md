@@ -60,7 +60,7 @@ REA upstream is MIT licensed and remains separately maintained: https://github.c
 
 The local model is optional until the operator configures it. Fun Industrial does not download model weights. Recommended first CPU model for the 16 GiB host is Qwen/Qwen3-4B-GGUF Q4_K_M (approximately 2.5 GB), published under Apache-2.0 by Qwen. Review the model card and license before use: https://huggingface.co/Qwen/Qwen3-4B-GGUF.
 
-Download an official Windows x64 CPU llama.cpp release archive from https://github.com/ggml-org/llama.cpp/releases and note the SHA-256 published by the release. Install it privately and download the pinned Qwen model into .runtime:
+Download an official Windows x64 CPU llama.cpp release archive from https://github.com/ggml-org/llama.cpp/releases and note the SHA-256 published by the release. The Qwen model download is pinned to revision `bc640142c66e1fdd12af0bd68f40445458f3869b`, expected size `2,497,280,256` bytes, and SHA-256 `7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5`; the script verifies both size and digest before accepting the file. Install it privately and download the pinned Qwen model into .runtime:
 
 ~~~powershell
 .\scripts\Install-LlamaCpp.ps1 -ArchivePath "$HOME\Downloads\llama-cpp-windows-x64-cpu.zip" -ExpectedSha256 "PASTE_OFFICIAL_RELEASE_SHA256"
