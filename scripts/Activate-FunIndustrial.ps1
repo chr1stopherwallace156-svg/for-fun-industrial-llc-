@@ -120,7 +120,7 @@ COMPUTE_PORT=8790
  Write-Host ""
  Write-Host "ACTIVATION REPORT: $Report" -ForegroundColor Cyan
  Start-Process "http://127.0.0.1:8787"
- Write-Host "Press Activate Fun Industrial in the dashboard to start enabled services and compute." -ForegroundColor Green
+ Write-Host "The platform has been activated; review service states in the dashboard and the JSON report." -ForegroundColor Green
 }catch{
  Add-Result "Activation run" "FAIL" $_.Exception.Message
  $Results.final_state="FAILED";$Results.finished_at=(Get-Date).ToString("o")
