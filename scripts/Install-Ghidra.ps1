@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
  [string]$InstallRoot=(Join-Path $env:LOCALAPPDATA "FunIndustrial\tools"),
- [string]$ArchivePath=(Join-Path $env:USERPROFILE "Downloads\ghidra_12.2_PUBLIC_20261016.zip")
+ [string]$ArchivePath=(Join-Path (Split-Path $PSScriptRoot -Parent) ".runtime\downloads\ghidra_12.2_PUBLIC_20261016.zip")
 )
 $ErrorActionPreference="Stop"
 $ProgressPreference="SilentlyContinue"
@@ -13,6 +13,7 @@ try{
  if($env:OS -ne "Windows_NT"){throw "This installer is Windows-only."}
  $winget=Get-Command winget.exe -ErrorAction SilentlyContinue
  if(-not $winget){throw "winget is required to install the supported JDK 25. Install Microsoft App Installer first."}
+ $jdkInstalledByFunIndustrial=$false
  $jdkDirs=@()
  if(Test-Path "C:\Program Files\Eclipse Adoptium"){$jdkDirs=Get-ChildItem "C:\Program Files\Eclipse Adoptium" -Directory -Filter "jdk-25*" -ErrorAction SilentlyContinue}
  if(-not $jdkDirs){
@@ -46,6 +47,16 @@ try{
  New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
  $report=Join-Path $reportDir ("ghidra-install-"+(Get-Date -Format "yyyyMMdd-HHmmss")+".json")
  [ordered]@{document="FUN_INDUSTRIAL_GHIDRA_INSTALL_V1";started_at=$started;finished_at=(Get-Date).ToString("o");jdk_home=$jdk.FullName;java_version=$javaVersion.Trim();ghidra_version="12.2";ghidra_root=$ghidraRoot;archive_path=$ArchivePath;archive_sha256=$actual;archive_integrity="PASS";sample_downloaded=$false;sample_executed=$false;final_state="PASS"} | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 $report
+ $repoRoot=(Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+ $manifestPath=Join-Path $repoRoot ".runtime\install-manifest.json"
+ $manifest=[ordered]@{}
+ if(Test-Path $manifestPath){$prior=Get-Content $manifestPath -Raw|ConvertFrom-Json;foreach($property in $prior.PSObject.Properties){$manifest[$property.Name]=$property.Value}}
+ $manifest["jdk_installed_by_funindustrial"]=$jdkInstalledByFunIndustrial
+ $manifest["ghidra_installed_by_funindustrial"]=$true
+ $manifest["ghidra_version"]="12.2"
+ $manifest["ghidra_archive_sha256"]=$actual
+ New-Item -ItemType Directory -Force -Path (Split-Path $manifestPath -Parent) | Out-Null
+ $manifest|ConvertTo-Json -Depth 6|Set-Content -Encoding UTF8 $manifestPath
  Write-Host "JDK25=PASS"
  Write-Host "GHIDRA_ARCHIVE_SHA256=PASS"
  Write-Host "GHIDRA_HEADLESS=PASS"
