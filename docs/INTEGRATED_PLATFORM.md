@@ -60,10 +60,12 @@ REA upstream is MIT licensed and remains separately maintained: https://github.c
 
 The local model is optional until the operator configures it. Fun Industrial does not download model weights. Recommended first CPU model for the 16 GiB host is Qwen/Qwen3-4B-GGUF Q4_K_M (approximately 2.5 GB), published under Apache-2.0 by Qwen. Review the model card and license before use: https://huggingface.co/Qwen/Qwen3-4B-GGUF.
 
-Download an official Windows x64 CPU llama.cpp build from https://github.com/ggml-org/llama.cpp/releases, and the Q4_K_M GGUF file from the official model repository. Do not use CUDA-only or NVIDIA-specific builds for the AMD RX 6600. Configure paths locally:
+Download an official Windows x64 CPU llama.cpp release archive from https://github.com/ggml-org/llama.cpp/releases and note the SHA-256 published by the release. Install it privately and download the pinned Qwen model into .runtime:
 
 ~~~powershell
-.\scripts\Configure-LocalModel.ps1 -LlamaServerPath 'C:\FunIndustrialClone\.runtime\llama.cpp\llama-server.exe' -ModelPath 'C:\FunIndustrialClone\.runtime\models\Qwen3-4B-Q4_K_M.gguf' -Threads 4 -Context 2048
+.\scripts\Install-LlamaCpp.ps1 -ArchivePath "$HOME\Downloads\llama-cpp-windows-x64-cpu.zip" -ExpectedSha256 "PASTE_OFFICIAL_RELEASE_SHA256"
+.\scripts\Download-QwenModel.ps1
+.\scripts\Configure-LocalModel.ps1 -LlamaServerPath "$PWD\.runtime\llama.cpp\llama-server.exe" -ModelPath "$PWD\.runtime\models\Qwen3-4B-Q4_K_M.gguf" -Threads 4 -Context 2048
 ~~~
 
 Then restart the platform. AI_AUTOSTART=true starts the local model during Activate. The first load may take time. If the model is not configured, the AI service is reported as not-configured rather than falsely ready.
@@ -90,7 +92,7 @@ Optional Ghidra removal:
 .\scripts\Remove-FunIndustrial.ps1 -RemoveGhidra
 ~~~
 
-The removal script does not uninstall system-wide Node.js, Python, JDK, or NetBird, because those may be used by other software. It does not touch Elektron. Remove those shared installations separately only if you independently confirm they are no longer needed.
+The installer records whether it installed Git, Node.js, Python 3.12, JDK 25, and NetBird. By default the removal script leaves system-wide packages alone. To remove only packages recorded as installed by Fun Industrial, use -RemoveOwnedPrerequisites. A full project removal, including Ghidra and owned prerequisites, is: ` .\scripts\Remove-FunIndustrial.ps1 -RemoveGhidra -RemoveOwnedPrerequisites -DeleteRepository`. This never uninstalls a package the ownership manifest does not identify as project-installed. It does not touch Elektron.
 
 ## Qualification gates
 
