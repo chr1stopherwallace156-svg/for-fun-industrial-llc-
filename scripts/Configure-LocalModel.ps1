@@ -28,3 +28,4 @@ Write-Host "LLAMA_SERVER=$server"
 Write-Host "GGUF_MODEL=$model"
 Write-Host "CPU_THREADS=$Threads CONTEXT=$Context"
 Write-Host "Model license and provenance must be reviewed separately before use."
+$global:LASTEXITCODE=0
