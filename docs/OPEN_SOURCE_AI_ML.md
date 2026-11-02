@@ -4,7 +4,7 @@ This additive subsystem is independent of Elektron. It provides classic and mode
 
 ## Runtime
 
-The llama.cpp adapter requires an operator-supplied local llama-server executable and GGUF model. It never downloads weights, uses shell execution, or binds beyond 127.0.0.1. The process adapter is currently a library interface only; it is not exposed as an unauthenticated HTTP process-launch endpoint. Process start is not proof of model readiness. GGUF model licenses are separate and must be reviewed individually.
+The local AI chat interface calls the llama.cpp OpenAI-compatible chat endpoint over loopback. The adapter starts only operator-supplied llama-server.exe and GGUF paths, validates readiness through /health, and binds 127.0.0.1 with CPU-only settings. No weights are downloaded by activation or CI. The documented starter is Qwen/Qwen3-4B-GGUF Q4_K_M (approximately 2.5 GB, Apache-2.0); model card and terms must be reviewed separately.
 
 ## Hopfield memory
 
@@ -20,10 +20,10 @@ Each universe has its own vector dimension/index, neural-state namespace, memory
 
 ## API
 
-Endpoints are under /ai on the existing loopback compute service: health; hopfield store/recall/modern-retrieve; universes create/list/describe; per-universe vector add/search/topology; bridge create/transfer; neural-state update; llama.cpp runtime status. The runtime adapter's process-launch method is not exposed as an unauthenticated HTTP route; operator-controlled launch integration remains a later security gate.
+Endpoints are under /ai on the existing loopback compute service: health; hopfield store/recall/modern-retrieve; universes create/list/describe; per-universe vector add/search/topology; bridge create/transfer; neural-state update; llama.cpp runtime status. The runtime lifecycle and chat endpoints are exposed only through the loopback control-plane proxy. REA tool schemas are passed to the model only after exact-name allowlisting; model proposals require a separate human approval click before execution.
 
 ## Qualification and limitations
 
-CPU-first; no model weights or corpora committed or downloaded by CI. No custom cryptography, secure transport, remote administration, GPU acceleration, production persistence, multi-host networking, or benchmark claims. CI tests deterministic synthetic fixtures. Independent code/license review and Windows host validation remain release gates.
+CPU-first; no model weights or corpora committed or downloaded by CI. No custom cryptography, public API, remote administration, GPU acceleration, production persistence, multi-host networking, or benchmark claims. Local chat history is browser-session-only. Full-device VPN enforcement requires a separately qualified Windows Firewall kill switch. CI tests deterministic synthetic fixtures. Independent code/license review and Windows host validation remain release gates.
 
 Upstream project: https://github.com/ggml-org/llama.cpp. No upstream source is vendored or modified.
