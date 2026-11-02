@@ -27,7 +27,8 @@ if($cert.NotAfter -le (Get-Date) -or $cert.NotBefore -gt (Get-Date)){throw "TLS 
 if($cert.Subject -notmatch [regex]::Escape($PublicHost.Split(":")[0]) -and $cert.GetNameInfo([Security.Cryptography.X509Certificates.X509NameType]::DnsName,$false) -ne $PublicHost.Split(":")[0]){throw "Certificate identity does not match the configured public hostname; inspect SAN manually before retrying."}
 $pwdPtr=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($GatewayPassword)
 try{$plain=[Runtime.InteropServices.Marshal]::PtrToStringBSTR($pwdPtr)}finally{[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pwdPtr)}
-if($plain.Length -lt 24){throw "Gateway password must be at least 24 characters."}
+if($plain -notmatch "^[A-Za-z0-9_-]{24,}$"){throw "Gateway password must be at least 24 URL-safe alphanumeric, underscore, or hyphen characters so .env parsing is unambiguous."}
+if($GatewayPort -ne 8443){throw "This qualified profile reserves gateway TCP port 8443; use the default port."}
 $envPath=Join-Path $root ".env"
 if(-not(Test-Path $envPath)){throw "Run base activation first; expected .env missing."}
 $lines=[System.Collections.Generic.List[string]]::new();Get-Content $envPath|ForEach-Object{$lines.Add($_)}
@@ -47,8 +48,7 @@ $action=New-ScheduledTaskAction -Execute $node -Argument ('"'+(Join-Path $root "
 $trigger=New-ScheduledTaskTrigger -AtLogOn -User $identity
 $principal=New-ScheduledTaskPrincipal -UserId $identity -LogonType Interactive -RunLevel Limited
 $settings=New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 0 -MultipleInstances IgnoreNew
-Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description "Fun Industrial only: supervise its own dashboard and VPN-bound HTTPS gateway." -Force|Out-Null
-Start-ScheduledTask -TaskName $taskName
+try{Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description "Fun Industrial only: supervise its own dashboard and VPN-bound HTTPS gateway." -Force|Out-Null;Start-ScheduledTask -TaskName $taskName}catch{Remove-NetFirewallRule -Name $firewallName -ErrorAction SilentlyContinue;throw}
 Write-Host "FUN_INDUSTRIAL_GATEWAY_FIREWALL=PASS"
 Write-Host "FUN_INDUSTRIAL_SUPERVISOR_TASK=REGISTERED_USER_LOGON"
 Write-Host "BIND=$NetBirdBindIPv4 INTERFACE=$NetBirdInterface PORT=$GatewayPort CLIENTS=$($AllowedClientIPv4 -join ',')"
