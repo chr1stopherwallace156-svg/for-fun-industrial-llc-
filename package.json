@@ -1,0 +1,14 @@
+{
+  "name": "fun-industrial-platform",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.23.4"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test",
+    "check": "node --check src/server.mjs && node --check src/platform.mjs && node --check src/config.mjs && node --check src/adapters/compute.mjs && node --check src/adapters/netbird.mjs && node --check src/adapters/rea.mjs"
+  }
+}
