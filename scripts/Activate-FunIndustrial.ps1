@@ -153,7 +153,7 @@ AI_AUTOSTART=true
   Start-Sleep -Seconds 2
  }
  $serverLog=Join-Path $ReportDir "platform-server-$Stamp.log"
- Start-Process -FilePath $Node -ArgumentList "src/server.mjs" -WorkingDirectory $RepoRoot -RedirectStandardOutput $serverLog -RedirectStandardError ($serverLog+".err") -WindowStyle Hidden
+ Start-Process -FilePath $Node -ArgumentList (Join-Path $RepoRoot "src\server.mjs") -WorkingDirectory $RepoRoot -RedirectStandardOutput $serverLog -RedirectStandardError ($serverLog+".err") -WindowStyle Hidden
  Start-Sleep -Seconds 3
  try{
   $status=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/status" -TimeoutSec 5
