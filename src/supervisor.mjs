@@ -1,4 +1,5 @@
 import {spawn} from "node:child_process";
+import {openSync,closeSync} from "node:fs";
 import {mkdir,open,writeFile,readFile} from "node:fs/promises";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
@@ -14,9 +15,10 @@ async function manifest(state){
 }
 function start(target){
  const out=path.join(logs,target.name+".out.log"),err=path.join(logs,target.name+".err.log");
- const child=spawn(process.execPath,[target.script],{cwd:root,windowsHide:true,stdio:["ignore", "ignore","ignore"]});
- const entry={...target,child};children.set(target.name,entry);
- child.on("exit",async(code,signal)=>{if(children.get(target.name)?.child===child)children.delete(target.name);await manifest(stopping?"stopping":"child-exited");});
+ const outFd=openSync(out,"a"),errFd=openSync(err,"a");
+ const child=spawn(process.execPath,[target.script],{cwd:root,windowsHide:true,stdio:["ignore",outFd,errFd]});
+ const entry={...target,child,outFd,errFd};children.set(target.name,entry);
+ child.on("exit",async(code,signal)=>{closeSync(outFd);closeSync(errFd);if(children.get(target.name)?.child===child)children.delete(target.name);await manifest(stopping?"stopping":"child-exited");});
  return entry;
 }
 for(const t of targets)start(t);
