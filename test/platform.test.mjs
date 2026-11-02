@@ -39,7 +39,7 @@ test("NetBird VPN connect and disconnect use explicit CLI commands",async()=>{
  const adapter=createNetbirdAdapter({enabled:true,autoConnect:false,command:"netbird"},runner);
  const connected=await adapter.connect();
  assert.equal(connected.state,"connected");
- assert.deepEqual(calls,[["up"],["status","-d"]]);
+ assert.deepEqual(calls,[["status","-d"],["up"],["status","-d"]]);
  const disconnected=await adapter.disconnect();
  assert.equal(disconnected.state,"disconnected");
  assert.deepEqual(calls[2],["down"]);
