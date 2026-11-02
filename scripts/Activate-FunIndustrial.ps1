@@ -51,9 +51,9 @@ try {
  try {
   & $Npm install --ignore-scripts
   if($LASTEXITCODE -ne 0){throw "npm install failed."}
-  & $Npm.Source run check
+  & $Npm run check
   if($LASTEXITCODE -ne 0){throw "Node syntax validation failed."}
-  & $Npm.Source test
+  & $Npm test
   if($LASTEXITCODE -ne 0){throw "Node tests failed."}
  } finally {Pop-Location}
  Add-Result "Node application" "PASS" "Dependencies installed; syntax and tests passed."
