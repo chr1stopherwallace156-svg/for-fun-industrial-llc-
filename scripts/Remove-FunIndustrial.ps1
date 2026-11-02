@@ -16,6 +16,13 @@ try{
  }
 }
 Start-Sleep -Seconds 2
+$venvPrefix=(Join-Path $RepoRoot ".venv").TrimEnd("\")+"\" 
+$runtimePrefix=(Join-Path $RepoRoot ".runtime").TrimEnd("\")+"\" 
+$owned=Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+ ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($venvPrefix,[System.StringComparison]::OrdinalIgnoreCase) -and $_.CommandLine -match "uvicorn compute_service\\.app:app") -or
+ ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($runtimePrefix,[System.StringComparison]::OrdinalIgnoreCase))
+}
+foreach($process in $owned){if($PSCmdlet.ShouldProcess("Fun Industrial owned runtime PID $($process.ProcessId)","Stop exact repository-private process")){Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue}}
 $targets=@((Join-Path $RepoRoot ".venv"),(Join-Path $RepoRoot ".runtime"),(Join-Path $RepoRoot "node_modules"),(Join-Path $RepoRoot "reports"),(Join-Path $RepoRoot ".pytest_cache"))
 foreach($target in $targets){if(Test-Path -LiteralPath $target){if($PSCmdlet.ShouldProcess($target,"Remove Fun Industrial private runtime data")){Remove-Item -LiteralPath $target -Recurse -Force}}}
 $envFile=Join-Path $RepoRoot ".env"
