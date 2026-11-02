@@ -34,6 +34,12 @@ try{
  Run "Node regression tests" { Push-Location $RepoRoot; try { npm test } finally { Pop-Location } }
  Push-Location $RepoRoot; try { npm ls --depth=0 --json | Set-Content -Encoding UTF8 (Join-Path $ReportDir "node-dependencies-$Stamp.json"); if($LASTEXITCODE -ne 0){throw "npm dependency inventory reported a problem."} } finally { Pop-Location }
  Record "Node package inventory" "PASS" "Top-level installed Node packages saved."
+ $reaPackagePath=Join-Path $RepoRoot ".runtime\rea\node_modules\rea-agents\package.json"
+ if(-not(Test-Path $reaPackagePath)){throw "Private REA package missing from .runtime\rea."}
+ $reaPackage=Get-Content $reaPackagePath -Raw|ConvertFrom-Json
+ if($reaPackage.version -ne "6.8.0"){throw "Expected pinned rea-agents 6.8.0; found $($reaPackage.version)."}
+ Push-Location $RepoRoot;try{npm ls --prefix (Join-Path $RepoRoot ".runtime\rea") --depth=0 --json | Set-Content -Encoding UTF8 (Join-Path $ReportDir "rea-dependencies-$Stamp.json");if($LASTEXITCODE -ne 0){throw "REA dependency inventory failed."}}finally{Pop-Location}
+ Record "REA pinned package" "PASS" "rea-agents 6.8.0 and its private dependency inventory verified."
  $pkg=Get-Content (Join-Path $RepoRoot "package.json") -Raw | ConvertFrom-Json
  if($pkg.license -ne "Apache-2.0" -or -not(Test-Path (Join-Path $RepoRoot "LICENSE"))){throw "Apache-2.0 licensing declaration or LICENSE file missing."}
  Record "Project license declaration" "PASS" "package.json declares Apache-2.0 and LICENSE exists."
