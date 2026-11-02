@@ -28,7 +28,7 @@ class NeuralTrain(BaseModel):
 class NeuralPredict(BaseModel):
  features:list[list[float]]=Field(min_length=1,max_length=512)
 class ChatRequest(BaseModel):
- messages:list[dict]=Field(min_length=1,max_length=24); max_tokens:int=Field(default=512,ge=1,le=1024); temperature:float=Field(default=0.7,ge=0,le=1.2)
+ messages:list[dict]=Field(min_length=1,max_length=24); max_tokens:int=Field(default=512,ge=1,le=1024); temperature:float=Field(default=0.7,ge=0,le=1.2); tools:list[dict]=Field(default_factory=list,max_length=32)
 def vector_index(universe_id):
     try:return registry._get(universe_id).vectors
     except ValueError as e:raise HTTPException(404,str(e)) from e
@@ -77,4 +77,4 @@ def start_runtime():return call(llama.start_configured)
 @router.post("/runtime/llama-cpp/stop")
 def stop_runtime():return call(llama.stop)
 @router.post("/chat")
-def chat(r:ChatRequest):return call(llama.chat,r.messages,r.max_tokens,r.temperature)
+def chat(r:ChatRequest):return call(llama.chat,r.messages,r.max_tokens,r.temperature,r.tools or None)
