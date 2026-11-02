@@ -8,6 +8,19 @@ New-Item -ItemType Directory -Force -Path $ReportDir | Out-Null
 $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $Report = Join-Path $ReportDir "windows-activation-$Stamp.json"
 $Results = [ordered]@{started_at=(Get-Date).ToString("o");repository=$RepoRoot;steps=@();final_state="RUNNING"}
+$RuntimeRoot=Join-Path $RepoRoot ".runtime"
+New-Item -ItemType Directory -Force -Path $RuntimeRoot | Out-Null
+$Ownership=[ordered]@{git_installed_by_funindustrial=$false;node_installed_by_funindustrial=$false;python312_installed_by_funindustrial=$false;netbird_installed_by_funindustrial=$false}
+function Save-InstallManifest {
+ $manifestPath=Join-Path $RuntimeRoot "install-manifest.json"
+ $manifest=[ordered]@{}
+ if(Test-Path $manifestPath){$prior=Get-Content $manifestPath -Raw|ConvertFrom-Json;foreach($property in $prior.PSObject.Properties){$manifest[$property.Name]=$property.Value}}
+ foreach($key in $Ownership.Keys){if($Ownership[$key]){$manifest[$key]=$true}elseif(-not $manifest.Contains($key)){$manifest[$key]=$false}}
+ $manifest["repository_root"]=$RepoRoot
+ $manifest["updated_at"]=(Get-Date).ToString("o")
+ $manifest|ConvertTo-Json -Depth 6|Set-Content -Encoding UTF8 $manifestPath
+}
+
 function Add-Result([string]$Name,[string]$State,[string]$Detail) {
  $Results.steps += [ordered]@{name=$Name;state=$State;detail=$Detail}
  $color=if($State -eq "PASS"){"Green"}elseif($State -eq "WARN"){"Yellow"}else{"Red"}
@@ -22,14 +35,14 @@ try {
  if($env:OS -ne "Windows_NT"){throw "Run this script on Windows."}
  $winget=Get-Command "winget.exe" -ErrorAction SilentlyContinue
  if(-not $winget){throw "winget is required for one-pass prerequisite installation. Install Microsoft App Installer, then rerun."}
- if(-not (Get-Command "git.exe" -ErrorAction SilentlyContinue)){& $winget.Source install --id Git.Git --exact --accept-package-agreements --accept-source-agreements;if($LASTEXITCODE -ne 0){throw "Git installation failed."}}
- if(-not (Get-Command "node.exe" -ErrorAction SilentlyContinue)){& $winget.Source install --id OpenJS.NodeJS.LTS --exact --accept-package-agreements --accept-source-agreements;if($LASTEXITCODE -ne 0){throw "Node.js LTS installation failed."}}
+ if(-not (Get-Command "git.exe" -ErrorAction SilentlyContinue)){& $winget.Source install --id Git.Git --exact --accept-package-agreements --accept-source-agreements;if($LASTEXITCODE -ne 0){throw "Git installation failed."};$Ownership.git_installed_by_funindustrial=$true;Save-InstallManifest}
+ if(-not (Get-Command "node.exe" -ErrorAction SilentlyContinue)){& $winget.Source install --id OpenJS.NodeJS.LTS --exact --accept-package-agreements --accept-source-agreements;if($LASTEXITCODE -ne 0){throw "Node.js LTS installation failed."};$Ownership.node_installed_by_funindustrial=$true;Save-InstallManifest}
  $pyLauncher=Get-Command "py.exe" -ErrorAction SilentlyContinue
  $pythonCommand=Get-Command "python.exe" -ErrorAction SilentlyContinue
  $pythonReady=$false
  if($pyLauncher){& $pyLauncher.Source -3.12 --version *> $null;$pythonReady=($LASTEXITCODE -eq 0)}
  elseif($pythonCommand){$pv=(& $pythonCommand.Source --version 2>&1 | Out-String).Trim();$pythonReady=($pv -match "^Python 3\.12\.")}
- if(-not $pythonReady){& $winget.Source install --id Python.Python.3.12 --exact --accept-package-agreements --accept-source-agreements;if($LASTEXITCODE -ne 0){throw "Python 3.12 installation failed."}}
+ if(-not $pythonReady){& $winget.Source install --id Python.Python.3.12 --exact --accept-package-agreements --accept-source-agreements;if($LASTEXITCODE -ne 0){throw "Python 3.12 installation failed."};$Ownership.python312_installed_by_funindustrial=$true;Save-InstallManifest}
  $env:Path=[Environment]::GetEnvironmentVariable("Path","Machine")+";"+[Environment]::GetEnvironmentVariable("Path","User")
  $Git=Require-Command "git.exe" "Install Git for Windows."
  $Node=Require-Command "node.exe" "Install Node.js LTS."
@@ -40,10 +53,12 @@ try {
  if($Python.Name -eq "py.exe"){& $Python.Source -3.12 --version *> $null;if($LASTEXITCODE -ne 0){throw "Python launcher does not find Python 3.12."}}
  else{$pyVersion=(& $Python.Source --version 2>&1 | Out-String).Trim();if($pyVersion -notmatch "^Python 3\.12\."){throw "Python 3.12 required; found $pyVersion."}}
  $nodeVersion=(& $Node --version).Trim()
- if([version]($nodeVersion.TrimStart("v")) -lt [version]"22.23.4"){throw "Node.js 22.23.4 or newer required; found $nodeVersion"}
+ $parsedNode=[version]($nodeVersion.TrimStart("v"))
+ $supportedNode=($parsedNode.Major -eq 22 -and $parsedNode -ge [version]"22.23.4") -or ($parsedNode.Major -eq 24 -and $parsedNode -ge [version]"24.22.1") -or ($parsedNode.Major -ge 26 -and $parsedNode -ge [version]"26.12.1")
+ if(-not $supportedNode){throw "REA requires Node 22.23.4+, 24.22.1+, or 26.12.1+; found $nodeVersion"}
  Add-Result "Prerequisites" "PASS" "Git and Node $nodeVersion found."
  $branch=(& $Git -C $RepoRoot branch --show-current).Trim()
- if($branch -ne "integration/bootstrap-architecture-v1"){Add-Result "Git branch" "WARN" "Running from $branch; expected integration/bootstrap-architecture-v1. No branch switch performed."}else{Add-Result "Git branch" "PASS" $branch}
+ if($branch -notmatch "^(main|integration/.+|feature/.+)$"){Add-Result "Git branch" "WARN" "Running from $branch; expected main, integration/*, or feature/*. No branch switch performed."}else{Add-Result "Git branch" "PASS" $branch}
  $venv=Join-Path $RepoRoot ".venv"
  $pythonExe=Join-Path $venv "Scripts\python.exe"
  if(-not(Test-Path $pythonExe)){
@@ -56,8 +71,8 @@ try {
  if($LASTEXITCODE -ne 0){throw "Compute dependencies installation failed."}
  & $pythonExe -m pip install torch==2.7.0 --extra-index-url https://download.pytorch.org/whl/cpu
  if($LASTEXITCODE -ne 0){throw "CPU PyTorch installation failed."}
- & $pythonExe -m pytest (Join-Path $RepoRoot "compute_service\test_compute.py") -q
- if($LASTEXITCODE -ne 0){throw "Graph/tensor/neural tests failed."}
+ & $pythonExe -m pytest (Join-Path $RepoRoot "compute_service\test_compute.py") (Join-Path $RepoRoot "ai_ml\test_ai_ml.py") (Join-Path $RepoRoot "malware_analysis\test_static_analysis.py") -q
+ if($LASTEXITCODE -ne 0){throw "Compute, AI/ML, and defensive malware static-analysis tests failed."}
  & $pythonExe -m pip freeze --all | Set-Content -Encoding UTF8 (Join-Path $ReportDir "compute-environment-$Stamp.txt")
  Add-Result "Compute engine" "PASS" "Python direct dependencies installed in isolated .venv; tests passed. Resolved environment recorded."
  Push-Location $RepoRoot
@@ -70,35 +85,70 @@ try {
   if($LASTEXITCODE -ne 0){throw "Node tests failed."}
  } finally {Pop-Location}
  Add-Result "Node application" "PASS" "Dependencies installed; syntax and tests passed."
+ $runtimeRoot=Join-Path $RepoRoot ".runtime"
+ $reaRoot=Join-Path $runtimeRoot "rea"
+ New-Item -ItemType Directory -Force -Path $reaRoot | Out-Null
+ & $Npm install --prefix $reaRoot --ignore-scripts --no-audit --no-fund "rea-agents@6.8.0"
+ if($LASTEXITCODE -ne 0){throw "Pinned REA package installation failed."}
+ $reaEntry=Join-Path $reaRoot "node_modules\rea-agents\scripts\rea.mjs"
+ if(-not(Test-Path $reaEntry)){throw "Pinned REA package entrypoint missing: $reaEntry"}
+ Add-Result "REA package" "PASS" "rea-agents 6.8.0 installed privately under .runtime\rea; no global client configuration modified."
  $envFile=Join-Path $RepoRoot ".env"
+ function Write-EnvLines([string[]]$Lines){[System.IO.File]::WriteAllLines($envFile,$Lines,[System.Text.UTF8Encoding]::new($false))}
+ function Append-EnvLine([string]$Line){[System.IO.File]::AppendAllText($envFile,$Line+[Environment]::NewLine,[System.Text.UTF8Encoding]::new($false))}
  if(-not(Test-Path $envFile)){
- @"
+ $envContent=@"
 HOST=127.0.0.1
 PORT=8787
-REA_ENABLED=false
-REA_COMMAND=rea
-REA_ARGS=mcp
+REA_ENABLED=true
+REA_COMMAND=$Node
+REA_ARGS=$(Join-Path $RepoRoot ".runtime\rea\node_modules\rea-agents\scripts\rea.mjs"),mcp
+REA_REQUIRES_VPN=true
+REA_ALLOWED_TOOLS=
 NETBIRD_ENABLED=true
 NETBIRD_COMMAND=netbird
-NETBIRD_AUTOCONNECT=false
+NETBIRD_AUTOCONNECT=true
+VPN_REQUIRED=true
+VPN_REQUIRE_EXIT_NODE=true
 COMPUTE_ENABLED=true
 COMPUTE_COMMAND=$pythonExe
 COMPUTE_PORT=8790
-"@ | Set-Content -Encoding UTF8 $envFile
-  Add-Result "Configuration" "PASS" "Created loopback-only .env. REA remains disabled until installed and enabled."
+FUN_INDUSTRIAL_RUNTIME=$(Join-Path $RepoRoot ".runtime")
+LLAMA_CPP_SERVER=
+LLAMA_CPP_MODEL=
+LLAMA_CPP_THREADS=4
+LLAMA_CPP_CONTEXT=4096
+AI_ENABLED=true
+AI_AUTOSTART=true
+"@
+  [System.IO.File]::WriteAllText($envFile,$envContent,[System.Text.UTF8Encoding]::new($false))
+  Add-Result "Configuration" "PASS" "Created loopback-only .env with VPN-required REA and local AI defaults. REA tools remain deny-by-default until explicitly allowlisted."
  }else{
+  $rawEnv=[System.IO.File]::ReadAllText($envFile)
+  if($rawEnv.Length -gt 0 -and $rawEnv[0] -eq [char]0xFEFF){$rawEnv=$rawEnv.TrimStart([char]0xFEFF);[System.IO.File]::WriteAllText($envFile,$rawEnv,[System.Text.UTF8Encoding]::new($false))}
   $existing=Get-Content $envFile -Raw
   if($existing -notmatch "(?m)^HOST=127\.0\.0\.1\s*$"){throw ".env must retain HOST=127.0.0.1. Unsafe binding refused."}
-  $required = @("COMPUTE_ENABLED=true","COMPUTE_COMMAND=$pythonExe","COMPUTE_PORT=8790","NETBIRD_ENABLED=true")
-  foreach($line in $required){$key=$line.Split("=")[0];if($existing -notmatch ("(?m)^"+[regex]::Escape($key)+"=")){Add-Content -Encoding UTF8 $envFile $line}}
-  Add-Result "Configuration" "PASS" "Existing .env preserved; missing compute and NetBird settings appended without overwriting existing values."
+  $reaEntry=Join-Path $RepoRoot ".runtime\rea\node_modules\rea-agents\scripts\rea.mjs"
+  $oldReaCommand=Get-Content $envFile | Where-Object { $_ -match "^REA_COMMAND=" } | Select-Object -Last 1
+  $oldReaArgs=Get-Content $envFile | Where-Object { $_ -match "^REA_ARGS=" } | Select-Object -Last 1
+  if(((-not $oldReaCommand) -or $oldReaCommand -eq "REA_COMMAND=rea") -and ((-not $oldReaArgs) -or $oldReaArgs -eq "REA_ARGS=mcp")){
+   $newCommand="REA_COMMAND=$Node"
+   if($oldReaCommand){$envLines=(Get-Content $envFile) -replace "^REA_COMMAND=.*$",$newCommand;Write-EnvLines $envLines}else{Append-EnvLine $newCommand}
+   $newArgs="REA_ARGS=$reaEntry,mcp"
+   if(-not $oldReaArgs -or $oldReaArgs -eq "REA_ARGS=mcp"){if($oldReaArgs){$envLines=(Get-Content $envFile) -replace "^REA_ARGS=mcp$",$newArgs;Write-EnvLines $envLines}else{Append-EnvLine $newArgs}}
+  }
+  $existing=Get-Content $envFile -Raw
+  $required = @("COMPUTE_ENABLED=true","COMPUTE_COMMAND=$pythonExe","COMPUTE_PORT=8790","NETBIRD_ENABLED=true","VPN_REQUIRED=true","VPN_REQUIRE_EXIT_NODE=true","REA_ENABLED=true","REA_REQUIRES_VPN=true","REA_ALLOWED_TOOLS=","FUN_INDUSTRIAL_RUNTIME=$(Join-Path $RepoRoot '.runtime')","LLAMA_CPP_SERVER=","LLAMA_CPP_MODEL=","LLAMA_CPP_THREADS=4","LLAMA_CPP_CONTEXT=4096","AI_ENABLED=true","AI_AUTOSTART=true")
+  foreach($line in $required){$key=$line.Split("=")[0];if($existing -notmatch ("(?m)^"+[regex]::Escape($key)+"=")){Append-EnvLine $line;$existing+=[Environment]::NewLine+$line}}
+  Add-Result "Configuration" "PASS" "Existing .env preserved; missing compute, VPN, REA and local AI settings appended without overwriting existing values."
  }
  if(-not $SkipNetBirdInstall){
+  $netbirdPreexisting=([bool](Get-Command "netbird.exe" -ErrorAction SilentlyContinue)) -or (Test-Path "C:\Program Files\NetBird\netbird.exe")
   $winget=Get-Command "winget.exe" -ErrorAction SilentlyContinue
   if(-not $winget){Add-Result "NetBird install" "WARN" "winget unavailable; install using https://docs.netbird.io/get-started/install/windows."}
   else{
    & $winget.Source install --id Netbird.NetBird --exact --accept-package-agreements --accept-source-agreements
-   if($LASTEXITCODE -ne 0){Add-Result "NetBird install" "WARN" "winget returned $LASTEXITCODE; check whether NetBird is already installed."}else{Add-Result "NetBird install" "PASS" "NetBird package installation completed."}
+   if($LASTEXITCODE -ne 0){Add-Result "NetBird install" "WARN" "winget returned $LASTEXITCODE; check whether NetBird is already installed."}else{Add-Result "NetBird install" "PASS" "NetBird package installation completed.";if(-not $netbirdPreexisting){$Ownership.netbird_installed_by_funindustrial=$true;Save-InstallManifest}}
   }
  }
  $netbird=Get-Command "netbird.exe" -ErrorAction SilentlyContinue
@@ -118,17 +168,25 @@ COMPUTE_PORT=8790
   }else{Add-Result "VPN activation" "WARN" "Skipped by operator option."}
  }else{Add-Result "NetBird client" "WARN" "Not detected; VPN controls remain unavailable until installed."}
  $listener=Get-NetTCPConnection -State Listen -LocalPort 8787 -ErrorAction SilentlyContinue
- if(-not $listener){
-  $serverLog=Join-Path $ReportDir "platform-server-$Stamp.log"
-  Start-Process -FilePath $Node -ArgumentList "src/server.mjs" -WorkingDirectory $RepoRoot -RedirectStandardOutput $serverLog -RedirectStandardError ($serverLog+".err") -WindowStyle Hidden
-  Start-Sleep -Seconds 3
+ if($listener){
+  foreach($entry in $listener){
+   $owner=Get-CimInstance Win32_Process -Filter ("ProcessId="+$entry.OwningProcess) -ErrorAction SilentlyContinue
+   if(-not $owner -or -not $owner.CommandLine.Contains((Join-Path $RepoRoot "src\server.mjs"))){throw "Port 8787 is owned by a process not identified as this Fun Industrial checkout. Refusing to connect to or stop it."}
+  }
+  Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/shutdown" -Method Post -ContentType "application/json" -Body "{}" -TimeoutSec 10 | Out-Null
+  Start-Sleep -Seconds 2
  }
+ $serverLog=Join-Path $ReportDir "platform-server-$Stamp.log"
+ Start-Process -FilePath $Node -ArgumentList (Join-Path $RepoRoot "src\server.mjs") -WorkingDirectory $RepoRoot -RedirectStandardOutput $serverLog -RedirectStandardError ($serverLog+".err") -WindowStyle Hidden
+ Start-Sleep -Seconds 3
  try{
   $status=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/status" -TimeoutSec 5
+  if($status.application -ne "Fun Industrial Platform"){throw "Port 8787 did not return the expected Fun Industrial application identity."}
   Add-Result "Platform API" "PASS" ("Lifecycle="+$status.lifecycle)
-  $activated=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/activate" -Method Post -ContentType "application/json" -Body "{}" -TimeoutSec 45
-  foreach($service in $activated.results){$state=if($service.state -in @("running","connected","observed")){"PASS"}elseif($service.state -eq "disabled"){"WARN"}else{"WARN"};Add-Result ("Service "+$service.name) $state $service.detail}
+  $activated=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/activate" -Method Post -ContentType "application/json" -Body "{}" -TimeoutSec 180
+  foreach($service in $activated.results){$state=if($service.state -in @("running","connected","observed","ready")){"PASS"}elseif($service.state -eq "disabled"){"WARN"}else{"WARN"};Add-Result ("Service "+$service.name) $state $service.detail}
  }catch{Add-Result "Platform activation" "FAIL" $_.Exception.Message;throw "Local platform activation did not complete."}
+ Save-InstallManifest
  $Results.final_state=if(($Results.steps|Where-Object{$_.state -eq "FAIL"}).Count -gt 0){"FAILED"}elseif(($Results.steps|Where-Object{$_.state -eq "WARN"}).Count -gt 0){"READY_WITH_ACTIONS_REQUIRED"}else{"READY"}
  $Results.finished_at=(Get-Date).ToString("o")
  $Results|ConvertTo-Json -Depth 8|Set-Content -Encoding UTF8 $Report
@@ -136,10 +194,12 @@ COMPUTE_PORT=8790
  Write-Host "ACTIVATION REPORT: $Report" -ForegroundColor Cyan
  Start-Process "http://127.0.0.1:8787"
  Write-Host "The platform has been activated; review service states in the dashboard and the JSON report." -ForegroundColor Green
+ $global:LASTEXITCODE=0
 }catch{
  Add-Result "Activation run" "FAIL" $_.Exception.Message
  $Results.final_state="FAILED";$Results.finished_at=(Get-Date).ToString("o")
  $Results|ConvertTo-Json -Depth 8|Set-Content -Encoding UTF8 $Report
  Write-Host "Activation stopped safely. Report: $Report" -ForegroundColor Red
- exit 1
+ $global:LASTEXITCODE=1
+ return
 }
