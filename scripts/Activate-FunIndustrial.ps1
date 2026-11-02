@@ -46,7 +46,8 @@ try {
  if($LASTEXITCODE -ne 0){throw "CPU PyTorch installation failed."}
  & $pythonExe -m pytest (Join-Path $RepoRoot "compute_service\test_compute.py") -q
  if($LASTEXITCODE -ne 0){throw "Graph/tensor/neural tests failed."}
- Add-Result "Compute engine" "PASS" "Python dependencies installed in isolated .venv; tests passed."
+ & $pythonExe -m pip freeze --all | Set-Content -Encoding UTF8 (Join-Path $ReportDir "compute-environment-$Stamp.txt")
+ Add-Result "Compute engine" "PASS" "Python direct dependencies installed in isolated .venv; tests passed. Resolved environment recorded."
  Push-Location $RepoRoot
  try {
   & $Npm install --ignore-scripts
