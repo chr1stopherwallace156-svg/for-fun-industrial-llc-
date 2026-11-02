@@ -10,6 +10,8 @@ test("defaults are loopback and integrations disabled",()=>{
  assert.equal(config.rea.enabled,false);
  assert.equal(config.netbird.enabled,false);
  assert.equal(config.netbird.autoConnect,false);
+ assert.equal(config.compute.enabled,false);
+ assert.equal(config.compute.port,8790);
 });
 test("rejects wildcard binding",()=>assert.throws(()=>loadConfig({HOST:"0.0.0.0"}),/loopback-only/));
 test("rejects invalid port values",()=>assert.throws(()=>loadConfig({PORT:"70000"}),/valid TCP port/));
