@@ -40,7 +40,8 @@ export function createGatewayServer(config,{readFileImpl=readFile,clock=()=>Date
   const host=(req.headers.host||"").toLowerCase();
   if(host!==config.publicHost){res.writeHead(421,{"cache-control":"no-store"});return res.end("Unexpected Host");}
   const origin=req.headers.origin;
-  if(origin&&origin!==config.origin){res.writeHead(403,{"cache-control":"no-store"});return res.end("Origin rejected");}
+  if((origin&&origin!==config.origin)||(!["GET","HEAD","OPTIONS"].includes(req.method)&&origin!==config.origin)){res.writeHead(403,{"cache-control":"no-store"});return res.end("Origin rejected");}
+  if(!req.url||!req.url.startsWith("/")||req.url.startsWith("//")||req.url.includes(String.fromCharCode(92))){res.writeHead(400,{"cache-control":"no-store"});return res.end("Invalid request target");}
   if(!["GET","HEAD","POST","PUT","PATCH","DELETE","OPTIONS"].includes(req.method)){res.writeHead(405,{"allow":"GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS"});return res.end("Method not allowed");}
   const headers={...req.headers,host:"127.0.0.1:"+config.backendPort};
   delete headers.authorization;delete headers.origin;delete headers.cookie;
