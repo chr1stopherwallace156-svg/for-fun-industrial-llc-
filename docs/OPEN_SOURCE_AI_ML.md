@@ -16,7 +16,7 @@ Exact cosine similarity is the correctness baseline. The topology output is an e
 
 ## Multi-universe option C
 
-Each universe has its own vector dimension/index, neural-state namespace, and memory inbox. Transfer is denied until an explicit directed bridge is created. Reverse transfer requires a second bridge. No implicit weight sharing, index sharing, or cross-space distance comparison exists. This is a local reference/control plane, not a distributed autonomous neural fabric.
+Each universe has its own vector dimension/index, neural-state namespace, memory inbox, and independently trained in-memory PyTorch model. Per-universe neural training and prediction are exposed under /universes/{id}/neural/train and /universes/{id}/neural/predict. Transfer is denied until an explicit directed bridge is created. Reverse transfer requires a second bridge. No implicit weight sharing, index sharing, or cross-space distance comparison exists. This is a local reference/control plane, not a distributed autonomous neural fabric.
 
 ## API
 
