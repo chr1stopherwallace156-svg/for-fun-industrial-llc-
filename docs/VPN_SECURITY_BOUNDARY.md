@@ -20,15 +20,15 @@ NetBird's exit-node Auto Apply is a convenience, not an immutable enforcement co
 ## Required operator checks
 
 1. Enroll the computer in the intended NetBird network using the official client.
-2. Configure a trusted routing peer as an exit node and assign only the intended device group.
-3. Verify NetBird reports the peer connected and advertises 0.0.0.0/0.
-4. Check the public IPv4 egress address against the expected exit-node location.
-5. Check IPv6 egress separately. Confirm it is routed through the tunnel or demonstrably blocked; do not assume IPv4 routing proves IPv6 safety.
-6. Check DNS behavior and DNS leak behavior.
-7. Disconnect NetBird deliberately. Confirm REA is stopped/blocked and the dashboard reports VPN gate blocked.
-8. Confirm the host firewall kill-switch behavior separately, if installed. Verify no direct egress is possible and that the rollback/recovery procedure works.
-9. Reconnect NetBird and confirm REA starts only after the exit route is again present.
-10. Preserve timestamped logs, command outputs, route state, test destination, observed egress IP, DNS result, IPv6 result, and firewall policy hash.
+2. Configure a trusted, preferably isolated routing peer as an exit node and assign only the intended device group. Ensure the required source-group-to-routing-peer access policy (including ICMP) is present.
+3. Configure a NetBird nameserver with match domain ALL so DNS follows the exit-node path. Restrict the exit node's access to internal LANs (for example, Block LAN access or a dedicated isolated network segment). The default route can otherwise reach networks available to the routing peer.\n4. Verify NetBird reports the peer connected and advertises 0.0.0.0/0.
+5. Check the public IPv4 egress address against the expected exit-node location.
+6. Check IPv6 egress separately. Confirm it is routed through the tunnel or demonstrably blocked; do not assume IPv4 routing proves IPv6 safety.
+7. Check DNS behavior and DNS leak behavior.
+8. Disconnect NetBird deliberately. Confirm REA is stopped/blocked and the dashboard reports VPN gate blocked.
+9. Confirm the host firewall kill-switch behavior separately, if installed. Verify no direct egress is possible and that the rollback/recovery procedure works.
+10. Reconnect NetBird and confirm REA starts only after the exit route is again present.
+11. Preserve timestamped logs, command outputs, route state, test destination, observed egress IP, DNS result, IPv6 result, and firewall policy hash.
 
 ## Release state
 
