@@ -57,7 +57,7 @@ try {
  & $pythonExe -m pip install torch==2.7.0 --extra-index-url https://download.pytorch.org/whl/cpu
  if($LASTEXITCODE -ne 0){throw "CPU PyTorch installation failed."}
  & $pythonExe -m pytest (Join-Path $RepoRoot "compute_service\test_compute.py") (Join-Path $RepoRoot "ai_ml\test_ai_ml.py") -q
- if($LASTEXITCODE -ne 0){throw "Compute and AI/ML tests failed."}
+ if($LASTEXITCODE -ne 0){throw "Compute, AI/ML, and defensive malware static-analysis tests failed."}
  & $pythonExe -m pip freeze --all | Set-Content -Encoding UTF8 (Join-Path $ReportDir "compute-environment-$Stamp.txt")
  Add-Result "Compute engine" "PASS" "Python direct dependencies installed in isolated .venv; tests passed. Resolved environment recorded."
  Push-Location $RepoRoot
