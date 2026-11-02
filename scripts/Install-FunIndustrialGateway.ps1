@@ -31,6 +31,28 @@ $pwdPtr=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($GatewayPassword)
 try{$plain=[Runtime.InteropServices.Marshal]::PtrToStringBSTR($pwdPtr)}finally{[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pwdPtr)}
 if($plain -notmatch "^[A-Za-z0-9_-]{24,}$"){throw "Gateway password must be at least 24 URL-safe alphanumeric, underscore, or hyphen characters so .env parsing is unambiguous."}
 if($GatewayPort -ne 8443){throw "This qualified profile reserves gateway TCP port 8443; use the default port."}
+$taskName="Fun Industrial Independent Supervisor"
+if(Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue){Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue;Start-Sleep -Seconds 2}
+$serverPath=(Join-Path $root "src\server.mjs")
+$gatewayPath=(Join-Path $root "src\gateway.mjs")
+$supervisorPath=(Join-Path $root "src\supervisor.mjs")
+$dashboardListeners=Get-NetTCPConnection -State Listen -LocalPort 8787 -ErrorAction SilentlyContinue
+foreach($entry in $dashboardListeners){
+ $owner=Get-CimInstance Win32_Process -Filter ("ProcessId="+$entry.OwningProcess) -ErrorAction SilentlyContinue
+ if(-not $owner -or -not $owner.CommandLine.Contains($serverPath)){throw "Port 8787 is owned by a process not proven to be this Fun Industrial checkout. No process was stopped."}
+ try{Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/shutdown" -Method Post -ContentType "application/json" -Body "{}" -TimeoutSec 8|Out-Null}catch{}
+ Start-Sleep -Seconds 2
+ $still=Get-CimInstance Win32_Process -Filter ("ProcessId="+$entry.OwningProcess) -ErrorAction SilentlyContinue
+ if($still -and $still.CommandLine.Contains($serverPath)){Stop-Process -Id $still.ProcessId -Force}
+}
+foreach($portToCheck in @(8443)){
+ foreach($entry in (Get-NetTCPConnection -State Listen -LocalPort $portToCheck -ErrorAction SilentlyContinue)){
+  $owner=Get-CimInstance Win32_Process -Filter ("ProcessId="+$entry.OwningProcess) -ErrorAction SilentlyContinue
+  if(-not $owner -or -not $owner.CommandLine.Contains($gatewayPath)){throw "Gateway port $portToCheck is occupied by a process not proven to be this Fun Industrial checkout. Refusing to stop it."}
+  Stop-Process -Id $owner.ProcessId -Force
+ }
+}
+Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -and $_.CommandLine.Contains($supervisorPath)}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}
 $envPath=Join-Path $root ".env"
 if(-not(Test-Path $envPath)){throw "Run base activation first; expected .env missing."}
 $lines=[System.Collections.Generic.List[string]]::new();Get-Content $envPath|ForEach-Object{$lines.Add($_)}
