@@ -20,7 +20,7 @@ test("platform blocks every functional service until NetBird advertises the requ
 test("platform exposes only exact allowlisted REA tools and stops all services when VPN is lost",async()=>{
  const f=fixtures();f.setRoute(true);await f.platform.start();
  assert.deepEqual((await f.platform.reaTools()).map(x=>x.name),["safe_read"]);
- await assert.rejects(()=>f.platform.callReaTool("unsafe_write",{}),/not explicitly allowlisted/);
+ await assert.rejects(()=>f.platform.callReaTool("unsafe_write",{}),/not among the first 14 explicitly allowlisted names/);
  await f.platform.callReaTool("safe_read",{path:"fixture"});
  assert.equal(f.counts().calls,1);
  f.setRoute(false);const status=await f.platform.status();
