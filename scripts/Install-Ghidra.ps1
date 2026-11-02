@@ -53,7 +53,7 @@ try{
  Write-Host "INSTALL_EVIDENCE=$report"
  $global:LASTEXITCODE=0
 }catch{
- Write-Error $_.Exception.Message
+ Write-Host $_.Exception.Message -ForegroundColor Red
  Write-Host "GHIDRA_INSTALL=FAILED"
  exit 1
 }
