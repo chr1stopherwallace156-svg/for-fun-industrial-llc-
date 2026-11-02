@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node src/server.mjs",
     "test": "node --test",
-    "check": "node --check src/server.mjs && node --check src/platform.mjs && node --check src/config.mjs && node --check src/adapters/ai.mjs && node --check src/adapters/compute.mjs && node --check src/adapters/netbird.mjs && node --check src/adapters/rea.mjs"
+    "check": "node --check src/server.mjs && node --check src/platform.mjs && node --check src/platform-tools.mjs && node --check src/config.mjs && node --check src/adapters/ai.mjs && node --check src/adapters/compute.mjs && node --check src/adapters/netbird.mjs && node --check src/adapters/rea.mjs"
   },
   "license": "Apache-2.0"
 }
