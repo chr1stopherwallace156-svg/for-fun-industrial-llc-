@@ -16,11 +16,11 @@ Run from the cloned repository root in PowerShell. Keep the repository on the fe
 Set-ExecutionPolicy -Scope Process RemoteSigned -Force; .\scripts\Activate-FunIndustrial.ps1; if ($LASTEXITCODE -ne 0) { throw 'Activation failed; stop here and preserve the report.' }; .\scripts\Qualify-FunIndustrial.ps1 -GhidraRoot 'D:\Tools\ghidra_12.2_PUBLIC'
 ~~~
 
-If Ghidra has not yet been installed, omit both -GhidraRoot and -GhidraArchivePath arguments. The report will state PASS_WITH_ACTIONS_REQUIRED; it will not claim decompilation is qualified. Do not chain onward after activation fails. Preserve the failure report and logs before any repair attempt.
+To receive a full Ghidra integrity PASS, provide both -GhidraRoot and -GhidraArchivePath; the latter must be the official 12.2 release ZIP whose SHA-256 matches the published digest. If Ghidra has not yet been installed, omit both arguments. The report will state PASS_WITH_ACTIONS_REQUIRED; it will not claim decompilation is qualified. Do not chain onward after activation fails. Preserve the failure report and logs before any repair attempt.
 
 ## Expected result
 
-- QUALIFICATION_FINAL=PASS only when all scripted stages pass and Ghidra is found.
+- QUALIFICATION_FINAL=PASS only when all scripted stages pass, Ghidra is found, and the supplied archive digest matches.
 - QUALIFICATION_FINAL=PASS_WITH_ACTIONS_REQUIRED when tests pass but an optional prerequisite such as Ghidra is missing or the branch is not the expected feature branch.
 - QUALIFICATION_FINAL=FAILED for a failed test, dependency issue, missing required environment, or other blocking error.
 - A timestamped reports/qualification-*.json records each stage and explicitly states that real malware-sample qualification was not performed.
