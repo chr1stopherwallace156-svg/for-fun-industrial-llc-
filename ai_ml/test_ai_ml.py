@@ -25,3 +25,12 @@ def test_api_bridge_default_deny():
 def test_llama_adapter_refuses_missing_assets():
  from ai_ml.llama_runtime import LlamaCppRuntime
  with pytest.raises(FileNotFoundError):LlamaCppRuntime().start("no-bin","no-model")
+
+def test_neural_models_train_independently_per_universe():
+ r=MultiUniverseRegistry(); r.create("net-a",2); r.create("net-b",2)
+ x=[[0.,0.],[0.,1.],[1.,0.],[1.,1.]]; y=[[0.],[1.],[1.],[2.]]
+ trained=r.train_neural("net-a",x,y,hidden_size=8,epochs=20)
+ assert trained["state"]=="trained-in-memory" and r.describe("net-a")["neural_model_trained"] is True
+ assert r.describe("net-b")["neural_model_trained"] is False
+ assert len(r.predict_neural("net-a",[[0.5,0.5]])["predictions"])==1
+ with pytest.raises(ValueError):r.predict_neural("net-b",[[0.5,0.5]])
