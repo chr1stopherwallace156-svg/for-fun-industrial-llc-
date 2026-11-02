@@ -36,7 +36,8 @@ const computeRoutes={"/api/compute/graph":"/graph/analyze","/api/compute/tensor"
 const aiRoutes={"/api/ai/status":{path:"/ai/runtime/llama-cpp",method:"GET"},"/api/ai/start":{path:"/ai/runtime/llama-cpp/start",method:"POST"},"/api/ai/stop":{path:"/ai/runtime/llama-cpp/stop",method:"POST"},"/api/ai/chat":{path:"/ai/chat",method:"POST"}};
 const server=http.createServer(async(req,res)=>{try{
  if(req.method==="GET"&&req.url==="/"){res.writeHead(200,{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'","x-content-type-options":"nosniff","referrer-policy":"no-referrer"});return res.end(page);}
- if(req.method==="GET"&&req.url==="/api/status")return json(res,200,await platform.status());\n if(req.method==="GET"&&req.url==="/api/ai/status"){if(!localRequest(req,res))return;const state=await platform.status();if(state.vpn_policy.required&&state.vpn_policy.state!=="connected")return json(res,200,{state:"blocked",detail:state.vpn_policy.detail});return proxyCompute(req,res,"/ai/runtime/llama-cpp","GET");}
+ if(req.method==="GET"&&req.url==="/api/status")return json(res,200,await platform.status());
+ if(req.method==="GET"&&req.url==="/api/ai/status"){if(!localRequest(req,res))return;const state=await platform.status();if(state.vpn_policy.required&&state.vpn_policy.state!=="connected")return json(res,200,{state:"blocked",detail:state.vpn_policy.detail});return proxyCompute(req,res,"/ai/runtime/llama-cpp","GET");}
  if(req.method==="GET"&&req.url==="/api/ai/tools"){
   if(!localRequest(req,res))return;
   let reaTools=[],reaError=null;
