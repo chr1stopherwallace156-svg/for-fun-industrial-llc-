@@ -4,12 +4,14 @@ import {loadConfig} from "../src/config.mjs";
 import {createPlatform} from "../src/platform.mjs";
 import {createNetbirdAdapter} from "../src/adapters/netbird.mjs";
 
-test("defaults are loopback and integrations disabled",()=>{
+test("defaults are loopback and VPN-gated integrations fail closed",()=>{
  const config=loadConfig({});
  assert.equal(config.host,"127.0.0.1");
+ assert.equal(config.vpnRequired,true);
+ assert.equal(config.vpnRequireExitNode,true);
  assert.equal(config.rea.enabled,false);
- assert.equal(config.netbird.enabled,false);
- assert.equal(config.netbird.autoConnect,false);
+ assert.equal(config.netbird.enabled,true);
+ assert.equal(config.netbird.autoConnect,true);
  assert.equal(config.compute.enabled,false);
  assert.equal(config.compute.port,8790);
 });
