@@ -12,6 +12,7 @@ export function createReaAdapter(config){
    try{send({jsonrpc:"2.0",id,method,params});}catch(e){clearTimeout(timer);pending.delete(id);reject(e);}
   });
  }
+ async function listTools(){const collected=[];let cursor;for(let page=0;page<16;page++){const params=cursor?{cursor}:{};const listing=await request("tools/list",params,30000);const pageTools=Array.isArray(listing.tools)?listing.tools:[];collected.push(...pageTools);if(collected.length>256)throw new Error("REA tool catalogue exceeds the 256-tool safety limit");cursor=listing.nextCursor;if(!cursor)return collected;}throw new Error("REA tools/list pagination exceeded 16 pages");}
  async function start(){
   if(!config.enabled)return {state:"disabled",detail:"REA integration disabled by configuration."};
   if(child&&child.exitCode===null&&tools.length)return {state:"ready",detail:"REA MCP initialized; "+tools.length+" tools discovered."};
@@ -34,14 +35,13 @@ export function createReaAdapter(config){
    const initialized=await request("initialize",{protocolVersion:"2025-11-25",capabilities:{},clientInfo:{name:"fun-industrial",version:"0.3.0"}},30000);
    serverInfo=initialized.serverInfo||null;
    send({jsonrpc:"2.0",method:"notifications/initialized",params:{}});
-   const listing=await request("tools/list",{},30000);
-   tools=Array.isArray(listing.tools)?listing.tools:[];
+   tools=await listTools();
    return {state:"ready",detail:"MCP initialize/initialized and tools/list completed.",server:serverInfo,tool_count:tools.length};
   }catch(error){await stop();return {state:"failed",detail:error.message,stderr:stderr.slice(-2000)};}
  }
  async function stop(){
   if(reader){reader.close();reader=null;}
-  if(child&&child.exitCode===null){child.kill();await Promise.race([new Promise(resolve=>child.once("exit",resolve)),wait(3000)]);}
+  if(child&&child.exitCode===null){const current=child;if(process.platform==="win32"){const killer=spawn("taskkill.exe",["/PID",String(current.pid),"/T","/F"],{shell:false,windowsHide:true,stdio:"ignore"});await Promise.race([new Promise(resolve=>killer.once("exit",resolve)),wait(5000)]);}else{current.kill("SIGTERM");}await Promise.race([new Promise(resolve=>current.once("exit",resolve)),wait(5000)]);if(current.exitCode===null)current.kill("SIGKILL");}
   child=null;tools=[];pending.clear();return {state:"stopped",detail:"REA MCP process stopped."};
  }
  async function health(){
