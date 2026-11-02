@@ -19,7 +19,6 @@ export function createGatewayConfig(env=process.env){
 }
 export function createGatewayServer(config,{readFileImpl=readFile,clock=()=>Date.now()}={}){
  const failures=new Map();
- const server=https.createServer({key:undefined,cert:undefined},()=>{});
  const authDigest=createHash("sha256").update(config.username+":"+config.password).digest();
  const tlsReady=Promise.all([readFileImpl(config.keyPath),readFileImpl(config.certPath)]);
  const handler=async(req,res)=>{
@@ -63,6 +62,7 @@ export function createGatewayServer(config,{readFileImpl=readFile,clock=()=>Date
 }
 if(import.meta.url===new URL(process.argv[1]||"", "file:").href){
  try{
+  try{process.loadEnvFile(new URL("../.env",import.meta.url));}catch(error){if(error.code!=="ENOENT")throw error;}
   const config=createGatewayConfig();
   const server=await createGatewayServer(config);
   server.listen(config.port,config.bindIp,()=>console.log("FUN_INDUSTRIAL_GATEWAY_LISTENING=https://"+config.publicHost+" BIND="+config.bindIp+":"+config.port));
