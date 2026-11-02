@@ -14,7 +14,7 @@ Standalone integration, compute, and open-source AI/ML platform for Fun Industri
 
 ## AI/ML layer
 
-See [open-source AI/ML architecture](docs/OPEN_SOURCE_AI_ML.md), [multi-universe design](docs/MULTI_UNIVERSE_DESIGN.md), [qualification plan](docs/OPEN_SOURCE_AI_ML_TEST_PLAN.md), [Windows qualification](docs/WINDOWS_QUALIFICATION.md), and [defensive malware static analysis](docs/MALWARE_STATIC_ANALYSIS.md).
+See [open-source AI/ML architecture](docs/OPEN_SOURCE_AI_ML.md), [multi-universe design](docs/MULTI_UNIVERSE_DESIGN.md), [qualification plan](docs/OPEN_SOURCE_AI_ML_TEST_PLAN.md), [Windows qualification](docs/WINDOWS_QUALIFICATION.md), and [defensive malware static analysis](docs/MALWARE_STATIC_ANALYSIS.md), and [evidence-first qualification doctrine](docs/EVIDENCE_AND_QUALIFICATION.md).
 
 Option C means each universe owns an independent neural-state namespace and a separate vector embedding space/index. Cross-universe memory transfer is denied unless an explicit directed bridge is configured. The current vector search is exact cosine, not HNSW. Neural models train independently per universe on CPU. llama.cpp starts only when the operator supplies a local executable and GGUF model; no weights are downloaded by the app or CI. Model licenses are reviewed separately.
 
