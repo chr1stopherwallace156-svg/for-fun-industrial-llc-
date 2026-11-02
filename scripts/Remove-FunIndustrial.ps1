@@ -50,7 +50,7 @@ if($RemoveOwnedPrerequisites){
     if($installManifest.($package.flag) -eq $true){
      if($package.id -eq "Netbird.NetBird"){
       $nb=Get-Command "netbird.exe" -ErrorAction SilentlyContinue
-      if($nb){& $nb.Source down}
+      if($nb -and $PSCmdlet.ShouldProcess("NetBird VPN","Disconnect project-owned NetBird before uninstall")){& $nb.Source down}
      }
      if($PSCmdlet.ShouldProcess($package.name,"Uninstall only because the Fun Industrial ownership manifest records it as installed by this project")){
       & $winget.Source uninstall --id $package.id --exact --silent --accept-source-agreements
