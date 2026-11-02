@@ -1,0 +1,8 @@
+Fun Industrial Platform
+Copyright 2026 Fun Industrial LLC
+
+Original Fun Industrial source code in this repository is licensed under the Apache License, Version 2.0. A copy of the license is provided in LICENSE.
+
+Third-party components remain under their respective licenses. See THIRD_PARTY_NOTICES.md and the individual upstream distributions for required notices. Optional Ghidra integration invokes an independently installed National Security Agency Ghidra distribution; Ghidra is not vendored or redistributed here. llama.cpp and model weights are also not vendored or redistributed here. Model-weight licenses are separate from runtime licenses.
+
+No endorsement by the National Security Agency, Apache Software Foundation, or any upstream project is implied.
