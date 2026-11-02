@@ -1,11 +1,13 @@
 from __future__ import annotations
 import math
+import asyncio
+import os
 from typing import List, Tuple
 import networkx as nx
 import numpy as np
 import quimb.tensor as qtn
 import torch
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 
 torch.set_num_threads(1)
@@ -74,5 +76,13 @@ def predict(request: PredictRequest):
     with torch.inference_mode(): result=_model(torch.from_numpy(x)).cpu().numpy()
     return {"predictions":result.tolist(),"device":"cpu"}
 
-from ai_ml.api import router as ai_ml_router
+from ai_ml.api import router as ai_ml_router, llama
 app.include_router(ai_ml_router,prefix="/ai")
+async def _shutdown_process():
+    await asyncio.sleep(0.4)
+    os._exit(0)
+@app.post("/admin/shutdown")
+def shutdown_compute(background_tasks: BackgroundTasks):
+    llama.stop()
+    background_tasks.add_task(_shutdown_process)
+    return {"state":"shutting-down","llama_cpp":"stopped"}
