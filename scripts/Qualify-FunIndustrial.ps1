@@ -20,7 +20,7 @@ function Run([string]$Name,[scriptblock]$Command){
 try{
  if($env:OS -ne "Windows_NT"){throw "This qualification script is Windows-only."}
  $branch=(& git -C $RepoRoot branch --show-current).Trim()
- Record "Git branch" $(if($branch -eq "feature/open-source-ai-multi-universe-v1"){"PASS"}else{"WARN"}) "Current branch: $branch"
+ Record "Git branch" $(if($branch -match "^(main|integration/.+|feature/.+)$"){"PASS"}else{"WARN"}) "Current branch: $branch"
  Run "Git whitespace validation" { git -C $RepoRoot diff --check }
  $python=Join-Path $RepoRoot ".venv\Scripts\python.exe"
  if(-not(Test-Path $python)){throw "Python environment missing. Run Activate-FunIndustrial.ps1 first."}
