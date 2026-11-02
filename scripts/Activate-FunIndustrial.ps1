@@ -43,7 +43,7 @@ try {
  if([version]($nodeVersion.TrimStart("v")) -lt [version]"22.23.4"){throw "Node.js 22.23.4 or newer required; found $nodeVersion"}
  Add-Result "Prerequisites" "PASS" "Git and Node $nodeVersion found."
  $branch=(& $Git -C $RepoRoot branch --show-current).Trim()
- if($branch -ne "feature/open-source-ai-multi-universe-v1"){Add-Result "Git branch" "WARN" "Running from $branch; expected feature/open-source-ai-multi-universe-v1. No branch switch performed."}else{Add-Result "Git branch" "PASS" $branch}
+ if($branch -notmatch "^(main|integration/.+|feature/.+)$"){Add-Result "Git branch" "WARN" "Running from $branch; expected main, integration/*, or feature/*. No branch switch performed."}else{Add-Result "Git branch" "PASS" $branch}
  $venv=Join-Path $RepoRoot ".venv"
  $pythonExe=Join-Path $venv "Scripts\python.exe"
  if(-not(Test-Path $pythonExe)){
