@@ -13,6 +13,8 @@ class Search(BaseModel): query:list[float]; k:int=Field(default=5,ge=1,le=100)
 class Bridge(BaseModel): source:str; target:str
 class Transfer(BaseModel): source:str; target:str; memory:dict
 class State(BaseModel): universe_id:str; key:str; values:list[float]
+class NeuralTrain(BaseModel): features:list[list[float]]=Field(min_length=2,max_length=512); targets:list[list[float]]=Field(min_length=2,max_length=512); hidden_size:int=Field(default=16,ge=1,le=128); epochs:int=Field(default=100,ge=1,le=500); learning_rate:float=Field(default=0.03,gt=0,le=0.2)
+class NeuralPredict(BaseModel): features:list[list[float]]=Field(min_length=1,max_length=512)
 def call(fn,*a,**kw):
     try:return fn(*a,**kw)
     except PermissionError as e:raise HTTPException(403,str(e)) from e
@@ -47,5 +49,9 @@ def bridge(r:Bridge):return call(registry.add_bridge,r.source,r.target)
 def transfer(r:Transfer):return call(registry.transfer_memory,r.source,r.target,r.memory)
 @router.put("/universes/neural-state")
 def neural_state(r:State):return call(registry.set_neural_state,r.universe_id,r.key,r.values)
+@router.post("/universes/{universe_id}/neural/train")
+def neural_train(universe_id,r:NeuralTrain):return call(registry.train_neural,universe_id,r.features,r.targets,r.hidden_size,r.epochs,r.learning_rate)
+@router.post("/universes/{universe_id}/neural/predict")
+def neural_predict(universe_id,r:NeuralPredict):return call(registry.predict_neural,universe_id,r.features)
 @router.get("/runtime/llama-cpp")
 def status():return llama.status()
