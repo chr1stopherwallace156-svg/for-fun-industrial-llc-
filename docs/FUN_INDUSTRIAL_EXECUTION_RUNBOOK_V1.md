@@ -1,9 +1,9 @@
 # Fun Industrial — Host Activation and Six-Stage Qualification Runbook (v1)
 
 **Status:** execution runbook; host preflight, Stage 2 dependency installation and first qualification attempt recorded 2026-11-02.
-**Current source HEAD:** `7165d91a23d537c9390e18505c5040eef1c0c589`.  
+**Current source HEAD at latest runbook update:** `226343f7cace084119f7dba7013cce9e02b9d5b6` (the subsequent test-alignment commit is recorded in Git history).  
 **Repository:** `feature/open-source-ai-multi-universe-v1`  
-**Reported host HEAD:** `67d0a0d2b068e58480036dd9ba8f0900914c8b2f`  
+**Reported host HEAD:** `226343f7cace084119f7dba7013cce9e02b9d5b6` (before the test-alignment commit)  
 **Windows clone:** `C:\\Users\\alxar\\FunIndustrial`  
 **NetBird Windows peer:** `100.109.4.20` (`oxytalkin.netbird.cloud`)  
 **NetBird iPhone peer:** `100.109.87.100` (confirmed in prior operator testing)  
@@ -41,6 +41,8 @@ Set-Location C:\Users\alxar\FunIndustrial; $ErrorActionPreference='Stop'; Set-Ex
 The two Skip switches are intentional: NetBird 0.82.0 is already installed and authenticated on this host. This avoids rerunning SSO or a package installation. It does **not** bypass the app's VPN/exit-node policy. Startup does not invoke `netbird up`; if the required exit-node route is absent, all functional services remain blocked until the operator explicitly connects/configures the approved route.
 
 **Observed first attempt (2026-11-02 09:00):** source update to `56fd15720a199274ea139a4054f606ebf6aba06c` passed. Node `v26.13.0`, Python `3.12.10`, Python dependency installation, CPU-only PyTorch `2.7.0+cpu`, and Python tests passed (`22 passed`, one Starlette/httpx deprecation warning). Node syntax checks passed. Initial Node suite reported 11 passed / 4 failed; activation stopped before REA installation, `.env` creation, server startup, or service activation. Report: `reports\\windows-activation-20261102-090025.json`.
+
+**Second Node regression run (2026-11-02):** syntax checks passed; 15/16 tests passed. The remaining explicit-connect test expected `up` to be the first command, but the adapter now performs a read-only `status -d` preflight before `up` and a second status verification afterward. This was a mock expectation mismatch; no live NetBird command was run by the test. The test assertion was aligned to `[status -d, up, status -d]`. Activation remains blocked until the full suite passes.
 
 **Repair qualification changes committed after that attempt:** stale tests were aligned with the current VPN fail-closed defaults and exact REA allowlist error; disabled-integration fixtures now disable every integration explicitly; the NetBird connect test now begins disconnected. Platform lifecycle reports `idle` when no integration is enabled. A new test asserts that NetBird startup only reads status and never issues `up`. Platform activation no longer attempts a VPN connection automatically. These changes preserve the VPN/exit-node gate and do not disable it.
 
