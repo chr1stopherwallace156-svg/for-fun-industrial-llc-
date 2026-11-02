@@ -22,9 +22,11 @@ if($AllowedClientIPv4.Count -lt 1 -or $AllowedClientIPv4 -contains "*"){throw "A
 foreach($client in $AllowedClientIPv4){if($client -notmatch "^(?:\d{1,3}\.){3}\d{1,3}$" -or $client.StartsWith("127.")){throw "Invalid client IPv4: $client"}}
 if($GatewayPort -lt 1 -or $GatewayPort -gt 65535){throw "Invalid gateway port."}
 if(-not(Test-Path -LiteralPath $TlsKeyPath) -or -not(Test-Path -LiteralPath $TlsCertPath)){throw "TLS key/certificate files must exist. No host changes made."}
-$cert=New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($TlsCertPath)
-if($cert.NotAfter -le (Get-Date) -or $cert.NotBefore -gt (Get-Date)){throw "TLS certificate is not currently valid."}
-if($cert.Subject -notmatch [regex]::Escape($PublicHost.Split(":")[0]) -and $cert.GetNameInfo([Security.Cryptography.X509Certificates.X509NameType]::DnsName,$false) -ne $PublicHost.Split(":")[0]){throw "Certificate identity does not match the configured public hostname; inspect SAN manually before retrying."}
+$node=(Get-Command node.exe).Source
+$certHost=$PublicHost.Split(":")[0]
+$validationCode='const fs=require("node:fs");const tls=require("node:tls");const {X509Certificate}=require("node:crypto");const cert=new X509Certificate(fs.readFileSync(process.argv[1]));tls.createSecureContext({key:fs.readFileSync(process.argv[2]),cert:fs.readFileSync(process.argv[1])});if(!cert.checkHost(process.argv[3]))process.exit(21);if(Date.parse(cert.validTo)<Date.now()||Date.parse(cert.validFrom)>Date.now())process.exit(22);'
+& $node -e $validationCode $TlsCertPath $TlsKeyPath $certHost
+if($LASTEXITCODE -ne 0){throw "TLS certificate/key mismatch, invalid date, or SAN does not match the public host. No firewall/task changes made."}
 $pwdPtr=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($GatewayPassword)
 try{$plain=[Runtime.InteropServices.Marshal]::PtrToStringBSTR($pwdPtr)}finally{[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pwdPtr)}
 if($plain -notmatch "^[A-Za-z0-9_-]{24,}$"){throw "Gateway password must be at least 24 URL-safe alphanumeric, underscore, or hyphen characters so .env parsing is unambiguous."}
@@ -38,7 +40,6 @@ foreach($key in $values.Keys){$found=$false;for($i=0;$i -lt $lines.Count;$i++){i
 $acl=Get-Acl $envPath;$acl.SetAccessRuleProtection($true,$false);$identity=[Security.Principal.WindowsIdentity]::GetCurrent().Name
 $acl.Access|ForEach-Object{$acl.RemoveAccessRule($_)|Out-Null}
 $rule=New-Object Security.AccessControl.FileSystemAccessRule($identity,"FullControl","Allow");$acl.SetAccessRule($rule);Set-Acl -Path $envPath -AclObject $acl
-$node=(Get-Command node.exe).Source
 $firewallName="FunIndustrial-Gateway-$GatewayPort"
 $existing=Get-NetFirewallRule -Name $firewallName -ErrorAction SilentlyContinue
 if($existing){Remove-NetFirewallRule -Name $firewallName}
