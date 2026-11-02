@@ -1,7 +1,7 @@
 name: Compute validation
 on:
   push:
-    branches: ["main", "integration/**", "feature/**"]
+    branches: ["main", "integration/**", "feature/**", "successor/**"]
   pull_request:
     branches: ["main", "integration/**"]
 permissions:
