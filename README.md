@@ -20,7 +20,7 @@ Option C means each universe owns an independent neural-state namespace and a se
 
 ## Windows deployment
 
-Clone the feature branch while PR #2 is under review; run scripts/Install-Ghidra.ps1 (optional static-analysis tool), scripts/Activate-FunIndustrial.ps1, then scripts/Qualify-FunIndustrial.ps1 in sequence. Configure llama.cpp and the local GGUF model using scripts/Configure-LocalModel.ps1. Full instructions: docs/WINDOWS_QUALIFICATION.md and docs/WINDOWS_ACTIVATION.md. Activation creates an isolated Python environment, installs pinned dependencies and CPU-only PyTorch, installs REA 6.8.0 privately, installs/checks NetBird, runs tests, and starts the enabled services. The VPN must have a connected exit-node route before REA starts.
+Clone the feature branch while PR #2 is under review. Run scripts/Install-Ghidra.ps1, scripts/Activate-FunIndustrial.ps1, install a verified Windows CPU llama.cpp archive with scripts/Install-LlamaCpp.ps1, download the pinned Qwen model with scripts/Download-QwenModel.ps1, configure it with scripts/Configure-LocalModel.ps1, rerun activation, then run scripts/Qualify-FunIndustrial.ps1. Configure selected REA tools with scripts/Set-REAAllowlist.ps1. Full instructions: docs/WINDOWS_QUALIFICATION.md and docs/WINDOWS_ACTIVATION.md. Activation creates an isolated Python environment, installs pinned dependencies and CPU-only PyTorch, installs REA 6.8.0 privately, installs/checks NetBird, runs tests, and starts the enabled services. The VPN must have a connected exit-node route before REA starts.
 
 ## Security and limitations
 
