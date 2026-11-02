@@ -45,6 +45,13 @@ test("NetBird VPN connect and disconnect use explicit CLI commands",async()=>{
  assert.deepEqual(calls[2],["down"]);
 });
 
+test("NetBird startup observes status without issuing an up command",async()=>{
+ const calls=[];
+ const adapter=createNetbirdAdapter({enabled:true,autoConnect:true,command:"netbird"},async(command,args)=>{calls.push(args);return {ok:true,stdout:"Daemon status: Disconnected"};});
+ assert.equal((await adapter.start()).state,"disconnected");
+ assert.deepEqual(calls,[["status","-d"]]);
+});
+
 test("NetBird status parser recognizes a disconnected daemon",async()=>{
  const adapter=createNetbirdAdapter({enabled:true,autoConnect:false,command:"netbird"},async()=>({ok:true,stdout:"Daemon status: Disconnected"}));
  assert.equal((await adapter.health()).state,"disconnected");
