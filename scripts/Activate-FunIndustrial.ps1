@@ -101,6 +101,8 @@ LLAMA_CPP_SERVER=
 LLAMA_CPP_MODEL=
 LLAMA_CPP_THREADS=4
 LLAMA_CPP_CONTEXT=2048
+AI_ENABLED=true
+AI_AUTOSTART=true
 "@ | Set-Content -Encoding UTF8 $envFile
   Add-Result "Configuration" "PASS" "Created loopback-only .env. REA remains disabled until installed and enabled."
  }else{
@@ -111,7 +113,7 @@ LLAMA_CPP_CONTEXT=2048
   if($oldReaCommand -eq "REA_COMMAND=rea"){(Get-Content $envFile) -replace "^REA_COMMAND=rea$","REA_COMMAND=$Node" | Set-Content -Encoding UTF8 $envFile}
   $oldReaArgs=Get-Content $envFile | Where-Object { $_ -match "^REA_ARGS=" } | Select-Object -Last 1
   if($oldReaArgs -eq "REA_ARGS=mcp"){(Get-Content $envFile) -replace "^REA_ARGS=mcp$","REA_ARGS=$reaEntry,mcp" | Set-Content -Encoding UTF8 $envFile}
-  $required = @("COMPUTE_ENABLED=true","COMPUTE_COMMAND=$pythonExe","COMPUTE_PORT=8790","NETBIRD_ENABLED=true","VPN_REQUIRED=true","VPN_REQUIRE_EXIT_NODE=true","REA_ENABLED=true","REA_REQUIRES_VPN=true","REA_COMMAND=$Node","REA_ARGS=$reaEntry,mcp","REA_ALLOWED_TOOLS=","FUN_INDUSTRIAL_RUNTIME=$(Join-Path $RepoRoot '.runtime')","LLAMA_CPP_SERVER=","LLAMA_CPP_MODEL=","LLAMA_CPP_THREADS=4","LLAMA_CPP_CONTEXT=2048")
+  $required = @("COMPUTE_ENABLED=true","COMPUTE_COMMAND=$pythonExe","COMPUTE_PORT=8790","NETBIRD_ENABLED=true","VPN_REQUIRED=true","VPN_REQUIRE_EXIT_NODE=true","REA_ENABLED=true","REA_REQUIRES_VPN=true","REA_COMMAND=$Node","REA_ARGS=$reaEntry,mcp","REA_ALLOWED_TOOLS=","FUN_INDUSTRIAL_RUNTIME=$(Join-Path $RepoRoot '.runtime')","LLAMA_CPP_SERVER=","LLAMA_CPP_MODEL=","LLAMA_CPP_THREADS=4","LLAMA_CPP_CONTEXT=2048","AI_ENABLED=true","AI_AUTOSTART=true")
   foreach($line in $required){$key=$line.Split("=")[0];if($existing -notmatch ("(?m)^"+[regex]::Escape($key)+"=")){Add-Content -Encoding UTF8 $envFile $line}}
   Add-Result "Configuration" "PASS" "Existing .env preserved; missing compute, VPN, REA and local AI settings appended without overwriting existing values."
  }
@@ -148,7 +150,7 @@ LLAMA_CPP_CONTEXT=2048
  try{
   $status=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/status" -TimeoutSec 5
   Add-Result "Platform API" "PASS" ("Lifecycle="+$status.lifecycle)
-  $activated=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/activate" -Method Post -ContentType "application/json" -Body "{}" -TimeoutSec 45
+  $activated=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/activate" -Method Post -ContentType "application/json" -Body "{}" -TimeoutSec 180
   foreach($service in $activated.results){$state=if($service.state -in @("running","connected","observed","ready")){"PASS"}elseif($service.state -eq "disabled"){"WARN"}else{"WARN"};Add-Result ("Service "+$service.name) $state $service.detail}
  }catch{Add-Result "Platform activation" "FAIL" $_.Exception.Message;throw "Local platform activation did not complete."}
  $Results.final_state=if(($Results.steps|Where-Object{$_.state -eq "FAIL"}).Count -gt 0){"FAILED"}elseif(($Results.steps|Where-Object{$_.state -eq "WARN"}).Count -gt 0){"READY_WITH_ACTIONS_REQUIRED"}else{"READY"}
