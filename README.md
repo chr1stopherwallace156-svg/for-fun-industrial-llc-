@@ -9,11 +9,12 @@ Standalone integration, compute, and open-source AI/ML platform for Fun Industri
 - REA CLI/MCP adapter (MCP handshake qualification remains pending).
 - Separate local compute service: NetworkX graph analytics, Quimb tensor contraction, and PyTorch CPU neural training/prediction.
 - Open-source AI/ML candidate: classic and modern Hopfield retrieval, isolated multi-universe neural/vector spaces, exact cosine vector search and kNN topology, and optional llama.cpp local inference adapter.
+- Defensive static malware analysis: SHA-256 sample intake and opt-in Ghidra headless decompilation for authorized samples; no sample execution or malware binaries included.
 - One-pass Windows PowerShell activation, tests, and JSON report.
 
 ## AI/ML layer
 
-See [Open-source AI/ML architecture](docs/OPEN_SOURCE_AI_ML.md), [multi-universe design](docs/MULTI_UNIVERSE_DESIGN.md), and [qualification plan](docs/OPEN_SOURCE_AI_ML_TEST_PLAN.md).
+See [open-source AI/ML architecture](docs/OPEN_SOURCE_AI_ML.md), [multi-universe design](docs/MULTI_UNIVERSE_DESIGN.md), [qualification plan](docs/OPEN_SOURCE_AI_ML_TEST_PLAN.md), [Windows qualification](docs/WINDOWS_QUALIFICATION.md), and [defensive malware static analysis](docs/MALWARE_STATIC_ANALYSIS.md).
 
 Option C means each universe owns an independent neural-state namespace and a separate vector embedding space/index. Cross-universe memory transfer is denied unless an explicit directed bridge is configured. The current vector search is exact cosine, not HNSW. Neural models train independently per universe on CPU. llama.cpp starts only when the operator supplies a local executable and GGUF model; no weights are downloaded by the app or CI. Model licenses are reviewed separately.
 
