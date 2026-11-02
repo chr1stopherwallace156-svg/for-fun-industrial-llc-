@@ -1,0 +1,74 @@
+[CmdletBinding(SupportsShouldProcess=$true)]
+param([switch]$DeleteRepository,[switch]$RemoveGhidra,[switch]$RemoveOwnedPrerequisites)
+$ErrorActionPreference="Stop"
+$RepoRoot=(Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$port=8787
+$manifestPath=Join-Path $RepoRoot ".runtime\install-manifest.json"
+$installManifest=$null
+if(Test-Path $manifestPath){try{$installManifest=Get-Content $manifestPath -Raw|ConvertFrom-Json}catch{Write-Warning "Install ownership manifest could not be parsed; system prerequisites will not be removed."}}
+if($PSCmdlet.ShouldProcess("http://127.0.0.1:$port","Stop Fun Industrial services and local controller")){
+ try{
+  $response=Invoke-RestMethod -Uri "http://127.0.0.1:$port/api/shutdown" -Method Post -ContentType "application/json" -Body "{}" -TimeoutSec 8
+  Write-Host "PLATFORM_SHUTDOWN=PASS"
+ }catch{
+  $listeners=Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue
+  foreach($listener in $listeners){
+   $process=Get-CimInstance Win32_Process -Filter ("ProcessId="+$listener.OwningProcess) -ErrorAction SilentlyContinue
+   if($process -and $process.CommandLine -like "*$RepoRoot*src\server.mjs*"){
+    if($PSCmdlet.ShouldProcess("Fun Industrial server PID $($process.ProcessId)","Stop exact repository-owned process")){Stop-Process -Id $process.ProcessId -Force}
+   }else{throw "Port $port is occupied by a process not proven to belong to this repository. Refusing to stop it."}
+  }
+ } 
+}
+Start-Sleep -Seconds 2
+$venvPrefix=(Join-Path $RepoRoot ".venv").TrimEnd([char]92)+[char]92
+$runtimePrefix=(Join-Path $RepoRoot ".runtime").TrimEnd([char]92)+[char]92
+$owned=Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+ ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($venvPrefix,[System.StringComparison]::OrdinalIgnoreCase) -and $_.CommandLine -and $_.CommandLine.Contains("compute_service.app:app")) -or
+ ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($runtimePrefix,[System.StringComparison]::OrdinalIgnoreCase)) -or
+ ($_.CommandLine -and $_.CommandLine.Contains((Join-Path $RepoRoot ".runtime\rea"))) -or
+ ($_.CommandLine -and $_.CommandLine.Contains((Join-Path $RepoRoot "src\server.mjs")))
+}
+foreach($process in $owned){if($PSCmdlet.ShouldProcess("Fun Industrial owned runtime PID $($process.ProcessId)","Stop exact repository-private process")){Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue}}
+$targets=@((Join-Path $RepoRoot ".venv"),(Join-Path $RepoRoot ".runtime"),(Join-Path $RepoRoot "node_modules"),(Join-Path $RepoRoot "reports"),(Join-Path $RepoRoot ".pytest_cache"))
+foreach($target in $targets){if(Test-Path -LiteralPath $target){if($PSCmdlet.ShouldProcess($target,"Remove Fun Industrial private runtime data")){Remove-Item -LiteralPath $target -Recurse -Force}}}
+$envFile=Join-Path $RepoRoot ".env"
+if(Test-Path $envFile){if($PSCmdlet.ShouldProcess($envFile,"Remove Fun Industrial local configuration and model paths")){Remove-Item -LiteralPath $envFile -Force}}
+Get-ChildItem -LiteralPath $RepoRoot -Directory -Recurse -Filter "__pycache__" -ErrorAction SilentlyContinue | ForEach-Object {if($PSCmdlet.ShouldProcess($_.FullName,"Remove Python cache")){Remove-Item -LiteralPath $_.FullName -Recurse -Force}}
+if($RemoveOwnedPrerequisites){
+ if(-not $installManifest){Write-Warning "No valid ownership manifest; no system-wide packages will be uninstalled."}
+ else{
+  $winget=Get-Command "winget.exe" -ErrorAction SilentlyContinue
+  if(-not $winget){Write-Warning "winget unavailable; owned system prerequisites were left installed."}
+  else{
+   $packages=@(
+    @{flag="netbird_installed_by_funindustrial";id="Netbird.NetBird";name="NetBird"},
+    @{flag="node_installed_by_funindustrial";id="OpenJS.NodeJS.LTS";name="Node.js LTS"},
+    @{flag="python312_installed_by_funindustrial";id="Python.Python.3.12";name="Python 3.12"},
+    @{flag="git_installed_by_funindustrial";id="Git.Git";name="Git for Windows"},
+    @{flag="jdk_installed_by_funindustrial";id="EclipseAdoptium.Temurin.25.JDK";name="Eclipse Temurin JDK 25"}
+   )
+   foreach($package in $packages){
+    if($installManifest.($package.flag) -eq $true){
+     if($package.id -eq "Netbird.NetBird"){
+      $nb=Get-Command "netbird.exe" -ErrorAction SilentlyContinue
+      if($nb -and $PSCmdlet.ShouldProcess("NetBird VPN","Disconnect project-owned NetBird before uninstall")){& $nb.Source down}
+     }
+     if($PSCmdlet.ShouldProcess($package.name,"Uninstall only because the Fun Industrial ownership manifest records it as installed by this project")){
+      & $winget.Source uninstall --id $package.id --exact --silent --accept-source-agreements
+      if($LASTEXITCODE -eq 0){Write-Host ("OWNED_PREREQUISITE_REMOVED="+$package.name)}else{Write-Warning ("Could not uninstall "+$package.name+"; WinGet exit code "+$LASTEXITCODE)}
+     }
+    }
+   }
+  }
+ }
+}
+if($RemoveGhidra){
+ $ghidra=Join-Path $env:LOCALAPPDATA "FunIndustrial\tools"
+ if(Test-Path $ghidra){if($PSCmdlet.ShouldProcess($ghidra,"Remove Fun Industrial Ghidra installation")){Remove-Item -LiteralPath $ghidra -Recurse -Force}}
+}
+Write-Host "FUN_INDUSTRIAL_PRIVATE_RUNTIME_REMOVAL=PASS"
+Write-Host "System-wide prerequisites are left installed by default. Use -RemoveOwnedPrerequisites to uninstall only packages recorded as installed by this Fun Industrial setup."
+Write-Host "No Elektron files, processes, services, or configuration were accessed."
+if($DeleteRepository){if($PSCmdlet.ShouldProcess($RepoRoot,"Delete entire Fun Industrial repository clone")){Remove-Item -LiteralPath $RepoRoot -Recurse -Force;Write-Host "FUN_INDUSTRIAL_REPOSITORY_DELETED=PASS"}}
+else{Write-Host "Repository source retained at $RepoRoot. Use -DeleteRepository to remove the entire clone."}

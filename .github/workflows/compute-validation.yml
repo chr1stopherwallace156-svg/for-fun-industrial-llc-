@@ -1,9 +1,9 @@
 name: Compute validation
 on:
   push:
-    branches: ["main", "integration/**"]
+    branches: ["main", "integration/**", "feature/**"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "integration/**"]
 permissions:
   contents: read
 jobs:
@@ -25,5 +25,5 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-compute.txt
           python -m pip install torch==2.7.0 --extra-index-url https://download.pytorch.org/whl/cpu
-      - name: Run compute tests
-        run: python -m pytest compute_service/test_compute.py -q
+      - name: Run compute, AI/ML and defensive static-analysis tests
+        run: python -m pytest compute_service/test_compute.py ai_ml/test_ai_ml.py malware_analysis/test_static_analysis.py -q
