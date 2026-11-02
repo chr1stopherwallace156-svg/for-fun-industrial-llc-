@@ -176,6 +176,7 @@ AI_AUTOSTART=true
   $activated=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/activate" -Method Post -ContentType "application/json" -Body "{}" -TimeoutSec 180
   foreach($service in $activated.results){$state=if($service.state -in @("running","connected","observed","ready")){"PASS"}elseif($service.state -eq "disabled"){"WARN"}else{"WARN"};Add-Result ("Service "+$service.name) $state $service.detail}
  }catch{Add-Result "Platform activation" "FAIL" $_.Exception.Message;throw "Local platform activation did not complete."}
+ Save-InstallManifest
  $Results.final_state=if(($Results.steps|Where-Object{$_.state -eq "FAIL"}).Count -gt 0){"FAILED"}elseif(($Results.steps|Where-Object{$_.state -eq "WARN"}).Count -gt 0){"READY_WITH_ACTIONS_REQUIRED"}else{"READY"}
  $Results.finished_at=(Get-Date).ToString("o")
  $Results|ConvertTo-Json -Depth 8|Set-Content -Encoding UTF8 $Report
