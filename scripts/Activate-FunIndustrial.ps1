@@ -8,6 +8,19 @@ New-Item -ItemType Directory -Force -Path $ReportDir | Out-Null
 $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $Report = Join-Path $ReportDir "windows-activation-$Stamp.json"
 $Results = [ordered]@{started_at=(Get-Date).ToString("o");repository=$RepoRoot;steps=@();final_state="RUNNING"}
+$RuntimeRoot=Join-Path $RepoRoot ".runtime"
+New-Item -ItemType Directory -Force -Path $RuntimeRoot | Out-Null
+$Ownership=[ordered]@{git_installed_by_funindustrial=$false;node_installed_by_funindustrial=$false;python312_installed_by_funindustrial=$false;netbird_installed_by_funindustrial=$false}
+function Save-InstallManifest {
+ $manifestPath=Join-Path $RuntimeRoot "install-manifest.json"
+ $manifest=[ordered]@{}
+ if(Test-Path $manifestPath){$prior=Get-Content $manifestPath -Raw|ConvertFrom-Json;foreach($property in $prior.PSObject.Properties){$manifest[$property.Name]=$property.Value}}
+ foreach($key in $Ownership.Keys){if($Ownership[$key]){$manifest[$key]=$true}elseif(-not $manifest.Contains($key)){$manifest[$key]=$false}}
+ $manifest["repository_root"]=$RepoRoot
+ $manifest["updated_at"]=(Get-Date).ToString("o")
+ $manifest|ConvertTo-Json -Depth 6|Set-Content -Encoding UTF8 $manifestPath
+}
+
 function Add-Result([string]$Name,[string]$State,[string]$Detail) {
  $Results.steps += [ordered]@{name=$Name;state=$State;detail=$Detail}
  $color=if($State -eq "PASS"){"Green"}elseif($State -eq "WARN"){"Yellow"}else{"Red"}
@@ -22,14 +35,14 @@ try {
  if($env:OS -ne "Windows_NT"){throw "Run this script on Windows."}
  $winget=Get-Command "winget.exe" -ErrorAction SilentlyContinue
  if(-not $winget){throw "winget is required for one-pass prerequisite installation. Install Microsoft App Installer, then rerun."}
- if(-not (Get-Command "git.exe" -ErrorAction SilentlyContinue)){& $winget.Source install --id Git.Git --exact --accept-package-agreements --accept-source-agreements;if($LASTEXITCODE -ne 0){throw "Git installation failed."}}
- if(-not (Get-Command "node.exe" -ErrorAction SilentlyContinue)){& $winget.Source install --id OpenJS.NodeJS.LTS --exact --accept-package-agreements --accept-source-agreements;if($LASTEXITCODE -ne 0){throw "Node.js LTS installation failed."}}
+ if(-not (Get-Command "git.exe" -ErrorAction SilentlyContinue)){& $winget.Source install --id Git.Git --exact --accept-package-agreements --accept-source-agreements;if($LASTEXITCODE -ne 0){throw "Git installation failed."};$Ownership.git_installed_by_funindustrial=$true;Save-InstallManifest}
+ if(-not (Get-Command "node.exe" -ErrorAction SilentlyContinue)){& $winget.Source install --id OpenJS.NodeJS.LTS --exact --accept-package-agreements --accept-source-agreements;if($LASTEXITCODE -ne 0){throw "Node.js LTS installation failed."};$Ownership.node_installed_by_funindustrial=$true;Save-InstallManifest}
  $pyLauncher=Get-Command "py.exe" -ErrorAction SilentlyContinue
  $pythonCommand=Get-Command "python.exe" -ErrorAction SilentlyContinue
  $pythonReady=$false
  if($pyLauncher){& $pyLauncher.Source -3.12 --version *> $null;$pythonReady=($LASTEXITCODE -eq 0)}
  elseif($pythonCommand){$pv=(& $pythonCommand.Source --version 2>&1 | Out-String).Trim();$pythonReady=($pv -match "^Python 3\.12\.")}
- if(-not $pythonReady){& $winget.Source install --id Python.Python.3.12 --exact --accept-package-agreements --accept-source-agreements;if($LASTEXITCODE -ne 0){throw "Python 3.12 installation failed."}}
+ if(-not $pythonReady){& $winget.Source install --id Python.Python.3.12 --exact --accept-package-agreements --accept-source-agreements;if($LASTEXITCODE -ne 0){throw "Python 3.12 installation failed."};$Ownership.python312_installed_by_funindustrial=$true;Save-InstallManifest}
  $env:Path=[Environment]::GetEnvironmentVariable("Path","Machine")+";"+[Environment]::GetEnvironmentVariable("Path","User")
  $Git=Require-Command "git.exe" "Install Git for Windows."
  $Node=Require-Command "node.exe" "Install Node.js LTS."
