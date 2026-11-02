@@ -4,7 +4,7 @@ import {createComputeAdapter} from "./adapters/compute.mjs";
 export function createPlatform(config){
  const vpn=createNetbirdAdapter(config.netbird),compute=createComputeAdapter(config.compute),rea=createReaAdapter(config.rea);
  let started=false,lastAction="idle",lastVpnGate="not-checked",gateDetail="VPN has not yet been checked.";
- async function vpnConnected(){const state=await vpn.health();const ok=state.state==="connected";lastVpnGate=ok?"connected":"blocked";gateDetail=state.detail;return ok;}
+ async function vpnConnected(){const state=await vpn.health();const ok=state.state==="connected"&&(!config.vpnRequireExitNode||state.exitNodeRoute===true);lastVpnGate=ok?"connected":"blocked";gateDetail=ok?state.detail:(state.state==="connected"&&config.vpnRequireExitNode?"NetBird is connected but its IPv4 default route (0.0.0.0/0) is missing. Configure an approved exit node.":state.detail);return ok;}
  return {
   async start(){
    const results=[];
@@ -33,14 +33,15 @@ export function createPlatform(config){
   async callReaTool(name,args){if(config.vpnRequired&&!await vpnConnected())throw new Error("VPN is not connected; REA tools are blocked.");if(!config.rea.allowedTools.includes(name))throw new Error("REA tool is not explicitly allowlisted in REA_ALLOWED_TOOLS.");return rea.callTool(name,args);},
   async status(){
    const services=await Promise.all([vpn.health(),compute.health(),rea.health()]);
-   const secure=services[0].state==="connected";lastVpnGate=secure?"connected":"blocked";gateDetail=services[0].detail;
+   const secure=services[0].state==="connected"&&(!config.vpnRequireExitNode||services[0].exitNodeRoute===true);lastVpnGate=secure?"connected":"blocked";gateDetail=secure?services[0].detail:(services[0].state==="connected"&&config.vpnRequireExitNode?"NetBird connected but no IPv4 default exit-node route was detected.":services[0].detail);
+   if(!secure&&services[0].state==="connected")services[0]={...services[0],state:"blocked",detail:gateDetail};
    if(config.vpnRequired&&!secure&&services[2].state==="ready"){await rea.stop();services[2]={state:"blocked",detail:"VPN disconnected; REA MCP stopped by fail-closed policy."};}
    if(config.vpnRequired&&!secure&&config.rea.enabled&&services[2].state==="stopped")services[2]={state:"blocked",detail:"VPN_REQUIRED is enabled; REA MCP unavailable while VPN is disconnected."};
    const definitions=[{id:"netbird",name:"NetBird VPN"},{id:"compute",name:"Graph / Tensor / Neural Compute"},{id:"rea",name:"REA MCP"}];
    const mapped=services.map((service,i)=>({...definitions[i],...service}));
    const enabled=mapped.filter(s=>s.state!=="disabled"),healthy=enabled.length>0&&enabled.every(s=>["running","observed","connected","ready"].includes(s.state));
    const lifecycle=!started?"stopped":healthy?"ready":"degraded";
-   return {application:"Fun Industrial Platform",version:"0.3.0",lifecycle,lastAction,services:mapped,vpn_policy:{required:config.vpnRequired,state:lastVpnGate,detail:gateDetail,rea_blocked_without_vpn:config.vpnRequired},safety:{localOnly:true,reaRequiresVpn:config.vpnRequired,shellExecution:false,customCryptography:false}};
+   return {application:"Fun Industrial Platform",version:"0.3.0",lifecycle,lastAction,services:mapped,vpn_policy:{required:config.vpnRequired,require_exit_node:config.vpnRequireExitNode,state:lastVpnGate,detail:gateDetail,rea_blocked_without_vpn:config.vpnRequired},safety:{localOnly:true,reaRequiresVpn:config.vpnRequired,shellExecution:false,customCryptography:false}};
   }
  };
 }
