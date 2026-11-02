@@ -4,6 +4,7 @@ import {fileURLToPath} from "node:url";
 import path from "node:path";
 import {loadConfig} from "./config.mjs";
 import {createPlatform} from "./platform.mjs";
+import {openAiToolDefinitions,getPlatformTool} from "./platform-tools.mjs";
 const root=path.dirname(fileURLToPath(import.meta.url));
 try{process.loadEnvFile(path.join(root,"../.env"));}catch(error){if(error.code!=="ENOENT")throw error;}
 const config=loadConfig({...process.env,APP_ROOT:path.resolve(root,"..")});
@@ -31,6 +32,30 @@ const aiRoutes={"/api/ai/status":{path:"/ai/runtime/llama-cpp",method:"GET"},"/a
 const server=http.createServer(async(req,res)=>{try{
  if(req.method==="GET"&&req.url==="/"){res.writeHead(200,{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'","x-content-type-options":"nosniff","referrer-policy":"no-referrer"});return res.end(page);}
  if(req.method==="GET"&&req.url==="/api/status")return json(res,200,await platform.status());
+ if(req.method==="GET"&&req.url==="/api/ai/tools"){
+  if(!localRequest(req,res))return;
+  let reaTools=[],reaError=null;
+  try{reaTools=await platform.reaTools();}catch(error){reaError=error.message;}
+  return json(res,200,{tools:openAiToolDefinitions(reaTools),local_tool_count:openAiToolDefinitions([]).length,rea_tool_count:reaTools.length,rea_error:reaError});
+ }
+ if(req.method==="POST"&&req.url==="/api/ai/tool-call"){
+  if(!localRequest(req,res))return;
+  const body=await readBody(req,1000000);
+  if(typeof body.name!=="string"||body.name.length>128)return json(res,400,{error:"invalid tool name"});
+  try{
+   if(body.name.startsWith("rea__"))return json(res,200,await platform.callReaTool(body.name.slice(5),body.arguments||{}));
+   const tool=getPlatformTool(body.name);if(!tool)return json(res,403,{error:"tool is not in the fixed Fun Industrial tool registry"});
+   const args={...(body.arguments||{})};let pathName=tool.path||tool.pathTemplate;
+   if(tool.pathTemplate){if(typeof args.universe_id!=="string"||!args.universe_id.length)throw new Error("universe_id is required");pathName=tool.pathTemplate.replace("{universe_id}",encodeURIComponent(args.universe_id));if(!["fi_universe_neural_state_set"].includes(tool.name))delete args.universe_id;}
+   const method=tool.method||"POST";
+   if(method==="GET"){const query=new URLSearchParams();if(args.neighbours!==undefined)query.set("neighbours",String(args.neighbours));if(query.size)pathName+="?"+query.toString();}
+   const response=await fetch("http://127.0.0.1:"+config.compute.port+pathName,{method,headers:method==="GET"?{}:{"content-type":"application/json"},body:method==="GET"?undefined:JSON.stringify(args),signal:AbortSignal.timeout(180000)});
+   const raw=await response.text();let result;try{result=JSON.parse(raw)}catch{result={raw:raw.slice(0,12000)}}
+   if(!response.ok)return json(res,response.status,{error:result.detail||result.error||"platform tool failed",detail:result});
+   return json(res,200,{tool:body.name,result});
+  }catch(error){return json(res,403,{error:error.message});}
+ }
+
  if(req.method==="GET"&&req.url==="/api/rea/catalog"){if(!localRequest(req,res))return;try{return json(res,200,{tools:await platform.reaCatalog()});}catch(e){return json(res,403,{error:e.message});}}
  if(req.method==="GET"&&req.url==="/api/rea/tools"){if(!localRequest(req,res))return;try{return json(res,200,{tools:await platform.reaTools()});}catch(e){return json(res,403,{error:e.message});}}
  if(req.method==="POST"&&req.url==="/api/rea/call"){if(!localRequest(req,res))return;const body=await readBody(req,65536);if(typeof body.name!=="string"||body.name.length>128)return json(res,400,{error:"invalid tool name"});try{return json(res,200,await platform.callReaTool(body.name,body.arguments||{}));}catch(e){return json(res,403,{error:e.message});}}
