@@ -20,6 +20,7 @@ try{
   Write-Host "Installing Eclipse Temurin JDK 25 through the official WinGet package ID..." -ForegroundColor Cyan
   & $winget.Source install --id EclipseAdoptium.Temurin.25.JDK --exact --accept-package-agreements --accept-source-agreements
   if($LASTEXITCODE -ne 0){throw "Eclipse Temurin JDK 25 installation failed with exit code $LASTEXITCODE."}
+  $jdkInstalledByFunIndustrial=$true
   if(Test-Path "C:\Program Files\Eclipse Adoptium"){$jdkDirs=Get-ChildItem "C:\Program Files\Eclipse Adoptium" -Directory -Filter "jdk-25*" -ErrorAction SilentlyContinue}
  }
  if(-not $jdkDirs){throw "JDK 25 installation directory not found under C:\Program Files\Eclipse Adoptium."}
