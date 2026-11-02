@@ -27,7 +27,7 @@
 - [x] PyTorch CPU neural-network training and prediction API.
 - [x] Neural training loss history and dashboard chart.
 - [x] Bounded inputs and compute service tests.
-- [x] GitHub-hosted compute tests on Linux and Windows.
+- [ ] GitHub-hosted compute tests on Linux and Windows (workflow queued; await completed evidence).
 - [ ] Benchmark representative real workloads and memory ceilings.
 - [ ] Add explicit model/dataset versioning before persistent storage.
 
