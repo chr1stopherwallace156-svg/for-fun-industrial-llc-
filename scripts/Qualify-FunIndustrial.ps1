@@ -58,8 +58,8 @@ try{
  $localTools=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/ai/tools" -TimeoutSec 10
  if($localTools.local_tool_count -lt 15){throw "Built-in AI tool registry is incomplete."}
  Record "AI tool registry" "PASS" ("Local tools="+$localTools.local_tool_count+"; allowlisted REA tools="+$localTools.rea_tool_count)
- $graphArgs=@{nodes=@("a","b","c");edges=@(@("a","b"),@("b","c"))}
- $graphTest=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/ai/tool-call" -Method Post -ContentType "application/json" -Body (@{name="fi_graph_analyze";arguments=$graphArgs}|ConvertTo-Json -Depth 8) -TimeoutSec 20
+ $graphBody='{"name":"fi_graph_analyze","arguments":{"nodes":["a","b","c"],"edges":[["a","b"],["b","c"]]}}'
+ $graphTest=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/ai/tool-call" -Method Post -ContentType "application/json" -Body $graphBody -TimeoutSec 20
  if(-not $graphTest.result){throw "Built-in graph tool integration returned no result."}
  Record "Built-in tool dispatch" "PASS" "Graph analysis completed through the same approval-gated tool gateway used by AI chat."
  $vpnService=$platform.services|Where-Object{$_.id -eq "netbird"}|Select-Object -First 1
