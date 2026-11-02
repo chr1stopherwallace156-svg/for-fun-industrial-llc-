@@ -51,7 +51,7 @@ try{
  $repoRoot=(Resolve-Path (Join-Path $PSScriptRoot "..")).Path
  $manifestPath=Join-Path $repoRoot ".runtime\install-manifest.json"
  $manifest=[ordered]@{}
- if(Test-Path $manifestPath){$prior=Get-Content $manifestPath -Raw|ConvertFrom-Json;foreach($property in $prior.PSObject.Properties){$manifest[$property.Name]=$property.Value}}
+ if(Test-Path $manifestPath){$prior=Get-Content $manifestPath -Raw|ConvertFrom-Json;foreach($property in $prior.PSObject.Properties){$manifest[$property.Name]=$property.Value};if($prior.jdk_installed_by_funindustrial -eq $true){$jdkInstalledByFunIndustrial=$true}}
  $manifest["jdk_installed_by_funindustrial"]=$jdkInstalledByFunIndustrial
  $manifest["ghidra_installed_by_funindustrial"]=$true
  $manifest["ghidra_version"]="12.2"
