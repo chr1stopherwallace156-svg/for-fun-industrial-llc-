@@ -25,7 +25,9 @@ $venvPrefix=(Join-Path $RepoRoot ".venv").TrimEnd("\")+"\"
 $runtimePrefix=(Join-Path $RepoRoot ".runtime").TrimEnd("\")+"\" 
 $owned=Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
  ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($venvPrefix,[System.StringComparison]::OrdinalIgnoreCase) -and $_.CommandLine.Contains("compute_service.app:app")) -or
- ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($runtimePrefix,[System.StringComparison]::OrdinalIgnoreCase))
+ ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($runtimePrefix,[System.StringComparison]::OrdinalIgnoreCase)) -or
+ ($_.CommandLine -and $_.CommandLine.Contains((Join-Path $RepoRoot ".runtime\rea"))) -or
+ ($_.CommandLine -and $_.CommandLine.Contains((Join-Path $RepoRoot "src\server.mjs")))
 }
 foreach($process in $owned){if($PSCmdlet.ShouldProcess("Fun Industrial owned runtime PID $($process.ProcessId)","Stop exact repository-private process")){Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue}}
 $targets=@((Join-Path $RepoRoot ".venv"),(Join-Path $RepoRoot ".runtime"),(Join-Path $RepoRoot "node_modules"),(Join-Path $RepoRoot "reports"),(Join-Path $RepoRoot ".pytest_cache"))
