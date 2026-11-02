@@ -8,4 +8,5 @@ reports/
 __pycache__/
 .pytest_cache/
 *.pyc
-\n.runtime/\n
+
+.runtime/
