@@ -16,7 +16,10 @@ This project integrates independently maintained software and does not vendor up
 | llama.cpp | Operator-provided build; not pinned or bundled | MIT upstream project; model weights have separate licenses | Optional local LLM runtime adapter |
 | FAISS | Not installed | MIT | Future optional vector index adapter; not used in this release |
 | Qdrant | Not installed | Apache-2.0 | Future optional vector database adapter; not used in this release |
+| Ghidra | 12.2 optional external installation; not bundled | Apache-2.0 upstream distribution; verify bundled component notices | Headless static reverse-engineering/decompilation adapter |
 
-Upstream sources: https://github.com/morluto/rea ; https://github.com/netbirdio/netbird ; https://github.com/networkx/networkx ; https://github.com/jcmgray/quimb ; https://github.com/pytorch/pytorch ; https://github.com/fastapi/fastapi ; https://github.com/encode/uvicorn ; https://github.com/encode/httpx ; https://github.com/pytest-dev/pytest ; https://github.com/ggml-org/llama.cpp ; https://github.com/facebookresearch/faiss ; https://github.com/qdrant/qdrant .
+Upstream sources: https://github.com/morluto/rea ; https://github.com/netbirdio/netbird ; https://github.com/networkx/networkx ; https://github.com/jcmgray/quimb ; https://github.com/pytorch/pytorch ; https://github.com/fastapi/fastapi ; https://github.com/encode/uvicorn ; https://github.com/encode/httpx ; https://github.com/pytest-dev/pytest ; https://github.com/ggml-org/llama.cpp ; https://github.com/facebookresearch/faiss ; https://github.com/qdrant/qdrant ; https://github.com/NationalSecurityAgency/ghidra .
+
+Fun Industrial original code is licensed under Apache-2.0; see LICENSE and NOTICE. Ghidra remains an independently installed upstream tool and is not redistributed by this repository.
 
 This inventory is preliminary, not a complete transitive dependency audit or legal opinion. Before release, capture exact resolved versions, checksums, provenance, license texts, and notices in a release-specific SBOM. GGUF weights must be reviewed separately from llama.cpp code.
