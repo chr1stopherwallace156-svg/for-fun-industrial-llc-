@@ -13,7 +13,7 @@ if(Test-Path -LiteralPath $target){
  $size=(Get-Item -LiteralPath $target).Length
  $sha=(Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant()
  if($size -eq $expectedSize -and $sha -eq $expectedSha){Write-Host "QWEN_MODEL=ALREADY_VERIFIED";Write-Host "MODEL_PATH=$target"
-$global:LASTEXITCODE=0;$global:LASTEXITCODE=0;return}
+$global:LASTEXITCODE=0;return}
  throw "Existing model file does not match pinned size/SHA-256. It was not overwritten."
 }
 $temp=$target+".partial"
@@ -32,3 +32,4 @@ Write-Host "MODEL_SIZE=$size"
 Write-Host "MODEL_SHA256=$sha"
 Write-Host "MODEL_LICENSE=Apache-2.0"
 Write-Host "MODEL_PATH=$target"
+$global:LASTEXITCODE=0
