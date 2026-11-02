@@ -31,7 +31,7 @@ class LlamaCppRuntime:
         if self._health():raise RuntimeError("another llama.cpp server already owns the configured port")
         log_dir=Path(os.environ.get("FUN_INDUSTRIAL_RUNTIME",Path.cwd()/".runtime"))/"logs"; log_dir.mkdir(parents=True,exist_ok=True)
         self.log_handle=(log_dir/"llama-server.log").open("a",encoding="utf-8")
-        args=[str(binary),"--model",str(model),"--host","127.0.0.1","--port",str(port),"--threads",str(threads),"--ctx-size",str(context),"--n-gpu-layers","0","--jinja"]
+        args=([str(binary),"serve","--model",str(model),"--host","127.0.0.1","--port",str(port),"--threads",str(threads),"--ctx-size",str(context),"--n-gpu-layers","0","--jinja"] if binary.stem.lower()=="llama" else [str(binary),"--model",str(model),"--host","127.0.0.1","--port",str(port),"--threads",str(threads),"--ctx-size",str(context),"--n-gpu-layers","0","--jinja"])
         self.process=subprocess.Popen(args,stdin=subprocess.DEVNULL,stdout=self.log_handle,stderr=subprocess.STDOUT,shell=False,cwd=str(binary.parent))
         self.model_path=str(model)
         deadline=time.monotonic()+90
