@@ -32,7 +32,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Qwen model download or SHA-256 verification fa
 $llamaServer = Get-ChildItem .\.runtime\llama.cpp -Recurse -File -Filter "llama-server.exe" | Select-Object -First 1 -ExpandProperty FullName
 if (-not $llamaServer) { $llamaServer = Get-ChildItem .\.runtime\llama.cpp -Recurse -File -Filter "llama.exe" | Select-Object -First 1 -ExpandProperty FullName }
 if (-not $llamaServer) { throw 'No llama-server.exe or llama.exe found in the verified runtime archive.' }
-.\scripts\Configure-LocalModel.ps1 -LlamaServerPath $llamaServer -ModelPath "$PWD\.runtime\models\Qwen3-4B-Q4_K_M.gguf" -Threads 4 -Context 2048
+.\scripts\Configure-LocalModel.ps1 -LlamaServerPath $llamaServer -ModelPath "$PWD\.runtime\models\Qwen3-4B-Q4_K_M.gguf" -Threads 4 -Context 4096
 if ($LASTEXITCODE -ne 0) { throw 'Local model configuration failed; stop.' }
 .\scripts\Activate-FunIndustrial.ps1
 if ($LASTEXITCODE -ne 0) { throw 'Integrated activation/model startup failed; preserve reports and stop.' }
