@@ -9,6 +9,7 @@ $expectedSize=[int64]2497280256
 $expectedSha="7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5"
 New-Item -ItemType Directory -Force -Path $Destination | Out-Null
 $target=Join-Path $Destination $file
+$licensePath=Join-Path $Destination "Qwen3-MODEL-LICENSE.txt"
 if(Test-Path -LiteralPath $target){
  $size=(Get-Item -LiteralPath $target).Length
  $sha=(Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant()
