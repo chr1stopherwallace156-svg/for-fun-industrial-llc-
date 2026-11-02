@@ -1,14 +1,18 @@
 # Architecture
 
-The application is a local control plane, not a replacement for upstream tools.
+The application is a local control plane coordinating independent upstream tools.
 
-- Dashboard: static browser UI served by the local Node.js process.
-- HTTP API: status and lifecycle endpoints.
-- Coordinator: serial adapter startup and aggregated health.
-- Adapters: narrow boundaries around independently installed external executables.
+- Dashboard: browser UI served by Node.
+- HTTP API: local lifecycle, VPN, and compute proxy endpoints.
+- Coordinator: sequential startup and aggregated health reporting.
+- NetBird adapter: status/connect/disconnect interface to the separately installed client.
+- Compute adapter: starts the isolated Python service on 127.0.0.1:8790.
+- REA adapter: starts the separately installed REA CLI/MCP process when explicitly enabled.
 
-Operator -> local dashboard -> loopback HTTP API -> lifecycle coordinator -> REA adapter / NetBird adapter -> upstream tools.
+Operator -> dashboard -> loopback API -> lifecycle coordinator -> NetBird / compute / REA adapters.
 
-Startup order: query NetBird status (read-only), start REA only when explicitly enabled, then aggregate states. The application-level ready state is bounded; it is not proof of VPN security or MCP protocol readiness.
+The compute service exposes bounded graph analysis, tensor contraction, neural training and prediction. It uses NetworkX, Quimb, and PyTorch CPU. Graphs and neural training loss are rendered in the dashboard.
 
-Non-goals: implementing cryptography, replacing WireGuard, automatic enrollment, rewriting REA, remote administration, privilege elevation, or arbitrary shell execution.
+Startup sequence: check NetBird state; start compute if enabled; start REA only if explicitly enabled; aggregate health. Activate Fun Industrial runs this sequence. A degraded result is reported when an enabled service fails. NetBird first-time identity enrollment remains an operator-controlled SSO flow.
+
+Non-goals: custom cryptography, replacing WireGuard, automatic secret provisioning, modifying upstream repos, remote administration, privilege elevation, or arbitrary shell execution.
