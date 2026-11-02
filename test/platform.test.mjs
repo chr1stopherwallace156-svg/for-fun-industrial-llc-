@@ -42,7 +42,7 @@ test("NetBird VPN connect and disconnect use explicit CLI commands",async()=>{
  assert.deepEqual(calls,[["status","-d"],["up"],["status","-d"]]);
  const disconnected=await adapter.disconnect();
  assert.equal(disconnected.state,"disconnected");
- assert.deepEqual(calls[2],["down"]);
+ assert.deepEqual(calls[3],["down"]);
 });
 
 test("NetBird startup observes status without issuing an up command",async()=>{
