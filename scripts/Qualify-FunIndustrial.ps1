@@ -52,6 +52,34 @@ try{
    Record "Ghidra archive integrity" "PASS" "Official 12.2 archive SHA-256 matches."
   }else{Record "Ghidra archive integrity" "WARN" "Archive hash not supplied; installed folder presence alone does not prove release archive integrity."}
  }else{Record "Ghidra installation" "WARN" "Not supplied. Static analysis tests ran with synthetic fixtures only; install and verify Ghidra before real-sample analysis."}
+ $platform=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/status" -TimeoutSec 10
+ if($platform.application -ne "Fun Industrial Platform"){throw "Local API identity mismatch."}
+ Record "Platform control plane" "PASS" ("Lifecycle="+$platform.lifecycle+"; services="+$platform.services.Count)
+ $localTools=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/ai/tools" -TimeoutSec 10
+ if($localTools.local_tool_count -lt 15){throw "Built-in AI tool registry is incomplete."}
+ Record "AI tool registry" "PASS" ("Local tools="+$localTools.local_tool_count+"; allowlisted REA tools="+$localTools.rea_tool_count)
+ $graphArgs=@{nodes=@("a","b","c");edges=@(@("a","b"),@("b","c"))}
+ $graphTest=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/ai/tool-call" -Method Post -ContentType "application/json" -Body (@{name="fi_graph_analyze";arguments=$graphArgs}|ConvertTo-Json -Depth 8) -TimeoutSec 20
+ if(-not $graphTest.result){throw "Built-in graph tool integration returned no result."}
+ Record "Built-in tool dispatch" "PASS" "Graph analysis completed through the same approval-gated tool gateway used by AI chat."
+ $vpnService=$platform.services|Where-Object{$_.id -eq "netbird"}|Select-Object -First 1
+ if($platform.vpn_policy.required -and $platform.vpn_policy.state -ne "connected"){Record "VPN exit-node gate" "WARN" $platform.vpn_policy.detail}else{Record "VPN exit-node gate" "PASS" "Configured VPN policy satisfied or VPN requirement explicitly disabled."}
+ $reaService=$platform.services|Where-Object{$_.id -eq "rea"}|Select-Object -First 1
+ if($reaService.state -eq "ready"){
+  $reaCatalog=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/rea/catalog" -TimeoutSec 15
+  Record "REA MCP handshake and tools/list" "PASS" ("REA READY; tools discovered="+$reaCatalog.tools.Count)
+ }else{Record "REA MCP handshake and tools/list" "WARN" ("REA state="+$reaService.state+"; "+$reaService.detail)}
+ $aiService=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/ai/status" -TimeoutSec 10
+ if($aiService.state -eq "ready"){
+  $chatBody=@{messages=@(@{role="user";content="Reply with a short confirmation that local inference is operational."});max_tokens=48;temperature=0.1;tools=@()}|ConvertTo-Json -Depth 8
+  $chatResult=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/ai/chat" -Method Post -ContentType "application/json" -Body $chatBody -TimeoutSec 180
+  if(-not $chatResult.reply){throw "Local model chat returned no text."}
+  Record "Local AI inference" "PASS" ("Model="+$aiService.model_path+"; response received.")
+ }else{
+  $modelConfigured=(Get-Content (Join-Path $RepoRoot ".env") -ErrorAction SilentlyContinue | Where-Object {$_ -match "^LLAMA_CPP_(SERVER|MODEL)=" -and $_ -notmatch "=$"}).Count -ge 2
+  if($modelConfigured){Record "Local AI inference" "FAIL" ("Model configured but not ready: "+$aiService.state);throw "Configured local model failed readiness."}
+  else{Record "Local AI inference" "WARN" "Local GGUF model not configured; install/configure it before using the conversation box."}
+ }
  $gitStatus=(& git -C $RepoRoot status --short | Out-String).Trim()
  $state=if(($Stages|Where-Object{$_.state -eq "FAIL"}).Count){ "FAILED" }elseif(($Stages|Where-Object{$_.state -eq "WARN"}).Count){ "PASS_WITH_ACTIONS_REQUIRED" }else{"PASS"}
  $result=[ordered]@{document="FUN_INDUSTRIAL_WINDOWS_QUALIFICATION_V1";started_at=$script:Started;finished_at=(Get-Date).ToString("o");repository=$RepoRoot;branch=$branch;commit_sha=$headSha;python_version=(& $python --version 2>&1 | Out-String).Trim();node_version=(& node --version).Trim();final_state=$state;stages=$Stages;git_status=$gitStatus;sample_execution_performed=$false;real_malware_sample_qualification="NOT_PERFORMED"}
