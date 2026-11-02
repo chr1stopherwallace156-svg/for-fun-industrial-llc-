@@ -40,3 +40,4 @@ Write-Host "LLAMA_CPP_INSTALL=PASS"
 Write-Host "ARCHIVE_SHA256=PASS"
 Write-Host "BINARY=$($binary.FullName)"
 Write-Host "BINARY_SHA256=$($manifest.binary_sha256)"
+$global:LASTEXITCODE=0
