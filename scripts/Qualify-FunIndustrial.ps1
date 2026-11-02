@@ -40,6 +40,10 @@ try{
  if($GhidraRoot){
   $gh=(Resolve-Path -LiteralPath $GhidraRoot).Path
   if(-not(Test-Path (Join-Path $gh "support\analyzeHeadless.bat"))){throw "Ghidra analyzeHeadless.bat missing under supplied GhidraRoot."}
+  $java=Get-Command "java.exe" -ErrorAction Stop
+  $javaVersion=(& $java.Source -version 2>&1 | Out-String)
+  if($javaVersion -notmatch 'version "25\.'){throw "Ghidra 12.2 requires JDK 25; found $javaVersion"}
+  Record "JDK 25 runtime" "PASS" ($javaVersion.Trim())
   Record "Ghidra installation" "PASS" "Headless analyzer located; no sample imported or executed."
   if($GhidraArchivePath){
    $expected="2c2cd776db3c1f6a097ba418922378ac3649cadd5e844a6f5f088ae628a7be67"
