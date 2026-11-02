@@ -63,14 +63,14 @@ The local model is optional until the operator configures it. Fun Industrial doe
 Download an official Windows x64 CPU llama.cpp build from https://github.com/ggml-org/llama.cpp/releases, and the Q4_K_M GGUF file from the official model repository. Do not use CUDA-only or NVIDIA-specific builds for the AMD RX 6600. Configure paths locally:
 
 ~~~powershell
-.\scripts\Configure-LocalModel.ps1 -LlamaServerPath 'C:\Tools\llama.cpp\llama-server.exe' -ModelPath 'D:\Models\Qwen3-4B-Q4_K_M.gguf' -Threads 4 -Context 2048
+.\scripts\Configure-LocalModel.ps1 -LlamaServerPath 'C:\FunIndustrialClone\.runtime\llama.cpp\llama-server.exe' -ModelPath 'C:\FunIndustrialClone\.runtime\models\Qwen3-4B-Q4_K_M.gguf' -Threads 4 -Context 2048
 ~~~
 
 Then restart the platform. AI_AUTOSTART=true starts the local model during Activate. The first load may take time. If the model is not configured, the AI service is reported as not-configured rather than falsely ready.
 
 ## Isolated removal
 
-All private package/model/runtime assets are stored within the repository clone or explicitly supplied model path. .venv, .runtime, node_modules, reports, .env, and Python caches are ignored by Git.
+Keep the llama.cpp binary and GGUF model inside .runtime (for example .runtime\llama.cpp and .runtime\models) so the repository-scoped uninstaller removes them. If you deliberately store a model elsewhere, that external file is not deleted by the uninstaller. .venv, .runtime, node_modules, reports, .env, and Python caches are ignored by Git.
 
 Stop and remove only Fun Industrial's private runtime:
 
