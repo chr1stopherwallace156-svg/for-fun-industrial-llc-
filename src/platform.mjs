@@ -10,8 +10,7 @@ export function createPlatform(config,overrides={}){
   async start(){
    const results=[];
    results.push({id:vpn.id,name:vpn.name,...await vpn.start()});
-   let secure=await vpnConnected();
-   if(config.vpnRequired&&!secure){results.push({id:"vpn-connect",name:"VPN connection attempt",...await vpn.connect()});secure=await vpnConnected();}
+   const secure=await vpnConnected();
    if(config.vpnRequired&&!secure)results.push({id:compute.id,name:compute.name,state:"blocked",detail:"All Fun Industrial functions require the NetBird exit-node gate; compute remains stopped until VPN is ready."});
    else results.push({id:compute.id,name:compute.name,...await compute.start()});
    if(config.vpnRequired&&!secure)results.push({id:ai.id,name:ai.name,state:"blocked",detail:"All Fun Industrial functions require the NetBird exit-node gate; local AI remains stopped until VPN is ready."});
