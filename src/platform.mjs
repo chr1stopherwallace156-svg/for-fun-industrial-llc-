@@ -32,7 +32,7 @@ export function createPlatform(config,overrides={}){
    return {results,status:await this.status()};
   },
   async connectVpn(){lastAction="vpn-connect";const result=await vpn.connect();const secure=await vpnConnected();if(secure&&started){const computeResult=await compute.start();const aiResult=await ai.start();const reaResult=config.rea.enabled?await rea.start():{state:"disabled"};return {state:"connected",vpn:result,compute:computeResult,ai:aiResult,rea:reaResult};}return result;},
-  async disconnectVpn(){lastAction="vpn-disconnect";const result=await vpn.disconnect();await rea.stop();await ai.stop();lastVpnGate="blocked";gateDetail="VPN was explicitly disconnected; Fun Industrial AI and REA services stopped.";return result;},
+  async disconnectVpn(){lastAction="vpn-disconnect";const result=await vpn.disconnect();await rea.stop();await ai.stop();await compute.stop();lastVpnGate="blocked";gateDetail="VPN was explicitly disconnected; Fun Industrial AI and REA services stopped.";return result;},
   async reaCatalog(){if(config.vpnRequired&&!await vpnConnected())throw new Error("VPN or required exit-node route is not connected; REA tools are blocked.");const state=await rea.health();if(state.state!=="ready")throw new Error("REA MCP is not ready.");return rea.tools();},
   async reaTools(){return (await this.reaCatalog()).filter(tool=>config.rea.allowedTools.includes(tool.name));},
   async callReaTool(name,args){if(config.vpnRequired&&!await vpnConnected())throw new Error("VPN or required exit-node route is not connected; REA tools are blocked.");if(!config.rea.allowedTools.includes(name))throw new Error("REA tool is not explicitly allowlisted in REA_ALLOWED_TOOLS.");return rea.callTool(name,args);},
