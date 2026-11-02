@@ -5,9 +5,9 @@
 - Dashboard and compute API bind to 127.0.0.1 only.
 - Browser requests are checked for loopback Host and expected Origin.
 - NetBird is checked through its local client status command.
-- REA MCP startup and all REA catalogue/tool operations are blocked unless VPN_REQUIRED=true is satisfied.
+- All compute, AI chat, built-in AI/ML tool calls, and REA MCP operations are blocked unless VPN_REQUIRED=true and the required exit-node route are satisfied.
 - VPN_REQUIRE_EXIT_NODE=true additionally requires the NetBird status output to advertise 0.0.0.0/0.
-- A five-second control-plane monitor stops REA when the required route or connected state is lost.
+- A five-second control-plane monitor stops managed compute, local AI inference, and REA when the required route or connected state is lost. The API gateway also checks the gate on each functional request.
 - NetBird private keys remain managed by the NetBird client.
 - The dashboard does not add firewall rules, install routes, set DNS, or modify the NetBird management policy.
 
