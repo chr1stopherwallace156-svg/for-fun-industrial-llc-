@@ -28,7 +28,7 @@ try {
  if(-not $Python){throw "Install Python 3.12 and rerun."}
  if($Python.Name -ne "py.exe"){$pyVersion=(& $Python.Source --version 2>&1 | Out-String).Trim();if($pyVersion -notmatch "^Python 3\.12\."){throw "Python 3.12 is required for this pinned CPU compute release. Found $pyVersion. Install Python 3.12 and rerun."}}
  $nodeVersion=(& $Node --version).Trim()
- if([version]($nodeVersion.TrimStart("v")) -lt [version]"22.0"){throw "Node.js 22 or newer required; found $nodeVersion"}
+ if([version]($nodeVersion.TrimStart("v")) -lt [version]"22.23.4"){throw "Node.js 22.23.4 or newer required; found $nodeVersion"}
  Add-Result "Prerequisites" "PASS" "Git and Node $nodeVersion found."
  $branch=(& $Git -C $RepoRoot branch --show-current).Trim()
  if($branch -ne "integration/bootstrap-architecture-v1"){Add-Result "Git branch" "WARN" "Running from $branch; expected integration/bootstrap-architecture-v1. No branch switch performed."}else{Add-Result "Git branch" "PASS" $branch}
@@ -49,7 +49,7 @@ try {
  Add-Result "Compute engine" "PASS" "Python dependencies installed in isolated .venv; tests passed."
  Push-Location $RepoRoot
  try {
-  & $Npm.Source install --ignore-scripts
+  & $Npm install --ignore-scripts
   if($LASTEXITCODE -ne 0){throw "npm install failed."}
   & $Npm.Source run check
   if($LASTEXITCODE -ne 0){throw "Node syntax validation failed."}
