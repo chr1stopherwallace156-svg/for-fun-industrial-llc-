@@ -94,7 +94,9 @@ COMPUTE_PORT=8790
  if($netbird){
   $nbVersion=(& $netbird.Source version 2>&1 | Out-String).Trim()
   Add-Result "NetBird client" "PASS" $nbVersion
-  if(-not $SkipNetBirdLogin){
+  $netbirdConfigured=Get-Content $envFile | Where-Object { $_ -match "^NETBIRD_ENABLED=" } | Select-Object -Last 1
+  if($netbirdConfigured -match "^NETBIRD_ENABLED=false$"){Add-Result "VPN activation" "WARN" "NETBIRD_ENABLED=false is preserved in .env; no connection command issued."}
+  elseif(-not $SkipNetBirdLogin){
    Write-Host "NetBird may open browser-based SSO. Complete sign-in there; do not paste setup keys into this terminal." -ForegroundColor Cyan
    & $netbird.Source up
    if($LASTEXITCODE -eq 0){Add-Result "VPN activation" "PASS" "NetBird up completed."}else{Add-Result "VPN activation" "WARN" "NetBird up returned $LASTEXITCODE; complete SSO and connect from dashboard."}
