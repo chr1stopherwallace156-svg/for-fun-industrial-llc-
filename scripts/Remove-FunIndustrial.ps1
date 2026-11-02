@@ -3,6 +3,10 @@ param([switch]$DeleteRepository,[switch]$RemoveGhidra,[switch]$RemoveOwnedPrereq
 $ErrorActionPreference="Stop"
 $RepoRoot=(Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $port=8787
+$gatewayTask="Fun Industrial Independent Supervisor"
+$gatewayRule=Get-NetFirewallRule -Name "FunIndustrial-Gateway-8443" -ErrorAction SilentlyContinue
+if(Get-ScheduledTask -TaskName $gatewayTask -ErrorAction SilentlyContinue){if($PSCmdlet.ShouldProcess($gatewayTask,"Stop and unregister Fun Industrial-only supervisor task")){Stop-ScheduledTask -TaskName $gatewayTask -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName $gatewayTask -Confirm:$false}}
+if($gatewayRule){if($PSCmdlet.ShouldProcess("FunIndustrial-Gateway-8443","Remove exact Fun Industrial gateway firewall allow rule")){Remove-NetFirewallRule -Name "FunIndustrial-Gateway-8443"}}
 $manifestPath=Join-Path $RepoRoot ".runtime\install-manifest.json"
 $installManifest=$null
 if(Test-Path $manifestPath){try{$installManifest=Get-Content $manifestPath -Raw|ConvertFrom-Json}catch{Write-Warning "Install ownership manifest could not be parsed; system prerequisites will not be removed."}}
