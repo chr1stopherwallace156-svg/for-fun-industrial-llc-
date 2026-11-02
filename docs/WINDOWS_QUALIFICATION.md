@@ -13,7 +13,7 @@ The intended initial host profile is a Windows 11 system with 16 GiB RAM and an 
 Run from the cloned repository root in PowerShell. Keep the repository on the feature branch until its PR is reviewed and merged. The activation step can install Git, Node LTS, Python 3.12, Python dependencies, CPU PyTorch, NetBird, run baseline tests, and start local services. NetBird login is an explicit operator step. The second command re-runs dependency consistency, compute/AI/ML/malware unit tests, Node syntax checks, Node regression tests, and license checks, then records a report.
 
 ~~~powershell
-Set-ExecutionPolicy -Scope Process RemoteSigned -Force; .\scripts\Activate-FunIndustrial.ps1; if ($LASTEXITCODE -ne 0) { throw 'Activation failed; stop here and preserve the report.' }; .\scripts\Qualify-FunIndustrial.ps1 -GhidraRoot 'D:\Tools\ghidra_12.2_PUBLIC'
+Set-ExecutionPolicy -Scope Process RemoteSigned -Force; .\scripts\Activate-FunIndustrial.ps1; if ($LASTEXITCODE -ne 0) { throw 'Activation failed; stop here and preserve the report.' }; .\scripts\Qualify-FunIndustrial.ps1 -GhidraRoot 'D:\Tools\ghidra_12.2_PUBLIC' -GhidraArchivePath 'D:\Downloads\ghidra_12.2_PUBLIC_20261016.zip'
 ~~~
 
 To receive a full Ghidra integrity PASS, provide both -GhidraRoot and -GhidraArchivePath; the latter must be the official 12.2 release ZIP whose SHA-256 matches the published digest. If Ghidra has not yet been installed, omit both arguments. The report will state PASS_WITH_ACTIONS_REQUIRED; it will not claim decompilation is qualified. Do not chain onward after activation fails. Preserve the failure report and logs before any repair attempt.
