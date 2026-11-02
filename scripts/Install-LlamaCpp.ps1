@@ -30,7 +30,11 @@ $server=Get-ChildItem -LiteralPath $target -Recurse -File -Filter "llama-server.
 $cli=Get-ChildItem -LiteralPath $target -Recurse -File -Filter "llama.exe" | Select-Object -First 1
 $binary=if($server){$server}else{$cli}
 if(-not $binary){throw "Archive did not contain llama-server.exe or llama.exe. Extracted files are retained for inspection."}
-$manifest=[ordered]@{document="FUN_INDUSTRIAL_LLAMA_CPP_INSTALL_V1";archive=$archive;archive_sha256=$actual;binary=$binary.FullName;binary_sha256=(Get-FileHash $binary.FullName -Algorithm SHA256).Hash.ToLowerInvariant();scope="repository-private .runtime";global_install=false;created_at=(Get-Date).ToString("o")}
+$downloads=Join-Path $RepoRoot ".runtime\downloads"
+New-Item -ItemType Directory -Force -Path $downloads | Out-Null
+$storedArchive=Join-Path $downloads (Split-Path $archive -Leaf)
+if($archive -ne $storedArchive){Move-Item -LiteralPath $archive -Destination $storedArchive -Force}
+$manifest=[ordered]@{document="FUN_INDUSTRIAL_LLAMA_CPP_INSTALL_V1";archive=$storedArchive;archive_sha256=$actual;binary=$binary.FullName;binary_sha256=(Get-FileHash $binary.FullName -Algorithm SHA256).Hash.ToLowerInvariant();scope="repository-private .runtime";global_install=$false;created_at=(Get-Date).ToString("o")}
 $manifest|ConvertTo-Json -Depth 4|Set-Content -Encoding UTF8 (Join-Path $target "install-manifest.json")
 Write-Host "LLAMA_CPP_INSTALL=PASS"
 Write-Host "ARCHIVE_SHA256=PASS"
