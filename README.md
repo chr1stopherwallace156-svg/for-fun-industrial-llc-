@@ -2,18 +2,19 @@
 
 A standalone integration application for Fun Industrial LLC. It coordinates existing open-source tools through adapters; it does not rewrite or absorb their upstream projects.
 
-## Current status — v0.1.0 bootstrap
+## Current status — v0.2 integration candidate
 
-The first implementation branch contains a local Node.js control plane, dashboard, lifecycle coordinator, REA process adapter, and read-only NetBird status adapter. These are initial integration components, not a claim that optional upstream services have been installed or qualified on an operator's machine.
+The implementation branch contains a local Node.js control plane, dashboard, lifecycle coordinator, REA process adapter, and an operator-controlled NetBird VPN adapter.
 
 ## Capabilities
 
 - **Central control panel:** local dashboard to start, stop, and inspect integrated services.
-- **Coordinated startup:** invokes enabled adapters in sequence and reports each observed state.
+- **Coordinated startup:** starts enabled adapters and reports observed states.
 - **REA integration:** starts the independently installed REA CLI/MCP process when explicitly enabled.
-- **VPN visibility:** reads NetBird client status; it does not enroll, connect, disconnect, or alter VPN configuration.
+- **VPN encryption:** integrates NetBird's WireGuard-based encrypted overlay through its installed CLI. The dashboard provides explicit Connect VPN and Disconnect VPN controls.
+- **Opt-in startup connection:** NETBIRD_AUTOCONNECT=true makes Start platform issue netbird up; it is false by default.
 - **Safety boundary:** loopback-only binding, no committed secrets, no automatic installation, no privilege elevation, and no shell command interpolation.
-- **Extensibility:** adapter boundaries allow additional upstream projects to be integrated without copying their source.
+- **Extensibility:** adapters connect upstream projects without copying their source.
 
 ## Requirements and quick start
 
@@ -27,30 +28,22 @@ npm start
 
 Open http://127.0.0.1:8787.
 
-Optional adapter settings are documented in `.env.example`. Both integrations are disabled by default.
+Copy .env.example to .env to configure optional integrations. REA and NetBird are disabled by default. Install and enroll NetBird independently before enabling its adapter.
 
-## Important qualification notes
+## Qualification notes
 
+- NetBird client-reported daemon status is not proof of peer reachability or policy correctness.
+- Actual VPN use requires installation, device enrollment, least-privilege access policies, and peer connectivity tests.
 - REA process startup is not yet an MCP initialize/handshake qualification.
-- NetBird status output is not independent proof of tunnel connectivity or cryptographic security.
-- NetBird must be installed and enrolled separately using its official operator flow.
 - Remote administration is not implemented. Do not expose this dashboard to a LAN or the internet.
-- Host acceptance, CI, packaging, and release qualification remain outstanding.
+- GitHub-hosted CI does not prove that external clients are enrolled or reachable.
 
 ## Upstream projects
 
 - [REA](https://github.com/morluto/rea) — reverse-engineering CLI/MCP capability.
-- [NetBird](https://github.com/netbirdio/netbird) — encrypted overlay networking based on WireGuard.
+- [NetBird](https://github.com/netbirdio/netbird) — WireGuard-based encrypted overlay networking.
 
-The integration calls upstream software through its external interface. It does not modify those upstream repositories. Preserve upstream licenses and attribution; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-## Documentation
-
-- [Architecture](docs/ARCHITECTURE.md)
-- [Integration inventory](docs/INTEGRATIONS.md)
-- [Security model](SECURITY.md)
-- [Operations](docs/OPERATIONS.md)
-- [Implementation plan and acceptance gates](docs/IMPLEMENTATION_PLAN.md)
+See [VPN encryption architecture](docs/VPN_ENCRYPTION.md), [architecture](docs/ARCHITECTURE.md), [security model](SECURITY.md), and [third-party notices](THIRD_PARTY_NOTICES.md).
 
 ## Independence
 
