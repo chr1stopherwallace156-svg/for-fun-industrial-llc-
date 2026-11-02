@@ -1,5 +1,11 @@
 import {runCommand} from "./command.mjs";
 function daemonConnected(output){return /daemon status:\s*connected/i.test(output)||/^status:\s*connected/im.test(output);}
+export function parseNetbirdStatus(output){
+ const connected=daemonConnected(output);
+ const peerBlocks=output.split(/\bPeer:\s*/i).slice(1);
+ const exitNodeRoute=peerBlocks.some(peer=>/Status:\s*Connected/i.test(peer)&&/(?:Networks|Routes):[^\r\n]*0\.0\.0\.0\/0/i.test(peer));
+ return {connected,exitNodeRoute};
+}
 export function createNetbirdAdapter(config,commandRunner=runCommand){
  async function status(){return commandRunner(config.command,["status","-d"],{timeoutMs:8000});}
  async function connect(){if(!config.enabled)return {state:"disabled",detail:"Enable NETBIRD_ENABLED after installing the official client."};const before=await status();if(before.ok&&daemonConnected(before.stdout))return {state:"connected",detail:"NetBird is already connected."};const result=await commandRunner(config.command,["up"],{timeoutMs:30000});if(!result.ok)return {state:"unavailable",detail:result.error||result.stderr||"NetBird connect command failed."};const check=await status();if(check.ok&&daemonConnected(check.stdout))return {state:"connected",detail:"NetBird client reports daemon connected. Verify peer access policies in the NetBird console."};return {state:"starting",detail:(result.stdout||result.stderr||"Connect command accepted.")+" Status: "+(check.stdout||check.stderr||check.error||"not yet available")};}
