@@ -29,7 +29,9 @@ try{
  if(-not(Test-Path $java)){throw "JDK 25 java.exe missing."}
  $env:JAVA_HOME=$jdk.FullName
  $env:Path=(Join-Path $jdk.FullName "bin")+";"+$env:Path
- $javaVersion=(& $java -version 2>&1 | Out-String)
+ $previousErrorActionPreference=$ErrorActionPreference
+ $ErrorActionPreference="Continue"
+ try{$javaVersion=(& $java -version 2>&1 | Out-String)}finally{$ErrorActionPreference=$previousErrorActionPreference}
  if($javaVersion -notmatch 'version "25\.'){throw "Selected Java runtime is not JDK 25: $javaVersion"}
  New-Item -ItemType Directory -Force -Path $InstallRoot,(Split-Path $ArchivePath -Parent) | Out-Null
  if(-not(Test-Path -LiteralPath $ArchivePath)){
