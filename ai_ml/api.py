@@ -13,7 +13,6 @@ class Search(BaseModel): query:list[float]; k:int=Field(default=5,ge=1,le=100)
 class Bridge(BaseModel): source:str; target:str
 class Transfer(BaseModel): source:str; target:str; memory:dict
 class State(BaseModel): universe_id:str; key:str; values:list[float]
-class Start(BaseModel): executable:str; model_path:str; port:int=Field(default=8088,ge=1024,le=65535)
 def call(fn,*a,**kw):
     try:return fn(*a,**kw)
     except PermissionError as e:raise HTTPException(403,str(e)) from e
@@ -48,9 +47,5 @@ def bridge(r:Bridge):return call(registry.add_bridge,r.source,r.target)
 def transfer(r:Transfer):return call(registry.transfer_memory,r.source,r.target,r.memory)
 @router.put("/universes/neural-state")
 def neural_state(r:State):return call(registry.set_neural_state,r.universe_id,r.key,r.values)
-@router.post("/runtime/llama-cpp/start")
-def start(r:Start):return call(llama.start,r.executable,r.model_path,r.port)
 @router.get("/runtime/llama-cpp")
 def status():return llama.status()
-@router.post("/runtime/llama-cpp/stop")
-def stop():return llama.stop()
