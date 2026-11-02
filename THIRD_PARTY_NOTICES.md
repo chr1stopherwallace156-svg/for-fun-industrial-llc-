@@ -1,19 +1,28 @@
 # Third-party notices
 
-This project integrates independently maintained software and does not vendor upstream source.
+This project integrates independently maintained software and does not vendor upstream source. Verify the exact release and license texts before redistribution.
 
-## REA
+| Project | Pinned integration version | Declared license / notice | Role |
+|---|---:|---|---|
+| REA | 6.8.0 observed upstream package | MIT | External CLI/MCP reverse-engineering tool |
+| NetBird | Installed client version determined on host | BSD-3-Clause for most repository content; some server directories have separate AGPLv3 terms | WireGuard encrypted overlay client |
+| NetworkX | 3.7 | BSD-3-Clause | Graph algorithms |
+| Quimb | 1.15.0 | Apache-2.0 | Tensor networks and contraction |
+| PyTorch | 2.7.0 CPU wheel | BSD-style license | Neural-network training and inference |
+| FastAPI | 0.162.0 | MIT | Local compute API |
+| Uvicorn | 0.54.0 | BSD-3-Clause | ASGI server |
+| httpx | 0.28.1 | BSD-3-Clause | API test client |
+| pytest | 9.0.2 | MIT | Compute tests |
 
-- Repository: https://github.com/morluto/rea
-- Upstream package observed during initial inspection: rea-agents 6.8.0.
-- Declared upstream package license: MIT.
-- Integration: external CLI/MCP process; no REA source copied here.
+Upstream sources:
+- https://github.com/morluto/rea
+- https://github.com/netbirdio/netbird
+- https://github.com/networkx/networkx
+- https://github.com/jcmgray/quimb
+- https://github.com/pytorch/pytorch
+- https://github.com/fastapi/fastapi
+- https://github.com/encode/uvicorn
+- https://github.com/encode/httpx
+- https://github.com/pytest-dev/pytest
 
-## NetBird
-
-- Repository: https://github.com/netbirdio/netbird
-- Integration: separately installed client; this application invokes the external CLI.
-- Upstream root LICENSE declares BSD-3-Clause for most repository content, with management/, signal/, relay/, and combined/ directories separately licensed under AGPLv3.
-- This repository does not vendor those components. Verify the exact client release and its applicable license notices before packaging or redistribution.
-
-This preliminary inventory is not a complete transitive dependency audit or legal opinion. Before shipping, record exact versions, checksums, provenance, license texts, and notices in a release-specific bill of materials.
+This inventory is preliminary, not a complete transitive dependency audit or legal opinion. Before shipping, capture exact resolved versions, checksums, provenance, license texts, and notices in a release-specific SBOM.
