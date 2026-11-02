@@ -34,3 +34,14 @@ def test_neural_models_train_independently_per_universe():
  assert r.describe("net-b")["neural_model_trained"] is False
  assert len(r.predict_neural("net-a",[[0.5,0.5]])["predictions"])==1
  with pytest.raises(ValueError):r.predict_neural("net-b",[[0.5,0.5]])
+
+def test_api_trains_and_predicts_inside_own_universe_only():
+ client.post("/ai/universes",json={"universe_id":"api-net-a","vector_dimension":2})
+ client.post("/ai/universes",json={"universe_id":"api-net-b","vector_dimension":2})
+ x=[[0.,0.],[0.,1.],[1.,0.],[1.,1.]]; y=[[0.],[1.],[1.],[2.]]
+ trained=client.post("/ai/universes/api-net-a/neural/train",json={"features":x,"targets":y,"hidden_size":8,"epochs":15})
+ assert trained.status_code==200 and trained.json()["universe_id"]=="api-net-a"
+ prediction=client.post("/ai/universes/api-net-a/neural/predict",json={"features":[[.5,.5]]})
+ assert prediction.status_code==200 and len(prediction.json()["predictions"])==1
+ denied=client.post("/ai/universes/api-net-b/neural/predict",json={"features":[[.5,.5]]})
+ assert denied.status_code==422
