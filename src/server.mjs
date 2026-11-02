@@ -48,4 +48,5 @@ const server=http.createServer(async(req,res)=>{try{
  return json(res,404,{error:"not found"});
 }catch(error){return json(res,error.message==="request too large"?413:400,{error:error.message});}});
 server.listen(config.port,config.host,()=>console.log("Fun Industrial Platform listening at http://"+config.host+":"+config.port));
-const shutdown=async()=>{await platform.stop();server.close(()=>process.exit(0));};process.on("SIGINT",shutdown);process.on("SIGTERM",shutdown);
+const vpnMonitor=setInterval(()=>{platform.status().catch(()=>{});},5000);vpnMonitor.unref();
+const shutdown=async()=>{clearInterval(vpnMonitor);await platform.stop();server.close(()=>process.exit(0));};process.on("SIGINT",shutdown);process.on("SIGTERM",shutdown);
