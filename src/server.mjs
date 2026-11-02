@@ -17,7 +17,7 @@ const server=http.createServer(async(req,res)=>{try{
  if(req.method==="GET"&&req.url==="/"){res.writeHead(200,{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'","x-content-type-options":"nosniff","referrer-policy":"no-referrer"});return res.end(page);}
  if(req.method==="GET"&&req.url==="/api/status")return json(res,200,await platform.status());
  const computeRoutes={"/api/compute/graph":"/graph/analyze","/api/compute/tensor":"/tensor/matmul","/api/compute/train":"/nn/train","/api/compute/predict":"/nn/predict"};
- if(req.method==="POST"&&computeRoutes[req.url]){const host=req.headers.host||"";if(!/^(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(host))return json(res,403,{error:"local host only"});return proxyCompute(req,res,computeRoutes[req.url]);}
+ if(req.method==="POST"&&computeRoutes[req.url]){const host=req.headers.host||"";if(!/^(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(host))return json(res,403,{error:"local host only"});const origin=req.headers.origin,allowed=["http://127.0.0.1:"+config.port,"http://localhost:"+config.port,"http://[::1]:"+config.port];if(origin&&!allowed.includes(origin))return json(res,403,{error:"origin rejected"});return proxyCompute(req,res,computeRoutes[req.url]);}
  const actions=["/api/start","/api/activate","/api/stop","/api/vpn/connect","/api/vpn/disconnect"];
  if(req.method==="POST"&&actions.includes(req.url)){
   const host=req.headers.host||"";if(!/^(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(host))return json(res,403,{error:"local host only"});
