@@ -43,7 +43,9 @@ try {
  if($pyLauncher){& $pyLauncher.Source -3.12 --version *> $null;$pythonReady=($LASTEXITCODE -eq 0)}
  elseif($pythonCommand){$pv=(& $pythonCommand.Source --version 2>&1 | Out-String).Trim();$pythonReady=($pv -match "^Python 3\.12\.")}
  if(-not $pythonReady){& $winget.Source install --id Python.Python.3.12 --exact --accept-package-agreements --accept-source-agreements;if($LASTEXITCODE -ne 0){throw "Python 3.12 installation failed."};$Ownership.python312_installed_by_funindustrial=$true;Save-InstallManifest}
+ $existingNodeCommand=Get-Command "node.exe" -ErrorAction SilentlyContinue
  $env:Path=[Environment]::GetEnvironmentVariable("Path","Machine")+";"+[Environment]::GetEnvironmentVariable("Path","User")
+ if($existingNodeCommand){$existingNodeDirectory=Split-Path $existingNodeCommand.Source -Parent;if(Test-Path (Join-Path $existingNodeDirectory "node.exe")){$env:Path=$existingNodeDirectory+";"+$env:Path}}
  $Git=Require-Command "git.exe" "Install Git for Windows."
  $Node=Require-Command "node.exe" "Install Node.js LTS."
  $Npm=Require-Command "npm.cmd" "Install Node.js LTS."
