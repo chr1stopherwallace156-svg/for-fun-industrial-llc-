@@ -13,13 +13,14 @@ This project integrates independently maintained software and does not vendor up
 | Uvicorn | 0.54.0 | BSD-3-Clause | ASGI server |
 | httpx | 0.28.1 | BSD-3-Clause | API test client |
 | pytest | 9.0.2 | MIT | Tests |
-| llama.cpp | Operator-provided build; not pinned or bundled | MIT upstream project; model weights have separate licenses | Optional local LLM runtime adapter |
+| llama.cpp | Operator-provided Windows x64 CPU build; not pinned or bundled | MIT upstream project; model weights have separate licenses | Local chat and tool-call proposal runtime |
+| Qwen3-4B-GGUF | Optional operator-downloaded Q4_K_M model; not bundled | Apache-2.0 | Recommended local chat model; model license distinct from runtime |
 | FAISS | Not installed | MIT | Future optional vector index adapter; not used in this release |
 | Qdrant | Not installed | Apache-2.0 | Future optional vector database adapter; not used in this release |
 | Ghidra | 12.2 optional external installation; not bundled | Apache-2.0 upstream distribution; verify bundled component notices | Headless static reverse-engineering/decompilation adapter |
 | Eclipse Temurin JDK | 25, optional install prerequisite for Ghidra 12.2 | GPL-2.0 with Classpath Exception | Java runtime for external Ghidra; installed separately through WinGet |
 
-Upstream sources: https://github.com/morluto/rea ; https://github.com/netbirdio/netbird ; https://github.com/networkx/networkx ; https://github.com/jcmgray/quimb ; https://github.com/pytorch/pytorch ; https://github.com/fastapi/fastapi ; https://github.com/encode/uvicorn ; https://github.com/encode/httpx ; https://github.com/pytest-dev/pytest ; https://github.com/ggml-org/llama.cpp ; https://github.com/facebookresearch/faiss ; https://github.com/qdrant/qdrant ; https://github.com/NationalSecurityAgency/ghidra .
+Upstream sources: https://github.com/morluto/rea ; https://github.com/netbirdio/netbird ; https://github.com/networkx/networkx ; https://github.com/jcmgray/quimb ; https://github.com/pytorch/pytorch ; https://github.com/fastapi/fastapi ; https://github.com/encode/uvicorn ; https://github.com/encode/httpx ; https://github.com/pytest-dev/pytest ; https://github.com/ggml-org/llama.cpp ; https://huggingface.co/Qwen/Qwen3-4B-GGUF ; https://github.com/facebookresearch/faiss ; https://github.com/qdrant/qdrant ; https://github.com/NationalSecurityAgency/ghidra .
 
 Fun Industrial original code is licensed under Apache-2.0; see LICENSE and NOTICE. Ghidra remains an independently installed upstream tool and is not redistributed by this repository.
 
