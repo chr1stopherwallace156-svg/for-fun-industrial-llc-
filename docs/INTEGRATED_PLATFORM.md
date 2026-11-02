@@ -30,7 +30,7 @@ Activation proceeds in dependency order:
 7. Complete MCP initialize, initialized notification, and tools/list. Process creation alone is not readiness.
 8. Publish service states and qualification evidence.
 
-If NetBird disconnects or the required default route disappears, the controller's five-second monitor stops REA and denies catalogue/tool calls. REA is not started without the VPN gate. Local dashboard and loopback compute remain available for local management. The platform does not silently claim that local traffic is routed through a VPN.
+If NetBird disconnects or the required default route disappears, the controller's five-second monitor stops REA, AI inference, and the managed compute service. The API gateway rejects chat, tool, graph, tensor, Hopfield, vector, and neural operations until the VPN gate is restored. The local dashboard and health/status controls remain available for recovery. The platform does not silently claim that local traffic is routed through a VPN.
 
 Shutdown order is REA, AI runtime, compute, then platform. The NetBird client is not globally disconnected or uninstalled by Stop because it may be used by other applications.
 
@@ -40,7 +40,7 @@ VPN_REQUIRED=true and VPN_REQUIRE_EXIT_NODE=true are defaults. REA is gated on N
 
 This is not yet an OS-level firewall kill switch. NetBird's Auto Apply option is not an enforcement lock: the device user can deselect the exit node. A true whole-device no-leak policy additionally needs a Windows Firewall/endpoint-security rule set that blocks direct egress when the tunnel is absent, with a tested recovery/rollback procedure. Fun Industrial does not silently change Windows Firewall, default routes, DNS, or system-wide network policy. Until those host-level controls are separately configured and tested, do not describe the entire computer as guaranteed VPN-only.
 
-The current application security boundary is: loopback-only dashboard and compute; REA is denied unless NetBird reports the required exit-node route; external network access by other Windows applications is outside this app's control.
+The current application security boundary is: loopback-only dashboard and compute; all functional APIs require the NetBird exit-node gate by default; compute/AI/REA processes are stopped or denied on loss of that gate; external network access by other Windows applications is outside this app's control.
 
 ## AI conversation and tool-use policy
 
