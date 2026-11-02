@@ -1,38 +1,36 @@
 # Fun Industrial Platform
 
-Standalone integration and compute platform for Fun Industrial LLC. It connects independently maintained open-source tools through adapters; it does not rewrite or absorb upstream projects.
+Standalone integration, compute, and open-source AI/ML platform for Fun Industrial LLC. It connects independently maintained open-source tools through adapters; it does not rewrite or absorb upstream projects.
 
-## Current implementation — v0.2.0
+## Platform capabilities
 
-- Local Node.js control plane and dashboard.
-- One Activate Fun Industrial operation for all explicitly enabled integrations.
+- Local Node.js control plane and dashboard with one Activate Fun Industrial operation.
 - NetBird integration for WireGuard-based encrypted networking.
 - REA CLI/MCP adapter (MCP handshake qualification remains pending).
-- Separate local graph, tensor-network, and neural compute service.
-- Graph analysis and SVG graph rendering.
-- Quimb tensor contraction operations.
-- PyTorch CPU neural-network training and prediction, with a loss-history chart.
-- One-pass Windows PowerShell installer, activation, tests, and JSON report.
+- Separate local compute service: NetworkX graph analytics, Quimb tensor contraction, and PyTorch CPU neural training/prediction.
+- Open-source AI/ML candidate: classic and modern Hopfield retrieval, isolated multi-universe neural/vector spaces, exact cosine vector search and kNN topology, and optional llama.cpp local inference adapter.
+- One-pass Windows PowerShell activation, tests, and JSON report.
+
+## AI/ML layer
+
+See [Open-source AI/ML architecture](docs/OPEN_SOURCE_AI_ML.md), [multi-universe design](docs/MULTI_UNIVERSE_DESIGN.md), and [qualification plan](docs/OPEN_SOURCE_AI_ML_TEST_PLAN.md).
+
+Option C means each universe owns an independent neural-state namespace and a separate vector embedding space/index. Cross-universe memory transfer is denied unless an explicit directed bridge is configured. The current vector search is exact cosine, not HNSW. llama.cpp starts only when the operator supplies a local executable and GGUF model; no weights are downloaded by the app or CI. Model licenses are reviewed separately.
 
 ## Windows deployment
 
-Clone the integration branch and run the PowerShell activation script from the repository root. Full instructions: docs/WINDOWS_ACTIVATION.md.
-
-The script installs missing Git, Node LTS, and Python 3.12 prerequisites through winget, creates an isolated Python environment, installs direct dependencies and CPU-only PyTorch, runs tests, installs NetBird, invokes the browser SSO login flow, configures loopback-only services, activates enabled integrations, and writes a local report. NetBird authentication requires the operator.
-
-## Compute service
-
-Initial APIs provide NetworkX graph analytics, Quimb tensor contraction, and PyTorch CPU model training/prediction. Models are memory-only and reset on service restart. The initial implementation is not a general-purpose trained model or production data platform.
+Clone the integration branch and run scripts/Activate-FunIndustrial.ps1 from the repository root. Full instructions: docs/WINDOWS_ACTIVATION.md. The script creates an isolated Python environment, installs pinned direct dependencies and CPU-only PyTorch, runs tests, installs NetBird, and activates enabled services. NetBird authentication requires the operator.
 
 ## Security and limitations
 
 - Dashboard and compute API are loopback-only.
-- NetBird manages its own WireGuard private key material; this app does not access it.
-- Peer reachability and least-privilege policy require a second enrolled device and actual connectivity tests.
-- The AMD GPU is not enabled for compute; PyTorch uses CPU in this release.
+- NetBird manages WireGuard private key material; this app does not access it.
+- Peer reachability and least-privilege policy require a second enrolled device and connectivity tests.
+- PyTorch uses CPU; GPU acceleration is not claimed.
 - REA process startup is not proof of a successful MCP handshake.
-- Remote administration, model persistence, broad subnet routes, and automatic VPN enrollment are not enabled.
-- Never commit .env, setup keys, private keys, or activation reports.
+- AI/ML models and training state are in-memory; model persistence and multi-host distributed learning are not enabled.
+- No custom cryptography, remote administration, broad subnet routes, or automatic model downloads.
+- Never commit .env, setup keys, private keys, model weights, or activation reports.
 
 ## Upstream projects
 
@@ -42,6 +40,7 @@ Initial APIs provide NetworkX graph analytics, Quimb tensor contraction, and PyT
 - https://github.com/jcmgray/quimb
 - https://github.com/pytorch/pytorch
 - https://github.com/fastapi/fastapi
+- https://github.com/ggml-org/llama.cpp (optional adapter; not vendored)
 
 See THIRD_PARTY_NOTICES.md for preliminary license information.
 
