@@ -55,5 +55,6 @@ try{
 }catch{
  Write-Host $_.Exception.Message -ForegroundColor Red
  Write-Host "GHIDRA_INSTALL=FAILED"
- exit 1
+ $global:LASTEXITCODE=1
+ return
 }
