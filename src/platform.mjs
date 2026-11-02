@@ -48,7 +48,7 @@ export function createPlatform(config,overrides={}){
    const definitions=[{id:"netbird",name:"NetBird VPN"},{id:"compute",name:"Graph / Tensor / Neural Compute"},{id:"ai",name:"Local AI / llama.cpp"},{id:"rea",name:"REA MCP"}];
    const mapped=services.map((service,i)=>({...definitions[i],...service}));
    const enabled=mapped.filter(s=>!["disabled","not-configured"].includes(s.state)),healthy=enabled.length>0&&enabled.every(s=>["running","observed","connected","ready"].includes(s.state));
-   const lifecycle=!started?"stopped":healthy?"ready":"degraded";
+   const lifecycle=!started?"stopped":enabled.length===0?"idle":healthy?"ready":"degraded";
    return {application:"Fun Industrial Platform",version:"0.3.0",lifecycle,lastAction,services:mapped,vpn_policy:{required:config.vpnRequired,require_exit_node:config.vpnRequireExitNode,state:lastVpnGate,detail:gateDetail,rea_blocked_without_vpn:config.vpnRequired},safety:{localOnly:true,reaRequiresVpn:config.vpnRequired,reaRequiresExitNode:config.vpnRequireExitNode,shellExecution:false,customCryptography:false}};
   }
  };
