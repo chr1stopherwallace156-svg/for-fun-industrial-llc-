@@ -3,7 +3,7 @@ param(
  [Parameter(Mandatory=$true)][string]$LlamaServerPath,
  [Parameter(Mandatory=$true)][string]$ModelPath,
  [ValidateRange(1,16)][int]$Threads=4,
- [ValidateRange(512,8192)][int]$Context=2048
+ [ValidateRange(512,8192)][int]$Context=4096
 )
 $ErrorActionPreference="Stop"
 $RepoRoot=(Resolve-Path (Join-Path $PSScriptRoot "..")).Path
