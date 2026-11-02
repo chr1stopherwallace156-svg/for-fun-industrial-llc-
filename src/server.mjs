@@ -5,9 +5,11 @@ import path from "node:path";
 import {loadConfig} from "./config.mjs";
 import {createPlatform} from "./platform.mjs";
 
+const root=path.dirname(fileURLToPath(import.meta.url));
+try { process.loadEnvFile(path.join(root,"../.env")); }
+catch(error) { if(error.code!=="ENOENT") throw error; }
 const config=loadConfig();
 const platform=createPlatform(config);
-const root=path.dirname(fileURLToPath(import.meta.url));
 const page=await readFile(path.join(root,"../public/index.html"));
 
 function json(res,code,data) {
