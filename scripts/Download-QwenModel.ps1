@@ -23,6 +23,9 @@ $size=(Get-Item -LiteralPath $temp).Length
 $sha=(Get-FileHash -LiteralPath $temp -Algorithm SHA256).Hash.ToLowerInvariant()
 if($size -ne $expectedSize -or $sha -ne $expectedSha){throw "Model integrity check FAILED. Expected size=$expectedSize SHA256=$expectedSha; got size=$size SHA256=$sha. Partial file preserved."}
 Move-Item -LiteralPath $temp -Destination $target
+$licensePath=Join-Path $Destination "Qwen3-MODEL-LICENSE.txt"
+Invoke-WebRequest -Uri "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/$revision/LICENSE" -OutFile $licensePath -UseBasicParsing
+if((Get-Item -LiteralPath $licensePath).Length -lt 1000){throw "Model license download is incomplete; inspect $licensePath"}
 Write-Host "QWEN_MODEL_DOWNLOAD=PASS"
 Write-Host "MODEL_SIZE=$size"
 Write-Host "MODEL_SHA256=$sha"
