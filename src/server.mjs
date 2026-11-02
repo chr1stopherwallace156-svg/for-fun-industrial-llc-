@@ -17,6 +17,11 @@ function localRequest(req,res){
  if(origin&&!allowed.includes(origin)){json(res,403,{error:"origin rejected"});return false;}
  return true;
 }
+async function requireVpnGate(res){
+ const status=await platform.status();
+ if(status.vpn_policy.required&&status.vpn_policy.state!=="connected"){json(res,403,{error:"Fun Industrial is fail-closed: connect NetBird and its approved exit-node route before using AI, compute, or REA capabilities.",vpn_policy:status.vpn_policy});return false;}
+ return true;
+}
 async function readBody(req,max=1000000){
  let body="";for await(const chunk of req){body+=chunk.toString("utf8");if(body.length>max)throw new Error("request too large");}
  if(!body)return {};try{return JSON.parse(body);}catch{throw new Error("invalid JSON body");}
@@ -40,6 +45,7 @@ const server=http.createServer(async(req,res)=>{try{
  }
  if(req.method==="POST"&&req.url==="/api/ai/tool-call"){
   if(!localRequest(req,res))return;
+  if(!await requireVpnGate(res))return;
   const body=await readBody(req,1000000);
   if(typeof body.name!=="string"||body.name.length>128)return json(res,400,{error:"invalid tool name"});
   try{
@@ -59,8 +65,8 @@ const server=http.createServer(async(req,res)=>{try{
  if(req.method==="GET"&&req.url==="/api/rea/catalog"){if(!localRequest(req,res))return;try{return json(res,200,{tools:await platform.reaCatalog()});}catch(e){return json(res,403,{error:e.message});}}
  if(req.method==="GET"&&req.url==="/api/rea/tools"){if(!localRequest(req,res))return;try{return json(res,200,{tools:await platform.reaTools()});}catch(e){return json(res,403,{error:e.message});}}
  if(req.method==="POST"&&req.url==="/api/rea/call"){if(!localRequest(req,res))return;const body=await readBody(req,65536);if(typeof body.name!=="string"||body.name.length>128)return json(res,400,{error:"invalid tool name"});try{return json(res,200,await platform.callReaTool(body.name,body.arguments||{}));}catch(e){return json(res,403,{error:e.message});}}
- if(req.method==="POST"&&computeRoutes[req.url]){if(!localRequest(req,res))return;const body=await readBody(req);return proxyCompute(req,res,computeRoutes[req.url],"POST",body);}
- if(aiRoutes[req.url]&&req.method===aiRoutes[req.url].method){if(!localRequest(req,res))return;const route=aiRoutes[req.url];const body=route.method==="POST"?await readBody(req,1000000):null;return proxyCompute(req,res,route.path,route.method,body);}
+ if(req.method==="POST"&&computeRoutes[req.url]){if(!localRequest(req,res))return;if(!await requireVpnGate(res))return;const body=await readBody(req);return proxyCompute(req,res,computeRoutes[req.url],"POST",body);}
+ if(aiRoutes[req.url]&&req.method===aiRoutes[req.url].method){if(!localRequest(req,res))return;const route=aiRoutes[req.url];if((req.url==="/api/ai/chat"||req.url==="/api/ai/start")&&!await requireVpnGate(res))return;const body=route.method==="POST"?await readBody(req,1000000):null;return proxyCompute(req,res,route.path,route.method,body);}
  const actions=["/api/start","/api/activate","/api/stop","/api/vpn/connect","/api/vpn/disconnect","/api/shutdown"];
  if(req.method==="POST"&&actions.includes(req.url)){
   if(!localRequest(req,res))return;await readBody(req,1024);
