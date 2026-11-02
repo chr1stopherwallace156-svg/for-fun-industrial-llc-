@@ -19,7 +19,7 @@ Start-Sleep -Seconds 2
 $venvPrefix=(Join-Path $RepoRoot ".venv").TrimEnd("\")+"\" 
 $runtimePrefix=(Join-Path $RepoRoot ".runtime").TrimEnd("\")+"\" 
 $owned=Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
- ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($venvPrefix,[System.StringComparison]::OrdinalIgnoreCase) -and $_.CommandLine -match "uvicorn compute_service\\.app:app") -or
+ ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($venvPrefix,[System.StringComparison]::OrdinalIgnoreCase) -and $_.CommandLine.Contains("compute_service.app:app")) -or
  ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($runtimePrefix,[System.StringComparison]::OrdinalIgnoreCase))
 }
 foreach($process in $owned){if($PSCmdlet.ShouldProcess("Fun Industrial owned runtime PID $($process.ProcessId)","Stop exact repository-private process")){Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue}}
