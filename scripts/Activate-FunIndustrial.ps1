@@ -20,13 +20,25 @@ function Require-Command([string]$Name,[string]$Hint) {
 }
 try {
  if($env:OS -ne "Windows_NT"){throw "Run this script on Windows."}
+ $winget=Get-Command "winget.exe" -ErrorAction SilentlyContinue
+ if(-not $winget){throw "winget is required for one-pass prerequisite installation. Install Microsoft App Installer, then rerun."}
+ if(-not (Get-Command "git.exe" -ErrorAction SilentlyContinue)){& $winget.Source install --id Git.Git --exact --accept-package-agreements --accept-source-agreements;if($LASTEXITCODE -ne 0){throw "Git installation failed."}}
+ if(-not (Get-Command "node.exe" -ErrorAction SilentlyContinue)){& $winget.Source install --id OpenJS.NodeJS.LTS --exact --accept-package-agreements --accept-source-agreements;if($LASTEXITCODE -ne 0){throw "Node.js LTS installation failed."}}
+ $pyLauncher=Get-Command "py.exe" -ErrorAction SilentlyContinue
+ $pythonCommand=Get-Command "python.exe" -ErrorAction SilentlyContinue
+ $pythonReady=$false
+ if($pyLauncher){& $pyLauncher.Source -3.12 --version *> $null;$pythonReady=($LASTEXITCODE -eq 0)}
+ elseif($pythonCommand){$pv=(& $pythonCommand.Source --version 2>&1 | Out-String).Trim();$pythonReady=($pv -match "^Python 3\.12\.")}
+ if(-not $pythonReady){& $winget.Source install --id Python.Python.3.12 --exact --accept-package-agreements --accept-source-agreements;if($LASTEXITCODE -ne 0){throw "Python 3.12 installation failed."}}
+ $env:Path=[Environment]::GetEnvironmentVariable("Path","Machine")+";"+[Environment]::GetEnvironmentVariable("Path","User")
  $Git=Require-Command "git.exe" "Install Git for Windows."
- $Node=Require-Command "node.exe" "Install Node.js 22 LTS or newer."
- $Npm=Require-Command "npm.cmd" "Install Node.js 22 LTS or newer."
+ $Node=Require-Command "node.exe" "Install Node.js LTS."
+ $Npm=Require-Command "npm.cmd" "Install Node.js LTS."
  $Python=Get-Command "py.exe" -ErrorAction SilentlyContinue
  if(-not $Python){$Python=Get-Command "python.exe" -ErrorAction SilentlyContinue}
- if(-not $Python){throw "Install Python 3.12 and rerun."}
- if($Python.Name -ne "py.exe"){$pyVersion=(& $Python.Source --version 2>&1 | Out-String).Trim();if($pyVersion -notmatch "^Python 3\.12\."){throw "Python 3.12 is required for this pinned CPU compute release. Found $pyVersion. Install Python 3.12 and rerun."}}
+ if(-not $Python){throw "Python 3.12 installation was not found after winget completed."}
+ if($Python.Name -eq "py.exe"){& $Python.Source -3.12 --version *> $null;if($LASTEXITCODE -ne 0){throw "Python launcher does not find Python 3.12."}}
+ else{$pyVersion=(& $Python.Source --version 2>&1 | Out-String).Trim();if($pyVersion -notmatch "^Python 3\.12\."){throw "Python 3.12 required; found $pyVersion."}}
  $nodeVersion=(& $Node --version).Trim()
  if([version]($nodeVersion.TrimStart("v")) -lt [version]"22.23.4"){throw "Node.js 22.23.4 or newer required; found $nodeVersion"}
  Add-Result "Prerequisites" "PASS" "Git and Node $nodeVersion found."
