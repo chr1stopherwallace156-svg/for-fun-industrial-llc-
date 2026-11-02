@@ -5,7 +5,7 @@ export function createReaAdapter(config) {
     async start() {
       if (!config.enabled) return {state:"disabled",detail:"Enable REA_ENABLED after installing REA."};
       if (child && child.exitCode === null) return {state:"running",detail:"REA process already running."};
-      try { child = spawn(config.command, config.args, {shell:false,windowsHide:true,stdio:["pipe","pipe","pipe"]}); child.stderr.on("data",()=>{}); child.on("error",()=>{}); await new Promise(r=>setTimeout(r,250));
+      try { child = spawn(config.command, config.args, {shell:false,windowsHide:true,stdio:["pipe","pipe","pipe"]}); child.stdout.on("data",()=>{}); child.stderr.on("data",()=>{}); child.on("error",()=>{}); await new Promise(r=>setTimeout(r,250));
         return child.exitCode === null ? {state:"running",detail:"Process started; MCP handshake is not yet qualified."} : {state:"failed",detail:"REA exited during startup."};
       } catch(e) { return {state:"failed",detail:e.message}; }
     },
