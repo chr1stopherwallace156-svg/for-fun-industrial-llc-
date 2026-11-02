@@ -22,7 +22,7 @@ foreach($key in $values.Keys){
  for($i=0;$i -lt $lines.Count;$i++){if($lines[$i] -match ("^"+[regex]::Escape($key)+"=")){$lines[$i]=$key+"="+$values[$key];$found=$true;break}}
  if(-not $found){$lines.Add($key+"="+$values[$key])}
 }
-$lines|Set-Content -Encoding UTF8 $envFile
+[System.IO.File]::WriteAllLines($envFile,[string[]]$lines,[System.Text.UTF8Encoding]::new($false))
 Write-Host "LOCAL_MODEL_CONFIGURATION=PASS"
 Write-Host "LLAMA_SERVER=$server"
 Write-Host "GGUF_MODEL=$model"
