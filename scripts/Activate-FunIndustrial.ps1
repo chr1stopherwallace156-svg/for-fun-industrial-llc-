@@ -133,11 +133,12 @@ AI_AUTOSTART=true
   Add-Result "Configuration" "PASS" "Existing .env preserved; missing compute, VPN, REA and local AI settings appended without overwriting existing values."
  }
  if(-not $SkipNetBirdInstall){
+  $netbirdPreexisting=([bool](Get-Command "netbird.exe" -ErrorAction SilentlyContinue)) -or (Test-Path "C:\Program Files\NetBird\netbird.exe")
   $winget=Get-Command "winget.exe" -ErrorAction SilentlyContinue
   if(-not $winget){Add-Result "NetBird install" "WARN" "winget unavailable; install using https://docs.netbird.io/get-started/install/windows."}
   else{
    & $winget.Source install --id Netbird.NetBird --exact --accept-package-agreements --accept-source-agreements
-   if($LASTEXITCODE -ne 0){Add-Result "NetBird install" "WARN" "winget returned $LASTEXITCODE; check whether NetBird is already installed."}else{Add-Result "NetBird install" "PASS" "NetBird package installation completed."}
+   if($LASTEXITCODE -ne 0){Add-Result "NetBird install" "WARN" "winget returned $LASTEXITCODE; check whether NetBird is already installed."}else{Add-Result "NetBird install" "PASS" "NetBird package installation completed.";if(-not $netbirdPreexisting){$Ownership.netbird_installed_by_funindustrial=$true;Save-InstallManifest}}
   }
  }
  $netbird=Get-Command "netbird.exe" -ErrorAction SilentlyContinue
