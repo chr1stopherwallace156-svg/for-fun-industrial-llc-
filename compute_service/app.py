@@ -49,8 +49,11 @@ def graph_analyze(request: GraphRequest):
 
 @app.post("/tensor/matmul")
 def tensor_matmul(request: TensorRequest):
-    left = np.asarray(request.left, dtype=np.float64)
-    right = np.asarray(request.right, dtype=np.float64)
+    try:
+        left = np.asarray(request.left, dtype=np.float64)
+        right = np.asarray(request.right, dtype=np.float64)
+    except (TypeError, ValueError):
+        raise HTTPException(422, "tensor inputs must be rectangular numeric matrices")
     if left.ndim != 2 or right.ndim != 2 or left.shape[1] != right.shape[0]:
         raise HTTPException(422, "matrix dimensions are incompatible")
     if not np.isfinite(left).all() or not np.isfinite(right).all():
@@ -67,8 +70,11 @@ def tensor_matmul(request: TensorRequest):
 @app.post("/nn/train")
 def train_network(request: TrainRequest):
     global _model, _model_input
-    x = np.asarray(request.features, dtype=np.float32)
-    y = np.asarray(request.targets, dtype=np.float32)
+    try:
+        x = np.asarray(request.features, dtype=np.float32)
+        y = np.asarray(request.targets, dtype=np.float32)
+    except (TypeError, ValueError):
+        raise HTTPException(422, "features and targets must be rectangular numeric matrices")
     if x.ndim != 2 or y.ndim != 2 or len(x) != len(y):
         raise HTTPException(422, "features and targets must be equally sized matrices")
     if x.shape[1] > 64 or y.shape[1] > 32:
@@ -99,7 +105,10 @@ def train_network(request: TrainRequest):
 def predict(request: PredictRequest):
     if _model is None:
         raise HTTPException(409,"train a model before requesting predictions")
-    x = np.asarray(request.features,dtype=np.float32)
+    try:
+        x = np.asarray(request.features,dtype=np.float32)
+    except (TypeError, ValueError):
+        raise HTTPException(422, "prediction features must be a rectangular numeric matrix")
     if x.ndim != 2 or x.shape[1] != _model_input or len(x) > 512:
         raise HTTPException(422,"prediction matrix has an invalid shape")
     if not np.isfinite(x).all():
