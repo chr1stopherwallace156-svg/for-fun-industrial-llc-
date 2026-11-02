@@ -31,7 +31,7 @@ class LlamaCppRuntime:
         if self._health():raise RuntimeError("another llama.cpp server already owns the configured port")
         log_dir=Path(os.environ.get("FUN_INDUSTRIAL_RUNTIME",Path.cwd()/".runtime"))/"logs"; log_dir.mkdir(parents=True,exist_ok=True)
         self.log_handle=(log_dir/"llama-server.log").open("a",encoding="utf-8")
-        args=[str(binary),"--model",str(model),"--host","127.0.0.1","--port",str(port),"--threads",str(threads),"--ctx-size",str(context),"--n-gpu-layers","0"]
+        args=[str(binary),"--model",str(model),"--host","127.0.0.1","--port",str(port),"--threads",str(threads),"--ctx-size",str(context),"--n-gpu-layers","0","--jinja"]
         self.process=subprocess.Popen(args,stdin=subprocess.DEVNULL,stdout=self.log_handle,stderr=subprocess.STDOUT,shell=False,cwd=str(binary.parent))
         self.model_path=str(model)
         deadline=time.monotonic()+90
@@ -65,7 +65,10 @@ class LlamaCppRuntime:
         code=self.process.poll();ready=code is None and self._health()
         return {"state":"ready" if ready else "exited" if code is not None else "loading","pid":self.process.pid,"exit_code":code,"model_path":self.model_path,"endpoint":self.endpoint,"device":"cpu"}
     def stop(self):
-        if self.process is None or self.process.poll() is not None:return {"state":"not-running"}
+        if self.process is None:return {"state":"not-running"}
+        if self.process.poll() is not None:
+            if self.log_handle:self.log_handle.close();self.log_handle=None
+            return {"state":"already-exited"}
         self.process.terminate()
         try:self.process.wait(timeout=10)
         except subprocess.TimeoutExpired:self.process.kill();self.process.wait(timeout=5)
