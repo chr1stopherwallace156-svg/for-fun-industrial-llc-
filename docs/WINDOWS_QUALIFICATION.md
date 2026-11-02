@@ -6,7 +6,7 @@ Provide a repeatable local sequence after cloning the public repository. Install
 
 ## Host constraints
 
-The intended initial host profile is a Windows 11 system with 16 GiB RAM and an AMD Radeon RX 6600. The first release is CPU-first. Avoid CUDA-only packages, large model downloads, or concurrent heavy jobs. The optional Ghidra distribution is approximately 570 MB and requires a supported JDK per the official release notes. Model weights and malware samples are not downloaded by setup or CI.
+The intended initial host profile is a Windows 11 system with 16 GiB RAM and an AMD Radeon RX 6600. The first release is CPU-first. Avoid CUDA-only packages, large model downloads, or concurrent heavy jobs. The optional Ghidra distribution is approximately 570 MB and requires 64-bit JDK 25 per the official release notes. Model weights and malware samples are not downloaded by setup or CI.
 
 ## Back-to-back sequence
 
@@ -16,7 +16,7 @@ Run from the cloned repository root in PowerShell. Keep the repository on the fe
 Set-ExecutionPolicy -Scope Process RemoteSigned -Force; .\scripts\Activate-FunIndustrial.ps1; if ($LASTEXITCODE -ne 0) { throw 'Activation failed; stop here and preserve the report.' }; .\scripts\Qualify-FunIndustrial.ps1 -GhidraRoot 'D:\Tools\ghidra_12.2_PUBLIC'
 ~~~
 
-If Ghidra has not yet been installed, omit the -GhidraRoot argument. The report will state PASS_WITH_ACTIONS_REQUIRED; it will not claim decompilation is qualified. Do not chain onward after activation fails. Preserve the failure report and logs before any repair attempt.
+If Ghidra has not yet been installed, omit both -GhidraRoot and -GhidraArchivePath arguments. The report will state PASS_WITH_ACTIONS_REQUIRED; it will not claim decompilation is qualified. Do not chain onward after activation fails. Preserve the failure report and logs before any repair attempt.
 
 ## Expected result
 
