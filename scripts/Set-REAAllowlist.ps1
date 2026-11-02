@@ -16,3 +16,4 @@ $lines|Set-Content -Encoding UTF8 $envFile
 Write-Host "REA_ALLOWLIST_UPDATED=PASS"
 Write-Host "APPROVED_TOOL_COUNT=$($names.Count)"
 Write-Host "Only these exact names can be called from the AI interface. Restart Fun Industrial to apply the change."
+$global:LASTEXITCODE=0
