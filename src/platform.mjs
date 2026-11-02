@@ -28,7 +28,8 @@ export function createPlatform(config){
   },
   async connectVpn(){lastAction="vpn-connect";const result=await vpn.connect();const secure=await vpnConnected();if(secure&&started&&config.rea.enabled){const r=await rea.start();return {state:"connected",vpn:result,rea:r};}return result;},
   async disconnectVpn(){lastAction="vpn-disconnect";const result=await vpn.disconnect();await rea.stop();lastVpnGate="blocked";gateDetail="VPN was explicitly disconnected; REA stopped.";return result;},
-  async reaTools(){if(config.vpnRequired&&!await vpnConnected())throw new Error("VPN is not connected; REA tools are blocked.");const state=await rea.health();if(state.state!=="ready")throw new Error("REA MCP is not ready.");return rea.tools().filter(tool=>config.rea.allowedTools.includes(tool.name));},
+  async reaCatalog(){if(config.vpnRequired&&!await vpnConnected())throw new Error("VPN is not connected; REA tools are blocked.");const state=await rea.health();if(state.state!=="ready")throw new Error("REA MCP is not ready.");return rea.tools();},
+  async reaTools(){return (await this.reaCatalog()).filter(tool=>config.rea.allowedTools.includes(tool.name));},
   async callReaTool(name,args){if(config.vpnRequired&&!await vpnConnected())throw new Error("VPN is not connected; REA tools are blocked.");if(!config.rea.allowedTools.includes(name))throw new Error("REA tool is not explicitly allowlisted in REA_ALLOWED_TOOLS.");return rea.callTool(name,args);},
   async status(){
    const services=await Promise.all([vpn.health(),compute.health(),rea.health()]);
