@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$GhidraRoot="")
+param([string]$GhidraRoot="",[string]$GhidraArchivePath="")
 $ErrorActionPreference="Stop"
 $RepoRoot=(Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $ReportDir=Join-Path $RepoRoot "reports"
@@ -36,6 +36,12 @@ try{
   $gh=(Resolve-Path -LiteralPath $GhidraRoot).Path
   if(-not(Test-Path (Join-Path $gh "support\analyzeHeadless.bat"))){throw "Ghidra analyzeHeadless.bat missing under supplied GhidraRoot."}
   Record "Ghidra installation" "PASS" "Headless analyzer located; no sample imported or executed."
+  if($GhidraArchivePath){
+   $expected="2c2cd776db3c1f6a097ba418922378ac3649cadd5e844a6f5f088ae628a7be67"
+   $actual=(Get-FileHash -LiteralPath $GhidraArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+   if($actual -ne $expected){throw "Ghidra archive SHA-256 mismatch: $actual"}
+   Record "Ghidra archive integrity" "PASS" "Official 12.2 archive SHA-256 matches."
+  }else{Record "Ghidra archive integrity" "WARN" "Archive hash not supplied; installed folder presence alone does not prove release archive integrity."}
  }else{Record "Ghidra installation" "WARN" "Not supplied. Static analysis tests ran with synthetic fixtures only; install and verify Ghidra before real-sample analysis."}
  $gitStatus=(& git -C $RepoRoot status --short | Out-String).Trim()
  $state=if(($Stages|Where-Object{$_.state -eq "FAIL"}).Count){ "FAILED" }elseif(($Stages|Where-Object{$_.state -eq "WARN"}).Count){ "PASS_WITH_ACTIONS_REQUIRED" }else{"PASS"}
