@@ -41,6 +41,8 @@ try {
  if($LASTEXITCODE -ne 0){throw "pip upgrade failed."}
  & $pythonExe -m pip install -r (Join-Path $RepoRoot "requirements-compute.txt")
  if($LASTEXITCODE -ne 0){throw "Compute dependencies installation failed."}
+ & $pythonExe -m pip install torch==2.7.0 --index-url https://download.pytorch.org/whl/cpu
+ if($LASTEXITCODE -ne 0){throw "CPU PyTorch installation failed."}
  & $pythonExe -m pytest (Join-Path $RepoRoot "compute_service\test_compute.py") -q
  if($LASTEXITCODE -ne 0){throw "Graph/tensor/neural tests failed."}
  Add-Result "Compute engine" "PASS" "Python dependencies installed in isolated .venv; tests passed."
@@ -73,7 +75,9 @@ COMPUTE_PORT=8790
  }else{
   $existing=Get-Content $envFile -Raw
   if($existing -notmatch "(?m)^HOST=127\.0\.0\.1\s*$"){throw ".env must retain HOST=127.0.0.1. Unsafe binding refused."}
-  Add-Result "Configuration" "PASS" "Existing .env preserved; no secrets overwritten."
+  $required = @("COMPUTE_ENABLED=true","COMPUTE_COMMAND=$pythonExe","COMPUTE_PORT=8790","NETBIRD_ENABLED=true")
+  foreach($line in $required){$key=$line.Split("=")[0];if($existing -notmatch ("(?m)^"+[regex]::Escape($key)+"=")){Add-Content -Encoding UTF8 $envFile $line}}
+  Add-Result "Configuration" "PASS" "Existing .env preserved; missing compute and NetBird settings appended without overwriting existing values."
  }
  if(-not $SkipNetBirdInstall){
   $winget=Get-Command "winget.exe" -ErrorAction SilentlyContinue
