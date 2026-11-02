@@ -18,7 +18,7 @@ Standalone integration and compute platform for Fun Industrial LLC. It connects 
 
 Clone the integration branch and run the PowerShell activation script from the repository root. Full instructions: docs/WINDOWS_ACTIVATION.md.
 
-The script uses an isolated Python 3.12 environment, installs pinned packages, runs tests, installs NetBird with winget when available, invokes the browser SSO login flow, configures loopback-only services, activates enabled integrations, and writes a local report. NetBird authentication requires the operator.
+The script installs missing Git, Node LTS, and Python 3.12 prerequisites through winget, creates an isolated Python environment, installs direct dependencies and CPU-only PyTorch, runs tests, installs NetBird, invokes the browser SSO login flow, configures loopback-only services, activates enabled integrations, and writes a local report. NetBird authentication requires the operator.
 
 ## Compute service
 
