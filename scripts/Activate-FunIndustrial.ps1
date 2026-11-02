@@ -136,6 +136,7 @@ COMPUTE_PORT=8790
  Write-Host "ACTIVATION REPORT: $Report" -ForegroundColor Cyan
  Start-Process "http://127.0.0.1:8787"
  Write-Host "The platform has been activated; review service states in the dashboard and the JSON report." -ForegroundColor Green
+ $global:LASTEXITCODE=0
 }catch{
  Add-Result "Activation run" "FAIL" $_.Exception.Message
  $Results.final_state="FAILED";$Results.finished_at=(Get-Date).ToString("o")
