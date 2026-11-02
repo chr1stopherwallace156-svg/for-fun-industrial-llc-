@@ -26,6 +26,7 @@ try {
  $Python=Get-Command "py.exe" -ErrorAction SilentlyContinue
  if(-not $Python){$Python=Get-Command "python.exe" -ErrorAction SilentlyContinue}
  if(-not $Python){throw "Install Python 3.12 and rerun."}
+ if($Python.Name -ne "py.exe"){$pyVersion=(& $Python.Source --version 2>&1 | Out-String).Trim();if($pyVersion -notmatch "^Python 3\.12\."){throw "Python 3.12 is required for this pinned CPU compute release. Found $pyVersion. Install Python 3.12 and rerun."}}
  $nodeVersion=(& $Node --version).Trim()
  if([version]($nodeVersion.TrimStart("v")) -lt [version]"22.0"){throw "Node.js 22 or newer required; found $nodeVersion"}
  Add-Result "Prerequisites" "PASS" "Git and Node $nodeVersion found."
@@ -98,7 +99,7 @@ COMPUTE_PORT=8790
    if($LASTEXITCODE -eq 0){Add-Result "VPN activation" "PASS" "NetBird up completed."}else{Add-Result "VPN activation" "WARN" "NetBird up returned $LASTEXITCODE; complete SSO and connect from dashboard."}
    $nbStatus=(& $netbird.Source status -d 2>&1 | Out-String)
    if($nbStatus -match "(?i)daemon status:\s*connected"){Add-Result "VPN status" "PASS" "Daemon reports connected; peer policy/reachability still need verification."}
-   else{Add-Result "VPN status" "WARN" ($nbStatus.Trim() -replace "[\r\n]+"," | ")}
+   else{Add-Result "VPN status" "WARN" "Daemon is not reporting Connected. Complete SSO or inspect the NetBird client UI; detailed peer data is intentionally omitted from the report."}
   }else{Add-Result "VPN activation" "WARN" "Skipped by operator option."}
  }else{Add-Result "NetBird client" "WARN" "Not detected; VPN controls remain unavailable until installed."}
  $listener=Get-NetTCPConnection -State Listen -LocalPort 8787 -ErrorAction SilentlyContinue
@@ -107,8 +108,12 @@ COMPUTE_PORT=8790
   Start-Process -FilePath $Node -ArgumentList "src/server.mjs" -WorkingDirectory $RepoRoot -RedirectStandardOutput $serverLog -RedirectStandardError ($serverLog+".err") -WindowStyle Hidden
   Start-Sleep -Seconds 3
  }
- try{$status=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/status" -TimeoutSec 5;Add-Result "Platform API" "PASS" ("Lifecycle="+$status.lifecycle)}
- catch{Add-Result "Platform API" "FAIL" $_.Exception.Message;throw "Local platform API did not start."}
+ try{
+  $status=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/status" -TimeoutSec 5
+  Add-Result "Platform API" "PASS" ("Lifecycle="+$status.lifecycle)
+  $activated=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/activate" -Method Post -ContentType "application/json" -Body "{}" -TimeoutSec 45
+  foreach($service in $activated.results){$state=if($service.state -in @("running","connected","observed")){"PASS"}elseif($service.state -eq "disabled"){"WARN"}else{"WARN"};Add-Result ("Service "+$service.name) $state $service.detail}
+ }catch{Add-Result "Platform activation" "FAIL" $_.Exception.Message;throw "Local platform activation did not complete."}
  $Results.final_state=if(($Results.steps|Where-Object{$_.state -eq "FAIL"}).Count -gt 0){"FAILED"}elseif(($Results.steps|Where-Object{$_.state -eq "WARN"}).Count -gt 0){"READY_WITH_ACTIONS_REQUIRED"}else{"READY"}
  $Results.finished_at=(Get-Date).ToString("o")
  $Results|ConvertTo-Json -Depth 8|Set-Content -Encoding UTF8 $Report
