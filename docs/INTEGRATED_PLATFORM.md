@@ -65,7 +65,7 @@ Download an official Windows x64 CPU llama.cpp release archive from https://gith
 ~~~powershell
 .\scripts\Install-LlamaCpp.ps1 -ArchivePath "$HOME\Downloads\llama-cpp-windows-x64-cpu.zip" -ExpectedSha256 "PASTE_OFFICIAL_RELEASE_SHA256"
 .\scripts\Download-QwenModel.ps1
-.\scripts\Configure-LocalModel.ps1 -LlamaServerPath "$PWD\.runtime\llama.cpp\llama-server.exe" -ModelPath "$PWD\.runtime\models\Qwen3-4B-Q4_K_M.gguf" -Threads 4 -Context 2048
+.\scripts\Configure-LocalModel.ps1 -LlamaServerPath "$PWD\.runtime\llama.cpp\llama-server.exe" -ModelPath "$PWD\.runtime\models\Qwen3-4B-Q4_K_M.gguf" -Threads 4 -Context 4096
 ~~~
 
 Then restart the platform. AI_AUTOSTART=true starts the local model during Activate. The first load may take time. If the model is not configured, the AI service is reported as not-configured rather than falsely ready.
