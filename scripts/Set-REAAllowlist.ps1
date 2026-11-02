@@ -13,7 +13,7 @@ $lines.AddRange([string[]](Get-Content $envFile))
 $found=$false
 for($i=0;$i -lt $lines.Count;$i++){if($lines[$i] -match "^REA_ALLOWED_TOOLS="){$lines[$i]="REA_ALLOWED_TOOLS=$value";$found=$true;break}}
 if(-not $found){$lines.Add("REA_ALLOWED_TOOLS=$value")}
-$lines|Set-Content -Encoding UTF8 $envFile
+[System.IO.File]::WriteAllLines($envFile,[string[]]$lines,[System.Text.UTF8Encoding]::new($false))
 Write-Host "REA_ALLOWLIST_UPDATED=PASS"
 Write-Host "APPROVED_TOOL_COUNT=$($names.Count)"
 Write-Host "Only these exact names can be called from the AI interface. Restart Fun Industrial to apply the change."
