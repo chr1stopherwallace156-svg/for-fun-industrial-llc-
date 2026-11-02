@@ -81,6 +81,7 @@ def train_network(request: TrainRequest):
     loss_fn = torch.nn.MSELoss()
     tx,ty = torch.from_numpy(x),torch.from_numpy(y)
     loss_value = math.inf
+    loss_history = []
     model.train()
     for _ in range(request.epochs):
         optimizer.zero_grad()
@@ -89,8 +90,10 @@ def train_network(request: TrainRequest):
         loss.backward()
         optimizer.step()
         loss_value = float(loss.detach().item())
+        if (_ + 1) % max(1, request.epochs // 20) == 0 or _ == 0 or _ == request.epochs - 1:
+            loss_history.append({"epoch": _ + 1, "loss": loss_value})
     _model, _model_input = model, x.shape[1]
-    return {"state":"trained-in-memory","samples":len(x),"input_width":_model_input,"output_width":y.shape[1],"hidden_size":request.hidden_size,"epochs":request.epochs,"final_loss":loss_value,"device":"cpu","persistence":"memory-only; model is not saved to disk"}
+    return {"state":"trained-in-memory","samples":len(x),"input_width":_model_input,"output_width":y.shape[1],"hidden_size":request.hidden_size,"epochs":request.epochs,"final_loss":loss_value,"loss_history":loss_history,"device":"cpu","persistence":"memory-only; model is not saved to disk"}
 
 @app.post("/nn/predict")
 def predict(request: PredictRequest):
