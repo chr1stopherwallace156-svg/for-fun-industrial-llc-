@@ -58,12 +58,13 @@ try{
  $result|ConvertTo-Json -Depth 8|Set-Content -Encoding UTF8 $Report
  Write-Host "QUALIFICATION_FINAL=$state"
  Write-Host "EVIDENCE_REPORT=$Report"
- if($state -eq "FAILED"){exit 1}
+ $global:LASTEXITCODE=0
 }catch{
  Record "Qualification run" "FAIL" $_.Exception.Message
  $result=[ordered]@{document="FUN_INDUSTRIAL_WINDOWS_QUALIFICATION_V1";finished_at=(Get-Date).ToString("o");repository=$RepoRoot;final_state="FAILED";stages=$Stages;sample_execution_performed=$false}
  $result|ConvertTo-Json -Depth 8|Set-Content -Encoding UTF8 $Report
  Write-Host "QUALIFICATION_FINAL=FAILED"
  Write-Host "EVIDENCE_REPORT=$Report"
- exit 1
+ $global:LASTEXITCODE=1
+ return
 }
