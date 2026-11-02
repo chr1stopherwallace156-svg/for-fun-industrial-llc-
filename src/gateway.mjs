@@ -3,16 +3,17 @@ import http from "node:http";
 import {readFile} from "node:fs/promises";
 import {timingSafeEqual,createHash} from "node:crypto";
 import {URL} from "node:url";
+import {isIP} from "node:net";
 
 function required(env,key){const v=env[key];if(!v||!String(v).trim())throw new Error(key+" is required");return String(v).trim();}
 function normalizeIp(ip){return String(ip||"").replace(/^::ffff:/i,"").replace(/^\[|\]$/g,"");}
 export function createGatewayConfig(env=process.env){
- const bindIp=required(env,"FI_GATEWAY_BIND_IP"),allowed=new Set(required(env,"FI_GATEWAY_ALLOWED_CLIENT_IPS").split(",").map(normalizeIp));
+ const bindIp=required(env,"FI_GATEWAY_BIND_IP"),clientList=required(env,"FI_GATEWAY_ALLOWED_CLIENT_IPS").split(",").map(normalizeIp).filter(Boolean),allowed=new Set(clientList);
  const port=Number(env.FI_GATEWAY_PORT||8443),backendPort=Number(env.PORT||8787),username=required(env,"FI_GATEWAY_USERNAME"),password=required(env,"FI_GATEWAY_PASSWORD");
  const keyPath=required(env,"FI_GATEWAY_TLS_KEY"),certPath=required(env,"FI_GATEWAY_TLS_CERT"),publicHost=required(env,"FI_GATEWAY_PUBLIC_HOST").toLowerCase();
  if(!/^(?:\d{1,3}\.){3}\d{1,3}$/.test(bindIp)||bindIp.startsWith("127.")||bindIp==="0.0.0.0")throw new Error("FI_GATEWAY_BIND_IP must be an explicit non-loopback IPv4 address (use the NetBird interface address).");
  if(!Number.isInteger(port)||port<1||port>65535||!Number.isInteger(backendPort)||backendPort<1||backendPort>65535)throw new Error("Invalid gateway/backend TCP port.");
- if(!allowed.size||allowed.has("*"))throw new Error("Explicit VPN client IP allowlist required; wildcards are forbidden.");
+ if(!allowed.size||allowed.has("*")||clientList.some(ip=>isIP(ip)!==4||ip.startsWith("127.")||ip==="0.0.0.0"))throw new Error("Explicit valid IPv4 VPN client allowlist required; wildcards and non-client addresses are forbidden.");
  if(!/^[a-zA-Z0-9._-]{1,64}$/.test(username)||password.length<24)throw new Error("Gateway username must be simple and password must be at least 24 characters.");
  if(!/^[a-z0-9.-]+(?::\d+)?$/.test(publicHost))throw new Error("FI_GATEWAY_PUBLIC_HOST must be the exact public VPN DNS name or address with optional port.");
  return Object.freeze({bindIp,allowed,port,backendPort,username,password,keyPath,certPath,publicHost,origin:"https://"+publicHost});
