@@ -20,7 +20,8 @@ $projectName="FI_Static_"+[guid]::NewGuid().ToString("N")
 $exportPath=Join-Path $out "decompilation.txt"
 $logPath=Join-Path $out "ghidra-analysis.log"
 $argList=@($projectRoot,$projectName,"-import",$sample,"-scriptPath",$exporter,"-postScript","ExportDecompilation.java",$exportPath,"-analysisTimeoutPerFile","900","-log",$logPath,"-deleteProject")
-$p=Start-Process -FilePath $headless -ArgumentList $argList -Wait -PassThru -NoNewWindow
+$quotedArgs=($argList | ForEach-Object { '"' + ($_ -replace '"','\"') + '"' }) -join ' '
+$p=Start-Process -FilePath $headless -ArgumentList $quotedArgs -Wait -PassThru -NoNewWindow
 if($p.ExitCode -ne 0){throw "Ghidra headless analysis failed with exit code $($p.ExitCode). Review $logPath"}
 if(-not(Test-Path -LiteralPath $exportPath -PathType Leaf)){throw "Ghidra did not produce the expected decompilation report."}
 Write-Output "GHIDRA_STATIC_ANALYSIS=PASS"
