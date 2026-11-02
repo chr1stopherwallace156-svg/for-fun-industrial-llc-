@@ -70,28 +70,45 @@ try {
   if($LASTEXITCODE -ne 0){throw "Node tests failed."}
  } finally {Pop-Location}
  Add-Result "Node application" "PASS" "Dependencies installed; syntax and tests passed."
+ $runtimeRoot=Join-Path $RepoRoot ".runtime"
+ $reaRoot=Join-Path $runtimeRoot "rea"
+ New-Item -ItemType Directory -Force -Path $reaRoot | Out-Null
+ & $Npm install --prefix $reaRoot --ignore-scripts --no-audit --no-fund "rea-agents@6.8.0"
+ if($LASTEXITCODE -ne 0){throw "Pinned REA package installation failed."}
+ $reaEntry=Join-Path $reaRoot "node_modules\rea-agents\scripts\rea.mjs"
+ if(-not(Test-Path $reaEntry)){throw "Pinned REA package entrypoint missing: $reaEntry"}
+ Add-Result "REA package" "PASS" "rea-agents 6.8.0 installed privately under .runtime\rea; no global client configuration modified."
  $envFile=Join-Path $RepoRoot ".env"
  if(-not(Test-Path $envFile)){
  @"
 HOST=127.0.0.1
 PORT=8787
-REA_ENABLED=false
-REA_COMMAND=rea
-REA_ARGS=mcp
+REA_ENABLED=true
+REA_COMMAND=$Node
+REA_ARGS=$(Join-Path $RepoRoot ".runtime\rea\node_modules\rea-agents\scripts\rea.mjs"),mcp
+REA_REQUIRES_VPN=true
+REA_ALLOWED_TOOLS=
 NETBIRD_ENABLED=true
 NETBIRD_COMMAND=netbird
-NETBIRD_AUTOCONNECT=false
+NETBIRD_AUTOCONNECT=true
+VPN_REQUIRED=true
 COMPUTE_ENABLED=true
 COMPUTE_COMMAND=$pythonExe
 COMPUTE_PORT=8790
+FUN_INDUSTRIAL_RUNTIME=$(Join-Path $RepoRoot ".runtime")
+LLAMA_CPP_SERVER=
+LLAMA_CPP_MODEL=
+LLAMA_CPP_THREADS=4
+LLAMA_CPP_CONTEXT=2048
 "@ | Set-Content -Encoding UTF8 $envFile
   Add-Result "Configuration" "PASS" "Created loopback-only .env. REA remains disabled until installed and enabled."
  }else{
   $existing=Get-Content $envFile -Raw
   if($existing -notmatch "(?m)^HOST=127\.0\.0\.1\s*$"){throw ".env must retain HOST=127.0.0.1. Unsafe binding refused."}
-  $required = @("COMPUTE_ENABLED=true","COMPUTE_COMMAND=$pythonExe","COMPUTE_PORT=8790","NETBIRD_ENABLED=true")
+  $reaEntry=Join-Path $RepoRoot ".runtime\rea\node_modules\rea-agents\scripts\rea.mjs"
+  $required = @("COMPUTE_ENABLED=true","COMPUTE_COMMAND=$pythonExe","COMPUTE_PORT=8790","NETBIRD_ENABLED=true","VPN_REQUIRED=true","REA_ENABLED=true","REA_REQUIRES_VPN=true","REA_COMMAND=$Node","REA_ARGS=$reaEntry,mcp","FUN_INDUSTRIAL_RUNTIME=$(Join-Path $RepoRoot '.runtime')","LLAMA_CPP_THREADS=4","LLAMA_CPP_CONTEXT=2048")
   foreach($line in $required){$key=$line.Split("=")[0];if($existing -notmatch ("(?m)^"+[regex]::Escape($key)+"=")){Add-Content -Encoding UTF8 $envFile $line}}
-  Add-Result "Configuration" "PASS" "Existing .env preserved; missing compute and NetBird settings appended without overwriting existing values."
+  Add-Result "Configuration" "PASS" "Existing .env preserved; missing compute, VPN, REA and local AI settings appended without overwriting existing values."
  }
  if(-not $SkipNetBirdInstall){
   $winget=Get-Command "winget.exe" -ErrorAction SilentlyContinue
@@ -127,7 +144,7 @@ COMPUTE_PORT=8790
   $status=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/status" -TimeoutSec 5
   Add-Result "Platform API" "PASS" ("Lifecycle="+$status.lifecycle)
   $activated=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/activate" -Method Post -ContentType "application/json" -Body "{}" -TimeoutSec 45
-  foreach($service in $activated.results){$state=if($service.state -in @("running","connected","observed")){"PASS"}elseif($service.state -eq "disabled"){"WARN"}else{"WARN"};Add-Result ("Service "+$service.name) $state $service.detail}
+  foreach($service in $activated.results){$state=if($service.state -in @("running","connected","observed","ready")){"PASS"}elseif($service.state -eq "disabled"){"WARN"}else{"WARN"};Add-Result ("Service "+$service.name) $state $service.detail}
  }catch{Add-Result "Platform activation" "FAIL" $_.Exception.Message;throw "Local platform activation did not complete."}
  $Results.final_state=if(($Results.steps|Where-Object{$_.state -eq "FAIL"}).Count -gt 0){"FAILED"}elseif(($Results.steps|Where-Object{$_.state -eq "WARN"}).Count -gt 0){"READY_WITH_ACTIONS_REQUIRED"}else{"READY"}
  $Results.finished_at=(Get-Date).ToString("o")
