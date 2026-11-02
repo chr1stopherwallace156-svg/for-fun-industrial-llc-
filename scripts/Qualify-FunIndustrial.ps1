@@ -58,12 +58,16 @@ try{
  $localTools=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/ai/tools" -TimeoutSec 10
  if($localTools.local_tool_count -lt 15){throw "Built-in AI tool registry is incomplete."}
  Record "AI tool registry" "PASS" ("Local tools="+$localTools.local_tool_count+"; allowlisted REA tools="+$localTools.rea_tool_count)
- $graphBody='{"name":"fi_graph_analyze","arguments":{"nodes":["a","b","c"],"edges":[["a","b"],["b","c"]]}}'
- $graphTest=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/ai/tool-call" -Method Post -ContentType "application/json" -Body $graphBody -TimeoutSec 20
- if(-not $graphTest.result){throw "Built-in graph tool integration returned no result."}
- Record "Built-in tool dispatch" "PASS" "Graph analysis completed through the same approval-gated tool gateway used by AI chat."
- $vpnService=$platform.services|Where-Object{$_.id -eq "netbird"}|Select-Object -First 1
- if($platform.vpn_policy.required -and $platform.vpn_policy.state -ne "connected"){Record "VPN exit-node gate" "WARN" $platform.vpn_policy.detail}else{Record "VPN exit-node gate" "PASS" "Configured VPN policy satisfied or VPN requirement explicitly disabled."}
+ if($platform.vpn_policy.required -and $platform.vpn_policy.state -ne "connected"){
+  Record "VPN exit-node gate" "WARN" $platform.vpn_policy.detail
+  Record "Built-in tool dispatch" "WARN" "Skipped safely because the required VPN exit-node gate is not ready."
+ }else{
+  Record "VPN exit-node gate" "PASS" "Configured VPN policy satisfied or VPN requirement explicitly disabled."
+  $graphBody='{"name":"fi_graph_analyze","arguments":{"nodes":["a","b","c"],"edges":[["a","b"],["b","c"]]}}'
+  $graphTest=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/ai/tool-call" -Method Post -ContentType "application/json" -Body $graphBody -TimeoutSec 20
+  if(-not $graphTest.result){throw "Built-in graph tool integration returned no result."}
+  Record "Built-in tool dispatch" "PASS" "Graph analysis completed through the same approval-gated tool gateway used by AI chat."
+ }
  $reaService=$platform.services|Where-Object{$_.id -eq "rea"}|Select-Object -First 1
  if($reaService.state -eq "ready"){
   $reaCatalog=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/rea/catalog" -TimeoutSec 15
@@ -77,7 +81,8 @@ try{
   Record "Local AI inference" "PASS" ("Model="+$aiService.model_path+"; response received.")
  }else{
   $modelConfigured=(Get-Content (Join-Path $RepoRoot ".env") -ErrorAction SilentlyContinue | Where-Object {$_ -match "^LLAMA_CPP_(SERVER|MODEL)=" -and $_ -notmatch "=$"}).Count -ge 2
-  if($modelConfigured){Record "Local AI inference" "FAIL" ("Model configured but not ready: "+$aiService.state);throw "Configured local model failed readiness."}
+  if($platform.vpn_policy.required -and $platform.vpn_policy.state -ne "connected"){Record "Local AI inference" "WARN" "Local AI is deliberately blocked until the VPN exit-node gate is ready."}
+  elseif($modelConfigured){Record "Local AI inference" "FAIL" ("Model configured but not ready: "+$aiService.state);throw "Configured local model failed readiness."}
   else{Record "Local AI inference" "WARN" "Local GGUF model not configured; install/configure it before using the conversation box."}
  }
  $gitStatus=(& git -C $RepoRoot status --short | Out-String).Trim()
