@@ -4,7 +4,7 @@ This additive subsystem is independent of Elektron. It provides classic and mode
 
 ## Runtime
 
-The llama.cpp adapter requires an operator-supplied local llama-server executable and GGUF model. It never downloads weights, uses shell execution, or binds beyond 127.0.0.1. Process start is not proof of model readiness. GGUF model licenses are separate and must be reviewed individually.
+The llama.cpp adapter requires an operator-supplied local llama-server executable and GGUF model. It never downloads weights, uses shell execution, or binds beyond 127.0.0.1. The process adapter is currently a library interface only; it is not exposed as an unauthenticated HTTP process-launch endpoint. Process start is not proof of model readiness. GGUF model licenses are separate and must be reviewed individually.
 
 ## Hopfield memory
 
@@ -20,7 +20,7 @@ Each universe has its own vector dimension/index, neural-state namespace, and me
 
 ## API
 
-Endpoints are under /ai on the existing loopback compute service: health; hopfield store/recall/modern-retrieve; universes create/list/describe; per-universe vector add/search/topology; bridge create/transfer; neural-state update; llama.cpp start/status/stop.
+Endpoints are under /ai on the existing loopback compute service: health; hopfield store/recall/modern-retrieve; universes create/list/describe; per-universe vector add/search/topology; bridge create/transfer; neural-state update; llama.cpp runtime status. The runtime adapter's process-launch method is not exposed as an unauthenticated HTTP route; operator-controlled launch integration remains a later security gate.
 
 ## Qualification and limitations
 
