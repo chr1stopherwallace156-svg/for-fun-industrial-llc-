@@ -3,6 +3,10 @@ param([switch]$DeleteRepository,[switch]$RemoveGhidra,[switch]$RemoveOwnedPrereq
 $ErrorActionPreference="Stop"
 $RepoRoot=(Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $port=8787
+$gatewayTask="Fun Industrial Independent Supervisor"
+$gatewayRule=Get-NetFirewallRule -Name "FunIndustrial-Gateway-8443" -ErrorAction SilentlyContinue
+if(Get-ScheduledTask -TaskName $gatewayTask -ErrorAction SilentlyContinue){if($PSCmdlet.ShouldProcess($gatewayTask,"Stop and unregister Fun Industrial-only supervisor task")){Stop-ScheduledTask -TaskName $gatewayTask -ErrorAction SilentlyContinue;Unregister-ScheduledTask -TaskName $gatewayTask -Confirm:$false}}
+if($gatewayRule){if($PSCmdlet.ShouldProcess("FunIndustrial-Gateway-8443","Remove exact Fun Industrial gateway firewall allow rule")){Remove-NetFirewallRule -Name "FunIndustrial-Gateway-8443"}}
 $manifestPath=Join-Path $RepoRoot ".runtime\install-manifest.json"
 $installManifest=$null
 if(Test-Path $manifestPath){try{$installManifest=Get-Content $manifestPath -Raw|ConvertFrom-Json}catch{Write-Warning "Install ownership manifest could not be parsed; system prerequisites will not be removed."}}
@@ -27,7 +31,7 @@ $owned=Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Objec
  ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($venvPrefix,[System.StringComparison]::OrdinalIgnoreCase) -and $_.CommandLine -and $_.CommandLine.Contains("compute_service.app:app")) -or
  ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($runtimePrefix,[System.StringComparison]::OrdinalIgnoreCase)) -or
  ($_.CommandLine -and $_.CommandLine.Contains((Join-Path $RepoRoot ".runtime\rea"))) -or
- ($_.CommandLine -and $_.CommandLine.Contains((Join-Path $RepoRoot "src\server.mjs")))
+ ($_.CommandLine -and ($_.CommandLine.Contains((Join-Path $RepoRoot "src\server.mjs")) -or $_.CommandLine.Contains((Join-Path $RepoRoot "src\gateway.mjs")) -or $_.CommandLine.Contains((Join-Path $RepoRoot "src\supervisor.mjs"))))
 }
 foreach($process in $owned){if($PSCmdlet.ShouldProcess("Fun Industrial owned runtime PID $($process.ProcessId)","Stop exact repository-private process")){Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue}}
 $targets=@((Join-Path $RepoRoot ".venv"),(Join-Path $RepoRoot ".runtime"),(Join-Path $RepoRoot "node_modules"),(Join-Path $RepoRoot "reports"),(Join-Path $RepoRoot ".pytest_cache"))
