@@ -26,7 +26,7 @@ Clone the feature branch while PR #2 is under review; run scripts/Install-Ghidra
 
 - Dashboard and compute API are loopback-only.
 - NetBird manages WireGuard private key material; this app does not access it.
-- All functional AI/ML, compute, and REA APIs are gated on NetBird connection and its advertised IPv4 default exit-node route; managed compute, AI, and REA processes stop when that gate is lost. A Windows firewall kill switch and IPv6/DNS leak tests are still separate host-level qualification gates.
+- All functional AI/ML, compute, and REA APIs are gated on NetBird connection and its advertised IPv4 default exit-node route; managed compute, AI, and REA processes stop when that gate is lost. This is application-level fail-closed gating, not a Windows Firewall kill switch; full-device VPN-only egress and IPv6/DNS leak tests remain separate host-level qualification gates.
 - PyTorch uses CPU; GPU acceleration is not claimed.
 - REA readiness requires MCP initialize and tools/list; tools remain blocked unless their exact names are allowlisted and every call is approved in the UI.
 - AI/ML models and training state are in-memory; model persistence and multi-host distributed learning are not enabled.
