@@ -72,6 +72,7 @@ try{
  if($reaService.state -eq "ready"){
   $reaCatalog=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/rea/catalog" -TimeoutSec 15
   Record "REA MCP handshake and tools/list" "PASS" ("REA READY; tools discovered="+$reaCatalog.tools.Count)
+  if($localTools.rea_tool_count -gt 0){Record "REA tool allowlist" "PASS" ("Explicitly allowlisted tools="+$localTools.rea_tool_count)}else{Record "REA tool allowlist" "WARN" "MCP is ready, but the default-deny allowlist is empty; add reviewed read-only tools before AI can call REA."}
  }else{Record "REA MCP handshake and tools/list" "WARN" ("REA state="+$reaService.state+"; "+$reaService.detail)}
  $aiService=Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/ai/status" -TimeoutSec 10
  if($aiService.state -eq "ready"){
