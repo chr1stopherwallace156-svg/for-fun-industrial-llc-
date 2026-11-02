@@ -11,11 +11,12 @@ export function createGatewayConfig(env=process.env){
  const bindIp=required(env,"FI_GATEWAY_BIND_IP"),clientList=required(env,"FI_GATEWAY_ALLOWED_CLIENT_IPS").split(",").map(normalizeIp).filter(Boolean),allowed=new Set(clientList);
  const port=Number(env.FI_GATEWAY_PORT||8443),backendPort=Number(env.PORT||8787),username=required(env,"FI_GATEWAY_USERNAME"),password=required(env,"FI_GATEWAY_PASSWORD");
  const keyPath=required(env,"FI_GATEWAY_TLS_KEY"),certPath=required(env,"FI_GATEWAY_TLS_CERT"),publicHost=required(env,"FI_GATEWAY_PUBLIC_HOST").toLowerCase();
- if(!/^(?:\d{1,3}\.){3}\d{1,3}$/.test(bindIp)||bindIp.startsWith("127.")||bindIp==="0.0.0.0")throw new Error("FI_GATEWAY_BIND_IP must be an explicit non-loopback IPv4 address (use the NetBird interface address).");
+ if(isIP(bindIp)!==4||bindIp.startsWith("127.")||bindIp==="0.0.0.0")throw new Error("FI_GATEWAY_BIND_IP must be an explicit non-loopback IPv4 address (use the NetBird interface address).");
  if(!Number.isInteger(port)||port<1||port>65535||!Number.isInteger(backendPort)||backendPort<1||backendPort>65535)throw new Error("Invalid gateway/backend TCP port.");
  if(!allowed.size||allowed.has("*")||clientList.some(ip=>isIP(ip)!==4||ip.startsWith("127.")||ip==="0.0.0.0"))throw new Error("Explicit valid IPv4 VPN client allowlist required; wildcards and non-client addresses are forbidden.");
  if(!/^[a-zA-Z0-9._-]{1,64}$/.test(username)||password.length<24)throw new Error("Gateway username must be simple and password must be at least 24 characters.");
- if(!/^[a-z0-9.-]+(?::\d+)?$/.test(publicHost))throw new Error("FI_GATEWAY_PUBLIC_HOST must be the exact public VPN DNS name or address with optional port.");
+ const hostOnly=publicHost.replace(/:\\d+$/,"");
+ if(!(isIP(hostOnly)===4||/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(hostOnly)))throw new Error("FI_GATEWAY_PUBLIC_HOST must be the exact public VPN DNS name or IPv4 address with optional port.");
  return Object.freeze({bindIp,allowed,port,backendPort,username,password,keyPath,certPath,publicHost,origin:"https://"+publicHost});
 }
 export function createGatewayServer(config,{readFileImpl=readFile,clock=()=>Date.now()}={}){
