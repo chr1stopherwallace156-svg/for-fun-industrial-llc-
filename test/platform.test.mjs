@@ -28,3 +28,20 @@ test("disabled NetBird adapter never attempts VPN mutation",async()=>{
  assert.equal((await adapter.disconnect()).state,"disabled");
  assert.equal((await adapter.health()).state,"disabled");
 });
+
+test("NetBird VPN connect and disconnect use explicit CLI commands",async()=>{
+ const calls=[];
+ const runner=async(command,args)=>{calls.push(args);if(args[0]==="status")return {ok:true,stdout:"Daemon status: Connected"};return {ok:true,stdout:""};};
+ const adapter=createNetbirdAdapter({enabled:true,autoConnect:false,command:"netbird"},runner);
+ const connected=await adapter.connect();
+ assert.equal(connected.state,"connected");
+ assert.deepEqual(calls,[["up"],["status","-d"]]);
+ const disconnected=await adapter.disconnect();
+ assert.equal(disconnected.state,"disconnected");
+ assert.deepEqual(calls[2],["down"]);
+});
+
+test("NetBird status parser recognizes a disconnected daemon",async()=>{
+ const adapter=createNetbirdAdapter({enabled:true,autoConnect:false,command:"netbird"},async()=>({ok:true,stdout:"Daemon status: Disconnected"}));
+ assert.equal((await adapter.health()).state,"disconnected");
+});
