@@ -24,7 +24,7 @@ Start-Sleep -Seconds 2
 $venvPrefix=(Join-Path $RepoRoot ".venv").TrimEnd([char]92)+[char]92
 $runtimePrefix=(Join-Path $RepoRoot ".runtime").TrimEnd([char]92)+[char]92
 $owned=Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
- ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($venvPrefix,[System.StringComparison]::OrdinalIgnoreCase) -and $_.CommandLine.Contains("compute_service.app:app")) -or
+ ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($venvPrefix,[System.StringComparison]::OrdinalIgnoreCase) -and $_.CommandLine -and $_.CommandLine.Contains("compute_service.app:app")) -or
  ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($runtimePrefix,[System.StringComparison]::OrdinalIgnoreCase)) -or
  ($_.CommandLine -and $_.CommandLine.Contains((Join-Path $RepoRoot ".runtime\rea"))) -or
  ($_.CommandLine -and $_.CommandLine.Contains((Join-Path $RepoRoot "src\server.mjs")))
