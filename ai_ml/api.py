@@ -15,6 +15,9 @@ class Transfer(BaseModel): source:str; target:str; memory:dict
 class State(BaseModel): universe_id:str; key:str; values:list[float]
 class NeuralTrain(BaseModel): features:list[list[float]]=Field(min_length=2,max_length=512); targets:list[list[float]]=Field(min_length=2,max_length=512); hidden_size:int=Field(default=16,ge=1,le=128); epochs:int=Field(default=100,ge=1,le=500); learning_rate:float=Field(default=0.03,gt=0,le=0.2)
 class NeuralPredict(BaseModel): features:list[list[float]]=Field(min_length=1,max_length=512)
+def vector_index(universe_id):
+    try:return registry._get(universe_id).vectors
+    except ValueError as e:raise HTTPException(404,str(e)) from e
 def call(fn,*a,**kw):
     try:return fn(*a,**kw)
     except PermissionError as e:raise HTTPException(403,str(e)) from e
@@ -38,11 +41,11 @@ def listing():return {"universes":registry.list()}
 @router.get("/universes/{universe_id}")
 def describe(universe_id):return call(registry.describe,universe_id)
 @router.post("/universes/{universe_id}/vectors")
-def add_vector(universe_id,r:AddVector):return call(registry._get(universe_id).vectors.add,r.vector_id,r.vector)
+def add_vector(universe_id,r:AddVector):return call(vector_index(universe_id).add,r.vector_id,r.vector)
 @router.post("/universes/{universe_id}/search")
-def search(universe_id,r:Search):return {"results":call(registry._get(universe_id).vectors.search,r.query,r.k)}
+def search(universe_id,r:Search):return {"results":call(vector_index(universe_id).search,r.query,r.k)}
 @router.get("/universes/{universe_id}/topology")
-def topology(universe_id,neighbours:int=3):return call(registry._get(universe_id).vectors.topology,neighbours)
+def topology(universe_id,neighbours:int=3):return call(vector_index(universe_id).topology,neighbours)
 @router.post("/universes/bridges")
 def bridge(r:Bridge):return call(registry.add_bridge,r.source,r.target)
 @router.post("/universes/transfer")
