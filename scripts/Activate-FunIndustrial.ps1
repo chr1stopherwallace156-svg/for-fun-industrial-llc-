@@ -42,7 +42,7 @@ try {
  if($LASTEXITCODE -ne 0){throw "pip upgrade failed."}
  & $pythonExe -m pip install -r (Join-Path $RepoRoot "requirements-compute.txt")
  if($LASTEXITCODE -ne 0){throw "Compute dependencies installation failed."}
- & $pythonExe -m pip install torch==2.7.0 --index-url https://download.pytorch.org/whl/cpu
+ & $pythonExe -m pip install torch==2.7.0 --extra-index-url https://download.pytorch.org/whl/cpu
  if($LASTEXITCODE -ne 0){throw "CPU PyTorch installation failed."}
  & $pythonExe -m pytest (Join-Path $RepoRoot "compute_service\test_compute.py") -q
  if($LASTEXITCODE -ne 0){throw "Graph/tensor/neural tests failed."}
