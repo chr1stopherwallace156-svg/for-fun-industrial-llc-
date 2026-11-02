@@ -40,7 +40,9 @@ try {
  if($Python.Name -eq "py.exe"){& $Python.Source -3.12 --version *> $null;if($LASTEXITCODE -ne 0){throw "Python launcher does not find Python 3.12."}}
  else{$pyVersion=(& $Python.Source --version 2>&1 | Out-String).Trim();if($pyVersion -notmatch "^Python 3\.12\."){throw "Python 3.12 required; found $pyVersion."}}
  $nodeVersion=(& $Node --version).Trim()
- if([version]($nodeVersion.TrimStart("v")) -lt [version]"22.23.4"){throw "Node.js 22.23.4 or newer required; found $nodeVersion"}
+ $parsedNode=[version]($nodeVersion.TrimStart("v"))
+ $supportedNode=($parsedNode.Major -eq 22 -and $parsedNode -ge [version]"22.23.4") -or ($parsedNode.Major -eq 24 -and $parsedNode -ge [version]"24.22.1") -or ($parsedNode.Major -ge 26 -and $parsedNode -ge [version]"26.12.1")
+ if(-not $supportedNode){throw "REA requires Node 22.23.4+, 24.22.1+, or 26.12.1+; found $nodeVersion"}
  Add-Result "Prerequisites" "PASS" "Git and Node $nodeVersion found."
  $branch=(& $Git -C $RepoRoot branch --show-current).Trim()
  if($branch -notmatch "^(main|integration/.+|feature/.+)$"){Add-Result "Git branch" "WARN" "Running from $branch; expected main, integration/*, or feature/*. No branch switch performed."}else{Add-Result "Git branch" "PASS" $branch}
@@ -104,7 +106,7 @@ LLAMA_CPP_CONTEXT=2048
 AI_ENABLED=true
 AI_AUTOSTART=true
 "@ | Set-Content -Encoding UTF8 $envFile
-  Add-Result "Configuration" "PASS" "Created loopback-only .env. REA remains disabled until installed and enabled."
+  Add-Result "Configuration" "PASS" "Created loopback-only .env with VPN-required REA and local AI defaults. REA tools remain deny-by-default until explicitly allowlisted."
  }else{
   $existing=Get-Content $envFile -Raw
   if($existing -notmatch "(?m)^HOST=127\.0\.0\.1\s*$"){throw ".env must retain HOST=127.0.0.1. Unsafe binding refused."}
