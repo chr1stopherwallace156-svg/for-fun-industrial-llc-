@@ -142,5 +142,6 @@ COMPUTE_PORT=8790
  $Results.final_state="FAILED";$Results.finished_at=(Get-Date).ToString("o")
  $Results|ConvertTo-Json -Depth 8|Set-Content -Encoding UTF8 $Report
  Write-Host "Activation stopped safely. Report: $Report" -ForegroundColor Red
- exit 1
+ $global:LASTEXITCODE=1
+ return
 }
