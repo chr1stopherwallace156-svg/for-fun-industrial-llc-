@@ -31,6 +31,7 @@ const aiRoutes={"/api/ai/status":{path:"/ai/runtime/llama-cpp",method:"GET"},"/a
 const server=http.createServer(async(req,res)=>{try{
  if(req.method==="GET"&&req.url==="/"){res.writeHead(200,{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'","x-content-type-options":"nosniff","referrer-policy":"no-referrer"});return res.end(page);}
  if(req.method==="GET"&&req.url==="/api/status")return json(res,200,await platform.status());
+ if(req.method==="GET"&&req.url==="/api/rea/catalog"){if(!localRequest(req,res))return;try{return json(res,200,{tools:await platform.reaCatalog()});}catch(e){return json(res,403,{error:e.message});}}
  if(req.method==="GET"&&req.url==="/api/rea/tools"){if(!localRequest(req,res))return;try{return json(res,200,{tools:await platform.reaTools()});}catch(e){return json(res,403,{error:e.message});}}
  if(req.method==="POST"&&req.url==="/api/rea/call"){if(!localRequest(req,res))return;const body=await readBody(req,65536);if(typeof body.name!=="string"||body.name.length>128)return json(res,400,{error:"invalid tool name"});try{return json(res,200,await platform.callReaTool(body.name,body.arguments||{}));}catch(e){return json(res,403,{error:e.message});}}
  if(req.method==="POST"&&computeRoutes[req.url]){if(!localRequest(req,res))return;const body=await readBody(req);return proxyCompute(req,res,computeRoutes[req.url],"POST",body);}
