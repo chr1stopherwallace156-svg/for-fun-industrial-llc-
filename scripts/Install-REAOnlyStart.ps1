@@ -24,7 +24,7 @@ if ($platform.Contains($platformMarker) -or $server.Contains($routeMarker) -or $
   throw "PATCH_MARKER_ALREADY_PRESENT: inspect current source; no files changed."
 }
 $platformAnchor = '  async reaCatalog(){'
-$serverAnchor = '  if(req.method==="GET"&&req.url==="/api/rea/catalog"){'
+$serverAnchor = ' if(req.method==="GET"&&req.url==="/api/rea/catalog"){'
 $testAnchor = 'test("compute-only startup starts compute without starting AI or REA",async()=>{'
 if (([regex]::Matches($platform,[regex]::Escape($platformAnchor))).Count -ne 1) { throw "PLATFORM_INSERTION_POINT_MISMATCH" }
 if (([regex]::Matches($server,[regex]::Escape($serverAnchor))).Count -ne 1) { throw "SERVER_INSERTION_POINT_MISMATCH" }
