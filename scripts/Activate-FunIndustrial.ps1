@@ -168,14 +168,7 @@ AI_AUTOSTART=true
   }else{Add-Result "VPN activation" "WARN" "Skipped by operator option."}
  }else{Add-Result "NetBird client" "WARN" "Not detected; VPN controls remain unavailable until installed."}
  $listener=Get-NetTCPConnection -State Listen -LocalPort 8787 -ErrorAction SilentlyContinue
- if($listener){
-  foreach($entry in $listener){
-   $owner=Get-CimInstance Win32_Process -Filter ("ProcessId="+$entry.OwningProcess) -ErrorAction SilentlyContinue
-   if(-not $owner -or -not $owner.CommandLine.Contains((Join-Path $RepoRoot "src\server.mjs"))){throw "Port 8787 is owned by a process not identified as this Fun Industrial checkout. Refusing to connect to or stop it."}
-  }
-  Invoke-RestMethod -Uri "http://127.0.0.1:8787/api/shutdown" -Method Post -ContentType "application/json" -Body "{}" -TimeoutSec 10 | Out-Null
-  Start-Sleep -Seconds 2
- }
+ if($listener){throw "Port 8787 is already occupied. Refusing to connect to, stop, or replace an existing process."}
  $serverLog=Join-Path $ReportDir "platform-server-$Stamp.log"
  Start-Process -FilePath $Node -ArgumentList (Join-Path $RepoRoot "src\server.mjs") -WorkingDirectory $RepoRoot -RedirectStandardOutput $serverLog -RedirectStandardError ($serverLog+".err") -WindowStyle Hidden
  Start-Sleep -Seconds 3
