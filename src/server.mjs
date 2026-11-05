@@ -50,7 +50,7 @@ const server=http.createServer(async(req,res)=>{try{
   const body=await readBody(req,1000000);
   if(typeof body.name!=="string"||body.name.length>128||!body.arguments||typeof body.arguments!=="object"||Array.isArray(body.arguments))return json(res,400,{error:"invalid tool name or arguments"});
   try{
-   if(body.name.startsWith("rea__"))return json(res,200,await platform.callReaTool(body.name.slice(5),body.arguments||{}));
+   if(body.name.startsWith("rea__"))return json(res,403,{error:"REA execution is disabled in this build; catalogue access is read-only."});
    const tool=getPlatformTool(body.name);if(!tool)return json(res,403,{error:"tool is not in the fixed Fun Industrial tool registry"});
    const args={...(body.arguments||{})};let pathName=tool.path||tool.pathTemplate;
    if(tool.pathTemplate){if(typeof args.universe_id!=="string"||!args.universe_id.length)throw new Error("universe_id is required");pathName=tool.pathTemplate.replace("{universe_id}",encodeURIComponent(args.universe_id));if(!["fi_universe_neural_state_set"].includes(tool.name))delete args.universe_id;}
@@ -65,7 +65,7 @@ const server=http.createServer(async(req,res)=>{try{
 
  if(req.method==="GET"&&req.url==="/api/rea/catalog"){if(!localRequest(req,res))return;try{return json(res,200,{tools:await platform.reaCatalog()});}catch(e){return json(res,403,{error:e.message});}}
  if(req.method==="GET"&&req.url==="/api/rea/tools"){if(!localRequest(req,res))return;try{return json(res,200,{tools:await platform.reaTools()});}catch(e){return json(res,403,{error:e.message});}}
- if(req.method==="POST"&&req.url==="/api/rea/call"){if(!localRequest(req,res))return;const body=await readBody(req,65536);if(typeof body.name!=="string"||body.name.length>128)return json(res,400,{error:"invalid tool name"});try{return json(res,200,await platform.callReaTool(body.name,body.arguments||{}));}catch(e){return json(res,403,{error:e.message});}}
+ if(req.method==="POST"&&req.url==="/api/rea/call"){if(!localRequest(req,res))return;return json(res,403,{error:"REA execution is disabled in this build; catalogue access is read-only."});}
  if(req.method==="POST"&&computeRoutes[req.url]){if(!localRequest(req,res))return;if(!await requireVpnGate(res))return;const body=await readBody(req);return proxyCompute(req,res,computeRoutes[req.url],"POST",body);}
  if(aiRoutes[req.url]&&req.method===aiRoutes[req.url].method){if(!localRequest(req,res))return;const route=aiRoutes[req.url];if((req.url==="/api/ai/chat"||req.url==="/api/ai/start")&&!await requireVpnGate(res))return;const body=route.method==="POST"?await readBody(req,1000000):null;return proxyCompute(req,res,route.path,route.method,body);}
  const actions=["/api/start","/api/activate","/api/stop","/api/vpn/connect","/api/vpn/disconnect","/api/shutdown"];
@@ -80,5 +80,5 @@ const server=http.createServer(async(req,res)=>{try{
  return json(res,404,{error:"not found"});
 }catch(error){return json(res,error.message==="request too large"?413:400,{error:error.message});}});
 server.listen(config.port,config.host,()=>console.log("Fun Industrial Platform listening at http://"+config.host+":"+config.port));
-const vpnMonitor=setInterval(()=>{platform.status().catch(()=>{});},5000);vpnMonitor.unref();
+const vpnMonitor=setInterval(()=>{platform.enforceVpnPolicy().catch(()=>{});},5000);vpnMonitor.unref();
 const shutdown=async()=>{clearInterval(vpnMonitor);await platform.stop();server.close(()=>process.exit(0));};process.on("SIGINT",shutdown);process.on("SIGTERM",shutdown);
