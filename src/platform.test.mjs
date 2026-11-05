@@ -17,7 +17,7 @@ test("platform blocks every functional service until NetBird advertises the requ
  assert.equal(result.results.find(x=>x.id==="rea").state,"blocked");
  assert.deepEqual(f.counts(),{computeStarted:0,computeStopped:0,aiStarted:0,aiStopped:0,reaStarted:0,reaStopped:0,calls:0});
 });
-test("platform exposes only exact allowlisted REA tools and stops all services when VPN is lost",async()=>{
+test("REA allowlist works; status is observational and explicit VPN enforcement stops services",async()=>{
  const f=fixtures();f.setRoute(true);await f.platform.start();
  assert.deepEqual((await f.platform.reaTools()).map(x=>x.name),["safe_read"]);
  await assert.rejects(()=>f.platform.callReaTool("unsafe_write",{}),/not explicitly allowlisted/);
@@ -27,5 +27,7 @@ test("platform exposes only exact allowlisted REA tools and stops all services w
  assert.equal(status.services.find(x=>x.id==="compute").state,"blocked");
  assert.equal(status.services.find(x=>x.id==="ai").state,"blocked");
  assert.equal(status.services.find(x=>x.id==="rea").state,"blocked");
+ assert.deepEqual(f.counts(),{computeStarted:1,computeStopped:0,aiStarted:1,aiStopped:0,reaStarted:1,reaStopped:0,calls:1});
+ await f.platform.enforceVpnPolicy();
  assert.deepEqual(f.counts(),{computeStarted:1,computeStopped:1,aiStarted:1,aiStopped:1,reaStarted:1,reaStopped:1,calls:1});
 });
