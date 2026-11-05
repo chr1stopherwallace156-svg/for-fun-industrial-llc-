@@ -38,14 +38,25 @@ export function createPlatform(config,overrides={}){
   async reaCatalog(){if(config.vpnRequired&&!await vpnConnected())throw new Error("VPN or required exit-node route is not connected; REA tools are blocked.");const state=await rea.health();if(state.state!=="ready")throw new Error("REA MCP is not ready.");return rea.tools();},
   async reaTools(){return (await this.reaCatalog()).filter(tool=>config.rea.allowedTools.slice(0,14).includes(tool.name));},
   async callReaTool(name,args){if(config.vpnRequired&&!await vpnConnected())throw new Error("VPN or required exit-node route is not connected; REA tools are blocked.");if(!config.rea.allowedTools.slice(0,14).includes(name))throw new Error("REA tool is not explicitly allowlisted among the first 14 names in REA_ALLOWED_TOOLS.");return rea.callTool(name,args);},
+  async enforceVpnPolicy(){
+   const services=await Promise.all([vpn.health(),compute.health(),ai.health(),rea.health()]);
+   const secure=services[0].state==="connected"&&(!config.vpnRequireExitNode||services[0].exitNodeRoute===true);
+   const enforcement=[];
+   if(config.vpnRequired&&!secure){
+    if(config.compute.enabled!==false&&services[1].state==="running")enforcement.push({id:compute.id,...await compute.stop()});
+    if(config.ai.aiEnabled!==false&&services[2].state==="ready")enforcement.push({id:ai.id,...await ai.stop()});
+    if(config.rea.enabled&&services[3].state==="ready")enforcement.push({id:rea.id,...await rea.stop()});
+   }
+   return {enforcement,status:await this.status()};
+  },
   async status(){
    const services=await Promise.all([vpn.health(),compute.health(),ai.health(),rea.health()]);
    const secure=services[0].state==="connected"&&(!config.vpnRequireExitNode||services[0].exitNodeRoute===true);lastVpnGate=secure?"connected":"blocked";gateDetail=secure?services[0].detail:(services[0].state==="connected"&&config.vpnRequireExitNode?"NetBird connected but no IPv4 default exit-node route was detected.":services[0].detail);
    if(!secure&&services[0].state==="connected")services[0]={...services[0],state:"blocked",detail:gateDetail};
-   if(config.vpnRequired&&config.compute.enabled!==false&&!secure&&services[1].state==="running"){await compute.stop();services[1]={state:"blocked",detail:"VPN or exit-node route lost; compute service stopped by fail-closed platform policy."};}
+   if(config.vpnRequired&&config.compute.enabled!==false&&!secure&&services[1].state==="running")services[1]={state:"blocked",detail:"VPN or exit-node route lost; compute is blocked by fail-closed platform policy."};
    if(config.vpnRequired&&config.compute.enabled&&!secure&&services[1].state==="stopped")services[1]={state:"blocked",detail:"VPN_REQUIRED is enabled; compute service remains stopped until NetBird and the exit-node route are ready."};
-   if(config.vpnRequired&&config.ai.aiEnabled!==false&&!secure&&services[2].state==="ready"){await ai.stop();services[2]={state:"blocked",detail:"VPN or exit-node route lost; local AI runtime stopped by fail-closed platform policy."};}
-   if(config.vpnRequired&&config.rea.enabled&&!secure&&services[3].state==="ready"){await rea.stop();services[3]={state:"blocked",detail:"VPN or exit-node route lost; REA MCP stopped by fail-closed policy."};}
+   if(config.vpnRequired&&config.ai.aiEnabled!==false&&!secure&&services[2].state==="ready")services[2]={state:"blocked",detail:"VPN or exit-node route lost; local AI is blocked by fail-closed platform policy."};
+   if(config.vpnRequired&&config.rea.enabled&&!secure&&services[3].state==="ready")services[3]={state:"blocked",detail:"VPN or exit-node route lost; REA MCP is blocked by fail-closed policy."};
    if(config.vpnRequired&&!secure&&config.rea.enabled&&services[3].state==="stopped")services[3]={state:"blocked",detail:"VPN_REQUIRED is enabled; REA MCP unavailable while VPN or exit-node route is disconnected."};
    const definitions=[{id:"netbird",name:"NetBird VPN"},{id:"compute",name:"Graph / Tensor / Neural Compute"},{id:"ai",name:"Local AI / llama.cpp"},{id:"rea",name:"REA MCP"}];
    const mapped=services.map((service,i)=>({...definitions[i],...service}));
