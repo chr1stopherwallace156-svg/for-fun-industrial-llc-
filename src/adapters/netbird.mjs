@@ -2,7 +2,8 @@ import {runCommand} from "./command.mjs";
 function daemonConnected(output){return /daemon status:\s*connected/i.test(output)||/^\s*status:\s*connected/im.test(output);}
 export function parseNetbirdStatus(output){
  const connected=daemonConnected(output);
- const peerBlocks=output.split(/\bPeer:\s*/i).slice(1);
+ let peerBlocks=output.split(/\bPeer:\s*/i).slice(1);
+ if(!peerBlocks.length){const section=output.split(/Peers detail:\s*/i).slice(1).join("\n");if(section){const starts=[...section.matchAll(/^[ \t]+([A-Za-z0-9][A-Za-z0-9._-]*):[ \t]*$/gm)].map(m=>m.index);peerBlocks=starts.map((start,i)=>section.slice(start,starts[i+1]??section.length));}}
  const exitNodeRoute=peerBlocks.some(peer=>/Status:\s*Connected/i.test(peer)&&/(?:Networks|Routes):[^\r\n]*0\.0\.0\.0\/0/i.test(peer));
  return {connected,exitNodeRoute};
 }
