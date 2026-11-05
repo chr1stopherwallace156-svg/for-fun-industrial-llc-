@@ -22,7 +22,7 @@ export function createReaAdapter(config){
    child.stdout.setEncoding("utf8");
    reader=createInterface({input:child.stdout,crlfDelay:Infinity});
    reader.on("line",line=>{
-    if(line.length>2_000_000)return;
+    if(line.length>8_000_000)return;
     let message;try{message=JSON.parse(line);}catch{return;}
     if(message.id!==undefined&&pending.has(message.id)){
      const item=pending.get(message.id);pending.delete(message.id);clearTimeout(item.timer);
