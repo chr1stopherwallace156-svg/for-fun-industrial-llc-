@@ -5,13 +5,15 @@ import {createAiAdapter} from "./adapters/ai.mjs";
 export function createPlatform(config,overrides={}){
  const vpn=overrides.vpn||createNetbirdAdapter(config.netbird),compute=overrides.compute||createComputeAdapter(config.compute),ai=overrides.ai||createAiAdapter(config.ai),rea=overrides.rea||createReaAdapter(config.rea);
  let started=false,lastAction="idle",lastVpnGate="not-checked",gateDetail="VPN has not yet been checked.";
- async function vpnConnected(){const state=await vpn.health();const ok=state.state==="connected"&&(!config.vpnRequireExitNode||state.exitNodeRoute===true);lastVpnGate=ok?"connected":"blocked";gateDetail=ok?state.detail:(state.state==="connected"&&config.vpnRequireExitNode?"NetBird is connected but its IPv4 default route (0.0.0.0/0) is missing. Configure an approved exit node.":state.detail);return ok;}
+ function vpnSecure(state){if(state.state!=="connected")return false;if(!config.vpnRequireExitNode)return true;if(config.vpnExitNodeRole==="provider")return config.netbirdProviderConfigConfirmed===true&&config.netbirdIphoneRouteVerified===true;return state.exitNodeRoute===true;}
+ async function vpnConnected(){const state=await vpn.health();const ok=vpnSecure(state);lastVpnGate=ok?"connected":"blocked";gateDetail=ok?state.detail:(state.state!=="connected"?state.detail:config.vpnExitNodeRole==="provider"?"Windows provider configuration and iPhone route must both be operator-confirmed.":"NetBird is connected but no connected peer advertises the IPv4 default route (0.0.0.0/0).");return ok;}
  return {
   async start(){
    const results=[];
    results.push({id:vpn.id,name:vpn.name,...await vpn.start()});
-   let secure=await vpnConnected();
-   if(config.vpnRequired&&!secure){results.push({id:"vpn-connect",name:"VPN connection attempt",...await vpn.connect()});secure=await vpnConnected();}
+   let vpnState=await vpn.health();
+   let secure=vpnSecure(vpnState);
+   if(config.vpnRequired&&vpnState.state!=="connected"){results.push({id:"vpn-connect",name:"VPN connection attempt",...await vpn.connect()});vpnState=await vpn.health();secure=vpnSecure(vpnState);}
    if(config.compute.enabled===false)results.push({id:compute.id,name:compute.name,...await compute.start()});
    else if(config.vpnRequired&&!secure)results.push({id:compute.id,name:compute.name,state:"blocked",detail:"All Fun Industrial functions require the NetBird exit-node gate; compute remains stopped until VPN is ready."});
    else results.push({id:compute.id,name:compute.name,...await compute.start()});
@@ -40,7 +42,7 @@ export function createPlatform(config,overrides={}){
   async callReaTool(name,args){if(config.vpnRequired&&!await vpnConnected())throw new Error("VPN or required exit-node route is not connected; REA tools are blocked.");if(!config.rea.allowedTools.slice(0,14).includes(name))throw new Error("REA tool is not explicitly allowlisted among the first 14 names in REA_ALLOWED_TOOLS.");return rea.callTool(name,args);},
   async enforceVpnPolicy(){
    const services=await Promise.all([vpn.health(),compute.health(),ai.health(),rea.health()]);
-   const secure=services[0].state==="connected"&&(!config.vpnRequireExitNode||services[0].exitNodeRoute===true);
+   const secure=vpnSecure(services[0]);
    const enforcement=[];
    if(config.vpnRequired&&!secure){
     if(config.compute.enabled!==false&&services[1].state==="running")enforcement.push({id:compute.id,...await compute.stop()});
@@ -51,7 +53,7 @@ export function createPlatform(config,overrides={}){
   },
   async status(){
    const services=await Promise.all([vpn.health(),compute.health(),ai.health(),rea.health()]);
-   const secure=services[0].state==="connected"&&(!config.vpnRequireExitNode||services[0].exitNodeRoute===true);lastVpnGate=secure?"connected":"blocked";gateDetail=secure?services[0].detail:(services[0].state==="connected"&&config.vpnRequireExitNode?"NetBird connected but no IPv4 default exit-node route was detected.":services[0].detail);
+   const secure=vpnSecure(services[0]);lastVpnGate=secure?"connected":"blocked";gateDetail=secure?services[0].detail:(services[0].state!=="connected"?services[0].detail:config.vpnExitNodeRole==="provider"?"Windows provider configuration and iPhone route must both be operator-confirmed.":"NetBird connected but no IPv4 default exit-node route was detected.");
    if(!secure&&services[0].state==="connected")services[0]={...services[0],state:"blocked",detail:gateDetail};
    if(config.vpnRequired&&config.compute.enabled!==false&&!secure&&services[1].state==="running")services[1]={state:"blocked",detail:"VPN or exit-node route lost; compute is blocked by fail-closed platform policy."};
    if(config.vpnRequired&&config.compute.enabled&&!secure&&services[1].state==="stopped")services[1]={state:"blocked",detail:"VPN_REQUIRED is enabled; compute service remains stopped until NetBird and the exit-node route are ready."};
@@ -62,7 +64,7 @@ export function createPlatform(config,overrides={}){
    const mapped=services.map((service,i)=>({...definitions[i],...service}));
    const enabled=mapped.filter(s=>!["disabled","not-configured"].includes(s.state)),healthy=enabled.length>0&&enabled.every(s=>["running","observed","connected","ready"].includes(s.state));
    const lifecycle=!started?"stopped":enabled.length===0?"idle":healthy?"ready":"degraded";
-   return {application:"Fun Industrial Platform",version:"0.3.0",lifecycle,lastAction,services:mapped,vpn_policy:{required:config.vpnRequired,require_exit_node:config.vpnRequireExitNode,state:lastVpnGate,detail:gateDetail,rea_blocked_without_vpn:config.vpnRequired},safety:{localOnly:true,reaRequiresVpn:config.vpnRequired,reaRequiresExitNode:config.vpnRequireExitNode,shellExecution:false,customCryptography:false}};
+   return {application:"Fun Industrial Platform",version:"0.3.0",lifecycle,lastAction,services:mapped,vpn_policy:{required:config.vpnRequired,require_exit_node:config.vpnRequireExitNode,exit_node_role:config.vpnExitNodeRole||"consumer",provider_config_operator_confirmed:config.netbirdProviderConfigConfirmed===true,iphone_route_operator_verified:config.netbirdIphoneRouteVerified===true,state:lastVpnGate,detail:gateDetail,rea_blocked_without_vpn:config.vpnRequired},safety:{localOnly:true,reaRequiresVpn:config.vpnRequired,reaRequiresExitNode:config.vpnRequireExitNode,shellExecution:false,customCryptography:false}};
   }
  };
 }
