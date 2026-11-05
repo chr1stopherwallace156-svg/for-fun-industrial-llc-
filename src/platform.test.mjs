@@ -1,22 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {createPlatform} from "./platform.mjs";
-function fixtures(){
+import {parseNetbirdStatus} from "./adapters/netbird.mjs";
+function fixtures(options={}){
  let exitNodeRoute=false,computeStarted=0,computeStopped=0,aiStarted=0,aiStopped=0,reaStarted=0,reaStopped=0,calls=0;
  const vpn={id:"netbird",name:"NetBird VPN",start:async()=>({state:"connected"}),connect:async()=>({state:"connected"}),health:async()=>({state:"connected",exitNodeRoute,detail:"fixture VPN"}),stop:async()=>({state:"not-controlled"})};
  const compute={id:"compute",name:"Compute",start:async()=>{computeStarted++;return {state:"running"};},health:async()=>({state:computeStarted>computeStopped?"running":"stopped"}),stop:async()=>{computeStopped++;return {state:"stopped"};}};
  const ai={id:"ai",name:"AI",start:async()=>{aiStarted++;return {state:"ready"};},health:async()=>({state:aiStarted>aiStopped?"ready":"not-configured"}),stop:async()=>{aiStopped++;return {state:"stopped"};}};
  const rea={id:"rea",name:"REA MCP",start:async()=>{reaStarted++;return {state:"ready"};},health:async()=>({state:reaStarted>reaStopped?"ready":"stopped"}),stop:async()=>{reaStopped++;return {state:"stopped"};},tools:()=>[{name:"safe_read",inputSchema:{}},{name:"unsafe_write",inputSchema:{}}],callTool:async(name,args)=>{calls++;return {name,args};}};
- const config={vpnRequired:true,vpnRequireExitNode:true,netbird:{},compute:{},ai:{},rea:{enabled:true,allowedTools:["safe_read"]}};
+ const config={vpnRequired:true,vpnRequireExitNode:true,vpnExitNodeRole:options.role||"consumer",netbirdProviderConfigConfirmed:options.providerConfirmed===true,netbirdIphoneRouteVerified:options.iphoneVerified===true,netbird:{},compute:{},ai:{},rea:{enabled:true,allowedTools:["safe_read"]}};
  return {platform:createPlatform(config,{vpn,compute,ai,rea}),setRoute:value=>{exitNodeRoute=value;},counts:()=>({computeStarted,computeStopped,aiStarted,aiStopped,reaStarted,reaStopped,calls})};
 }
-test("platform blocks every functional service until NetBird advertises the required exit-node route",async()=>{
+test("consumer role blocks every functional service until NetBird advertises the required exit-node route",async()=>{
  const f=fixtures();const result=await f.platform.start();
  assert.equal(result.results.find(x=>x.id==="compute").state,"blocked");
  assert.equal(result.results.find(x=>x.id==="ai").state,"blocked");
  assert.equal(result.results.find(x=>x.id==="rea").state,"blocked");
  assert.deepEqual(f.counts(),{computeStarted:0,computeStopped:0,aiStarted:0,aiStopped:0,reaStarted:0,reaStopped:0,calls:0});
 });
+test("provider role requires both confirmations and does not require Windows to consume its own default route",async()=>{const unconfirmed=fixtures({role:"provider",providerConfirmed:true,iphoneVerified:false});const blocked=await unconfirmed.platform.start();assert.equal(blocked.results.find(x=>x.id==="compute").state,"blocked");assert.equal(blocked.status.vpn_policy.exit_node_role,"provider");assert.equal(blocked.status.vpn_policy.iphone_route_operator_verified,false);const confirmed=fixtures({role:"provider",providerConfirmed:true,iphoneVerified:true});const ready=await confirmed.platform.start();assert.equal(ready.results.find(x=>x.id==="compute").state,"running");assert.equal(ready.results.find(x=>x.id==="ai").state,"ready");assert.equal(ready.results.find(x=>x.id==="rea").state,"ready");assert.equal(ready.status.vpn_policy.state,"connected");});
+test("NetBird parser recognizes hostname-style and legacy peer blocks",()=>{const hostname="Daemon status: Connected\nPeers detail:\n iphone.example.net:\n  Status: Connected\n  Networks: 0.0.0.0/0\n";assert.deepEqual(parseNetbirdStatus(hostname),{connected:true,exitNodeRoute:true});const legacy="Daemon status: Connected\nPeer: iphone.example.net\n Status: Connected\n Networks: 0.0.0.0/0\n";assert.deepEqual(parseNetbirdStatus(legacy),{connected:true,exitNodeRoute:true});});
 test("REA allowlist works; status is observational and explicit VPN enforcement stops services",async()=>{
  const f=fixtures();f.setRoute(true);await f.platform.start();
  assert.deepEqual((await f.platform.reaTools()).map(x=>x.name),["safe_read"]);
