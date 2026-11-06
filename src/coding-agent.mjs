@@ -120,7 +120,7 @@ export function createCodingAgent({root,modelPort,baseDir,aiderPath,execFile=exe
       await fs.writeFile(path.join(dir,"empty-config.yml"),"{}\n");
       await fs.writeFile(path.join(dir,"empty.env"),"");
       await fs.writeFile(taskFile,"Task: "+p.task+"\n\nEdit only the explicitly supplied files. Never run shell commands, tests, or git commits. Do not add dependencies. Write the smallest reviewable change.\n",{mode:0o600});
-      const args=["--model","openai/local-model","--chat-mode","code","--message-file",taskFile,
+      const args=["--model","openai/local-model","--weak-model","openai/local-model","--editor-model","openai/local-model","--edit-format","diff","--chat-mode","code","--message-file",taskFile,
         "--no-auto-commits","--no-dirty-commits","--no-auto-lint","--no-auto-test","--no-gitignore",
         "--no-check-update","--no-analytics","--no-suggest-shell-commands","--no-stream",
         "--no-pretty","--no-restore-chat-history","--no-watch-files","--no-detect-urls","--no-auto-accept-architect",
