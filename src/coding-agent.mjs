@@ -31,14 +31,11 @@ export function validateCodingTask(task){
   if(/\b(?:password|secret|api[_-]?key|bearer)\s*[:=]\s*\S+/i.test(task))throw Error("secrets cannot be submitted to coding agent");
   return task.trim();
 }
-export function codingContextRecord({files,task,baseCommit,sessionId}){
-  return {WHO:{initiating_actor:"local operator",authority_holder:"local operator"},
-    WHAT:{objective:task.slice(0,240),requested_operation:"create isolated reviewable patch"},
-    WHY:{purpose:"operator-reviewed coding assistance",failure_reason:"NOT_ESTABLISHED"},
-    WHEN:{created_time:new Date().toISOString()},
-    WHERE:{repository_worktree:"disposable local Git clone",base_commit:baseCommit,files},
-    HOW:{method:"Aider over loopback llama.cpp",validation_method:"diff plus independently approved node tests"},
-    authority:"ISOLATED_CLONE_ONLY",session_id:sessionId,evidence_status:"CANDIDATE_NOT_QUALIFIED"};
+export function codingEvidenceRecord({files,task,baseCommit,sessionId}){
+  return {kind:"isolated-coding-candidate-v1",task:task.slice(0,240),files,
+    base_commit:baseCommit,session_id:sessionId,approval:"operator-approved",
+    candidate_status:"not_qualified",tests_run:false,
+    created_at:new Date().toISOString()};
 }
 function send(res,code,body){res.writeHead(code,{"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"});res.end(JSON.stringify(body))}
 function safeError(e){return String(e?.message||e).slice(0,340)}
@@ -145,7 +142,7 @@ export function createCodingAgent({root,modelPort,baseDir,aiderPath,execFile=exe
         session_id:id,source_commit:base,original_commit:original,changed_files:sourceFiles,out_of_scope:outOfScope,workspace:clone,
         diff_path:diffPath,diff_sha256:createHash("sha256").update(diff).digest("hex"),
         diff_preview:diff.slice(0,20000),agent_log:output.slice(-6000),tests_run:false,
-        context:codingContextRecord({files:p.files,task:p.task,baseCommit:base,sessionId:id})};
+        evidence:codingEvidenceRecord({files:p.files,task:p.task,baseCommit:base,sessionId:id})};
       await fs.writeFile(path.join(dir,"receipt.json"),JSON.stringify({...result,diff_preview:undefined},null,2));
       sessions.set(id,{...result,clone,files:p.files,created:Date.now(),tested:false});
       return result;
