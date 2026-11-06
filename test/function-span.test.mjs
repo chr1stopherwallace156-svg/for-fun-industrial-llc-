@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,writeFile,rm,mkdir} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {buildCodeContext} from '../src/code-context.mjs';
 
 async function fixture(fn){
@@ -53,3 +54,14 @@ test('regular source queries still work without an explicit function symbol',()=
  assert.ok(result.files.includes('src/unified-agent.mjs'));
  assert.ok(result.context.length<=2300);
 }));
+
+test('real selectCapabilities implementation is fully captured within the live 2300-char budget',async()=>{
+ const repoRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+ const result=await buildCodeContext(repoRoot,'Explain the selectCapabilities function in src/unified-agent.mjs',{maxChars:2300,maxFiles:140});
+ assert.equal(result.focus_symbol,'selectCapabilities');
+ assert.equal(result.source_span_complete,true);
+ assert.deepEqual(result.files,['src/unified-agent.mjs']);
+ assert.match(result.context,/scoreTool\(query,def\)/);
+ assert.match(result.context,/return \{tools:selected\.slice\(0,2\)/);
+ assert.ok(result.context.length<=2300);
+});
