@@ -50,7 +50,13 @@ export function selectCapabilities(query,localDefinitions=[],reaCatalog=[]){
 export function constrainForReadOnlyCodeAnswer(query,route,codeContext){
   if(!codeContext?.context||!Array.isArray(codeContext.files)||!codeContext.files.length)return route;
   if(!/\b(explain|describe|summari[sz]e|review|suggest|understand|how|why|what|analy[sz]e|inspect|walk through)\b/i.test(query))return route;
-  if(/\b(?:use|invoke|call|execute|run|activate)\s+(?:the\s+|an?\s+)?(?:rea(?:\s+mcp)?\s+)?(?:tool|capability|function|command|tests?\b)/i.test(query)||/\brea__[a-z0-9_]+\b/i.test(query))return route;
+  // A negated request ("do not execute tools") must never be interpreted as
+  // an affirmative tool invocation. Denial wins if the prompt is ambiguous.
+  const noToolExecution=/\b(?:do\s+not|don't|dont|never|without)\s+(?:(?:please|ever|try\s+to|need\s+to|attempt\s+to|any|the)\s+){0,3}(?:use|using|invoke|invoking|call|calling|execute|executing|run|running|activate|activating)\b/i.test(query)
+    ||/\bno\s+(?:rea\s+)?(?:tool\s+calls?|tool\s+execution)\b/i.test(query);
+  const affirmativeToolRequest=/\b(?:use|invoke|call|execute|run|activate)\s+(?:the\s+|an?\s+)?(?:rea(?:\s+mcp)?\s+)?(?:tools?|capability|function|commands?|tests?\b)/i.test(query)
+    ||/\brea__[a-z0-9_]+\b/i.test(query);
+  if(affirmativeToolRequest&&!noToolExecution)return route;
   return {...route,tools:[],routes:[],strategy:"read-only-code-analysis-v1",approval_required:true};
 }
 
