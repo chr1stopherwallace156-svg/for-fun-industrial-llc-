@@ -22,3 +22,11 @@ test('REA comes before unified readiness after dashboard restart',async()=>{
  const unified=s.indexOf('Invoke-RestMethod "$base/api/unified/status"',begin);
  assert.ok(begin>=0&&rea>begin&&unified>rea);
 });
+
+test('installer exports read-only routing helper for imported regression suite',async()=>{
+ const script=await readFile(new URL('../scripts/Repair-FunIndustrial-NegatedToolIntent.ps1',import.meta.url),'utf8');
+ assert.ok(script.includes("$oldHelper='function constrainForReadOnlyCodeAnswer(query,route,codeContext){'"));
+ assert.ok(script.includes("$newHelper='export function constrainForReadOnlyCodeAnswer(query,route,codeContext){'"));
+ assert.ok(script.includes('$patched=$patched.Replace($oldHelper,$newHelper)'));
+ assert.ok(script.indexOf('$patched=$patched.Replace($oldHelper,$newHelper)') < script.indexOf("ACTIVE_REGRESSION_FAILED"));
+});
