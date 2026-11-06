@@ -130,28 +130,61 @@ if(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyCont
 $stamp=Get-Date -Format 'yyyyMMdd-HHmmss'
 $new=Start-Process -FilePath $node -ArgumentList 'src/server.mjs' -WorkingDirectory $Root -PassThru -RedirectStandardOutput (Join-Path $logDir "coding-$stamp.out.log") -RedirectStandardError (Join-Path $logDir "coding-$stamp.err.log")
 $base="http://127.0.0.1:$Port"
-$ready=$false
+function Restore-AfterActivationFailure([string]$reason) {
+ Write-Warning "CODING_ACTIVATION_HOLD=$reason"
+ if($new -and -not $new.HasExited){Stop-Process -Id $new.Id -ErrorAction SilentlyContinue}
+ for($i=0;$i -lt 30;$i++){
+  if(-not(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)){break}
+  Start-Sleep -Milliseconds 500
+ }
+ if(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue){
+  throw "CODING_ACTIVATION_HOLD_SOURCE_NOT_RESTORED_PORT_BUSY LOGS=$logDir REASON=$reason"
+ }
+ Restore-CodingSource
+ $recovery=Start-Process -FilePath $node -ArgumentList 'src/server.mjs' -WorkingDirectory $Root -PassThru
+ # The REA adapter belongs to Node. Restore REA for the previous UI if permitted.
+ $recovered=$false
+ for($i=0;$i -lt 20;$i++){
+  Start-Sleep -Seconds 1
+  if($recovery.HasExited){break}
+  try{
+   $restoredStatus=Invoke-RestMethod "$base/api/status" -TimeoutSec 3
+   if($restoredStatus.application -eq 'Fun Industrial Platform'){$recovered=$true;break}
+  }catch{}
+ }
+ if($recovered){
+  try{$null=Invoke-RestMethod "$base/api/rea/start" -Method POST -ContentType 'application/json' -Body '{}' -TimeoutSec 120}
+  catch{Write-Warning "ROLLBACK_REA_RECONNECT_HOLD=$($_.Exception.Message)"}
+ }
+ throw "CODING_ACTIVATION_FAILED_SOURCE_RESTORED PREVIOUS_DASHBOARD_PID=$($recovery.Id) PREVIOUS_DASHBOARD_READY=$recovered LOGS=$logDir REASON=$reason"
+}
+# Phase 1: verify the new Node listener independently of REA startup.
+$httpReady=$false
 for($i=0;$i -lt 40;$i++){
  Start-Sleep -Seconds 1
  if($new.HasExited){break}
  try{
-  $s=Invoke-RestMethod "$base/api/unified/status" -TimeoutSec 3
-  if($s.state -eq 'ready'){$ready=$true;break}
+  $listen=Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue|Select-Object -First 1
+  if(-not $listen -or $listen.OwningProcess -ne $new.Id){continue}
+  $status=Invoke-RestMethod "$base/api/status" -TimeoutSec 3
+  if($status.application -eq 'Fun Industrial Platform'){$httpReady=$true;break}
  }catch{}
 }
-if(-not $ready){
- if(-not $new.HasExited){Stop-Process -Id $new.Id -ErrorAction SilentlyContinue}
- for($i=0;$i -lt 20;$i++){if(-not(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)){break};Start-Sleep -Milliseconds 500}
- Restore-CodingSource
- if(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue){throw "DASHBOARD_FAILED_PORT_BUSY_SOURCE_RESTORED LOGS=$logDir"}
- $recovery=Start-Process -FilePath $node -ArgumentList 'src/server.mjs' -WorkingDirectory $Root -PassThru
- throw "CODING_DASHBOARD_FAILED_SOURCE_RESTORED PREVIOUS_SERVER_RELAUNCHED_PID=$($recovery.Id) LOGS=$logDir"
-}
-$page=(Invoke-WebRequest "$base/" -UseBasicParsing -TimeoutSec 15).Content
-if(-not $page.Contains('showCodeSources(')){throw 'CODING_UI_NOT_SERVED'}
-$rea=Invoke-RestMethod "$base/api/rea/start" -Method POST -ContentType 'application/json' -Body '{}' -TimeoutSec 120
-$count=@((Invoke-RestMethod "$base/api/rea/tools" -TimeoutSec 30).tools).Count
+if(-not $httpReady){Restore-AfterActivationFailure 'HTTP_LISTENER_OR_API_STATUS_NOT_READY'}
+# Phase 2: the unified status depends on REA. Start only REA before checking it.
+try{
+ $rea=Invoke-RestMethod "$base/api/rea/start" -Method POST -ContentType 'application/json' -Body '{}' -TimeoutSec 120
+ if($rea.state -ne 'ready'){throw "REA_NOT_READY_STATE=$($rea.state)"}
+}catch{Restore-AfterActivationFailure ("REA_ACTIVATION_FAILED: "+$_.Exception.Message)}
+# Phase 3: confirm the cognitive memory subprocess and full unified readiness.
+try{
+ $unified=Invoke-RestMethod "$base/api/unified/status" -TimeoutSec 45
+ if($unified.state -ne 'ready'){throw "UNIFIED_STATE=$($unified.state)"}
+ $page=(Invoke-WebRequest "$base/" -UseBasicParsing -TimeoutSec 15).Content
+ if(-not $page.Contains('showCodeSources(')){throw 'CODING_UI_NOT_SERVED'}
+ $count=@((Invoke-RestMethod "$base/api/rea/tools" -TimeoutSec 30).tools).Count
+ if($count -ne 229){throw "REA_ENABLED_COUNT_MISMATCH=$count EXPECTED=229"}
+}catch{Restore-AfterActivationFailure ("POSTSTART_VERIFICATION_FAILED: "+$_.Exception.Message)}
 Write-Host "CODING_CONTEXT_READY=PASS DASHBOARD_PID=$($new.Id) REA_STATE=$($rea.state) REA_ENABLED=$count BACKUP=$backup" -ForegroundColor Green
-if($count -ne 229){Write-Warning 'REA count changed from 229; verify before REA actions.'}
 Write-Host "LOCAL_URL=$base/"
-Write-Warning 'Local code snippets are passed only to the local model; avoid storing secrets in source. Keep iPhone forwarding private and access controlled.'
+Write-Warning 'Code snippets are passed only to the local model; keep secrets out of repository files and keep iPhone forwarding private.'
