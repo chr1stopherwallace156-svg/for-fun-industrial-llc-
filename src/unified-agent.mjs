@@ -54,7 +54,7 @@ const text=(s,max)=>typeof s==="string"?s.slice(0,max):"";
 const validId=(s)=>typeof s==="string"&&/^[a-f0-9]{32}$/.test(s);
 export function createUnifiedAgent({root,config,platform,openAiToolDefinitions}){
   const db=path.join(process.env.LOCALAPPDATA||path.join(os.homedir(),"AppData","Local"),"FunIndustrial","Cognitive","unified-memory.sqlite3");
-  const py=process.env.FI_COGNITIVE_PYTHON||"python";
+  const py=process.env.FI_COGNITIVE_PYTHON||(process.platform==="win32"?path.join(os.homedir(),"AppData","Local","Programs","Python","Python312","python.exe"):"python3");
   async function memory(command,args=[]){
     const cliArgs=["-m","cognitive.cli","--db",db,command,...args];
     const {stdout}=await execFileAsync(py,cliArgs,{cwd:root,env:{...process.env,PYTHONPATH:root},windowsHide:true,timeout:12000,maxBuffer:300000});
