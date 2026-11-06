@@ -31,7 +31,15 @@ if(([regex]::Matches($old,[regex]::Escape($oldGuard))).Count -ne 1){throw 'NEGAT
 if(-not $old.Contains('const analysisRoute=constrainForReadOnlyCodeAnswer(last.content,route,codeContext);')){throw 'READONLY_ROUTING_BASELINE_MISSING'}
 if(-not $old.Contains('code_source_complete:codeContext.source_span_complete===true')){throw 'COMPLETE_SOURCE_BASELINE_MISSING'}
 $patched=$old.Replace($oldGuard,$newGuard)
-if($patched -ceq $old){throw 'PATCH_NO_CHANGE'}
+# The previous qualified Windows router declared the helper without export.
+# The regression suite imports it by name, so preserve the same public test API
+# as the GitHub candidate before running npm test on the active worktree.
+$oldHelper='function constrainForReadOnlyCodeAnswer(query,route,codeContext){'
+$newHelper='export function constrainForReadOnlyCodeAnswer(query,route,codeContext){'
+if($old.Contains($newHelper)){throw 'EXPORT_ALREADY_PRESENT_OR_BASELINE_DRIFT_HOLD'}
+if(([regex]::Matches($patched,[regex]::Escape($oldHelper))).Count -ne 1){throw 'HELPER_EXPORT_ANCHOR_MISMATCH'}
+$patched=$patched.Replace($oldHelper,$newHelper)
+if($patched -ceq $old -or -not $patched.Contains($newHelper)){throw 'PATCH_NO_CHANGE_OR_MISSING_EXPORT'}
 # Qualify candidate implementation before touching the live system.
 Push-Location $Source
 try{
