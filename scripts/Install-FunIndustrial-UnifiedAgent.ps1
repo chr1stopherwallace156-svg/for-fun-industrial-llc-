@@ -83,7 +83,10 @@ $new=Start-Process -FilePath $node -ArgumentList 'src/server.mjs' -WorkingDirect
 $base="http://127.0.0.1:$Port";$ready=$false
 for($i=0;$i -lt 40;$i++){Start-Sleep -Seconds 1;if($new.HasExited){break};try{$s=Invoke-RestMethod "$base/api/status" -TimeoutSec 2;if($s.application -eq 'Fun Industrial Platform'){$ready=$true;break}}catch{}}
 if(-not $ready){
+ if(-not $new.HasExited){Stop-Process -Id $new.Id -ErrorAction SilentlyContinue}
+ for($i=0;$i -lt 20;$i++){if(-not(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)){break};Start-Sleep -Milliseconds 500}
  Restore-Source
+ if(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue){throw "NEW_DASHBOARD_FAILED_PORT_BUSY_SOURCE_RESTORED LOGS=$logdir"}
  $recovery=Start-Process -FilePath $node -ArgumentList 'src/server.mjs' -WorkingDirectory $Root -PassThru
  throw "NEW_DASHBOARD_FAILED_RESTORED_OLD_PID=$($recovery.Id) LOGS=$logdir"
 }
