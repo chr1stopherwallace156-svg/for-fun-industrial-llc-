@@ -12,7 +12,7 @@ export function isCodingRequest(text){return typeof text==='string'&&INTENT.test
 function terms(input){return new Set((String(input).toLowerCase().match(/[a-z0-9]{3,}/g)||[]).filter(t=>!STOP.has(t)).slice(0,30))}
 function safeFile(name){const lower=name.toLowerCase();return !SKIP_NAMES.has(lower)&&!lower.startsWith('.env')&&!/(?:secret|credential|password|private.key|\.pem$|\.pfx$|\.p12$|\.key$)/i.test(lower)&&EXT.has(path.extname(lower))}
 function inside(root,file){return file.startsWith(root+path.sep)}
-function boundedLine(line){return line.length>200?line.slice(0,197)+'...':line}
+function boundedLine(line){if(/\b(?:token|secret|api[_-]?key|password|credential|private[_-]?key|authorization)\b\s*[:=]/i.test(line))return '[redacted possible credential]';return line.length>200?line.slice(0,197)+'...':line}
 
 export async function buildCodeContext(root,query,{maxChars=1000,maxFiles=140}={}){
   if(typeof query!=='string'||query.length>3000)throw new TypeError('Invalid coding query');
