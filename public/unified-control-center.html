@@ -146,10 +146,11 @@ function showWebSources(items){
  for(const item of items.slice(0,3)){const href=safeHttpHref(item.href);if(!href)continue;const a=document.createElement('a');a.href=href;a.target='_blank';a.rel='noopener noreferrer';a.textContent=String(item.title||new URL(href).hostname).slice(0,150);a.style.cssText='display:block;padding:7px 0;overflow-wrap:anywhere';card.append(a)}
  $('chatMessages').append(card);
 }
-function showCodeSources(files){
+function showCodeSources(files,focus,complete){
  if(!Array.isArray(files)||files.length===0)return;
  const card=document.createElement('div');card.className='proposal';
  const h=document.createElement('h3');h.textContent='Local source examined (read-only)';card.append(h);
+ if(focus){const note=document.createElement('div');note.className='subtle';note.textContent='Function '+String(focus).slice(0,100)+' · '+(complete?'complete source span':'incomplete — verify before relying on analysis');card.append(note);}
  for(const file of files.slice(0,3)){
   const item=document.createElement('div');item.className='subtle';item.textContent=String(file).slice(0,180);card.append(item);
  }
@@ -171,7 +172,7 @@ async function submitChat(){
    save.addEventListener('click',async()=>{save.disabled=true;try{await proposeMemory(reply,'model','Local Qwen3 chat · '+new Date().toISOString())}catch(e){save.disabled=false;appendBubble('assistant','Memory save failed: '+humanError(e),true)}});
    $('chatMessages').append(save);
   }else if(!calls.length)appendBubble('assistant','The local model returned no visible answer. Try a shorter prompt.',true);
-  showWebSources(result.web_results);showMemoryUsed(result.memories_used);showCodeSources(result.code_files);
+  showWebSources(result.web_results);showMemoryUsed(result.memories_used);showCodeSources(result.code_files,result.code_focus_symbol,result.code_source_complete);
   const defs=Array.isArray(result.tools)?result.tools:[];
   for(const call of calls)renderProposal(call,defs);
   $('chatContext').textContent='Automatic routing · '+defs.map(x=>x.function?.name).filter(Boolean).join(', ').slice(0,100)+' · '+(result.memories_used?.length||0)+' memory matches';
