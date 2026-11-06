@@ -78,8 +78,33 @@ if(-not $listener -or $listener.LocalAddress -notin @('127.0.0.1','::1')){throw 
 $oldProcess=Get-CimInstance Win32_Process -Filter "ProcessId=$($listener.OwningProcess)"
 if(-not $oldProcess -or $oldProcess.Name -ne 'node.exe' -or $oldProcess.CommandLine -notmatch 'src[/\\]server\.mjs'){throw 'DASHBOARD_PROCESS_IDENTITY_MISMATCH'}
 $base="http://127.0.0.1:$Port"
-$before=Invoke-RestMethod "$base/api/unified/status" -TimeoutSec 45
+# /api/unified/status requires a live REA catalog and cognitive memory.
+# The dashboard may answer /api/status before its REA adapter is connected.
+# Reconnect REA only when discovery is unavailable, before any source change.
+$platformStatus=Invoke-RestMethod "$base/api/status" -TimeoutSec 12
+if($platformStatus.application -ne 'Fun Industrial Platform'){throw 'BASELINE_DASHBOARD_IDENTITY_HOLD'}
+$before=$null
+try{$before=Invoke-RestMethod "$base/api/unified/status" -TimeoutSec 45}
+catch{
+ $originalFailure=$_.Exception.Message
+ Write-Host "UNIFIED_PREFLIGHT_UNAVAILABLE=$originalFailure" -ForegroundColor Yellow
+ $catalogReady=$false
+ try{
+  $catalog=Invoke-RestMethod "$base/api/rea/tools" -TimeoutSec 20
+  $catalogReady=(@($catalog.tools).Count -eq 229)
+ }catch{Write-Host "REA_DISCOVERY_PREFLIGHT_UNAVAILABLE=$($_.Exception.Message)" -ForegroundColor Yellow}
+ if(-not $catalogReady){
+  Write-Host 'REA_PREFLIGHT_RECOVERY=START_ONLY_REA'
+  try{
+   $reaPreflight=Invoke-RestMethod "$base/api/rea/start" -Method POST -ContentType 'application/json' -Body '{}' -TimeoutSec 120
+   if($reaPreflight.state -ne 'ready'){throw "REA_PREFLIGHT_NOT_READY=$($reaPreflight.state)"}
+  }catch{throw "REA_PREFLIGHT_RECOVERY_FAILED_BEFORE_SOURCE_EDITS=$($_.Exception.Message)"}
+ }
+ try{$before=Invoke-RestMethod "$base/api/unified/status" -TimeoutSec 45}
+ catch{throw "UNIFIED_STATUS_STILL_UNAVAILABLE_BEFORE_SOURCE_EDITS ORIGINAL=$originalFailure CURRENT=$($_.Exception.Message)"}
+}
 if($before.state -ne 'ready' -or $before.rea_enabled -ne 229){throw "BASELINE_UNQUALIFIED_STATE=$($before.state)_REA=$($before.rea_enabled)"}
+Write-Host "AIDER_BASELINE_READY=PASS REA_ENABLED=$($before.rea_enabled)" -ForegroundColor Green
 $backup=Join-Path $env:LOCALAPPDATA ('FunIndustrial\CodingBackups\aider-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,6))
 New-Item -ItemType Directory -Path $backup -Force|Out-Null
 Copy-Item -LiteralPath $agent -Destination (Join-Path $backup 'unified-agent.mjs')
