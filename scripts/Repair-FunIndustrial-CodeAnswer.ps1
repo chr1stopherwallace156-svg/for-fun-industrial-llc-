@@ -143,7 +143,7 @@ try{
  if($unified.state -ne 'ready'){throw "UNIFIED_NOT_READY=$($unified.state)"}
  $count=@((Invoke-RestMethod "$base/api/rea/tools" -TimeoutSec 30).tools).Count
  if($count -ne 229){throw "REA_COUNT_CHANGED=$count EXPECTED=229"}
-}catch{Restore-PreviousDashboard $_.Exception.Message}
+}catch{Restore-PreviousDashboard ($_.Exception.Message)}
 Write-Host "READONLY_CODE_ROUTING_READY=PASS PID=$($new.Id) REA=$($rea.state) ENABLED=$count BACKUP=$backup" -ForegroundColor Green
 Write-Host "LOCAL_URL=$base/"
 Write-Warning 'Code explanations will no longer propose unrelated tools. Explicit REA requests remain review-gated. Keep your iPhone forward private.'
