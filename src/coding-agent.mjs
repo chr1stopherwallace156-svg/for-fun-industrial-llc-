@@ -69,7 +69,8 @@ export function createCodingAgent({root,modelPort,baseDir,aiderPath,execFile=exe
   }
   async function status(){
     const installed=await fs.stat(aider).then(s=>s.isFile()).catch(()=>false);
-    return {provider:"Aider",installed,available:installed,mode:"on-demand",authority:"operator-approval-isolated-clone-only",model:"openai/local-model",model_port:modelPort,active_sessions:sessions.size,executing:busy};
+    const model_ready=await fetch("http://127.0.0.1:"+modelPort+"/health",{signal:AbortSignal.timeout(2000)}).then(r=>r.ok).catch(()=>false);
+    return {provider:"Aider",installed,model_ready,available:installed&&model_ready,mode:"on-demand",authority:"operator-approval-isolated-clone-only",model:"openai/local-model",model_port:modelPort,active_sessions:sessions.size,executing:busy};
   }
   function cleanPending(){for(const [id,p] of pending)if(Date.now()-p.created>300000)pending.delete(id)}
   async function intent(data){
@@ -86,13 +87,14 @@ export function createCodingAgent({root,modelPort,baseDir,aiderPath,execFile=exe
     const p=pending.get(data.intent_id);
     if(!p||p.nonce!==data.approval_token||Date.now()-p.created>300000)throw Error("approval expired or invalid");
     if(busy)throw Error("another coding operation is active");
+    if(sessions.size>=10)throw Error("maximum retained sessions reached; review prior evidence before restart");
     pending.delete(data.intent_id);
     const rootReal=await checkFiles(p.files);
     if(!await fs.stat(aider).then(s=>s.isFile()).catch(()=>false))throw Error("Aider is not installed in the dedicated local environment");
     const id=token(),dir=path.join(home,"Sessions",id),clone=path.join(dir,"worktree");
     await fs.mkdir(dir,{recursive:true});
     busy=true;
-    let output="";
+    let output="",agentFailed=false;
     try{
       const original=(await call("git",["-C",rootReal,"rev-parse","HEAD"])).trim();
       await call("git",["clone","--no-local","--no-hardlinks","--no-tags",rootReal,clone],{timeout:90000});
@@ -126,11 +128,11 @@ export function createCodingAgent({root,modelPort,baseDir,aiderPath,execFile=exe
         "--input-history-file",path.join(dir,"input.history"),"--chat-history-file",path.join(dir,"chat.history"),
         "--llm-history-file",path.join(dir,"llm.history"),"--config",path.join(dir,"empty-config.yml"),"--env-file",path.join(dir,"empty.env")];
       for(const f of p.files)args.push("--file",f);
-      const env={...process.env,OPENAI_API_BASE:modelUrl,OPENAI_API_KEY:"local-only",
+      const env={...process.env,OPENAI_API_BASE:modelUrl,OPENAI_API_KEY:"local-only",NO_PROXY:"127.0.0.1,localhost",no_proxy:"127.0.0.1,localhost",
         AIDER_ANALYTICS:"false",AIDER_CHECK_UPDATE:"false",AIDER_AUTO_COMMITS:"false",
         AIDER_AUTO_TEST:"false",AIDER_AUTO_LINT:"false",AIDER_GITIGNORE:"false"};
       try{output=await call(aider,args,{cwd:clone,env,timeout:175000})}
-      catch(e){output=String(e?.stdout||"")+"\n"+String(e?.stderr||"")+"\nERROR "+safeError(e)}
+      catch(e){agentFailed=true;output=String(e?.stdout||"")+"\n"+String(e?.stderr||"")+"\nERROR "+safeError(e)}
       const changed=(await call("git",["-C",clone,"diff","--name-only","--no-ext-diff"])).trim().split(/\r?\n/).filter(Boolean);
       const extra=(await call("git",["-C",clone,"ls-files","--others","--exclude-standard"])).trim().split(/\r?\n/).filter(Boolean);
       const outOfScope=[...changed,...extra].filter(x=>!p.files.includes(x));
@@ -138,7 +140,7 @@ export function createCodingAgent({root,modelPort,baseDir,aiderPath,execFile=exe
       const diffPath=path.join(dir,"candidate.patch");
       await fs.writeFile(diffPath,diff);
       const sourceFiles=changed.filter(x=>p.files.includes(x));
-      const result={state:outOfScope.length?"hold_scope_violation":diff.trim()?"candidate_ready":"no_patch",
+      const result={state:outOfScope.length?"hold_scope_violation":agentFailed?"hold_agent_failed":diff.trim()?"candidate_ready":"no_patch",
         session_id:id,source_commit:base,original_commit:original,changed_files:sourceFiles,out_of_scope:outOfScope,workspace:clone,
         diff_path:diffPath,diff_sha256:createHash("sha256").update(diff).digest("hex"),
         diff_preview:diff.slice(0,20000),agent_log:output.slice(-6000),tests_run:false,
