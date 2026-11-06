@@ -38,7 +38,7 @@ $newResponse='code_files:codeContext.files,code_context_tokens_estimate:codeCont
 $patchedAgent=Replace-Once $patchedAgent $oldResponse $newResponse 'SOURCE_COMPLETENESS'
 $patchedUi=Replace-Once $oldUi 'function showCodeSources(files){' 'function showCodeSources(files,focus,complete){' 'UI_SIGNATURE'
 $uiLine=" const h=document.createElement('h3');h.textContent='Local source examined (read-only)';card.append(h);"
-$uiMessage=" if(focus){const note=document.createElement('div');note.className='subtle';note.textContent='Function '+String(focus).slice(0,100)+' · '+(complete?'complete source span':'incomplete — verify before relying on analysis');card.append(note);}"
+$uiMessage=" if(focus){const note=document.createElement('div');note.className='subtle';note.textContent='Function '+String(focus).slice(0,100)+' | '+(complete?'complete source span':'incomplete - verify before relying on analysis');card.append(note);}"
 $patchedUi=Replace-Once $patchedUi $uiLine ($uiLine+[Environment]::NewLine+$uiMessage) 'UI_COMPLETENESS'
 $patchedUi=Replace-Once $patchedUi 'showCodeSources(result.code_files);' 'showCodeSources(result.code_files,result.code_focus_symbol,result.code_source_complete);' 'UI_RECEIPT'
 Push-Location $Source
