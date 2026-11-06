@@ -162,6 +162,7 @@ try{
  if($unified.state -ne 'ready' -or $unified.rea_enabled -ne 229){throw "UNIFIED_NOT_READY=$($unified.state)_REA=$($unified.rea_enabled)"}
  $codingStatus=Invoke-RestMethod "$base/api/unified/coding/status" -TimeoutSec 20
  if($codingStatus.provider -ne 'Aider' -or $codingStatus.installed -ne $true){throw 'AIDER_STATUS_NOT_INSTALLED'}
+ if($codingStatus.model_ready -ne $true){throw 'EXISTING_LOCAL_LLAMA_MODEL_NOT_READY_ON_CONFIGURED_PORT'}
  $page=(Invoke-WebRequest "$base/" -UseBasicParsing -TimeoutSec 15).Content
  if(-not $page.Contains('offerIsolatedCoding(content,result.code_files);')){throw 'UNIFIED_CODING_UI_NOT_SERVED'}
 }catch{Recover-PreviousDashboard ($_.Exception.Message)}
