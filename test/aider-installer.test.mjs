@@ -42,3 +42,17 @@ test('iPhone coding UI requires separate affirmative approval for edits and test
  assert.ok(s.includes('Approve isolated Aider edit'));
  assert.ok(s.includes('Approve isolated node --test'));
 });
+
+test('503 unified preflight recovers REA before touching active source',async()=>{
+ const s=(await ps()).toString('utf8');
+ const status=s.indexOf('Invoke-RestMethod "$base/api/status"');
+ const initial=s.indexOf('try{$before=Invoke-RestMethod "$base/api/unified/status"');
+ const catalog=s.indexOf('Invoke-RestMethod "$base/api/rea/tools"');
+ const recovery=s.indexOf('Invoke-RestMethod "$base/api/rea/start"',initial);
+ const retry=s.indexOf('try{$before=Invoke-RestMethod "$base/api/unified/status"',recovery);
+ const backup=s.indexOf('Copy-Item -LiteralPath $agent -Destination');
+ assert.ok(status>=0&&initial>status&&catalog>initial&&recovery>catalog&&retry>recovery&&backup>retry);
+ assert.ok(s.includes('REA_PREFLIGHT_RECOVERY_FAILED_BEFORE_SOURCE_EDITS'));
+ assert.ok(s.includes('UNIFIED_STATUS_STILL_UNAVAILABLE_BEFORE_SOURCE_EDITS'));
+ assert.ok(s.includes('AIDER_BASELINE_READY=PASS'));
+});
