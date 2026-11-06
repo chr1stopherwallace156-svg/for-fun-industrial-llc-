@@ -65,7 +65,8 @@ export function createCodingAgent({root,modelPort,baseDir,aiderPath,execFile=exe
       if(!stat.isFile()||stat.isSymbolicLink()||stat.size>48000)throw Error("source file unavailable or too large");
       const actual=await fs.realpath(full);
       if(!isWithin(rootReal,actual))throw Error("source symlink escape");
-      await call("git",["-C",rootReal,"ls-files","--error-unmatch","--",file]);
+      // Active dashboard source may be uncommitted or untracked by Git; copy the
+      // operator-selected snapshot into the isolated clone, not the active files.
     }
     return rootReal;
   }
@@ -96,20 +97,37 @@ export function createCodingAgent({root,modelPort,baseDir,aiderPath,execFile=exe
     busy=true;
     let output="";
     try{
-      const base=(await call("git",["-C",rootReal,"rev-parse","HEAD"])).trim();
+      const original=(await call("git",["-C",rootReal,"rev-parse","HEAD"])).trim();
       await call("git",["clone","--no-local","--no-hardlinks","--no-tags",rootReal,clone],{timeout:90000});
+      // Establish an exact source snapshot inside the clone so edits compare
+      // against the selected ACTIVE file even when it was not committed to Git.
+      const emptyHooks=path.join(dir,"no-hooks");
+      await fs.mkdir(emptyHooks);
+      for(const file of p.files){
+        const destination=path.join(clone,file);
+        await fs.mkdir(path.dirname(destination),{recursive:true});
+        await fs.copyFile(path.join(rootReal,file),destination);
+      }
+      await call("git",["-C",clone,"add","--",...p.files]);
+      const staged=await call("git",["-C",clone,"diff","--cached","--name-only"]);
+      if(staged.trim()){
+        await call("git",["-c","user.name=Fun Industrial Coding Snapshot","-c","user.email=coding-snapshot@localhost","-c","core.hooksPath="+emptyHooks,"-C",clone,"commit","-m","Snapshot approved source files for isolated coding"],{timeout:30000});
+      }
+      const base=(await call("git",["-C",clone,"rev-parse","HEAD"])).trim();
       const modelUrl="http://127.0.0.1:"+modelPort+"/v1";
       const health=await fetch("http://127.0.0.1:"+modelPort+"/health",{signal:AbortSignal.timeout(2500)}).then(r=>r.ok).catch(()=>false);
       if(!health)throw Error("existing local llama.cpp model is not ready");
       const taskFile=path.join(dir,"task.txt");
+      await fs.writeFile(path.join(dir,"empty-config.yml"),"{}\n");
+      await fs.writeFile(path.join(dir,"empty.env"),"");
       await fs.writeFile(taskFile,"Task: "+p.task+"\n\nEdit only the explicitly supplied files. Never run shell commands, tests, or git commits. Do not add dependencies. Write the smallest reviewable change.\n",{mode:0o600});
       const args=["--model","openai/local-model","--chat-mode","code","--message-file",taskFile,
         "--no-auto-commits","--no-dirty-commits","--no-auto-lint","--no-auto-test","--no-gitignore",
         "--no-check-update","--no-analytics","--no-suggest-shell-commands","--no-stream",
-        "--no-pretty","--no-restore-chat-history","--no-watch-files","--no-detect-urls",
-        "--no-show-model-warnings","--no-check-model-accepts-settings","--map-tokens","128",
+        "--no-pretty","--no-restore-chat-history","--no-watch-files","--no-detect-urls","--no-auto-accept-architect",
+        "--no-show-model-warnings","--no-check-model-accepts-settings","--map-tokens","0",
         "--input-history-file",path.join(dir,"input.history"),"--chat-history-file",path.join(dir,"chat.history"),
-        "--llm-history-file",path.join(dir,"llm.history"),"--config",path.join(dir,"empty-config.yml")];
+        "--llm-history-file",path.join(dir,"llm.history"),"--config",path.join(dir,"empty-config.yml"),"--env-file",path.join(dir,"empty.env")];
       for(const f of p.files)args.push("--file",f);
       const env={...process.env,OPENAI_API_BASE:modelUrl,OPENAI_API_KEY:"local-only",
         AIDER_ANALYTICS:"false",AIDER_CHECK_UPDATE:"false",AIDER_AUTO_COMMITS:"false",
@@ -118,13 +136,13 @@ export function createCodingAgent({root,modelPort,baseDir,aiderPath,execFile=exe
       catch(e){output=String(e?.stdout||"")+"\n"+String(e?.stderr||"")+"\nERROR "+safeError(e)}
       const changed=(await call("git",["-C",clone,"diff","--name-only","--no-ext-diff"])).trim().split(/\r?\n/).filter(Boolean);
       const extra=(await call("git",["-C",clone,"ls-files","--others","--exclude-standard"])).trim().split(/\r?\n/).filter(Boolean);
-      const outOfScope=[...changed,...extra.filter(x=>!x.startsWith(".aider"))].filter(x=>!p.files.includes(x));
+      const outOfScope=[...changed,...extra].filter(x=>!p.files.includes(x));
       const diff=await call("git",["-C",clone,"diff","--no-ext-diff","--",...p.files],{timeout:10000});
       const diffPath=path.join(dir,"candidate.patch");
       await fs.writeFile(diffPath,diff);
       const sourceFiles=changed.filter(x=>p.files.includes(x));
       const result={state:outOfScope.length?"hold_scope_violation":diff.trim()?"candidate_ready":"no_patch",
-        session_id:id,source_commit:base,changed_files:sourceFiles,out_of_scope:outOfScope,workspace:clone,
+        session_id:id,source_commit:base,original_commit:original,changed_files:sourceFiles,out_of_scope:outOfScope,workspace:clone,
         diff_path:diffPath,diff_sha256:createHash("sha256").update(diff).digest("hex"),
         diff_preview:diff.slice(0,20000),agent_log:output.slice(-6000),tests_run:false,
         context:codingContextRecord({files:p.files,task:p.task,baseCommit:base,sessionId:id})};
