@@ -6,6 +6,7 @@ import {promisify} from "node:util";
 import path from "node:path";
 import os from "node:os";
 import {buildCodeContext,isCodingRequest} from "./code-context.mjs";
+import {createCodingAgent} from "./coding-agent.mjs";
 const execFileAsync=promisify(execFile);
 const STOP=new Set("a an and are as at be by can could do does for from have how i in is it me my of on or our please that the their this to use using what when where which with would you your into give need get find show all about tell".split(" "));
 const EXPAND={website:["web","search"],online:["web","search"],internet:["web","search"],research:["web","search"],recent:["latest","news"],code:["source","repository"],repo:["repository","git"],python:["source","code"],failure:["error","test"],bugs:["failure","error"],fleet:["vehicle","industrial"],cars:["vehicle"],trucks:["vehicle"],graph:["topology","network"],memory:["recall","knowledge"],inspect:["analyze","audit"],audit:["inspect","analyze"]};
@@ -77,9 +78,16 @@ export function createUnifiedAgent({root,config,platform,openAiToolDefinitions})
     return JSON.parse(stdout);
   }
   async function catalog(){const rea=await platform.reaTools();return {local:openAiToolDefinitions([]),rea};}
+  // Optional on-demand coding adapter. No process starts and no source changes
+  // occur until the operator separately approves an isolated coding request.
+  const coding=createCodingAgent({root,modelPort:Number(process.env.LLAMA_CPP_PORT||8088)});
   return async function unified(req,res){
     try{
       const endpoint=req.url.split("?")[0];
+      if(endpoint.startsWith("/api/unified/coding/")){
+        const data=req.method==="POST"?await bodyOf(req):{};
+        return coding(req,res,endpoint,data);
+      }
       if(req.method==="GET"&&endpoint==="/api/unified/status"){
         const {local,rea}=await catalog();
         const stats=await memory("stats");

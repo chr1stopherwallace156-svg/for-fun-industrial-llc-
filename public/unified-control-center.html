@@ -156,6 +156,50 @@ function showCodeSources(files,focus,complete){
  }
  $('chatMessages').append(card);
 }
+// Aider coding is part of the same chat. It never executes just because the
+// model suggested a fix: the operator selects the isolated proposal explicitly.
+function offerIsolatedCoding(task,files){
+ if(!/\b(fix|implement|patch|refactor|edit|modify|change|repair|develop)\b/i.test(task))return;
+ if(!Array.isArray(files)||!files.length)return;
+ const selected=files.filter(f=>typeof f==='string'&&/\.(mjs|cjs|js|jsx|ts|tsx|py|rs|go|java|c|cpp|h|hpp|json|md)$/i.test(f)).slice(0,2);
+ if(!selected.length)return;
+ const card=document.createElement('div');card.className='proposal';
+ const head=document.createElement('h3');head.textContent='Optional isolated coding change';card.append(head);
+ const desc=document.createElement('div');desc.className='subtle';
+ desc.textContent='Review the exact files before approval: '+selected.join(', ')+'. Aider changes only a disposable clone, never this running installation.';
+ card.append(desc);
+ const launch=document.createElement('button');launch.className='btn secondary full';launch.textContent='Prepare coding approval';card.append(launch);
+ const status=document.createElement('div');status.className='subtle';card.append(status);
+ launch.onclick=async()=>{
+  launch.disabled=true;status.textContent='Preparing read-only action request...';
+  try{
+   const intent=await api('/api/unified/coding/intent',{task,files:selected},25000);
+   status.textContent='Review: '+intent.review.action+' | '+intent.review.files.join(', ');
+   launch.remove();
+   const approve=document.createElement('button');approve.className='btn secondary full';approve.textContent='Approve isolated Aider edit';card.append(approve);
+   approve.onclick=async()=>{
+    approve.disabled=true;status.textContent='Running Aider against a disposable clone...';
+    try{
+     const x=await api('/api/unified/coding/approve',{approve:true,intent_id:intent.intent_id,approval_token:intent.approval_token},190000);
+     status.textContent='Result: '+x.state+' | changed: '+(x.changed_files||[]).join(', ')+' | source: '+x.source_commit;
+     const pre=document.createElement('pre');pre.textContent=String(x.diff_preview||x.agent_log||'No patch generated').slice(0,12000);card.append(pre);
+     if(x.state==='candidate_ready'){
+      const test=document.createElement('button');test.className='btn secondary full';test.textContent='Approve isolated node --test';card.append(test);
+      test.onclick=async()=>{
+       test.disabled=true;status.textContent='Running approved tests in disposable clone...';
+       try{const t=await api('/api/unified/coding/test',{approve:true,session_id:x.session_id},150000);
+        status.textContent='Isolated test result: '+t.state+'; active source remains untouched.';
+        const result=document.createElement('pre');result.textContent=String(t.test_log||'').slice(-8000);card.append(result);
+       }catch(e){status.textContent='Test failed or blocked: '+humanError(e)}
+      };
+     }
+    }catch(e){status.textContent='Isolated coding request held: '+humanError(e)}
+   };
+  }catch(e){launch.disabled=false;status.textContent='Coding proposal unavailable: '+humanError(e)}
+ };
+ $('chatMessages').append(card);
+}
+
 async function submitChat(){
  if(state.chatPending)return;
  const input=$('chatInput'),content=input.value.trim();
@@ -173,6 +217,7 @@ async function submitChat(){
    $('chatMessages').append(save);
   }else if(!calls.length)appendBubble('assistant','The local model returned no visible answer. Try a shorter prompt.',true);
   showWebSources(result.web_results);showMemoryUsed(result.memories_used);showCodeSources(result.code_files,result.code_focus_symbol,result.code_source_complete);
+  offerIsolatedCoding(content,result.code_files);
   const defs=Array.isArray(result.tools)?result.tools:[];
   for(const call of calls)renderProposal(call,defs);
   $('chatContext').textContent='Automatic routing · '+defs.map(x=>x.function?.name).filter(Boolean).join(', ').slice(0,100)+' · '+(result.memories_used?.length||0)+' memory matches';
