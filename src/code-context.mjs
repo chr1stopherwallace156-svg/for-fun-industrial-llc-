@@ -14,6 +14,38 @@ function safeFile(name){const lower=name.toLowerCase();return !SKIP_NAMES.has(lo
 function inside(root,file){return file.startsWith(root+path.sep)}
 function boundedLine(line){if(/\b(?:token|secret|api[_-]?key|password|credential|private[_-]?key|authorization)\b\s*[:=]/i.test(line))return '[redacted possible credential]';return line.length>200?line.slice(0,197)+'...':line}
 
+// Heuristic top-level function-span extraction (not an AST parser). Matches an
+// explicitly named symbol and preserves contiguous source lines up to the budget.
+function namedFunctionSpan(lines,query,filename){
+  if(!/\b(?:function|method|class|def|source|code|review|explain|inspect)\b/i.test(query))return null;
+  const matchers=[
+    /^(?:(?:export|default|async)\s+)*function\s+([A-Za-z_$][\w$]*)\s*\(/,
+    /^(?:async\s+)?def\s+([A-Za-z_]\w*)\s*\(/,
+    /^(?:(?:export|default)\s+)*(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=/
+  ];
+  const names=new Set((query.match(/[A-Za-z_$][\w$]{3,}/g)||[]).map(x=>x.toLowerCase()));
+  for(let i=0;i<lines.length;i++){
+    let decl=null;
+    for(const re of matchers){decl=lines[i].match(re);if(decl)break}
+    if(!decl||!names.has(decl[1].toLowerCase()))continue;
+    let end=i,closed=false;
+    if(filename.toLowerCase().endsWith('.py')){
+      end=lines.length-1;closed=true;
+      for(let k=i+1;k<lines.length;k++)if(lines[k].trim()&&!/^\s/.test(lines[k])){end=k-1;break}
+    }else{
+      if(/;\s*$/.test(lines[i])&&!/\{\s*$/.test(lines[i])){closed=true}
+      else for(let k=i+1;k<lines.length;k++){
+        if(/^}\s*;?\s*$/.test(lines[k])){end=k;closed=true;break}
+        if(k-i>=140)break;
+      }
+    }
+    if(!closed)end=Math.min(lines.length-1,i+22);
+    return {symbol:decl[1],start:i+1,end:end+1,complete:closed,
+      source:lines.slice(i,end+1).map((line,j)=>String(i+j+1)+': '+boundedLine(line))};
+  }
+  return null;
+}
+
 export async function buildCodeContext(root,query,{maxChars=1000,maxFiles=140}={}){
   if(typeof query!=='string'||query.length>3000)throw new TypeError('Invalid coding query');
   if(!Number.isInteger(maxChars)||maxChars<100||maxChars>2400)throw new RangeError('Invalid code context budget');
@@ -47,6 +79,8 @@ export async function buildCodeContext(root,query,{maxChars=1000,maxFiles=140}={
       let score=0;
       for(const t of q){if(basename.includes(t))score+=8;else if(source.toLowerCase().includes(t))score+=1}
       if(query.toLowerCase().includes(rel.toLowerCase()))score+=30;
+      const focus=namedFunctionSpan(lines,query,rel);
+      if(focus)score+=100;
       if(!score)continue;
       let matches=[];
       for(let i=0;i<lines.length;i++){
@@ -54,10 +88,29 @@ export async function buildCodeContext(root,query,{maxChars=1000,maxFiles=140}={
       }
       if(matches.length===0)matches=[0];
       const snippet=matches.map(i=>String(i+1)+': '+boundedLine(lines[i])).join('\n');
-      candidates.push({path:rel,score,fragment:'FILE '+rel+'\n'+snippet+'\n'});
+      candidates.push({path:rel,score,fragment:'FILE '+rel+'\n'+snippet+'\n',focus});
     }
   }
   candidates.sort((a,b)=>b.score-a.score||a.path.localeCompare(b.path));
+  const exact=candidates.find(c=>c.focus);
+  if(exact){
+    const f=exact.focus;
+    const header='FILE '+exact.path+' SYMBOL '+f.symbol+' LINES '+f.start+'-'+f.end+'\n';
+    const chunks=[header];let used=header.length,fit=0;
+    for(const line of f.source){
+      if(used+line.length+1>maxChars)break;
+      chunks.push(line+'\n');used+=line.length+1;fit++;
+    }
+    const complete=f.complete&&fit===f.source.length;
+    if(!complete){
+      const marker='[SOURCE SPAN INCOMPLETE — request narrower scope]\n';
+      while(used+marker.length>maxChars&&chunks.length>1)used-=chunks.pop().length;
+      if(used+marker.length<=maxChars)chunks.push(marker);
+    }
+    const context=chunks.join('');
+    return {context,files:[exact.path],focus_symbol:f.symbol,source_span_complete:complete,
+      estimated_tokens:Math.ceil(Buffer.byteLength(context,'utf8')/3),inspected:seen,scanned_bytes:scannedBytes};
+  }
   const fragments=[],files=[];let remaining=maxChars;
   for(const c of candidates){
     if(files.length>=3||remaining<80)break;
