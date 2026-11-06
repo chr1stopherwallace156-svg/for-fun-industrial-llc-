@@ -17,3 +17,9 @@ test('unified availability is checked only after REA activation',async()=>{
  assert.ok(begin>=0&&rea>begin&&ready>rea);
  assert.ok(code.includes('FUNCTION_SPAN_READY=PASS'));
 });
+
+test('Windows PowerShell 5.1 entrypoint stays ASCII-only to avoid UTF-8 no-BOM parser corruption',async()=>{
+ const installer=await readFile(new URL('../scripts/Upgrade-FunIndustrial-FunctionSpan.ps1',import.meta.url));
+ assert.ok(installer.every(byte=>byte<=0x7F),'PowerShell entrypoint contains non-ASCII bytes without a BOM');
+ assert.ok(installer.toString('utf8').includes('incomplete - verify before relying on analysis'));
+});
