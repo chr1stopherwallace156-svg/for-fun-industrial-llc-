@@ -9,7 +9,7 @@ export const SOURCE_REGISTRY=Object.freeze([
  {id:"KR_ONBID_VEHICLE",country:"KR",name:"KAMCO OnBid Vehicle Auctions",kind:"government_auction",url:"https://www.onbid.co.kr/",allowedHost:"onbid.co.kr",access:"official_api_key_required",api:"https://www.data.go.kr/data/15157233/openapi.do",inventory:"vehicles",notes:"Manufacturer, model and mileage are searchable; import and title rules still apply"},
  {id:"VN_MOJ",country:"VN",name:"Vietnam National Asset Auction Portal",kind:"government_auction",url:"https://dgts.moj.gov.vn/",allowedHost:"dgts.moj.gov.vn",access:"public_site_manual_review",api:"not_verified",inventory:"asset_auction_notices",notes:"Notices may require registration, deposits, local eligibility and document review"},
  {id:"JP_JETRO",country:"JP",name:"JETRO Trade and Supplier Research",kind:"supplier_discovery",url:"https://www.jetro.go.jp/en/",allowedHost:"jetro.go.jp",access:"public_site_manual_review",api:"not_verified",inventory:"supplier_discovery_only",notes:"Supplier research does not certify current stock or prices"},
- {id:"GLOBAL_OSH",country:"JP",name:"Open Supply Hub Facility Research",kind:"facility_discovery",url:"https://opensupplyhub.org/",allowedHost:"opensupplyhub.org",access:"research_reference_only",api:"not_qualified",inventory:"facilities_not_goods",notes:"Facility location is not an inventory listing; country of a supplied lead must be confirmed"}
+ {id:"GLOBAL_OSH",country:"GLOBAL",name:"Open Supply Hub Facility Research",kind:"facility_discovery",url:"https://opensupplyhub.org/",allowedHost:"opensupplyhub.org",access:"research_reference_only",api:"not_qualified",inventory:"facilities_not_goods",notes:"Facility location is not an inventory listing; country of a supplied lead must be confirmed"}
 ]);
 export const PORTS=Object.freeze([
  {code:"JPTYO",country:"JP",name:"Tokyo"}, {code:"JPYOK",country:"JP",name:"Yokohama"},
@@ -67,15 +67,15 @@ export function normalizeLead(x){
  if(quantity!==null&&(!Number.isInteger(quantity)||quantity<1||quantity>1e8))throw Error("INVALID_QUANTITY");
  const amountType=["ask","current_bid","supplier_quote","unknown"].includes(x.priceType)?x.priceType:"unknown";
  const id=createHash("sha256").update(source.id+"\0"+externalId).digest("hex").slice(0,24);
- const manufacturer=makerFor(x.manufacturer||title);
+ const manufacturer=x.manufacturer?makerFor(x.manufacturer):(MAKERS.find(([,re])=>re.test(title))?.[0]||"");
  return {id,externalId,sourceId:source.id,source:source.name,country:source.country,countryName:COUNTRIES[source.country].name,
   title,titleLocal:trim(x.titleLocal||title,260),description:trim(x.description,400),category,
-  manufacturer:manufacturer==="GENERAL"?"":manufacturer,model:trim(x.model,100),
+  manufacturer,model:trim(x.model,100),
   city:trim(x.city,100),region:trim(x.region,100),originPort:port?.code||null,originPortName:port?.name||null,
   quantity,unit:trim(x.unit||"lot",30),priceLocal:price,currency:COUNTRIES[source.country].currency,
   priceType:amountType,sourceUrl:url,condition:trim(x.condition||"unverified",110),
   observedAt:trim(x.observedAt,40)||null,provenance:"operator_supplied_public_listing_unverified",
-  status:"operator_review_only",bidIsFinalPrice:false,exportEligible:"unknown",realEstate:x.category==="property"};
+  status:"operator_review_only",bidIsFinalPrice:false,exportEligible:"unknown",realEstate:category==="property"};
 }
 export function prepareInventory(raw,{limit=500,now=Date.now()}={}){
  const rows=Array.isArray(raw)?raw:raw?.leads;
