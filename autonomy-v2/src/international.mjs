@@ -2,25 +2,52 @@
 // Read-only registries and vetted operator-supplied listings, no scraping or bidding.
 import {createHash} from "node:crypto";
 const trim=(v,n=220)=>String(v??"").normalize("NFKC").replace(/[\u0000-\u001f\u007f]/g," ").trim().slice(0,n);
-export const COUNTRIES=Object.freeze({JP:{name:"Japan",currency:"JPY",language:"ja"},KR:{name:"South Korea",currency:"KRW",language:"ko"},VN:{name:"Vietnam",currency:"VND",language:"vi"}});
+export const COUNTRIES=Object.freeze({
+ JP:{name:"Japan",currency:"JPY",language:"ja"},KR:{name:"South Korea",currency:"KRW",language:"ko"},VN:{name:"Vietnam",currency:"VND",language:"vi"},
+ CN:{name:"China",currency:"CNY",language:"zh"},TW:{name:"Taiwan",currency:"TWD",language:"zh"},TH:{name:"Thailand",currency:"THB",language:"th"},
+ MY:{name:"Malaysia",currency:"MYR",language:"ms"},ID:{name:"Indonesia",currency:"IDR",language:"id"},PH:{name:"Philippines",currency:"PHP",language:"en"},
+ HK:{name:"Hong Kong",currency:"HKD",language:"zh"},IN:{name:"India",currency:"INR",language:"en"},SG:{name:"Singapore",currency:"SGD",language:"en"}
+});
 export const SOURCE_REGISTRY=Object.freeze([
  {id:"JP_KSI",country:"JP",name:"KSI Government Auctions",kind:"government_auction",url:"https://kankocho.jp/",allowedHost:"kankocho.jp",access:"public_site_manual_review",api:"not_verified",inventory:"vehicles_equipment_property",notes:"Site participation and export eligibility must be checked for each lot"},
  {id:"KR_ONBID_MOVABLE",country:"KR",name:"KAMCO OnBid Movable Property",kind:"government_auction",url:"https://www.onbid.co.kr/",allowedHost:"onbid.co.kr",access:"official_api_key_required",api:"https://www.data.go.kr/data/15157232/openapi.do",inventory:"machinery_equipment_bulk_lots",notes:"Official API application needed; schema and permissions to qualify before auto-ingestion"},
  {id:"KR_ONBID_VEHICLE",country:"KR",name:"KAMCO OnBid Vehicle Auctions",kind:"government_auction",url:"https://www.onbid.co.kr/",allowedHost:"onbid.co.kr",access:"official_api_key_required",api:"https://www.data.go.kr/data/15157233/openapi.do",inventory:"vehicles",notes:"Manufacturer, model and mileage are searchable; import and title rules still apply"},
  {id:"VN_MOJ",country:"VN",name:"Vietnam National Asset Auction Portal",kind:"government_auction",url:"https://dgts.moj.gov.vn/",allowedHost:"dgts.moj.gov.vn",access:"public_site_manual_review",api:"not_verified",inventory:"asset_auction_notices",notes:"Notices may require registration, deposits, local eligibility and document review"},
  {id:"JP_JETRO",country:"JP",name:"JETRO Trade and Supplier Research",kind:"supplier_discovery",url:"https://www.jetro.go.jp/en/",allowedHost:"jetro.go.jp",access:"public_site_manual_review",api:"not_verified",inventory:"supplier_discovery_only",notes:"Supplier research does not certify current stock or prices"},
+ {id:"KR_BUYKOREA",country:"KR",name:"KOTRA buyKOREA Exporter Marketplace",kind:"b2b_supplier_marketplace",url:"https://www.buykorea.org/",allowedHost:"buykorea.org",access:"public_browse_buyer_account_may_be_required",api:"not_verified",inventory:"Korean_company_export_products",notes:"Independent of OnBid Korean mobile registration; buyer inquiries may need separate account"},
+ {id:"JP_JGOODTECH",country:"JP",name:"Japan J-GoodTech SME Company Directory",kind:"supplier_discovery",url:"https://jgoodtech.smrj.go.jp/pub/en/",allowedHost:"jgoodtech.smrj.go.jp",access:"public_research_member_contact_approval",api:"not_verified",inventory:"company_profiles_not_live_stock",notes:"Overseas membership may require support-organization recommendation; discovery is not stock"},
+ {id:"JP_JMT",country:"JP",name:"Japan Machinery Trader",kind:"machinery_marketplace",url:"https://www.japanmachinerytrader.com/en/browse",allowedHost:"japanmachinerytrader.com",access:"public_browse_inquiry",api:"not_verified",inventory:"used_export_machinery_commercial_vehicles",notes:"Verify live listing and seller before money transfer"},
+ {id:"TW_TAIWANTRADE",country:"TW",name:"Taiwantrade Suppliers and Products",kind:"b2b_supplier_marketplace",url:"https://www.taiwantrade.com/",allowedHost:"taiwantrade.com",access:"public_browse_contact_registration",api:"not_verified",inventory:"manufacturers_components_industrial_packing",notes:"Buyer registration/inquiry is separate from public catalog; quoted prices and MOQ are unverified"},
+ {id:"TH_THAITRADE",country:"TH",name:"Thailand Thaitrade Export Marketplace",kind:"b2b_supplier_marketplace",url:"https://www.thaitrade.com/",allowedHost:"thaitrade.com",access:"public_browse_contact_registration",api:"not_verified",inventory:"Thai_exporters_products_warehousing_goods",notes:"Supported by DITP; check supplier availability, MOQ, certificates and export documents"},
+ {id:"ID_INAEXPORT",country:"ID",name:"Indonesia InaExport Company Directory",kind:"supplier_discovery",url:"https://www.inaexport.id/",allowedHost:"inaexport.id",access:"public_company_catalog_contacts_may_require_login",api:"not_verified",inventory:"export_company_and_product_directory",notes:"Official Indonesian Ministry of Trade buyer/supplier portal; prices and MOQ may require login"},
+ {id:"MY_MATRADE",country:"MY",name:"Malaysia MATRADE Products Directory",kind:"supplier_discovery",url:"https://myexport.matrade.gov.my/apps/mpd/",allowedHost:"matrade.gov.my",access:"public_company_product_directory",api:"not_verified",inventory:"exporters_packaging_electronics_industrial_equipment",notes:"Registry contains manufacturers and traders, not verified ready stock"},
+ {id:"PH_TRADELINE",country:"PH",name:"Philippines DTI TradelinePH Exporters",kind:"supplier_discovery",url:"https://tradelinephilippines.dti.gov.ph/",allowedHost:"tradelinephilippines.dti.gov.ph",access:"public_research_contact_may_require_login",api:"not_verified",inventory:"exporters_buyer_supplier_matching",notes:"Directory/business matching, not an auction inventory feed"},
+ {id:"VN_GOGLOBAL",country:"VN",name:"Vietnam Ministry of Industry and Trade GoGlobal Companies",kind:"supplier_discovery",url:"https://goglobal.moit.gov.vn/en/form/directory",allowedHost:"goglobal.moit.gov.vn",access:"public_company_directory",api:"not_verified",inventory:"Vietnamese_company_profiles_products",notes:"Official MOIT business directory; no stock or price API verified"},
+ {id:"CN_MADEINCHINA",country:"CN",name:"Made-in-China Manufacturer Marketplace",kind:"b2b_supplier_marketplace",url:"https://en.made-in-china.com/",allowedHost:"made-in-china.com",access:"public_catalog_inquiry_registration",api:"not_verified",inventory:"factories_pallet_quantity_goods_parts_container_orders",notes:"Request itemized quote and actual export origin; audited supplier badge is not proof of quality or profit"},
+ {id:"GLOBAL_ALIBABA",country:"GLOBAL",allowedCountries:["CN","TW","HK","VN","TH","MY","ID","PH","IN","JP","KR","SG"],name:"Alibaba Global Wholesale Suppliers",kind:"b2b_supplier_marketplace",url:"https://www.alibaba.com/",allowedHost:"alibaba.com",access:"public_catalog_inquiry_registration",api:"not_verified",inventory:"OEM_ODM_wholesale_bulk_and_moq_listings",notes:"Suppliers across multiple countries: seller's actual shipping origin must be confirmed; no API authorized"},
+ {id:"GLOBAL_HKTDC",country:"GLOBAL",allowedCountries:["HK","CN","TW","TH","VN","MY","ID","PH","IN","SG","JP","KR"],name:"HKTDC Hong Kong and Asia Sourcing Directory",kind:"supplier_discovery",url:"https://sourcing.hktdc.com/en",allowedHost:"hktdc.com",access:"public_supplier_directory_inquiry_registration",api:"not_verified",inventory:"Asia_company_profiles_products_sourcing",notes:"Company profiles and catalogs are not inventory; actual origin must be verified"},
  {id:"GLOBAL_OSH",country:"GLOBAL",name:"Open Supply Hub Facility Research",kind:"facility_discovery",url:"https://opensupplyhub.org/",allowedHost:"opensupplyhub.org",access:"research_reference_only",api:"not_qualified",inventory:"facilities_not_goods",notes:"Facility location is not an inventory listing; country of a supplied lead must be confirmed"}
 ]);
 export const PORTS=Object.freeze([
  {code:"JPTYO",country:"JP",name:"Tokyo"}, {code:"JPYOK",country:"JP",name:"Yokohama"},
  {code:"KRPUS",country:"KR",name:"Busan"}, {code:"KRINC",country:"KR",name:"Incheon"},
  {code:"VNSGN",country:"VN",name:"Ho Chi Minh City"}, {code:"VNHPH",country:"VN",name:"Hai Phong"},
+ {code:"CNSHA",country:"CN",name:"Shanghai"},{code:"CNSZX",country:"CN",name:"Shenzhen"},
+ {code:"TWTPE",country:"TW",name:"Taipei"},{code:"TWKHH",country:"TW",name:"Kaohsiung"},
+ {code:"THBKK",country:"TH",name:"Bangkok"},{code:"THLCH",country:"TH",name:"Laem Chabang"},
+ {code:"IDJKT",country:"ID",name:"Jakarta"},{code:"IDSUB",country:"ID",name:"Surabaya"},
+ {code:"MYPKG",country:"MY",name:"Port Klang"},{code:"MYTPP",country:"MY",name:"Tanjung Pelepas"},
+ {code:"PHMNL",country:"PH",name:"Manila"},{code:"HKHKG",country:"HK",name:"Hong Kong"},
+ {code:"SGSIN",country:"SG",name:"Singapore"},{code:"INMAA",country:"IN",name:"Chennai"},
  {code:"USLAX",country:"US",name:"Los Angeles"}, {code:"USLGB",country:"US",name:"Long Beach"}
 ]);
-export const CATEGORIES=Object.freeze(["bulk_lots","vehicles","industrial_equipment","electronics_components","textiles","furniture","property","general"]);
+export const CATEGORIES=Object.freeze(["bulk_lots","shipping_containers","packaging_materials","vehicles","industrial_equipment","electronics_components","automotive_parts","textiles","furniture","property","general"]);
 const REGISTRY=new Map(SOURCE_REGISTRY.map(s=>[s.id,s]));
 const PORTMAP=new Map(PORTS.map(p=>[p.code,p]));
 const CATS=[
+ ["shipping_containers",/(?:\b(?:shipping container|sea container|intermodal container|20ft container|40ft container)\b|コンテナ|貨柜|貨櫃|컨테이너)/i],
+ ["packaging_materials",/(?:\b(?:packaging materials|corrugated box|carton boxes|pallet packaging|packing crates)\b|包材|包装箱|梱包材|บรรจุภัณฑ์|kemasan|bao bì)/i],
+ ["automotive_parts",/(?:\b(?:auto parts|car parts|automotive components|engine parts)\b|自動車部品|汽车配件|자동차부품|phụ tùng ô tô)/i],
  ["bulk_lots",/(?:\b(?:pallet|crate|container lot|bulk lot|wholesale lot|overstock|liquidation)\b|パレット|まとめ売り|一括|팔레트|일괄|화물|pallet|thùng hàng|lô hàng)/i],
  ["vehicles",/(?:\b(?:truck|vehicle|pickup|forklift|automotive|motorbike|car|bus)\b|トラック|自動車|車両|자동차|차량|트럭|xe tải|ô tô|xe hơi)/i],
  ["industrial_equipment",/(?:\b(?:generator|lathe|machinery|compressor|industrial equipment|machine|conveyor|cnc)\b|工作機械|機械|発電機|기계|공작|발전기|máy móc|thiết bị|máy phát điện)/i],
@@ -29,7 +56,7 @@ const CATS=[
  ["furniture",/(?:\b(?:furniture|desk|chair|cabinet)\b|家具|가구|nội thất)/i],
  ["property",/(?:\b(?:real estate|building|warehouse property|land plot)\b|不動産|부동산|bất động sản)/i]
 ];
-const MAKERS=[["TOYOTA",/(?:\btoyota\b|トヨタ|도요타|토요타)/i],["HYUNDAI",/(?:\bhyundai\b|현대|ヒュンダイ)/i],["SAMSUNG",/(?:\bsamsung\b|삼성|サムスン)/i],["HONDA",/(?:\bhonda\b|ホンダ|혼다)/i],["KIA",/(?:\bkia\b|기아)/i],["MITSUBISHI",/(?:\bmitsubishi\b|三菱|미쓰비시)/i],["DAEWOO",/(?:\bdaewoo\b|대우)/i]];
+const MAKERS=[["KOMATSU",/(?:\bkomatsu\b|コマツ|小松)/i],["HITACHI",/(?:\bhitachi\b|日立)/i],["ISUZU",/(?:\bisuzu\b|いすゞ)/i],["CAT",/(?:\bcaterpillar\b|\bcat\b|卡特彼勒)/i],["TOYOTA",/(?:\btoyota\b|トヨタ|도요타|토요타)/i],["HYUNDAI",/(?:\bhyundai\b|현대|ヒュンダイ)/i],["SAMSUNG",/(?:\bsamsung\b|삼성|サムスン)/i],["HONDA",/(?:\bhonda\b|ホンダ|혼다)/i],["KIA",/(?:\bkia\b|기아)/i],["MITSUBISHI",/(?:\bmitsubishi\b|三菱|미쓰비시)/i],["DAEWOO",/(?:\bdaewoo\b|대우)/i]];
 export const categoryFor=(name)=>CATS.find(([,re])=>re.test(trim(name,800)))?.[0]||"general";
 export function makerFor(value){const name=trim(value,120);return MAKERS.find(([,re])=>re.test(name))?.[0]||name.toUpperCase()}
 function isHttpsSourceUrl(raw,source){
@@ -53,14 +80,19 @@ export function normalizeLead(x){
  if(!source)throw Error("SOURCE_NOT_APPROVED");
  // Facility directory is research, not inventory: report the real rejection before checking country.
  if(source.kind==="facility_discovery")throw Error("FACILITY_NOT_A_SELLER_OR_LISTING");
- if(x.country&&x.country!==source.country)throw Error("COUNTRY_SOURCE_MISMATCH");
+ // Global B2B platforms must provide the actual item/company origin; a platform's
+ // headquarters is not automatically the location where goods ship from.
+ const country=source.country==="GLOBAL"?trim(x.country,2).toUpperCase():source.country;
+ if(!COUNTRIES[country])throw Error("COUNTRY_REQUIRED_OR_UNSUPPORTED");
+ if(source.country==="GLOBAL"&&!source.allowedCountries.includes(country))throw Error("COUNTRY_NOT_SUPPORTED_BY_SOURCE");
+ if(source.country!=="GLOBAL"&&x.country&&x.country!==source.country)throw Error("COUNTRY_SOURCE_MISMATCH");
  const externalId=trim(x.externalId,130),title=trim(x.title,260);
  if(!externalId||!title)throw Error("LEAD_ID_TITLE_REQUIRED");
  const url=isHttpsSourceUrl(x.url,source);
  if(!url)throw Error("LEAD_SOURCE_URL_NOT_APPROVED");
  const category=CATEGORIES.includes(x.category)?x.category:categoryFor([title,x.description].join(" "));
  const originPort=trim(x.originPort,5).toUpperCase(),port=originPort?PORTMAP.get(originPort):null;
- if(originPort&&(!port||port.country!==source.country))throw Error("ORIGIN_PORT_MISMATCH");
+ if(originPort&&(!port||port.country!==country))throw Error("ORIGIN_PORT_MISMATCH");
  const price=money(x.priceLocal);
  if(x.priceLocal!=null&&x.priceLocal!==""&&price===null)throw Error("INVALID_PRICE");
  const quantity=money(x.quantity);
@@ -68,11 +100,13 @@ export function normalizeLead(x){
  const amountType=["ask","current_bid","supplier_quote","unknown"].includes(x.priceType)?x.priceType:"unknown";
  const id=createHash("sha256").update(source.id+"\0"+externalId).digest("hex").slice(0,24);
  const manufacturer=x.manufacturer?makerFor(x.manufacturer):(MAKERS.find(([,re])=>re.test(title))?.[0]||"");
- return {id,externalId,sourceId:source.id,source:source.name,country:source.country,countryName:COUNTRIES[source.country].name,
+ return {id,externalId,sourceId:source.id,source:source.name,country,countryName:COUNTRIES[country].name,
   title,titleLocal:trim(x.titleLocal||title,260),description:trim(x.description,400),category,
+  companyName:trim(x.companyName,150),recordType:["supplier_profile","product_listing","auction_lot"].includes(x.recordType)?x.recordType:(source.kind==="supplier_discovery"?"supplier_profile":"product_listing"),
+  minOrderQuantity:money(x.minOrderQuantity),incoterm:trim(x.incoterm,18)||"unverified",
   manufacturer,model:trim(x.model,100),
   city:trim(x.city,100),region:trim(x.region,100),originPort:port?.code||null,originPortName:port?.name||null,
-  quantity,unit:trim(x.unit||"lot",30),priceLocal:price,currency:COUNTRIES[source.country].currency,
+  quantity,unit:trim(x.unit||"lot",30),priceLocal:price,currency:COUNTRIES[country].currency,
   priceType:amountType,priceBasis:["lot_total","per_unit"].includes(x.priceBasis)?x.priceBasis:"unknown",sourceUrl:url,condition:trim(x.condition||"unverified",110),
   observedAt:trim(x.observedAt,40)||null,provenance:"operator_supplied_public_listing_unverified",
   status:"operator_review_only",bidIsFinalPrice:false,exportEligible:"unknown",realEstate:category==="property"};

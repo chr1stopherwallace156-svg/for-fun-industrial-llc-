@@ -1,0 +1,20 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import {fileURLToPath} from "node:url";
+import {prepareInventory} from "../src/international.mjs";
+const file=fileURLToPath(new URL("../data/asia-public-supplier-research-20261107.json",import.meta.url));
+test("grounded company research pack is valid, uniquely sourced and never claims prices, stock or export permission",()=>{
+ const rows=JSON.parse(fs.readFileSync(file,"utf8"));
+ assert.equal(rows.length,4);
+ const data=prepareInventory(rows);
+ assert.equal(data.count,4);
+ assert.equal(data.countries.JP,1);
+ assert.equal(data.countries.ID,1);
+ assert.equal(data.countries.HK,2);
+ assert.equal(data.leads.every(x=>x.recordType==="supplier_profile"),true);
+ assert.equal(data.leads.every(x=>x.priceLocal===null&&x.exportEligible==="unknown"&&x.status==="operator_review_only"),true);
+ assert.equal(new Set(data.leads.map(x=>x.id)).size,4);
+ assert.equal(data.leads.some(x=>x.sourceId==="KR_ONBID_VEHICLE"),false);
+ assert.ok(data.leads.every(x=>x.sourceUrl.startsWith("https://")));
+});
