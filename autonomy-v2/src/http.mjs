@@ -3,6 +3,7 @@ import {readFileSync} from "node:fs";
 import {join} from "node:path";
 import {events,readJSON,HOME} from "./core.mjs";
 import {DomesticScan} from "./jobs.mjs";
+import {combinedOpportunities} from "./gsa-bridge.mjs";
 const page=readFileSync(join(HOME,"dashboard.html"),"utf8");
 const ALLOWED=new Set(["/","/api/status","/api/events","/api/tasks","/api/research","/api/rea","/api/opportunities"]);
 function output(res,status,body,type="application/json; charset=utf-8"){
@@ -27,7 +28,7 @@ export function startDashboard({sidequest,port=8792}){
   if(req.url==="/api/tasks")return output(res,200,{tasks:readJSON("pending-tasks.json",[]).slice(-100).reverse()});
   if(req.url==="/api/research")return output(res,200,{research:readJSON("latest-research.json",{}),products:readJSON("product-snapshot.json",{})});
   if(req.url==="/api/rea")return output(res,200,readJSON("rea-registry.json",{state:"not_yet_observed"}));
-  if(req.url==="/api/opportunities")return output(res,200,readJSON("domestic-latest.json",{checkedAt:null,scope:"United States",mode:"read_only_discovery",items:[],sources:[],summary:{total:0,workingSources:0,unavailableSources:0}}));
+  if(req.url==="/api/opportunities")return output(res,200,combinedOpportunities(readJSON("domestic-latest.json",{checkedAt:null,scope:"United States",mode:"read_only_discovery",items:[],sources:[],summary:{total:0,workingSources:0,unavailableSources:0}}),readJSON("gsa-import.json",null)));
   const jobs=await sidequest.job.count();
   return output(res,200,{state:"running",application:"Fun Industrial Autonomous Workers",version:"0.2.0",pid:process.pid,uptimeSeconds:Math.floor(process.uptime()),schedule:{platform:"every 5 minutes",registry:"every 30 minutes",research:"every 6 hours",products:"hourly",domestic:"every 6 hours; on-demand scan"},mode:"read-only",reaToolCalls:0,aiderRuns:0,externalResearch:"allowlisted GitHub releases, Grants.gov, optional SAM.gov and GSA Auctions APIs",jobs,platform:readJSON("platform-health.json",{state:"pending"}),lastResearch:readJSON("latest-research.json",{state:"pending"}),registry:readJSON("rea-registry.json",{state:"pending"}),eventsRecorded:events(10000).length});
  }catch(e){return output(res,500,{error:"DASHBOARD_ERROR",detail:String(e.message).slice(0,150)})}});
