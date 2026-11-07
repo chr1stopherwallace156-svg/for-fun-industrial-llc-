@@ -15,6 +15,52 @@ test("government solicitation and surplus normalization",()=>{
  const gsa=normalizeGSA({Results:{Result:[{SaleNo:"A123",LotNo:"08",ItemName:"Used pallet of industrial parts",HighBidAmount:"370.50",PropertyCity:"Los Angeles",PropertyState:"CA"}]}});
  assert.equal(gsa[0].kind,"surplus_auction");assert.equal(gsa[0].askPrice,370.5);assert.equal(gsa[0].currency,"USD");
 });
+test("GSA live camelCase response captures active sale, bidder count, and safe condition text",()=>{
+ const sample={auctions:[
+  {saleNo:"91QSCI-26-100",lotNo:12,itemName:"Six pairs of extreme cold boots",
+   auctionStatus:"Active",propertyCity:"Pullman",propertyState:"WA",biddersCount:2,
+   highBidAmount:"$1,250.50",aucEndDt:"2026-11-12",
+   lotInfo:"<h4>Overview</h4><p>This lot contains (6) pairs of extreme cold boots.</p><p>Parts may be missing; repairs &amp; inspection required.</p><script>alert('x')</script>",
+   itemDescURL:"https://www.gsaauctions.gov/"
+  }]};
+ const out=normalizeGSA(sample);
+ assert.equal(out.length,1);
+ assert.equal(out[0].kind,"surplus_auction");
+ assert.equal(out[0].source,"GSA Auctions");
+ assert.equal(out[0].location,"Pullman, WA");
+ assert.equal(out[0].askPrice,1250.50);
+ assert.equal(out[0].deadline,"2026-11-12");
+ assert.match(out[0].summary,/Auction status: Active/);
+ assert.match(out[0].summary,/Bidders: 2/);
+ assert.match(out[0].summary,/Parts may be missing/);
+ assert.doesNotMatch(out[0].summary,/<h4>|<p>|<script>/i);
+ assert.match(out[0].summary,/Highest observed bid \(not final price\)/);
+});
+test("GSA response preserves legacy fields and safely rejects malformed values",()=>{
+ const x=normalizeGSA({Results:{Result:[{
+   SaleNo:"SELL-01",LotNo:"2",ItemName:"Government surplus pallet",
+   HighBidAmount:"not-a-number",AuctionStatus:"A",
+   LotDescript:"<p>Used &amp; untested</p>",PropertyState:"CA",PropertyCity:"Los Angeles"}]}});
+ assert.equal(x[0].askPrice,null);
+ assert.equal(x[0].location,"Los Angeles, CA");
+ assert.match(x[0].summary,/Used & untested/);
+});
+test("GSA scan works with a separately supplied key and never uses it in result diagnostics",async()=>{
+ const grants={errorcode:0,data:{oppHits:[]}};
+ const sample={items:[{saleNo:"US-812",lotNo:1,itemName:"Fleet truck",auctionStatus:"Active",propertyCity:"Sacramento",propertyState:"CA",highBidAmount:900}]};
+ const seen=[];
+ const fetcher=async(url)=>{
+  seen.push(url);
+  return {ok:true,text:async()=>JSON.stringify(url.includes("gsa.gov")?sample:grants)};
+ };
+ const out=await scanDomestic({fetcher,env:{GSA_API_KEY:"unit-test-secret"},manual:[]});
+ assert.equal(out.summary.auctionCount,1);
+ assert.equal(out.items[0].title,"Fleet truck");
+ assert.equal(out.sources.find(s=>s.name==="GSA Auctions").ok,true);
+ assert.equal(out.sources.find(s=>s.name==="GSA Auctions").count,1);
+ assert.ok(seen.some(u=>u.includes("api_key=unit-test-secret")));
+ assert.doesNotMatch(JSON.stringify(out),/unit-test-secret/);
+});
 test("ranking is relevance, not profitability or a purchase recommendation",()=>{
  const a={title:"Fleet truck equipment lot",summary:"salvage"};
  const b={title:"Art history lecture",summary:""};
