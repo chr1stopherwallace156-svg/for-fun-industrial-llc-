@@ -23,20 +23,75 @@ export function normalizeSAM(response){
  if(!Array.isArray(response?.opportunitiesData))throw Error("SAM_RESPONSE_INVALID");
  return response.opportunitiesData.slice(0,100).filter(o=>o&&o.noticeId&&o.title).map(o=>record("SAM.gov","solicitation",o.noticeId,o.title,{summary:"Notice "+clean(o.solicitationNumber)+"; type "+clean(o.type)+"; NAICS "+clean(o.naicsCode),deadline:o.responseDeadLine||o.reponseDeadLine,url:publicLink(o.uiLink)||("https://sam.gov/opp/"+encodeURIComponent(String(o.noticeId))+"/view"),location:clean(o.placeOfPerformance?.state?.name||o.placeOfPerformance?.state?.code||"USA")}));
 }
+// GSA has supplied both legacy PascalCase and live camelCase JSON responses.
+// Parse field names explicitly and treat free-text auction descriptions as untrusted HTML.
+function gsaValue(obj,...names){
+ if(!obj||typeof obj!=="object"||Array.isArray(obj))return undefined;
+ const props=Object.keys(obj);
+ for(const name of names){
+  const key=props.find(p=>p.replace(/[^a-z0-9]/gi,"").toLowerCase()===name.toLowerCase());
+  if(key!==undefined&&obj[key]!==null&&obj[key]!==undefined)return obj[key];
+ }
+ return undefined;
+}
+function gsaText(value,limit=450){
+ if(Array.isArray(value))return clean(value.slice(0,30).map(row=>
+  typeof row==="string"?row:gsaValue(row,"lotDescript","description","text")||"").join(" "),limit);
+ if(value===undefined||value===null)return "";
+ if(typeof value==="object")return "";
+ const html=String(value).replace(/<\s*(?:br|\/p|\/h[1-6]|\/li)\b[^>]*>/gi," ")
+  .replace(/<[^>]*>/g," ").replace(/&#(?:x([a-f0-9]+)|([0-9]+));/gi,(_,hex,dec)=>{
+   const n=parseInt(hex||dec,hex?16:10);return n>0&&n<=0x10ffff?String.fromCodePoint(n):" ";
+  }).replace(/&(amp|nbsp|quot|apos|lt|gt|ndash|mdash|reg);/gi,(_,name)=>
+   ({amp:"&",nbsp:" ",quot:'"',apos:"'",lt:"<",gt:">",ndash:"-",mdash:"-",reg:"(R)"})[name.toLowerCase()]||" ");
+ return clean(html.replace(/\s+/g," "),limit);
+}
+function gsaBid(value){
+ if(value===undefined||value===null||value==="")return null;
+ if(typeof value==="number")return Number.isFinite(value)&&value>=0?value:null;
+ if(typeof value!=="string")return null;
+ const n=value.trim().replace(/^\$/,"").replace(/,/g,"");
+ return /^\d+(?:\.\d{1,2})?$/.test(n)&&Number.isFinite(Number(n))?Number(n):null;
+}
 export function extractGSALots(response){
- const result=[],stack=[{v:response,d:0}],seen=new Set();
- while(stack.length&&seen.size<10000&&result.length<MAX_ITEMS){
-  const {v,d}=stack.shift();
+ const result=[],queue=[{v:response,d:0}],seen=new Set();
+ let head=0;
+ while(head<queue.length&&seen.size<15000&&result.length<MAX_ITEMS){
+  const {v,d}=queue[head++];
   if(!v||typeof v!=="object"||seen.has(v))continue;seen.add(v);
-  if(v.SaleNo!=null&&(v.ItemName||v.LotDescript)){result.push(v);continue}
-  if(d<7){for(const val of Object.values(v).slice(0,30)){if(val&&typeof val==="object"){if(Array.isArray(val)){for(const item of val.slice(0,250))stack.push({v:item,d:d+1})}else stack.push({v:val,d:d+1})}}}
+  const sale=gsaValue(v,"saleNo","saleNumber","auctionId");
+  const name=gsaValue(v,"itemName","lotDescript","itemDescription","title","lotInfo");
+  // Require a sale/auction identity and item description; reject opaque wrappers.
+  if(sale!==undefined&&name!==undefined){result.push(v);continue}
+  if(d<7)for(const val of Object.values(v).slice(0,35)){
+   if(!val||typeof val!=="object")continue;
+   if(Array.isArray(val)){for(const item of val.slice(0,600))queue.push({v:item,d:d+1})}
+   else queue.push({v:val,d:d+1});
+  }
  }
  return result;
 }
 export function normalizeGSA(response){
  const lots=extractGSALots(response);
  if(!lots.length)throw Error("GSA_RESPONSE_HAS_NO_RECOGNIZED_LOTS");
- return lots.slice(0,MAX_ITEMS).map((o,i)=>record("GSA Auctions","surplus_auction",clean(o.SaleNo)+"-"+clean(o.LotNo??i),o.ItemName||o.LotDescript,{summary:"Lot "+clean(o.LotNo)+"; "+clean(o.LotDescript)+"; status "+clean(o.AuctionStatus),deadline:o.AucEndDt,askPrice:o.HighBidAmount,location:[o.PropertyCity,o.PropertyState].map(x=>clean(x)).filter(Boolean).join(", "),url:publicLink(o.ItemDescURL)||"https://www.gsaauctions.gov/"}));
+ return lots.map((o,i)=>{
+  const sale=gsaText(gsaValue(o,"saleNo","saleNumber","auctionId"),100);
+  const lot=gsaText(gsaValue(o,"lotNo","lotNumber","lotSequence"),50);
+  const name=gsaText(gsaValue(o,"itemName","itemDescription","title","lotDescript"),220)
+    ||("GSA auction lot "+sale+(lot?" / "+lot:""));
+  const description=gsaText(gsaValue(o,"lotInfo","lotDescript","itemDescription"),340);
+  const status=gsaText(gsaValue(o,"auctionStatus","status"),35);
+  const bidders=gsaValue(o,"biddersCount","bidderCount");
+  const observedBid=gsaBid(gsaValue(o,"highBidAmount","currentBid","highestBid"));
+  const summary=["Lot "+(lot||"unspecified"),description,status?"Auction status: "+status:"",
+   bidders!==undefined?"Bidders: "+gsaText(bidders,8):"",observedBid!==null?"Highest observed bid (not final price): $"+observedBid:""].filter(Boolean).join("; ");
+  return record("GSA Auctions","surplus_auction",sale+"-"+(lot||i),name,{
+   summary,deadline:gsaValue(o,"aucEndDt","auctionEndDate","endDate","closingDate"),
+   askPrice:observedBid,
+   location:[gsaValue(o,"propertyCity","city"),gsaValue(o,"propertyState","state")].map(x=>gsaText(x,70)).filter(Boolean).join(", "),
+   url:publicLink(gsaValue(o,"itemDescURL","itemDescUrl","itemDescriptionUrl","auctionUrl"))||"https://www.gsaauctions.gov/"
+  });
+ });
 }
 export function validateManual(items){
  if(!Array.isArray(items))throw Error("MANUAL_LEADS_MUST_BE_ARRAY");
