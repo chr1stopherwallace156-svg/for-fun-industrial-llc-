@@ -14,7 +14,7 @@ $server=Join-Path $Root 'src\server.mjs'
 $html=Join-Path $Root 'public\index.html'
 $patcher=Join-Path $source 'scripts\patch-asia-dashboard.mjs'
 $launcher=Join-Path $installed 'Start.ps1'
-$modules=@('src\international.mjs','Import-International.mjs')
+$modules=@('src\international.mjs','src\http.mjs','Import-International.mjs')
 foreach($f in @($server,$html,$patcher,$launcher,(Join-Path $installed 'src\service.mjs'))){
  if(-not(Test-Path $f -PathType Leaf)){throw "INTERNATIONAL_PREREQUISITE_MISSING=$f"}
 }
@@ -22,7 +22,7 @@ foreach($f in $modules){
  $src=Join-Path $source $f;if(-not(Test-Path $src -PathType Leaf)){throw "INTERNATIONAL_SOURCE_MISSING=$f"}
  & $node --check $src;if($LASTEXITCODE -ne 0){throw "INTERNATIONAL_SYNTAX_HOLD=$f"}
 }
-$tests=@('test\international.test.mjs','test\international-import.test.mjs','test\international-patcher.test.mjs','test\domestic.test.mjs','test\gsa-bridge.test.mjs','test\gsa-import.test.mjs','test\asia-suppliers.test.mjs','test\asia-dashboard-patcher.test.mjs')
+$tests=@('test\international.test.mjs','test\international-import.test.mjs','test\international-patcher.test.mjs','test\domestic.test.mjs','test\gsa-bridge.test.mjs','test\gsa-import.test.mjs','test\asia-suppliers.test.mjs','test\asia-dashboard-patcher.test.mjs','test\asia-research-leads.test.mjs')
 foreach($f in $tests){if(-not(Test-Path (Join-Path $source $f) -PathType Leaf)){throw "INTERNATIONAL_TEST_MISSING=$f"}}
 $nodeTestArgs=@('--test')+@($tests|ForEach-Object {Join-Path $source $_})
 & $node @nodeTestArgs
@@ -102,12 +102,13 @@ if([int]$afterUnified.rea_enabled -ne $preservedEnabled){throw 'REA_EXECUTION_SC
  $intl=Invoke-RestMethod "$base/api/autonomy/international" -TimeoutSec 20
  if($intl.scope -ne 'international' -or @($intl.sources).Count -lt 18){throw '8789_ASIA_SOURCE_REGISTRY_NOT_READY'}
 if(-not $intl.countries.TW -or -not $intl.countries.TH -or -not $intl.countries.ID){throw 'ASIA_COUNTRY_REGISTRY_NOT_READY'}
+if($intl.summary.verifiedStockCount -ne 0 -or $null -eq $intl.summary.companyProfiles){throw 'ASIA_COMPANY_VS_STOCK_SUMMARY_MISSING'}
  $checkDomestic=Invoke-RestMethod "$base/api/autonomy/opportunities" -TimeoutSec 20
  if($checkDomestic.scope -ne 'United States'){throw '8789_DOMESTIC_ROUTE_FAILED'}
  $page=(Invoke-WebRequest "$base/" -UseBasicParsing -TimeoutSec 15).Content
  if(-not $page.Contains('FI_ASIA_COMPANIES_V2')){throw '8789_ASIA_SUPPLIER_PANEL_NOT_SERVED'}
  Write-Host "ASIA_COMPANY_SOURCING_V2=PASS DASHBOARD_PID=$($newUI.Id) WORKER_PID=$newWorkerPid REA_CATALOG=$($catalog.Count)"
- Write-Host "ASIA_COUNTRIES=12 REGISTERED_SOURCES=$(@($intl.sources).Count) INVENTORY_COUNT=$($intl.summary.total) MODE=RESEARCH_ONLY"
+ Write-Host "ASIA_COUNTRIES=12 REGISTERED_SOURCES=$(@($intl.sources).Count) IMPORTED_RESEARCH_LEADS=$($intl.summary.total) COMPANY_PROFILES=$($intl.summary.companyProfiles) VERIFIED_STOCK=$($intl.summary.verifiedStockCount)"
  Write-Host "DASHBOARD=$base/ MENU=Autonomy"
  Write-Host "BACKUP=$backup"
  Write-Host 'AUTOMATED_ASIA_SUPPLIER_FEEDS=NOT_YET_QUALIFIED; KOREAN_ONBID_KEY=NOT_REQUIRED_FOR_OTHER_SOURCES'
