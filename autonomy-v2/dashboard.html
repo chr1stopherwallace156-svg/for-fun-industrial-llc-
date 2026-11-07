@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fun Industrial — Autonomous Workers</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}
+body{margin:0;background:#0d141e;color:#edf3fa;font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1000px;margin:auto;padding:24px 16px 70px}
+header{display:flex;gap:16px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:25px}
+h1{font-size:clamp(23px,4vw,32px);margin:0}h2{font-size:16px;margin:0 0 10px}
+small,p.muted{color:#a8b8ca}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px}
+.panel{border:1px solid #35465a;border-radius:15px;padding:17px;background:#172536}
+.stat{font-size:26px;font-weight:750;color:#83ead0;margin:3px 0}.bad{color:#ffaaa9}.ok{color:#83ead0}
+button{padding:10px 15px;border:1px solid #698ba3;border-radius:9px;color:#edf3fa;background:#1e354d;cursor:pointer}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;color:#c5d6e3}
+ul{padding-left:20px;margin-bottom:0}li{margin:7px 0;overflow-wrap:anywhere}
+#note{color:#a8b8ca}a{color:#80dcef}
+</style>
+</head>
+<body><main>
+<header><div><small>FUN INDUSTRIAL / LOCAL FIRST</small><h1>Autonomous Worker Console</h1><p class="muted">Code-driven Sidequest + SQLite · Read-only · Local PC</p></div><button id="refresh">Refresh</button></header>
+<div class="grid">
+ <section class="panel"><h2>Coordinator</h2><div class="stat" id="coordinator">Checking</div><small id="pid"></small></section>
+ <section class="panel"><h2>REA registry</h2><div class="stat" id="rea">Checking</div><small>Inventory only · Zero automatic tool calls</small></section>
+ <section class="panel"><h2>Platform</h2><div class="stat" id="platform">Checking</div><small>Discover → Analyze → Verify</small></section>
+ <section class="panel"><h2>Reviews pending</h2><div class="stat" id="pending">Checking</div><small>Human review before consequential action</small></section>
+</div>
+<div class="grid">
+ <section class="panel"><h2>Latest research</h2><ul id="research"></ul></section>
+ <section class="panel"><h2>Background schedule</h2><ul id="schedule"></ul></section>
+</div>
+<section class="panel" style="margin-bottom:14px"><h2>Operator review queue</h2><ul id="tasks"></ul></section>
+<section class="panel"><h2>Recent worker events</h2><ul id="events"></ul></section>
+<p id="note"></p>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+function text(id,value){$(id).textContent=String(value)}
+function list(id,items,format){const el=$(id);el.replaceChildren();if(!items.length){const li=document.createElement("li");li.textContent="No records yet";el.append(li);return}for(const obj of items.slice(0,35)){const li=document.createElement("li");li.textContent=format(obj);el.append(li)}}
+async function api(path){const r=await fetch(path,{cache:"no-store"});if(!r.ok)throw Error(path+" HTTP "+r.status);return r.json()}
+async function refresh(){
+ $("refresh").disabled=true;
+ try{
+  const [s,e,t]=await Promise.all([api("/api/status"),api("/api/events"),api("/api/tasks")]);
+  text("coordinator",s.state);text("pid","Process "+s.pid+" · uptime "+s.uptimeSeconds+"s");
+  text("rea",s.registry?.count??"Pending");text("platform",s.platform?.ready===true?"Ready":s.platform?.state||"Review");
+  text("pending",Array.isArray(t.tasks)?t.tasks.length:0);
+  list("schedule",Object.entries(s.schedule||{}),x=>x[0]+": "+x[1]);
+  list("research",s.lastResearch?.results||[],x=>x.name+": "+(x.ok?x.tag:"unavailable"));
+  list("tasks",t.tasks||[],x=>x.title+" — "+x.detail);
+  list("events",e.events||[],x=>x.at+" · "+x.stage+" · "+JSON.stringify(x).slice(0,200));
+  text("note","Last refreshed "+new Date().toLocaleTimeString()+" · Local diagnostics only, no tool execution");
+ }catch(err){text("note","Service unavailable: "+err.message)}
+ finally{$("refresh").disabled=false}
+}
+$("refresh").addEventListener("click",refresh);
+refresh();setInterval(()=>{if(!document.hidden)refresh()},30000);
+</script>
+</main></body></html>

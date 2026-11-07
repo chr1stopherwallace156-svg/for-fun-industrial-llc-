@@ -1,0 +1,10 @@
+[
+  {
+    "name": "Adafruit CircuitPython",
+    "url": "https://api.github.com/repos/adafruit/circuitpython/releases/latest"
+  },
+  {
+    "name": "Raspberry Pi Pico SDK",
+    "url": "https://api.github.com/repos/raspberrypi/pico-sdk/releases/latest"
+  }
+]

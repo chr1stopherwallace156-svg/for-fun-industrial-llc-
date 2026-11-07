@@ -1,0 +1,18 @@
+[
+  {
+    "id": "raspberry-pi-5",
+    "name": "Raspberry Pi 5",
+    "price": null,
+    "currency": "USD",
+    "availability": "unknown",
+    "note": "Operator-entered example; not live pricing"
+  },
+  {
+    "id": "used-tv-speakers",
+    "name": "Salvaged television speakers",
+    "price": null,
+    "currency": "USD",
+    "availability": "unverified",
+    "note": "Example only; verify inventory manually"
+  }
+]
