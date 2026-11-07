@@ -29,7 +29,7 @@ export function combinedOpportunities(base,imported,{now=Date.now()}={}){
  const displayed=ranked.slice(0,300);
  const status=valid&&eligible.length?"active":imported?.checkedAt?"expired_or_invalid":"not_imported";
  const supplemental={name:"GSA Auctions / Windows verified snapshot",ok:valid&&eligible.length>0,detail:status==="active"?"Manual official API download; expires "+imported.expiresAt:status==="not_imported"?"Not imported; run approved Windows preview import":"Snapshot expired or invalid — refresh required",count:valid?eligible.length:0};
- return {...original,checkedAt:original.checkedAt||null,scope:"United States",items:displayed,sources:[...sources.filter(s=>s?.name!==supplemental.name),supplemental],
+ return {...original,checkedAt:valid?imported.checkedAt:(original.checkedAt||null),scope:"United States",items:displayed,sources:[...sources.filter(s=>s?.name!==supplemental.name),supplemental],
   summary:{...(original.summary||{}),total:displayed.length,auctionCount:displayed.filter(x=>x.kind==="surplus_auction").length,grantCount:displayed.filter(x=>x.kind==="grant").length,bidCount:displayed.filter(x=>x.kind==="solicitation").length},
   gsaSnapshot:{state:status,checkedAt:imported?.checkedAt||null,expiresAt:imported?.expiresAt||null,importedLots:valid?eligible.length:0,source:"official_manual_download_not_recurring",bidIsFinalPrice:false}};
 }
