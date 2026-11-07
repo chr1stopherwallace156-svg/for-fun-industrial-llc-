@@ -47,7 +47,7 @@ try{await api(stop?'/api/stop':'/api/activate',{},120000);log('Platform '+which+
 $newUiFragment=@'
 try{const result=await api(stop?'/api/stop':'/api/activate',{},120000);log('Platform '+which+' request completed');if(!stop){const autonomy=result.autonomy;log('Autonomy '+(autonomy?.state||'unknown')+' / '+(autonomy?.action||'unverified'));if(autonomy?.state!=='running')alert('Autonomous workloads are not ready: '+(autonomy?.detail||'Inspect backend status'));}await refreshStatus(true);await refreshTools(true);if(!stop&&typeof refreshAutonomy==='function')await refreshAutonomy()}catch(e)
 '@
-foreach($anchor in @($anchorImport,$anchorEngine,$anchorStatus,$anchorActivation)){if($oldServer.Split(@($anchor),[StringSplitOptions]::None).Length -ne 2){throw "SERVER_ANCHOR_MISMATCH=$($anchor.Substring(0,[Math]::Min(70,$anchor.Length)))"}}
+foreach($anchor in @($anchorImport,$anchorEngine,$anchorStatus,$anchorActivation)){if(([regex]::Matches($oldServer,[regex]::Escape($anchor))).Count -ne 1){throw "SERVER_ANCHOR_MISMATCH=$($anchor.Substring(0,[Math]::Min(70,$anchor.Length)))"}}
 if($oldUi.Split(@($oldUiFragment),[StringSplitOptions]::None).Length -ne 2){throw 'UI_PLATFORM_BUTTON_ANCHOR_MISMATCH'}
 $import=$anchorImport+[Environment]::NewLine+'import {createAutonomyActivator} from "./autonomy-activation.mjs";'
 $engine='const autonomyActivator=createAutonomyActivator();'+[Environment]::NewLine+$anchorEngine
