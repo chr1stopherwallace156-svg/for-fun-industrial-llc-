@@ -73,7 +73,7 @@ export function normalizeLead(x){
   manufacturer,model:trim(x.model,100),
   city:trim(x.city,100),region:trim(x.region,100),originPort:port?.code||null,originPortName:port?.name||null,
   quantity,unit:trim(x.unit||"lot",30),priceLocal:price,currency:COUNTRIES[source.country].currency,
-  priceType:amountType,sourceUrl:url,condition:trim(x.condition||"unverified",110),
+  priceType:amountType,priceBasis:["lot_total","per_unit"].includes(x.priceBasis)?x.priceBasis:"unknown",sourceUrl:url,condition:trim(x.condition||"unverified",110),
   observedAt:trim(x.observedAt,40)||null,provenance:"operator_supplied_public_listing_unverified",
   status:"operator_review_only",bidIsFinalPrice:false,exportEligible:"unknown",realEstate:category==="property"};
 }
@@ -101,14 +101,17 @@ export function landedCost(lead,input={}){
  const names=["usdPerLocal","internationalFreightUsd","domesticFreightUsd","insuranceUsd","dutyUsd","brokerageUsd","portAndStorageUsd","inspectionUsd","otherUsd","resaleEstimateUsd"];
  const missing=names.filter(n=>money(input[n])===null);
  if(missing.length)return {state:"blocked",missing,reason:"No price, duty, freight or exchange rate is invented"};
+ const basis=input.priceBasis||lead.priceBasis;
+ if(!["lot_total","per_unit"].includes(basis))return {state:"blocked",missing:["priceBasis_lot_total_or_per_unit"]};
+ if(basis==="per_unit"&&(!Number.isInteger(lead.quantity)||lead.quantity<1))return {state:"blocked",missing:["quantity_for_per_unit_price"]};
  const fx=money(input.usdPerLocal);
  if(fx<=0||fx>1e4)return {state:"blocked",missing:["valid_usdPerLocal"]};
  const shipping=["internationalFreightUsd","domesticFreightUsd","insuranceUsd","dutyUsd","brokerageUsd","portAndStorageUsd","inspectionUsd","otherUsd"].reduce((n,key)=>n+Number(input[key]),0);
- const merchandise=Number(lead.priceLocal)*fx;
+ const merchandise=Number(lead.priceLocal)*fx*(basis==="per_unit"?lead.quantity:1);
  const landed=merchandise+shipping,expected=Number(input.resaleEstimateUsd);
  const gross=expected-landed;
  return {state:"scenario_only_not_verified",currency:"USD",fxUsdPerLocal:fx,merchandiseUsd:Number(merchandise.toFixed(2)),
-  landedUsd:Number(landed.toFixed(2)),resaleEstimateUsd:expected,grossBeforeIncomeTaxAndOverheadUsd:Number(gross.toFixed(2)),
+  landedUsd:Number(landed.toFixed(2)),priceBasis:basis,quantityUsed:basis==="per_unit"?lead.quantity:1,resaleEstimateUsd:expected,grossBeforeIncomeTaxAndOverheadUsd:Number(gross.toFixed(2)),
   grossMarginPct:expected>0?Number((100*gross/expected).toFixed(2)):null,
   warning:"Not an assured profit: require quote evidence, customs broker classification, buyer demand, taxes and inspection"};
 }
