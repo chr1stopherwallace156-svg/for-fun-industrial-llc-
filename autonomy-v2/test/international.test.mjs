@@ -52,7 +52,18 @@ test("landed-cost scenario requires supplied FX/freight/duties/insurance and doe
  const item=normalizeLead(lead);
  const missing=landedCost(item,{usdPerLocal:0.0065});
  assert.equal(missing.state,"blocked");assert.ok(missing.missing.includes("dutyUsd"));
- const scenario=landedCost(item,{usdPerLocal:0.0065,internationalFreightUsd:1000,domesticFreightUsd:500,insuranceUsd:75,dutyUsd:200,brokerageUsd:160,portAndStorageUsd:240,inspectionUsd:100,otherUsd:125,resaleEstimateUsd:4800});
+ const scenario=landedCost(item,{priceBasis:"lot_total",usdPerLocal:0.0065,internationalFreightUsd:1000,domesticFreightUsd:500,insuranceUsd:75,dutyUsd:200,brokerageUsd:160,portAndStorageUsd:240,inspectionUsd:100,otherUsd:125,resaleEstimateUsd:4800});
  assert.equal(scenario.merchandiseUsd,1300);assert.equal(scenario.landedUsd,3700);
  assert.equal(scenario.grossBeforeIncomeTaxAndOverheadUsd,1100);assert.equal(scenario.state,"scenario_only_not_verified");
+});
+
+test("whole lot vs per-unit prices cannot be confused",()=>{
+ const item=normalizeLead({...lead,priceLocal:500,quantity:10,priceBasis:"unknown"});
+ const costs={usdPerLocal:0.006,internationalFreightUsd:100,domesticFreightUsd:20,insuranceUsd:10,dutyUsd:40,brokerageUsd:30,portAndStorageUsd:20,inspectionUsd:10,otherUsd:0,resaleEstimateUsd:500};
+ assert.deepEqual(landedCost(item,costs).missing,["priceBasis_lot_total_or_per_unit"]);
+ const total=landedCost(item,{...costs,priceBasis:"lot_total"});
+ const each=landedCost(item,{...costs,priceBasis:"per_unit"});
+ assert.equal(total.merchandiseUsd,3);
+ assert.equal(each.merchandiseUsd,30);
+ assert.equal(each.quantityUsed,10);
 });
