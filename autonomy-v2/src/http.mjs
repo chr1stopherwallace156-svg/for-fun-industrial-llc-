@@ -4,8 +4,9 @@ import {join} from "node:path";
 import {events,readJSON,HOME} from "./core.mjs";
 import {DomesticScan} from "./jobs.mjs";
 import {combinedOpportunities} from "./gsa-bridge.mjs";
+import {sourcesForUI,PORTS,CATEGORIES,COUNTRIES} from "./international.mjs";
 const page=readFileSync(join(HOME,"dashboard.html"),"utf8");
-const ALLOWED=new Set(["/","/api/status","/api/events","/api/tasks","/api/research","/api/rea","/api/opportunities"]);
+const ALLOWED=new Set(["/","/api/status","/api/events","/api/tasks","/api/research","/api/rea","/api/opportunities","/api/international"]);
 function output(res,status,body,type="application/json; charset=utf-8"){
  res.writeHead(status,{"content-type":type,"cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"no-referrer","content-security-policy":"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"});
  res.end(type.startsWith("text/html")?body:JSON.stringify(body));
@@ -28,6 +29,17 @@ export function startDashboard({sidequest,port=8792}){
   if(req.url==="/api/tasks")return output(res,200,{tasks:readJSON("pending-tasks.json",[]).slice(-100).reverse()});
   if(req.url==="/api/research")return output(res,200,{research:readJSON("latest-research.json",{}),products:readJSON("product-snapshot.json",{})});
   if(req.url==="/api/rea")return output(res,200,readJSON("rea-registry.json",{state:"not_yet_observed"}));
+  if(req.url==="/api/international"){
+   const inventory=readJSON("international-inventory.json",{schema:1,count:0,importedAt:null,leads:[],countries:{JP:0,KR:0,VN:0}});
+   const timestamp=Date.parse(inventory.importedAt||"");
+   const ageHours=Number.isFinite(timestamp)?Math.floor((Date.now()-timestamp)/3600000):null;
+   const imported=Array.isArray(inventory.leads)?inventory.leads.slice(0,500):[];
+   return output(res,200,{scope:"international",mode:"research_only_no_live_inventory_claim",
+    sources:sourcesForUI(),ports:PORTS,categories:CATEGORIES,countries:COUNTRIES,
+    importedAt:inventory.importedAt||null,ageHours,stale:ageHours===null||ageHours>=24,
+    summary:{total:imported.length,byCountry:inventory.countries||{JP:0,KR:0,VN:0}},
+    items:imported,autoSourcesActive:0,transactionsEnabled:false});
+  }
   if(req.url==="/api/opportunities")return output(res,200,combinedOpportunities(readJSON("domestic-latest.json",{checkedAt:null,scope:"United States",mode:"read_only_discovery",items:[],sources:[],summary:{total:0,workingSources:0,unavailableSources:0}}),readJSON("gsa-import.json",null)));
   const jobs=await sidequest.job.count();
   return output(res,200,{state:"running",application:"Fun Industrial Autonomous Workers",version:"0.2.0",pid:process.pid,uptimeSeconds:Math.floor(process.uptime()),schedule:{platform:"every 5 minutes",registry:"every 30 minutes",research:"every 6 hours",products:"hourly",domestic:"every 6 hours; on-demand scan"},mode:"read-only",reaToolCalls:0,aiderRuns:0,externalResearch:"allowlisted GitHub releases, Grants.gov, optional SAM.gov and GSA Auctions APIs",jobs,platform:readJSON("platform-health.json",{state:"pending"}),lastResearch:readJSON("latest-research.json",{state:"pending"}),registry:readJSON("rea-registry.json",{state:"pending"}),eventsRecorded:events(10000).length});
