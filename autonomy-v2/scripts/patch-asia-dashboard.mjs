@@ -27,9 +27,6 @@ export function applyAsiaUi(original){
   'i.quantity?"Quantity "+i.quantity+" "+i.unit:"",i.minOrderQuantity?"MOQ "+i.minOrderQuantity:"",i.incoterm&&i.incoterm!=="unverified"?"Incoterm "+i.incoterm:"",');
  return updated;
 }
-if(process.argv[1]&&path.resolve(process.argv[1])===new URL(import.meta.url).pathname){
- // Filename path conversion for Windows handled below instead.
-}
 import {fileURLToPath} from "node:url";
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  try{
