@@ -12,8 +12,42 @@ $key=if([string]::IsNullOrWhiteSpace($env:GSA_API_KEY)){'DEMO_KEY'}else{$env:GSA
 $auth=if($key -eq 'DEMO_KEY'){'DEMO_ONLY'}else{'PERSONAL_KEY'}
 try {
  $u='https://api.gsa.gov/assets/gsaauctions/v2/auctions?format=JSON&api_key='+[uri]::EscapeDataString($key)
- $response=Invoke-WebRequest -Uri $u -UseBasicParsing -TimeoutSec 45 -Headers @{Accept='application/json'} -MaximumRedirection 0 -ErrorAction Stop
- if([int]$response.StatusCode -ne 200){throw "GSA_HTTP_$($response.StatusCode)"}
+ $policy=Join-Path $PSScriptRoot 'GSA-RedirectPolicy.ps1'
+ if(-not(Test-Path -LiteralPath $policy -PathType Leaf)){throw 'GSA_REDIRECT_POLICY_MISSING'}
+ . $policy
+ $origin=[uri]$u
+ $response=$null
+ $destination=$null
+ try {
+  $response=Invoke-WebRequest -Uri $u -UseBasicParsing -TimeoutSec 45 -Headers @{Accept='application/json'} -MaximumRedirection 0 -ErrorAction Stop
+ } catch {
+  $ex=$_.Exception
+  if($null -eq $ex.Response){throw 'GSA_INITIAL_REQUEST_FAILED_NO_HTTP_RESPONSE'}
+  $status=[int]$ex.Response.StatusCode
+  if($status -ne 303){throw "GSA_HTTP_$status"}
+  $location=[string]$ex.Response.Headers['Location']
+  if([string]::IsNullOrWhiteSpace($location)){throw 'GSA_REDIRECT_LOCATION_MISSING'}
+  $destination=[uri]::new($origin,$location)
+ }
+ if($null -ne $response -and [int]$response.StatusCode -eq 303){
+  $location=[string]$response.Headers['Location']
+  if([string]::IsNullOrWhiteSpace($location)){throw 'GSA_REDIRECT_LOCATION_MISSING'}
+  $destination=[uri]::new($origin,$location)
+ }
+ if($null -ne $destination){
+  if(-not(Test-FIApprovedGsaRedirect -From $origin -Location $destination.AbsoluteUri)){
+   Write-Host ("GSA_REDIRECT_REVIEW_NEEDED HOST="+$destination.Host+" PATH="+$destination.AbsolutePath) -ForegroundColor Yellow
+   throw 'GSA_REDIRECT_TARGET_NOT_APPROVED'
+  }
+  Write-Host 'GSA_REDIRECT_APPROVED=TRUE SIGNED_URL_REDACTED=TRUE'
+  try {
+   $response=Invoke-WebRequest -Uri $destination.AbsoluteUri -UseBasicParsing -TimeoutSec 45 -Headers @{Accept='application/json'} -MaximumRedirection 0 -ErrorAction Stop
+  } catch {
+   $status=if($_.Exception.Response){[int]$_.Exception.Response.StatusCode}else{0}
+   throw "GSA_SIGNED_DOWNLOAD_FAILED_HTTP_$status"
+  }
+ }
+ if($null -eq $response -or [int]$response.StatusCode -ne 200){throw 'GSA_FINAL_RESPONSE_NOT_200'}
  $body=[string]$response.Content
  $byteCount=[Text.Encoding]::UTF8.GetByteCount($body)
  if($byteCount -lt 2 -or $byteCount -gt 25000000){throw "GSA_RESPONSE_SIZE_INVALID=$byteCount"}
