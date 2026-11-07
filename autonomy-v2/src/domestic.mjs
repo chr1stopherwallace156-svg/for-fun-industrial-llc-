@@ -1,0 +1,77 @@
+// Fun Industrial Opportunity Intelligence US V1 — read-only official-feed adapters.
+// No browser login, CAPTCHA interaction, bids, payments, account creation or unrestricted crawling.
+import {createHash} from "node:crypto";
+const MAX_ITEMS=200, MAX_BYTES=5_000_000;
+export function clean(value,limit=220){return String(value??"").replace(/[\u0000-\u001f\u007f]/g," ").slice(0,limit).trim()}
+export function stableId(source,raw){return createHash("sha256").update(source+"\x00"+String(raw)).digest("hex").slice(0,22)}
+export function publicLink(value){try{const u=new URL(String(value));return u.protocol==="https:"&&!u.username&&!u.password&&u.href.length<650?u.href:""}catch{return ""}}
+export function scoreOpportunity(item){
+ const x=(item.title+" "+item.summary).toLowerCase();let score=10;
+ for(const [re,points] of [[/\b(truck|vehicle|fleet|automotive|bus|salvage)\b/g,18],[/\b(industrial|equipment|machin|generator|tool|electrical)\b/g,15],[/\b(warehouse|bulk|lot|pallet|surplus|inventory)\b/g,13],[/\b(property|estate|real estate|land|foreclosure)\b/g,12],[/\b(software|engineering|research|manufactur)\b/g,10]]){if(re.test(x))score+=points}
+ if(item.deadline)score+=4;if(item.askPrice!=null)score+=3;
+ return Math.min(100,score); // relevance only; NOT profitability or authenticity
+}
+function record(source,kind,id,title,extra={}){
+ const v={id:stableId(source,id),source,kind,title:clean(title,220),summary:clean(extra.summary,450),url:publicLink(extra.url),location:clean(extra.location,120),deadline:clean(extra.deadline,80),askPrice:extra.askPrice==null?null:(Number.isFinite(Number(extra.askPrice))?Number(extra.askPrice):null),currency:"USD",collectedAt:new Date().toISOString(),evidence:"source_feed",status:"unverified_details"};
+ v.score=scoreOpportunity(v);return v;
+}
+export function normalizeGrants(response,keyword){
+ if(Number(response?.errorcode)!==0||!Array.isArray(response?.data?.oppHits))throw Error("GRANTS_RESPONSE_INVALID");
+ return response.data.oppHits.slice(0,60).filter(o=>o&&o.id&&o.title).map(o=>record("Grants.gov","grant",o.id,o.title,{summary:"Grant number "+clean(o.number)+"; agency "+clean(o.agencyName)+"; status "+clean(o.oppStatus)+"; keyword "+keyword,deadline:o.closeDate,url:"https://www.grants.gov/search-results-detail/"+encodeURIComponent(String(o.id)),location:"United States"}));
+}
+export function normalizeSAM(response){
+ if(!Array.isArray(response?.opportunitiesData))throw Error("SAM_RESPONSE_INVALID");
+ return response.opportunitiesData.slice(0,100).filter(o=>o&&o.noticeId&&o.title).map(o=>record("SAM.gov","solicitation",o.noticeId,o.title,{summary:"Notice "+clean(o.solicitationNumber)+"; type "+clean(o.type)+"; NAICS "+clean(o.naicsCode),deadline:o.responseDeadLine||o.reponseDeadLine,url:publicLink(o.uiLink)||("https://sam.gov/opp/"+encodeURIComponent(String(o.noticeId))+"/view"),location:clean(o.placeOfPerformance?.state?.name||o.placeOfPerformance?.state?.code||"USA")}));
+}
+export function extractGSALots(response){
+ const result=[],stack=[{v:response,d:0}],seen=new Set();
+ while(stack.length&&seen.size<10000&&result.length<MAX_ITEMS){
+  const {v,d}=stack.shift();
+  if(!v||typeof v!=="object"||seen.has(v))continue;seen.add(v);
+  if(v.SaleNo!=null&&(v.ItemName||v.LotDescript)){result.push(v);continue}
+  if(d<7){for(const val of Object.values(v).slice(0,30)){if(val&&typeof val==="object"){if(Array.isArray(val)){for(const item of val.slice(0,250))stack.push({v:item,d:d+1})}else stack.push({v:val,d:d+1})}}}
+ }
+ return result;
+}
+export function normalizeGSA(response){
+ const lots=extractGSALots(response);
+ if(!lots.length)throw Error("GSA_RESPONSE_HAS_NO_RECOGNIZED_LOTS");
+ return lots.slice(0,MAX_ITEMS).map((o,i)=>record("GSA Auctions","surplus_auction",clean(o.SaleNo)+"-"+clean(o.LotNo??i),o.ItemName||o.LotDescript,{summary:"Lot "+clean(o.LotNo)+"; "+clean(o.LotDescript)+"; status "+clean(o.AuctionStatus),deadline:o.AucEndDt,askPrice:o.HighBidAmount,location:[o.PropertyCity,o.PropertyState].map(x=>clean(x)).filter(Boolean).join(", "),url:publicLink(o.ItemDescURL)||"https://www.gsaauctions.gov/"}));
+}
+export function validateManual(items){
+ if(!Array.isArray(items))throw Error("MANUAL_LEADS_MUST_BE_ARRAY");
+ return items.slice(0,100).filter(x=>x&&x.id&&x.title).map(x=>record("Operator intake","manual_review",clean(x.id,100),x.title,{summary:x.notes,location:x.location,deadline:x.deadline,askPrice:x.askPrice,url:x.url}));
+}
+function requestError(r){return "HTTP_"+r.status}
+async function getJson(url,{method="GET",body=null,timeout=15000,fetcher=fetch}={}){
+ const options={method,headers:{"user-agent":"FunIndustrial-DomesticOpportunityV1/1.0","accept":"application/json",...(body?{"content-type":"application/json"}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(timeout),redirect:"error"};
+ const res=await fetcher(url,options);
+ if(!res.ok)throw Error(requestError(res));
+ const raw=await res.text();if(raw.length>MAX_BYTES)throw Error("FEED_TOO_LARGE");return JSON.parse(raw);
+}
+function dateMMDDYYYY(dt){return [String(dt.getUTCMonth()+1).padStart(2,"0"),String(dt.getUTCDate()).padStart(2,"0"),dt.getUTCFullYear()].join("/")}
+export async function scanDomestic({fetcher=fetch,env=process.env,manual=[]}={}){
+ const sources=[],items=[];const recordSource=(name,ok,details,count=0)=>{sources.push({name,ok,detail:clean(details,160),count})};
+ const push=(list)=>{items.push(...list)};
+ for(const keyword of ["vehicle","manufacturing"]){
+  try{const json=await getJson("https://api.grants.gov/v1/api/search2",{method:"POST",body:{keyword,rows:15,oppStatuses:"posted|forecasted"},fetcher});
+   const list=normalizeGrants(json,keyword);push(list);recordSource("Grants.gov / "+keyword,true,"Open opportunity search",list.length);
+  }catch(e){recordSource("Grants.gov / "+keyword,false,e.message)}
+ }
+ if(env.GSA_API_KEY){
+  try{const u=new URL("https://api.gsa.gov/assets/gsaauctions/v2/auctions");u.searchParams.set("api_key",env.GSA_API_KEY);u.searchParams.set("format","JSON");
+   const json=await getJson(u.href,{fetcher});const list=normalizeGSA(json);push(list);recordSource("GSA Auctions",true,"Current public federal surplus lots",list.length);
+  }catch(e){recordSource("GSA Auctions",false,e.message)}
+ }else recordSource("GSA Auctions",false,"API_KEY_REQUIRED (optional GSA_API_KEY)");
+ if(env.SAM_GOV_API_KEY){
+  try{const now=new Date(),then=new Date(now.getTime()-7*86400000),u=new URL("https://api.sam.gov/opportunities/v2/search");
+   for(const [k,v] of Object.entries({api_key:env.SAM_GOV_API_KEY,postedFrom:dateMMDDYYYY(then),postedTo:dateMMDDYYYY(now),limit:"75",offset:"0",ptype:"o"}))u.searchParams.set(k,v);
+   const json=await getJson(u.href,{fetcher});const list=normalizeSAM(json);push(list);recordSource("SAM.gov solicitations",true,"Last seven days",list.length);
+  }catch(e){recordSource("SAM.gov solicitations",false,e.message)}
+ }else recordSource("SAM.gov solicitations",false,"API_KEY_REQUIRED (optional SAM_GOV_API_KEY)");
+ try{const list=validateManual(manual);push(list);recordSource("Manual auction / property intake",true,"Operator-entered leads; not scraped",list.length)}
+ catch(e){recordSource("Manual auction / property intake",false,e.message)}
+ const unique=new Map();for(const item of items){if(!unique.has(item.id))unique.set(item.id,item)}
+ const sorted=[...unique.values()].sort((a,b)=>b.score-a.score||a.title.localeCompare(b.title)).slice(0,300);
+ return {checkedAt:new Date().toISOString(),scope:"United States",mode:"read_only_discovery",ranking:"keyword_relevance_not_profit",items:sorted,sources,summary:{total:sorted.length,workingSources:sources.filter(x=>x.ok).length,unavailableSources:sources.filter(x=>!x.ok).length,auctionCount:sorted.filter(x=>x.kind==="surplus_auction").length,bidCount:sorted.filter(x=>x.kind==="solicitation").length,grantCount:sorted.filter(x=>x.kind==="grant").length}};
+}
