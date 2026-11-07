@@ -74,7 +74,7 @@ const server=http.createServer(async(req,res)=>{try{
  const actions=["/api/start","/api/activate","/api/stop","/api/vpn/connect","/api/vpn/disconnect","/api/shutdown"];
  if(req.method==="POST"&&actions.includes(req.url)){
   if(!localRequest(req,res))return;await readBody(req,1024);
-  if(req.url==="/api/start"||req.url==="/api/activate"){const result=await platform.start();const autonomy=await autonomyActivator.activate();return json(res,200,{...result,autonomy});}
+  if(req.url==="/api/start"||req.url==="/api/activate"){let result={},platform_error=null;try{result=await platform.start()}catch(error){platform_error=String(error.message||error).slice(0,180)}const autonomy=await autonomyActivator.activate();return json(res,200,{...result,...(platform_error?{platform_error}:{}),autonomy});}
   if(req.url==="/api/stop")return json(res,200,await platform.stop());
   if(req.url==="/api/shutdown"){const result=await platform.stop();json(res,200,{state:"shutting-down",result});setTimeout(()=>server.close(()=>process.exit(0)),250);return;}
   if(req.url==="/api/vpn/connect")return json(res,200,{result:await platform.connectVpn(),status:await platform.status()});

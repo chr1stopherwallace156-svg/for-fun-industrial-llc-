@@ -45,7 +45,7 @@ $oldUiFragment=@'
 try{await api(stop?'/api/stop':'/api/activate',{},120000);log('Platform '+which+' request completed');await refreshStatus(true);await refreshTools(true)}catch(e)
 '@
 $newUiFragment=@'
-try{const result=await api(stop?'/api/stop':'/api/activate',{},120000);log('Platform '+which+' request completed');if(!stop){const autonomy=result.autonomy;log('Autonomy '+(autonomy?.state||'unknown')+' / '+(autonomy?.action||'unverified'));if(autonomy?.state!=='running')alert('Autonomous workloads are not ready: '+(autonomy?.detail||'Inspect backend status'));}await refreshStatus(true);await refreshTools(true);if(!stop&&typeof refreshAutonomy==='function')await refreshAutonomy()}catch(e)
+try{const result=await api(stop?'/api/stop':'/api/activate',{},120000);log('Platform '+which+' request completed');if(result.platform_error)alert('Another platform service failed: '+result.platform_error);if(!stop){const autonomy=result.autonomy;log('Autonomy '+(autonomy?.state||'unknown')+' / '+(autonomy?.action||'unverified'));if(autonomy?.state!=='running')alert('Autonomous workloads are not ready: '+(autonomy?.detail||'Inspect backend status'));}await refreshStatus(true);await refreshTools(true);if(!stop&&typeof refreshAutonomy==='function')await refreshAutonomy()}catch(e)
 '@
 foreach($anchor in @($anchorImport,$anchorEngine,$anchorStatus,$anchorActivation)){if(([regex]::Matches($oldServer,[regex]::Escape($anchor))).Count -ne 1){throw "SERVER_ANCHOR_MISMATCH=$($anchor.Substring(0,[Math]::Min(70,$anchor.Length)))"}}
 if(([regex]::Matches($oldUi,[regex]::Escape($oldUiFragment))).Count -ne 1){throw 'UI_PLATFORM_BUTTON_ANCHOR_MISMATCH'}
@@ -55,7 +55,7 @@ $status=@'
  // FI_AUTONOMY_PLATFORM_ACTIVATION_V1: include current worker readiness in platform controls.
  if(req.method==="GET"&&req.url==="/api/status"){const status=await platform.status(),worker=await autonomyActivator.status();return json(res,200,{...status,services:[...(status.services||[]),{id:"autonomy",name:"Autonomous Workers",state:worker.state,detail:worker.state==="running"?"Sidequest coordinator PID "+worker.pid:worker.detail}]});}
 '@
-$activate='  if(req.url==="/api/start"||req.url==="/api/activate"){const result=await platform.start();const autonomy=await autonomyActivator.activate();return json(res,200,{...result,autonomy});}'
+$activate='  if(req.url==="/api/start"||req.url==="/api/activate"){let result={},platform_error=null;try{result=await platform.start()}catch(error){platform_error=String(error.message||error).slice(0,180)}const autonomy=await autonomyActivator.activate();return json(res,200,{...result,...(platform_error?{platform_error}:{}),autonomy});}'
 $patchedServer=$oldServer.Replace($anchorImport,$import).Replace($anchorEngine,$engine).Replace($anchorStatus,$status).Replace($anchorActivation,$activate)
 $patchedUi=$oldUi.Replace($oldUiFragment,$newUiFragment)
 $backup=Join-Path $env:LOCALAPPDATA ('FunIndustrial\AutonomyLab\8789ActivationBackups\'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,8))
