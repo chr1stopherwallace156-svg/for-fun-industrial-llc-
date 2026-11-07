@@ -83,7 +83,7 @@ export function normalizeGSA(response){
   const status=gsaText(gsaValue(o,"auctionStatus","status"),35);
   const bidders=gsaValue(o,"biddersCount","bidderCount");
   const observedBid=gsaBid(gsaValue(o,"highBidAmount","currentBid","highestBid"));
-  const summary=["Lot "+(lot||"unspecified"),status?"Auction status: "+status:"",
+  const summary=["Sale "+sale+"; lot "+(lot||"unspecified"),status?"Auction status: "+status:"",
    bidders!==undefined?"Bidders: "+gsaText(bidders,8):"",observedBid!==null?"Highest observed bid (not final price): $"+observedBid:"",description].filter(Boolean).join("; ");
   return record("GSA Auctions","surplus_auction",sale+"-"+(lot||i),name,{
    summary,deadline:gsaValue(o,"aucEndDt","auctionEndDate","endDate","closingDate"),
