@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {execFileSync} from "node:child_process";
+import {fileURLToPath} from "node:url";
 const script=new URL("../scripts/patch-domestic-dashboard.mjs",import.meta.url);
 test("guarded 8789 patch adds only domestic routes and view; second patch refuses",()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),"fi-domestic-test-"));
@@ -33,7 +34,7 @@ test("guarded 8789 patch adds only domestic routes and view; second patch refuse
   ].join("\n");
   fs.writeFileSync(path.join(root,"src","server.mjs"),server);
   fs.writeFileSync(path.join(root,"public","index.html"),ui);
-  execFileSync(process.execPath,[script.pathname,root],{timeout:8000});
+  execFileSync(process.execPath,[fileURLToPath(script),root],{timeout:8000});
   const editedServer=fs.readFileSync(path.join(root,"src","server.mjs"),"utf8");
   const editedHtml=fs.readFileSync(path.join(root,"public","index.html"),"utf8");
   assert.match(editedServer,/\/api\/autonomy\/opportunities/);
@@ -41,6 +42,6 @@ test("guarded 8789 patch adds only domestic routes and view; second patch refuse
   assert.match(editedHtml,/id="fiDomesticList"/);
   assert.match(editedHtml,/function refreshDomesticOpportunities/);
   assert.match(editedHtml,/fiDomesticScanBtn/);
-  assert.throws(()=>execFileSync(process.execPath,[script.pathname,root],{stdio:"pipe",timeout:8000}),/DOMESTIC_ALREADY_PATCHED/);
+  assert.throws(()=>execFileSync(process.execPath,[fileURLToPath(script),root],{stdio:"pipe",timeout:8000}),/DOMESTIC_ALREADY_PATCHED/);
  }finally{fs.rmSync(root,{recursive:true,force:true})}
 });
