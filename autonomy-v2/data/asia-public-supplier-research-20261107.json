@@ -1,0 +1,50 @@
+[
+  {
+    "sourceId": "JP_JGOODTECH",
+    "externalId": "JC0000000043679",
+    "country": "JP",
+    "recordType": "supplier_profile",
+    "companyName": "DaiPare Co., Ltd. (株式会社ダイパレ)",
+    "title": "Logistics pallets, rolling carts and warehouse racks",
+    "category": "packaging_materials",
+    "description": "Public J-GoodTech profile describes pallet, rack and logistics equipment design and sales. Japan company; actual manufacturing origin and export terms require confirmation.",
+    "url": "https://jgoodtech.smrj.go.jp/corp/info/JC0000000043679?createdLocale=ja_JP&preview=false"
+  },
+  {
+    "sourceId": "ID_INAEXPORT",
+    "externalId": "189821",
+    "country": "ID",
+    "recordType": "supplier_profile",
+    "companyName": "PT Tunas Mitra Sukses",
+    "title": "Packaging supplies: stretch film, strapping bands, tapes and packaging machinery",
+    "category": "packaging_materials",
+    "description": "Indonesian official exporter directory profile describes packaging supplier and producer. Published profile is not a stock quote.",
+    "region": "West Java",
+    "city": "Bekasi",
+    "url": "https://www.inaexport.id/public/front_end/listeksportir/cetakpdfnew/189821"
+  },
+  {
+    "sourceId": "GLOBAL_HKTDC",
+    "externalId": "1S00O6P4Z",
+    "country": "HK",
+    "recordType": "supplier_profile",
+    "companyName": "JIN XIU (HongKong) Industrial Limited",
+    "title": "Packaging bags, plastic packaging and custom packing materials",
+    "category": "packaging_materials",
+    "description": "Hong Kong exporter public HKTDC company profile, 2026 update. Physical shipping origin, quote and stock to be confirmed.",
+    "city": "Hong Kong",
+    "url": "https://sourcing.hktdc.com/en/Supplier-Store/Profile/JIN-XIU-HongKong-Industrial-Limited/1S00O6P4Z"
+  },
+  {
+    "sourceId": "GLOBAL_HKTDC",
+    "externalId": "1X00082A",
+    "country": "HK",
+    "recordType": "supplier_profile",
+    "companyName": "Universal Metal Plastic Trading Ltd",
+    "title": "Wooden boxes, paper boxes, metal boxes and other packaging materials",
+    "category": "packaging_materials",
+    "description": "Hong Kong HKTDC exporter/manufacturer profile with packaging products. Profile is not proof of currently exportable stock or a competitive wholesale price.",
+    "city": "Hong Kong",
+    "url": "https://sourcing.hktdc.com/en/Supplier-Store/Profile/Universal-Metal-Plastic-Trading-Ltd/1X00082A"
+  }
+]
