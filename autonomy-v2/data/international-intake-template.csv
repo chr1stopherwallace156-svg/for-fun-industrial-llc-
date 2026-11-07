@@ -1,1 +1,1 @@
-sourceId,externalId,title,titleLocal,description,country,category,manufacturer,model,city,region,originPort,quantity,unit,priceLocal,priceType,url,condition,observedAt
+sourceId,externalId,title,titleLocal,description,country,category,manufacturer,model,city,region,originPort,quantity,unit,priceLocal,priceType,priceBasis,url,condition,observedAt
