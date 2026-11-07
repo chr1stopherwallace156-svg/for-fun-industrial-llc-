@@ -61,3 +61,23 @@ For a company record supply `recordType=supplier_profile`; for a priced product 
 4. Compare independently evidenced U.S. resale demand and ALL landed costs; keep every result as scenario-only until a buyer/quote is verified.
 
 **Not implemented:** automatic supplier crawling, credentialed marketplace APIs, automated outreach, guaranteed profitable deals, live Asian listings, import customs clearance, payments, bids, orders or house/property sourcing. The original Korean government OnBid APIs remain optional, not a prerequisite.
+
+
+## Four genuine public company profiles, available for OPTIONAL local import
+
+`autonomy-v2/data/asia-public-supplier-research-20261107.json` contains four website-grounded **supplier profile leads, not currently offered inventory**:
+
+- Japan: DaiPare Co., Ltd. — designs/sells pallets, wheeled carts and warehouse racks (J-GoodTech company profile https://jgoodtech.smrj.go.jp/corp/info/JC0000000043679).
+- Indonesia: PT Tunas Mitra Sukses — packaging, stretch film, strapping and machinery (InaExport PDF https://www.inaexport.id/public/front_end/listeksportir/cetakpdfnew/189821).
+- Hong Kong: JIN XIU (HongKong) Industrial Limited — bags/custom packaging (HKTDC supplier profile https://sourcing.hktdc.com/en/Supplier-Store/Profile/JIN-XIU-HongKong-Industrial-Limited/1S00O6P4Z).
+- Hong Kong: Universal Metal Plastic Trading Ltd — wooden, paper, aluminum and other packaging boxes (HKTDC supplier profile https://sourcing.hktdc.com/en/Supplier-Store/Profile/Universal-Metal-Plastic-Trading-Ltd/1X00082A).
+
+All four have `recordType=supplier_profile`, no asserted product price, no verified stock, no export approval, no made-up MOQ, and links to the original company profiles. A company can be headquartered in a different country from the plant or goods that would ship; origin must be checked for each order.
+
+After a **successful** V2 installation, optionally import those profiles with this one-liner:
+
+```powershell
+$d=Join-Path $env:USERPROFILE 'FunIndustrial-Asia-Sourcing';& node (Join-Path $env:LOCALAPPDATA 'FunIndustrial\AutonomyLab\autonomy-v2-github\Import-International.mjs') (Join-Path $d 'autonomy-v2\data\asia-public-supplier-research-20261107.json')
+```
+
+Confirm the result from `http://127.0.0.1:8789/api/autonomy/international`. Its response now distinguishes `summary.companyProfiles` from `summary.pricedCandidates` and `summary.verifiedStockCount` (always 0 until actual validation infrastructure exists). No price quote, export permission, inventory availability or profitability is inferred from company registration.
