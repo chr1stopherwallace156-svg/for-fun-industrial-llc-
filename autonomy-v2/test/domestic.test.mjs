@@ -124,3 +124,35 @@ test("optional GSA feed can return live-structure lots without extra permissions
  assert.ok(out.sources.find(x=>x.name==="GSA Auctions"&&x.ok===true));
  assert.equal(calls.filter(x=>x.startsWith("https://api.gsa.gov/")).length,1);
 });
+
+
+test("live GSA camelCase JSON is parsed into an auction lot with clean condition text",()=>{
+ const data={auctions:[{
+  saleNo:"26QSCI71007",lotNo:9,itemName:"Six pairs of extreme cold boots",
+  propertyCity:"Pullman",propertyState:"WA",auctionStatus:"Active",
+  biddersCount:2,highBidAmount:"$1,250.00",aucEndDt:"2026-11-23",
+  lotInfo:'<h4>Overview</h4><p>Six used pairs of boots.</p><p>Condition &amp; Markings</p><ul><li>Dirt and scuff marks</li></ul>'
+ }]};
+ const items=normalizeGSA(data);
+ assert.equal(items.length,1);
+ assert.equal(items[0].kind,"surplus_auction");
+ assert.equal(items[0].location,"Pullman, WA");
+ assert.equal(items[0].askPrice,1250);
+ assert.equal(items[0].deadline,"2026-11-23");
+ assert.match(items[0].summary,/Six used pairs of boots/);
+ assert.match(items[0].summary,/Condition & Markings/);
+ assert.match(items[0].summary,/Bidders: 2/);
+ assert.doesNotMatch(items[0].summary,/<[^>]+>/);
+ assert.match(items[0].summary,/not final price/);
+});
+test("GSA parser tolerates missing bid data without inventing zero dollars",()=>{
+ const x=normalizeGSA({auctions:[{saleNo:"26A",lotNo:"3",lotInfo:"<p>Used pallet of tools.</p>",propertyState:"CA",auctionStatus:"Active"}]});
+ assert.equal(x.length,1);
+ assert.equal(x[0].askPrice,null);
+ assert.equal(x[0].title,"GSA auction lot 26A / 3");
+ assert.equal(x[0].location,"CA");
+});
+test("GSA parser also recognizes older documented PascalCase data",()=>{
+ const x=normalizeGSA({Results:{Result:[{SaleNo:"OLD12",LotNo:2,ItemName:"Industrial generator",PropertyCity:"San Diego",PropertyState:"CA",HighBidAmount:2400}]}});
+ assert.equal(x.length,1);assert.equal(x[0].title,"Industrial generator");assert.equal(x[0].askPrice,2400);
+});
