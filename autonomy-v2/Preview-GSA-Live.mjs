@@ -9,7 +9,7 @@ try {
  const res=await fetch(url,{method:"GET",headers:{"accept":"application/json"},redirect:"error",signal:AbortSignal.timeout(25000)});
  if(!res.ok)throw Error("GSA_HTTP_"+res.status);
  const raw=await res.text();
- if(raw.length>8_000_000)throw Error("GSA_FEED_OVER_8_MB");
+ if(raw.length>25_000_000)throw Error("GSA_FEED_OVER_25_MB");
  const data=JSON.parse(raw);
  const lots=normalizeGSA(data).sort((a,b)=>b.score-a.score||a.title.localeCompare(b.title));
  console.log("GSA_PREVIEW=PASS SOURCE="+source+" LOTS_PARSED="+lots.length);
