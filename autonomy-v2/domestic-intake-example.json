@@ -1,0 +1,11 @@
+[
+  {
+    "id": "fleet-surplus-local-001",
+    "title": "Example: public surplus fleet vehicle auction",
+    "url": "https://www.gsaauctions.gov/",
+    "location": "United States",
+    "notes": "Replace this example with a specific verified public listing; do not infer eligibility or profitability.",
+    "askPrice": null,
+    "deadline": ""
+  }
+]
