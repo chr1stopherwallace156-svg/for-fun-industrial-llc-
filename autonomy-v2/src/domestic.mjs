@@ -1,7 +1,7 @@
 // Fun Industrial Opportunity Intelligence US V1 — read-only official-feed adapters.
 // No browser login, CAPTCHA interaction, bids, payments, account creation or unrestricted crawling.
 import {createHash} from "node:crypto";
-const MAX_ITEMS=200, MAX_BYTES=5_000_000;
+const MAX_GSA_LOTS=6000, MAX_BYTES=5_000_000;
 export function clean(value,limit=220){return String(value??"").replace(/[\u0000-\u001f\u007f]/g," ").slice(0,limit).trim()}
 export function stableId(source,raw){return createHash("sha256").update(source+"\x00"+String(raw)).digest("hex").slice(0,22)}
 export function publicLink(value){try{const u=new URL(String(value));return u.protocol==="https:"&&!u.username&&!u.password&&u.href.length<650?u.href:""}catch{return ""}}
@@ -56,7 +56,7 @@ function gsaBid(value){
 export function extractGSALots(response){
  const result=[],queue=[{v:response,d:0}],seen=new Set();
  let head=0;
- while(head<queue.length&&seen.size<15000&&result.length<MAX_ITEMS){
+ while(head<queue.length&&seen.size<20000&&result.length<MAX_GSA_LOTS){
   const {v,d}=queue[head++];
   if(!v||typeof v!=="object"||seen.has(v))continue;seen.add(v);
   const sale=gsaValue(v,"saleNo","saleNumber","auctionId");
@@ -98,11 +98,11 @@ export function validateManual(items){
  return items.slice(0,100).filter(x=>x&&x.id&&x.title).map(x=>record("Operator intake","manual_review",clean(x.id,100),x.title,{summary:x.notes,location:x.location,deadline:x.deadline,askPrice:x.askPrice,url:x.url}));
 }
 function requestError(r){return "HTTP_"+r.status}
-async function getJson(url,{method="GET",body=null,timeout=15000,fetcher=fetch}={}){
+async function getJson(url,{method="GET",body=null,timeout=15000,maxBytes=MAX_BYTES,fetcher=fetch}={}){
  const options={method,headers:{"user-agent":"FunIndustrial-DomesticOpportunityV1/1.0","accept":"application/json",...(body?{"content-type":"application/json"}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(timeout),redirect:"error"};
  const res=await fetcher(url,options);
  if(!res.ok)throw Error(requestError(res));
- const raw=await res.text();if(raw.length>MAX_BYTES)throw Error("FEED_TOO_LARGE");return JSON.parse(raw);
+ const raw=await res.text();if(raw.length>maxBytes)throw Error("FEED_TOO_LARGE");return JSON.parse(raw);
 }
 function dateMMDDYYYY(dt){return [String(dt.getUTCMonth()+1).padStart(2,"0"),String(dt.getUTCDate()).padStart(2,"0"),dt.getUTCFullYear()].join("/")}
 export async function scanDomestic({fetcher=fetch,env=process.env,manual=[]}={}){
@@ -115,7 +115,7 @@ export async function scanDomestic({fetcher=fetch,env=process.env,manual=[]}={})
  }
  if(env.GSA_API_KEY){
   try{const u=new URL("https://api.gsa.gov/assets/gsaauctions/v2/auctions");u.searchParams.set("api_key",env.GSA_API_KEY);u.searchParams.set("format","JSON");
-   const json=await getJson(u.href,{fetcher});const list=normalizeGSA(json);push(list);recordSource("GSA Auctions",true,"Current public federal surplus lots",list.length);
+   const json=await getJson(u.href,{fetcher,maxBytes:25_000_000});const list=normalizeGSA(json);push(list);recordSource("GSA Auctions",true,"Current public federal surplus lots",list.length);
   }catch(e){recordSource("GSA Auctions",false,e.message)}
  }else recordSource("GSA Auctions",false,"API_KEY_REQUIRED (optional GSA_API_KEY)");
  if(env.SAM_GOV_API_KEY){
