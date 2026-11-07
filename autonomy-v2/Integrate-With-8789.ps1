@@ -18,7 +18,7 @@ $oldUi=[IO.File]::ReadAllText($ui)
 if($oldServer.Contains('FI_AUTONOMY_8789_PROXY_V1') -or $oldUi.Contains('FI_AUTONOMY_8789_VIEW_V1')){throw 'AUTONOMY_INTEGRATION_ALREADY_PRESENT'}
 $anchor='const server=http.createServer(async(req,res)=>{try{'
 if(([regex]::Matches($oldServer,[regex]::Escape($anchor))).Count -ne 1){throw 'SERVER_ROUTE_ANCHOR_NOT_UNIQUE'}
-$nav="['settings','System','⚙']"
+$nav="['settings','System','"+[char]0x2699+"']"
 if(-not $oldUi.Contains($nav)){throw 'UNIFIED_NAV_ANCHOR_MISSING'}
 $viewAnchor='</main>'
 if(([regex]::Matches($oldUi,[regex]::Escape($viewAnchor))).Count -ne 1){throw 'UNIFIED_VIEW_ANCHOR_NOT_UNIQUE'}
@@ -49,17 +49,17 @@ $view=@'
 <div class="stack">
 <div class="grid2">
 <div class="card metric"><div class="metric-label">Background coordinator</div><div class="metric-value small" id="fiAutonomyState">Checking</div></div>
-<div class="card metric"><div class="metric-label">REA tools inventoried</div><div class="metric-value" id="fiAutonomyRea">—</div></div>
-<div class="card metric"><div class="metric-label">Pending reviews</div><div class="metric-value" id="fiAutonomyPending">—</div></div>
+<div class="card metric"><div class="metric-label">REA tools inventoried</div><div class="metric-value" id="fiAutonomyRea">-</div></div>
+<div class="card metric"><div class="metric-label">Pending reviews</div><div class="metric-value" id="fiAutonomyPending">-</div></div>
 <div class="card metric"><div class="metric-label">Worker jobs</div><div class="metric-value small" id="fiAutonomyJobs">Checking</div></div>
 </div>
-<div class="card"><div class="heading-row"><h2 class="section-title">Worker activity</h2><button class="btn secondary small" id="fiAutonomyRefresh">Refresh</button></div><div class="subtle" id="fiAutonomyActivity">Loading…</div></div>
-<div class="card"><h2 class="section-title">Research updates</h2><div class="subtle" id="fiAutonomyResearch">Loading…</div></div>
-<div class="card"><h2 class="section-title">Operator review queue</h2><div class="subtle" id="fiAutonomyTasks">Loading…</div></div>
+<div class="card"><div class="heading-row"><h2 class="section-title">Worker activity</h2><button class="btn secondary small" id="fiAutonomyRefresh">Refresh</button></div><div class="subtle" id="fiAutonomyActivity">Loading...</div></div>
+<div class="card"><h2 class="section-title">Research updates</h2><div class="subtle" id="fiAutonomyResearch">Loading...</div></div>
+<div class="card"><h2 class="section-title">Operator review queue</h2><div class="subtle" id="fiAutonomyTasks">Loading...</div></div>
 </div></section>
 '@
 $js=@'
-/* FI_AUTONOMY_8789_UI_V1 — read-only same-origin status */
+/* FI_AUTONOMY_8789_UI_V1 - read-only same-origin status */
 async function refreshAutonomy(){
  const activity=$('fiAutonomyActivity'),tasks=$('fiAutonomyTasks'),research=$('fiAutonomyResearch');
  try {
@@ -69,15 +69,15 @@ async function refreshAutonomy(){
   $('fiAutonomyPending').textContent=String((t.tasks||[]).length);
   $('fiAutonomyJobs').textContent=String(s.jobs??'Active');
   function show(el,arr,format){el.replaceChildren();for(const value of arr.slice(0,18)){const p=document.createElement('p');p.textContent=format(value);el.appendChild(p)}if(!arr.length)el.textContent='No records yet';}
-  show(activity,e.events||[],x=>(x.at||'')+' · '+(x.stage||'')+' · '+(x.title||''));
+  show(activity,e.events||[],x=>(x.at||'')+' | '+(x.stage||'')+' | '+(x.title||''));
   show(tasks,t.tasks||[],x=>(x.title||'')+': '+(x.detail||''));
-  show(research,r.research?.results||[],x=>(x.name||'')+' · '+(x.tag||x.error||'pending'));
+  show(research,r.research?.results||[],x=>(x.name||'')+' | '+(x.tag||x.error||'pending'));
  }catch(err){$('fiAutonomyState').textContent='Unavailable';activity.textContent='Worker backend unavailable: '+err.message;tasks.textContent='No data';research.textContent='No data'}
 }
 '@
 $patchedServer=$oldServer.Replace($anchor,$anchor+[Environment]::NewLine+$proxy)
-$patchedUi=$oldUi.Replace($nav,"['autonomy','Autonomy','◇'],"+$nav).Replace($viewAnchor,$view+[Environment]::NewLine+$viewAnchor).Replace($goAnchor,$goAnchor+"if(id==='autonomy')void refreshAutonomy();").Replace($iconAnchor,"autonomy:'<path d=" + [char]34 + "M12 2v5m0 10v5M2 12h5m10 0h5M5 5l3 3m8 8 3 3m0-14-3 3M8 16l-3 3" + [char]34 + "/>',"+$iconAnchor).Replace($jsAnchor,$js+[Environment]::NewLine+$jsAnchor)
-$patchedUi=$patchedUi.Replace("function bindEvents(){","function bindEvents(){$('fiAutonomyRefresh').addEventListener('click',refreshAutonomy);")
+$patchedUi=$oldUi.Replace($nav,"['autonomy','Autonomy','A'],"+$nav).Replace($viewAnchor,$view+[Environment]::NewLine+$viewAnchor).Replace($goAnchor,$goAnchor+"if(id==='autonomy')void refreshAutonomy();").Replace($iconAnchor,"autonomy:'<path d=" + [char]34 + "M12 2v5m0 10v5M2 12h5m10 0h5M5 5l3 3m8 8 3 3m0-14-3 3M8 16l-3 3" + [char]34 + "/>',"+$iconAnchor).Replace($jsAnchor,$js+[Environment]::NewLine+$jsAnchor)
+$patchedUi=$patchedUi.Replace('function bindEvents(){',"function bindEvents(){" + [char]36 + "('fiAutonomyRefresh').addEventListener('click',refreshAutonomy);")
 if(-not $patchedUi.Contains('FI_AUTONOMY_8789_VIEW_V1') -or -not $patchedServer.Contains('FI_AUTONOMY_8789_PROXY_V1')){throw 'PATCH_FAILED_TO_INSERT'}
 $node=(Get-Command node.exe -ErrorAction Stop).Source
 $tmp=Join-Path $env:TEMP ('funindustrial-autonomy-'+[guid]::NewGuid().ToString('N')+'.mjs')
