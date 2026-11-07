@@ -5,6 +5,7 @@ import path from "node:path";
 import {loadConfig} from "./config.mjs";
 import {createPlatform} from "./platform.mjs";
 import {openAiToolDefinitions,getPlatformTool} from "./platform-tools.mjs";
+import {createAutonomyActivator} from "./autonomy-activation.mjs";
 const root=path.dirname(fileURLToPath(import.meta.url));
 try{process.loadEnvFile(path.join(root,"../.env"));}catch(error){if(error.code!=="ENOENT")throw error;}
 const config=loadConfig({...process.env,APP_ROOT:path.resolve(root,"..")});
@@ -34,9 +35,11 @@ async function proxyCompute(req,res,pathName,method="POST",body=null){
 }
 const computeRoutes={"/api/compute/graph":"/graph/analyze","/api/compute/tensor":"/tensor/matmul","/api/compute/train":"/nn/train","/api/compute/predict":"/nn/predict"};
 const aiRoutes={"/api/ai/status":{path:"/ai/runtime/llama-cpp",method:"GET"},"/api/ai/start":{path:"/ai/runtime/llama-cpp/start",method:"POST"},"/api/ai/stop":{path:"/ai/runtime/llama-cpp/stop",method:"POST"},"/api/ai/chat":{path:"/ai/chat",method:"POST"}};
+const autonomyActivator=createAutonomyActivator();
 const server=http.createServer(async(req,res)=>{try{
  if(req.method==="GET"&&req.url==="/"){res.writeHead(200,{"content-type":"text/html; charset=utf-8","cache-control":"no-store","content-security-policy":"default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'","x-content-type-options":"nosniff","referrer-policy":"no-referrer"});return res.end(page);}
- if(req.method==="GET"&&req.url==="/api/status")return json(res,200,await platform.status());
+ // FI_AUTONOMY_PLATFORM_ACTIVATION_V1: show worker health in the same platform status view.
+ if(req.method==="GET"&&req.url==="/api/status"){const status=await platform.status(),worker=await autonomyActivator.status();return json(res,200,{...status,services:[...(status.services||[]),{id:"autonomy",name:"Autonomous Workers",state:worker.state,detail:worker.state==="running"?"Sidequest coordinator PID "+worker.pid:worker.detail}]});}
  if(req.method==="GET"&&req.url==="/api/ai/status"){if(!localRequest(req,res))return;const state=await platform.status();if(state.vpn_policy.required&&state.vpn_policy.state!=="connected")return json(res,200,{state:"blocked",detail:state.vpn_policy.detail});return proxyCompute(req,res,"/ai/runtime/llama-cpp","GET");}
  if(req.method==="GET"&&req.url==="/api/ai/tools"){
   if(!localRequest(req,res))return;
@@ -71,7 +74,7 @@ const server=http.createServer(async(req,res)=>{try{
  const actions=["/api/start","/api/activate","/api/stop","/api/vpn/connect","/api/vpn/disconnect","/api/shutdown"];
  if(req.method==="POST"&&actions.includes(req.url)){
   if(!localRequest(req,res))return;await readBody(req,1024);
-  if(req.url==="/api/start"||req.url==="/api/activate")return json(res,200,await platform.start());
+  if(req.url==="/api/start"||req.url==="/api/activate"){const result=await platform.start();const autonomy=await autonomyActivator.activate();return json(res,200,{...result,autonomy});}
   if(req.url==="/api/stop")return json(res,200,await platform.stop());
   if(req.url==="/api/shutdown"){const result=await platform.stop();json(res,200,{state:"shutting-down",result});setTimeout(()=>server.close(()=>process.exit(0)),250);return;}
   if(req.url==="/api/vpn/connect")return json(res,200,{result:await platform.connectVpn(),status:await platform.status()});
