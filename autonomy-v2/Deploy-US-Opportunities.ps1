@@ -17,8 +17,8 @@ foreach($f in @($server,$ui,(Join-Path $stage 'Start.ps1'),(Join-Path $stage 'sr
 foreach($f in @('src\domestic.mjs','src\jobs.mjs','src\service.mjs','src\http.mjs')){
  & $node --check (Join-Path $source $f);if($LASTEXITCODE -ne 0){throw "SOURCE_SYNTAX_FAILED=$f"}
 }
-& $node --test (Join-Path $source 'test\domestic.test.mjs')
-if($LASTEXITCODE -ne 0){throw 'DOMESTIC_FEED_TESTS_FAILED'}
+& $node --test (Join-Path $source 'test\domestic.test.mjs') (Join-Path $source 'test\domestic-patcher.test.mjs')
+if($LASTEXITCODE -ne 0){throw 'DOMESTIC_FEED_OR_DASHBOARD_TESTS_FAILED'}
 $live=Invoke-RestMethod "$base/api/status" -TimeoutSec 20
 if($live.application -ne 'Fun Industrial Platform'){throw 'PRIMARY_DASHBOARD_IDENTITY_MISMATCH'}
 $listener=Get-NetTCPConnection -LocalPort 8789 -State Listen -ErrorAction Stop|Where-Object {$_.LocalAddress -in @('127.0.0.1','::1')}|Select-Object -First 1
