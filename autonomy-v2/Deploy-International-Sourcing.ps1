@@ -24,8 +24,8 @@ foreach($f in $modules){
 }
 $tests=@('test\international.test.mjs','test\international-import.test.mjs','test\international-patcher.test.mjs','test\domestic.test.mjs','test\gsa-bridge.test.mjs','test\gsa-import.test.mjs')
 foreach($f in $tests){if(-not(Test-Path (Join-Path $source $f) -PathType Leaf)){throw "INTERNATIONAL_TEST_MISSING=$f"}}
-$args=@('--test')+@($tests|ForEach-Object {Join-Path $source $_})
-& $node @args
+$nodeTestArgs=@('--test')+@($tests|ForEach-Object {Join-Path $source $_})
+& $node @nodeTestArgs
 if($LASTEXITCODE -ne 0){throw 'INTERNATIONAL_REGRESSION_TESTS_FAILED'}
 $uiStatus=Invoke-RestMethod "$base/api/status" -TimeoutSec 15
 $workStatus=Invoke-RestMethod "$worker/api/status" -TimeoutSec 15
@@ -39,6 +39,9 @@ if($uiProc.Name -ne 'node.exe' -or $uiProc.CommandLine -notmatch 'src[/\\]server
 if($workerProc.Name -ne 'node.exe' -or $workerProc.CommandLine -notmatch 'autonomy-v2-github.*service\.mjs'){throw 'UNEXPECTED_SIDEQUEST_PROCESS'}
 $beforeCatalog=(Invoke-RestMethod "$base/api/rea/tools" -TimeoutSec 35).tools
 if(@($beforeCatalog).Count -ne 229){throw "REA_CATALOG_PREFLIGHT_HOLD=$(@($beforeCatalog).Count)"}
+$preUnified=Invoke-RestMethod "$base/api/unified/status" -TimeoutSec 30
+$preservedEnabled=[int]$preUnified.rea_enabled
+if($preservedEnabled -ne 229){throw "REA_EXECUTION_SCOPE_PREFLIGHT_HOLD=$preservedEnabled"}
 $origServer=[IO.File]::ReadAllText($server)
 $origHtml=[IO.File]::ReadAllText($html)
 if(-not $origServer.Contains('FI_DOMESTIC_OPPORTUNITIES_V1') -or -not $origHtml.Contains('FI_DOMESTIC_OPPORTUNITIES_V1')){throw 'EXISTING_DOMESTIC_UI_REQUIRED'}
@@ -82,6 +85,8 @@ try {
  for($i=0;$i -lt 55;$i++){if(-not(Get-NetTCPConnection -LocalPort 8789 -State Listen -ErrorAction SilentlyContinue)){break};Start-Sleep -Milliseconds 350}
  if(Get-NetTCPConnection -LocalPort 8789 -State Listen -ErrorAction SilentlyContinue){throw 'DASHBOARD_PORT_NOT_RELEASED'}
  $env:PORT='8789';$env:HOST='127.0.0.1'
+# Preserve only the existing verified tool names from the already-running platform.
+$env:REA_ALLOWED_TOOLS=(@($beforeCatalog|ForEach-Object {$_.name}) -join ',')
  $stamp=Get-Date -Format 'yyyyMMdd-HHmmss'
  $newUI=Start-Process -FilePath $node -ArgumentList 'src/server.mjs' -WorkingDirectory $Root -PassThru -RedirectStandardOutput (Join-Path $logDir "international-$stamp.stdout.log") -RedirectStandardError (Join-Path $logDir "international-$stamp.stderr.log")
  $uiOk=$false
@@ -91,6 +96,8 @@ try {
  if($rea.state -ne 'ready'){throw 'REA_RECONNECT_HOLD'}
  $catalog=@((Invoke-RestMethod "$base/api/rea/tools" -TimeoutSec 40).tools)
  if($catalog.Count -ne 229){throw 'REA_REGISTRY_RECONNECT_FAILED'}
+$afterUnified=Invoke-RestMethod "$base/api/unified/status" -TimeoutSec 30
+if([int]$afterUnified.rea_enabled -ne $preservedEnabled){throw 'REA_EXECUTION_SCOPE_CHANGED'}
  $intl=Invoke-RestMethod "$base/api/autonomy/international" -TimeoutSec 20
  if($intl.scope -ne 'international' -or @($intl.sources).Count -lt 3){throw '8789_INTERNATIONAL_PROXY_FAILED'}
  $checkDomestic=Invoke-RestMethod "$base/api/autonomy/opportunities" -TimeoutSec 20
