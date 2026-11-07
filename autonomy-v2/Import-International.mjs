@@ -6,7 +6,7 @@ import {fileURLToPath} from "node:url";
 import {prepareInventory,COUNTRIES} from "./src/international.mjs";
 import {readJSON,atomicJSON,logEvent} from "./src/core.mjs";
 const DATA_FILE="international-inventory.json";
-const FIELDS=new Set(["sourceId","externalId","title","titleLocal","description","country","category","manufacturer","model","city","region","originPort","quantity","unit","priceLocal","priceType","url","condition","observedAt"]);
+const FIELDS=new Set(["sourceId","externalId","title","titleLocal","description","country","category","manufacturer","model","city","region","originPort","quantity","unit","priceLocal","priceType","priceBasis","url","condition","observedAt"]);
 export function csvRows(raw){
  const cells=[],rows=[];let cell="",row=[],quoted=false;
  for(let i=0;i<raw.length;i++){
@@ -40,7 +40,7 @@ export function importIntake(filename,{persist=true,existing=null}={}){
  const current=existing??readJSON(DATA_FILE,null);
  const old=Array.isArray(current?.leads)?current.leads:[];
  const map=new Map(old.map(r=>[r.id,r]));
- for(const item of incoming.leads)map.set(item.id,item);
+ const now=new Date().toISOString();for(const item of incoming.leads)map.set(item.id,{...item,sourceLastImportedAt:now});
  if(map.size>500)throw Error("CUMULATIVE_LEADS_OVER_500");
  const merged=prepareInventory([]),countByCountry=Object.fromEntries(Object.keys(COUNTRIES).map(c=>[c,0]));
  merged.leads=[...map.values()];merged.count=merged.leads.length;
