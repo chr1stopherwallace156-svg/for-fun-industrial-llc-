@@ -37,7 +37,7 @@ export function startDashboard({sidequest,port=8792}){
    return output(res,200,{scope:"international",mode:"research_only_no_live_inventory_claim",
     sources:sourcesForUI(),ports:PORTS,categories:CATEGORIES,countries:COUNTRIES,
     importedAt:inventory.importedAt||null,ageHours,stale:ageHours===null||ageHours>=24,
-    summary:{total:imported.length,byCountry:inventory.countries||{JP:0,KR:0,VN:0}},
+    summary:{total:imported.length,companyProfiles:imported.filter(x=>x.recordType==="supplier_profile").length,productCandidates:imported.filter(x=>x.recordType==="product_listing").length,auctionCandidates:imported.filter(x=>x.recordType==="auction_lot").length,pricedCandidates:imported.filter(x=>x.priceLocal!=null).length,verifiedStockCount:0,byCountry:inventory.countries||{JP:0,KR:0,VN:0}},
     items:imported,autoSourcesActive:0,transactionsEnabled:false});
   }
   if(req.url==="/api/opportunities")return output(res,200,combinedOpportunities(readJSON("domestic-latest.json",{checkedAt:null,scope:"United States",mode:"read_only_discovery",items:[],sources:[],summary:{total:0,workingSources:0,unavailableSources:0}}),readJSON("gsa-import.json",null)));
