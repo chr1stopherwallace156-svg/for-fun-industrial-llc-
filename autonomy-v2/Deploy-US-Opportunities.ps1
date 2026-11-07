@@ -4,7 +4,7 @@
 param([string]$Root='C:\Users\alxar\FunIndustrial-REA-MCP-Activation')
 $ErrorActionPreference='Stop'
 $Root=[IO.Path]::GetFullPath($Root)
-$source=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$source=[IO.Path]::GetFullPath($PSScriptRoot)
 $stage=Join-Path $env:LOCALAPPDATA 'FunIndustrial\AutonomyLab\autonomy-v2-github'
 $node=(Get-Command node.exe -ErrorAction Stop).Source
 $psExe=(Get-Command powershell.exe -ErrorAction Stop).Source
