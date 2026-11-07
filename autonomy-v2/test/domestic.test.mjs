@@ -82,3 +82,45 @@ test("upstream request failure is recorded without stopping other sources",async
  const out=await scanDomestic({fetcher,env:{},manual:[]});
  assert.equal(out.summary.total,0);assert.equal(out.sources.filter(s=>s.detail==="HTTP_429").length,2);
 });
+
+
+test("live GSA camelCase auction record maps location, active status, sanitized description and observed bid",()=>{
+ const data={auctions:[{saleNo:"71QSCI26F001",lotNo:"007",itemName:"Six pairs of extreme cold boots",propertyAddr2:"College of Veterinary Medicine",propertyCity:"Pullman",propertyState:"WA",auctionStatus:"Active",biddersCount:2,highBidAmount:"$1,234.50",lotInfo:"<h4>Overview</h4><p>Used condition &amp; scuff marks.</p><script>not html</script>",aucEndDt:"2026-11-14",itemDescURL:"https://www.gsaauctions.gov/"}]};
+ const rows=normalizeGSA(data);
+ assert.equal(rows.length,1);
+ const x=rows[0];
+ assert.equal(x.kind,"surplus_auction");
+ assert.equal(x.location,"Pullman, WA");
+ assert.equal(x.deadline,"2026-11-14");
+ assert.equal(x.askPrice,1234.50);
+ assert.ok(x.summary.includes("Active"));
+ assert.ok(x.summary.includes("Bidders: 2"));
+ assert.ok(x.summary.includes("Used condition & scuff marks"));
+ assert.ok(!x.summary.includes("<h4>"));
+ assert.ok(!x.summary.includes("<script>"));
+ assert.ok(x.title.includes("extreme cold boots"));
+});
+test("GSA legacy field format and camelCase record both parse in same response",()=>{
+ const data={Results:{Result:[
+  {SaleNo:"B1",LotNo:"003",ItemName:"Industrial pallet",HighBidAmount:"1700",PropertyCity:"Reno",PropertyState:"NV"},
+  {saleNo:"B2",lotNo:"004",itemName:"Used truck parts",highBidAmount:300,propertyCity:"Ontario",propertyState:"CA"}
+ ]}};
+ const out=normalizeGSA(data);
+ assert.deepEqual(out.map(x=>x.location),["Reno, NV","Ontario, CA"]);
+ assert.deepEqual(out.map(x=>x.askPrice),[1700,300]);
+});
+test("GSA lot inventory scans beyond first 200 entries for equipment opportunities",()=>{
+ const lots=Array.from({length:275},(_,i)=>({saleNo:"S"+i,lotNo:"001",itemName:i===274?"Salvage fleet truck":"Mixed surplus lot"}));
+ const out=normalizeGSA({auctions:lots});
+ assert.equal(out.length,275);
+ assert.ok(out.some(x=>x.title==="Salvage fleet truck"));
+});
+test("optional GSA feed can return live-structure lots without extra permissions",async()=>{
+ const calls=[],grant={errorcode:0,data:{oppHits:[]}},gsa={auctions:[{saleNo:"LOT1",lotNo:1,itemName:"Industrial generator",auctionStatus:"Active",propertyCity:"San Diego",propertyState:"CA"}]};
+ const fetcher=async(url,options)=>{calls.push(url);return {ok:true,text:async()=>JSON.stringify(url.startsWith("https://api.gsa.gov/")?gsa:grant)}};
+ const out=await scanDomestic({fetcher,env:{GSA_API_KEY:"fixture-key"},manual:[]});
+ assert.equal(out.summary.auctionCount,1);
+ assert.equal(out.summary.grantCount,0);
+ assert.ok(out.sources.find(x=>x.name==="GSA Auctions"&&x.ok===true));
+ assert.equal(calls.filter(x=>x.startsWith("https://api.gsa.gov/")).length,1);
+});
