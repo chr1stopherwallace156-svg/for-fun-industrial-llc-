@@ -6,7 +6,7 @@ import {fileURLToPath} from "node:url";
 import {prepareInventory,COUNTRIES} from "./src/international.mjs";
 import {readJSON,atomicJSON,logEvent} from "./src/core.mjs";
 const DATA_FILE="international-inventory.json";
-const FIELDS=new Set(["sourceId","externalId","title","titleLocal","description","country","category","manufacturer","model","city","region","originPort","quantity","unit","priceLocal","priceType","priceBasis","url","condition","observedAt"]);
+const FIELDS=new Set(["sourceId","externalId","title","titleLocal","description","country","category","manufacturer","model","city","region","originPort","quantity","unit","priceLocal","priceType","priceBasis","companyName","recordType","minOrderQuantity","incoterm","url","condition","observedAt"]);
 export function csvRows(raw){
  const cells=[],rows=[];let cell="",row=[],quoted=false;
  for(let i=0;i<raw.length;i++){
