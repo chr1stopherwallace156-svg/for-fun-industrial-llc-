@@ -51,9 +51,9 @@ export function normalizeLead(x){
  if(!x||typeof x!=="object"||Array.isArray(x))throw Error("LEAD_INVALID");
  const source=REGISTRY.get(trim(x.sourceId,40));
  if(!source)throw Error("SOURCE_NOT_APPROVED");
- if(x.country&&x.country!==source.country)throw Error("COUNTRY_SOURCE_MISMATCH");
- // Facility directory is research, not inventory.
+ // Facility directory is research, not inventory: report the real rejection before checking country.
  if(source.kind==="facility_discovery")throw Error("FACILITY_NOT_A_SELLER_OR_LISTING");
+ if(x.country&&x.country!==source.country)throw Error("COUNTRY_SOURCE_MISMATCH");
  const externalId=trim(x.externalId,130),title=trim(x.title,260);
  if(!externalId||!title)throw Error("LEAD_ID_TITLE_REQUIRED");
  const url=isHttpsSourceUrl(x.url,source);
