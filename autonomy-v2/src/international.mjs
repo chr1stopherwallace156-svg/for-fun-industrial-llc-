@@ -2,26 +2,42 @@
 // Read-only registries and vetted operator-supplied listings, no scraping or bidding.
 import {createHash} from "node:crypto";
 const trim=(v,n=220)=>String(v??"").normalize("NFKC").replace(/[\u0000-\u001f\u007f]/g," ").trim().slice(0,n);
-export const COUNTRIES=Object.freeze({JP:{name:"Japan",currency:"JPY",language:"ja"},KR:{name:"South Korea",currency:"KRW",language:"ko"},VN:{name:"Vietnam",currency:"VND",language:"vi"}});
+export const COUNTRIES=Object.freeze({
+ JP:{name:"Japan",currency:"JPY",language:"ja"},KR:{name:"South Korea",currency:"KRW",language:"ko"},VN:{name:"Vietnam",currency:"VND",language:"vi"},
+ DE:{name:"Germany",currency:"EUR",language:"de"},NL:{name:"Netherlands",currency:"EUR",language:"nl"},FR:{name:"France",currency:"EUR",language:"fr"},
+ CA:{name:"Canada",currency:"CAD",language:"en"},AU:{name:"Australia",currency:"AUD",language:"en"},
+ AE:{name:"United Arab Emirates",currency:"AED",language:"ar"},GB:{name:"United Kingdom",currency:"GBP",language:"en"},
+ US:{name:"United States",currency:"USD",language:"en"}
+});
 export const SOURCE_REGISTRY=Object.freeze([
  {id:"JP_KSI",country:"JP",name:"KSI Government Auctions",kind:"government_auction",url:"https://kankocho.jp/",allowedHost:"kankocho.jp",access:"public_site_manual_review",api:"not_verified",inventory:"vehicles_equipment_property",notes:"Site participation and export eligibility must be checked for each lot"},
  {id:"KR_ONBID_MOVABLE",country:"KR",name:"KAMCO OnBid Movable Property",kind:"government_auction",url:"https://www.onbid.co.kr/",allowedHost:"onbid.co.kr",access:"official_api_key_required",api:"https://www.data.go.kr/data/15157232/openapi.do",inventory:"machinery_equipment_bulk_lots",notes:"Official API application needed; schema and permissions to qualify before auto-ingestion"},
  {id:"KR_ONBID_VEHICLE",country:"KR",name:"KAMCO OnBid Vehicle Auctions",kind:"government_auction",url:"https://www.onbid.co.kr/",allowedHost:"onbid.co.kr",access:"official_api_key_required",api:"https://www.data.go.kr/data/15157233/openapi.do",inventory:"vehicles",notes:"Manufacturer, model and mileage are searchable; import and title rules still apply"},
  {id:"VN_MOJ",country:"VN",name:"Vietnam National Asset Auction Portal",kind:"government_auction",url:"https://dgts.moj.gov.vn/",allowedHost:"dgts.moj.gov.vn",access:"public_site_manual_review",api:"not_verified",inventory:"asset_auction_notices",notes:"Notices may require registration, deposits, local eligibility and document review"},
  {id:"JP_JETRO",country:"JP",name:"JETRO Trade and Supplier Research",kind:"supplier_discovery",url:"https://www.jetro.go.jp/en/",allowedHost:"jetro.go.jp",access:"public_site_manual_review",api:"not_verified",inventory:"supplier_discovery_only",notes:"Supplier research does not certify current stock or prices"},
+ {id:"DE_ZOLL",country:"DE",name:"Germany Zoll-Auktion Public Surplus",kind:"government_auction",url:"https://www.zoll-auktion.de/auktion/",allowedHost:"zoll-auktion.de",access:"public_browse_manual_review",api:"not_verified",inventory:"government_surplus_vehicles_tools_bulk_assets",notes:"Public lot descriptions visible; bidding requires registration. No unattended scraping or export permission assumed"},
+ {id:"EU_TROOSTWIJK",country:"GLOBAL",allowedCountries:["NL","DE","FR","GB"],name:"Troostwijk European Industrial Auctions",kind:"industrial_liquidation",url:"https://www.troostwijkauctions.com/en",allowedHost:"troostwijkauctions.com",access:"public_browse_manual_review",api:"not_verified",inventory:"bulk_trade_warehouse_equipment_containers_machinery",notes:"Operator must confirm actual lot country, purchase terms, premiums, transport and export; no listing API qualified"},
+ {id:"CA_GOVDEALS",country:"CA",name:"GovDeals Canada Government Surplus",kind:"government_auction",url:"https://www.govdeals.ca/",allowedHost:"govdeals.ca",allowedHosts:["govdeals.ca","govdeals.com"],access:"public_browse_manual_review",api:"not_verified",inventory:"municipal_surplus_vehicles_equipment",notes:"Public browsing; bidding, shipping and Canadian import rules require independent qualification"},
+ {id:"GLOBAL_RITCHIE",country:"GLOBAL",allowedCountries:["CA","AU","AE","JP","DE","NL","FR","GB","US"],name:"Ritchie Bros Global Industrial Auctions",kind:"industrial_auction",url:"https://www.rbauction.com/",allowedHost:"rbauction.com",allowedHosts:["rbauction.com","rbauctioneers.com"],access:"public_browse_manual_review",api:"not_verified",inventory:"commercial_vehicles_heavy_equipment_machinery",notes:"Operator must identify actual country and yard location. Public research is not live-feed API authorization"},
+ {id:"GLOBAL_BSTOCK",country:"GLOBAL",allowedCountries:["US","GB","NL","DE","FR"],name:"B-Stock Liquidation Pallets & Truckloads",kind:"liquidation_wholesale",url:"https://bstock.com/auctions/liquidation-auctions/",allowedHost:"bstock.com",access:"public_browse_buyer_eligibility_required",api:"not_verified",inventory:"pallets_truckloads_returns_overstock",notes:"Marketplace-specific approval, shipping, resale tax and regional restrictions; Amazon EU liquidation excludes US-based applicants"},
  {id:"GLOBAL_OSH",country:"GLOBAL",name:"Open Supply Hub Facility Research",kind:"facility_discovery",url:"https://opensupplyhub.org/",allowedHost:"opensupplyhub.org",access:"research_reference_only",api:"not_qualified",inventory:"facilities_not_goods",notes:"Facility location is not an inventory listing; country of a supplied lead must be confirmed"}
 ]);
 export const PORTS=Object.freeze([
  {code:"JPTYO",country:"JP",name:"Tokyo"}, {code:"JPYOK",country:"JP",name:"Yokohama"},
  {code:"KRPUS",country:"KR",name:"Busan"}, {code:"KRINC",country:"KR",name:"Incheon"},
  {code:"VNSGN",country:"VN",name:"Ho Chi Minh City"}, {code:"VNHPH",country:"VN",name:"Hai Phong"},
+ {code:"NLRTM",country:"NL",name:"Rotterdam"}, {code:"DEHAM",country:"DE",name:"Hamburg"},
+ {code:"FRLEH",country:"FR",name:"Le Havre"}, {code:"CAVAN",country:"CA",name:"Vancouver"},
+ {code:"AUSYD",country:"AU",name:"Sydney"}, {code:"AEJEA",country:"AE",name:"Jebel Ali"},
+ {code:"GBFXT",country:"GB",name:"Felixstowe"},
  {code:"USLAX",country:"US",name:"Los Angeles"}, {code:"USLGB",country:"US",name:"Long Beach"}
 ]);
-export const CATEGORIES=Object.freeze(["bulk_lots","vehicles","industrial_equipment","electronics_components","textiles","furniture","property","general"]);
+export const CATEGORIES=Object.freeze(["bulk_lots","shipping_containers","vehicles","industrial_equipment","electronics_components","textiles","furniture","property","general"]);
 const REGISTRY=new Map(SOURCE_REGISTRY.map(s=>[s.id,s]));
 const PORTMAP=new Map(PORTS.map(p=>[p.code,p]));
 const CATS=[
- ["bulk_lots",/(?:\b(?:pallet|crate|container lot|bulk lot|wholesale lot|overstock|liquidation)\b|パレット|まとめ売り|一括|팔레트|일괄|화물|pallet|thùng hàng|lô hàng)/i],
+ ["shipping_containers",/(?:\b(?:shipping container|sea container|storage container|20ft container|40ft container)\b|seecontainer|lagercontainer)/i],
+ ["bulk_lots",/(?:\b(?:pallet|pallets|crate|container lot|bulk lot|wholesale lot|overstock|liquidation|stocklot|joblot)\b|Paletten|Restposten|Mischpaletten|Palettenware|partijgoederen|partijhandel|restpartijen|パレット|まとめ売り|一括|팔레트|일괄|화물|thùng hàng|lô hàng)/i],
  ["vehicles",/(?:\b(?:truck|vehicle|pickup|forklift|automotive|motorbike|car|bus)\b|トラック|自動車|車両|자동차|차량|트럭|xe tải|ô tô|xe hơi)/i],
  ["industrial_equipment",/(?:\b(?:generator|lathe|machinery|compressor|industrial equipment|machine|conveyor|cnc)\b|工作機械|機械|発電機|기계|공작|발전기|máy móc|thiết bị|máy phát điện)/i],
  ["electronics_components",/(?:\b(?:semiconductor|circuit board|pcb|microcontroller|electronics|electronic parts)\b|電子部品|半導体|전자부품|반도체|linh kiện|điện tử)/i],
@@ -35,9 +51,9 @@ export function makerFor(value){const name=trim(value,120);return MAKERS.find(([
 function isHttpsSourceUrl(raw,source){
  try{
   const u=new URL(String(raw));
-  const host=u.hostname.toLowerCase(),allow=source.allowedHost.toLowerCase();
+  const host=u.hostname.toLowerCase(),allows=source.allowedHosts||[source.allowedHost];
   return u.protocol==="https:"&&!u.username&&!u.password&&!u.port&&!u.hash&&
-   (host===allow||host.endsWith("."+allow))&&u.href.length<=850?u.href:null;
+   allows.some(allow=>host===allow||host.endsWith("."+allow))&&u.href.length<=850?u.href:null;
  }catch{return null}
 }
 function money(raw){
@@ -53,14 +69,19 @@ export function normalizeLead(x){
  if(!source)throw Error("SOURCE_NOT_APPROVED");
  // Facility directory is research, not inventory: report the real rejection before checking country.
  if(source.kind==="facility_discovery")throw Error("FACILITY_NOT_A_SELLER_OR_LISTING");
- if(x.country&&x.country!==source.country)throw Error("COUNTRY_SOURCE_MISMATCH");
+ // Global sites offer listings across countries, but the inventory currency and location
+ // must reflect the REAL lot country; "GLOBAL" is never used as inventory origin.
+ const country=source.country==="GLOBAL"?trim(x.country,2).toUpperCase():source.country;
+ if(!COUNTRIES[country]||country==="GLOBAL")throw Error("COUNTRY_UNSUPPORTED_OR_REQUIRED");
+ if(source.country==="GLOBAL"&&!source.allowedCountries.includes(country))throw Error("COUNTRY_NOT_OFFERED_BY_SOURCE");
+ if(source.country!=="GLOBAL"&&x.country&&x.country!==source.country)throw Error("COUNTRY_SOURCE_MISMATCH");
  const externalId=trim(x.externalId,130),title=trim(x.title,260);
  if(!externalId||!title)throw Error("LEAD_ID_TITLE_REQUIRED");
  const url=isHttpsSourceUrl(x.url,source);
  if(!url)throw Error("LEAD_SOURCE_URL_NOT_APPROVED");
  const category=CATEGORIES.includes(x.category)?x.category:categoryFor([title,x.description].join(" "));
  const originPort=trim(x.originPort,5).toUpperCase(),port=originPort?PORTMAP.get(originPort):null;
- if(originPort&&(!port||port.country!==source.country))throw Error("ORIGIN_PORT_MISMATCH");
+ if(originPort&&(!port||port.country!==country))throw Error("ORIGIN_PORT_MISMATCH");
  const price=money(x.priceLocal);
  if(x.priceLocal!=null&&x.priceLocal!==""&&price===null)throw Error("INVALID_PRICE");
  const quantity=money(x.quantity);
@@ -68,11 +89,11 @@ export function normalizeLead(x){
  const amountType=["ask","current_bid","supplier_quote","unknown"].includes(x.priceType)?x.priceType:"unknown";
  const id=createHash("sha256").update(source.id+"\0"+externalId).digest("hex").slice(0,24);
  const manufacturer=x.manufacturer?makerFor(x.manufacturer):(MAKERS.find(([,re])=>re.test(title))?.[0]||"");
- return {id,externalId,sourceId:source.id,source:source.name,country:source.country,countryName:COUNTRIES[source.country].name,
+ return {id,externalId,sourceId:source.id,source:source.name,country,countryName:COUNTRIES[country].name,
   title,titleLocal:trim(x.titleLocal||title,260),description:trim(x.description,400),category,
   manufacturer,model:trim(x.model,100),
   city:trim(x.city,100),region:trim(x.region,100),originPort:port?.code||null,originPortName:port?.name||null,
-  quantity,unit:trim(x.unit||"lot",30),priceLocal:price,currency:COUNTRIES[source.country].currency,
+  quantity,unit:trim(x.unit||"lot",30),priceLocal:price,currency:COUNTRIES[country].currency,
   priceType:amountType,priceBasis:["lot_total","per_unit"].includes(x.priceBasis)?x.priceBasis:"unknown",sourceUrl:url,condition:trim(x.condition||"unverified",110),
   observedAt:trim(x.observedAt,40)||null,provenance:"operator_supplied_public_listing_unverified",
   status:"operator_review_only",bidIsFinalPrice:false,exportEligible:"unknown",realEstate:category==="property"};
@@ -115,4 +136,4 @@ export function landedCost(lead,input={}){
   grossMarginPct:expected>0?Number((100*gross/expected).toFixed(2)):null,
   warning:"Not an assured profit: require quote evidence, customs broker classification, buyer demand, taxes and inspection"};
 }
-export function sourcesForUI(){return SOURCE_REGISTRY.map(({allowedHost,...x})=>x)}
+export function sourcesForUI(){return SOURCE_REGISTRY.map(({allowedHost,allowedHosts,...x})=>x)}
