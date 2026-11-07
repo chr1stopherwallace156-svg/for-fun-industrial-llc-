@@ -1,4 +1,5 @@
 import {Job,Sidequest} from "sidequest";
+import {scanDomestic} from "./domestic.mjs";
 import {atomicJSON,checkGithubUrl,classifyRea,detectResearchChange,hash,localGet,logEvent,pendingTask,readJSON,safeText,statusAssessment,fetchJson} from "./core.mjs";
 const enqueue=async(cls,data)=>Sidequest.build(cls).queue("fi-autonomy").maxAttempts(1).timeout(30000).enqueue(data);
 
@@ -75,6 +76,25 @@ export class ProductSnapshot extends Job {
    if(old&&(old.price!==product.price||old.availability!==product.availability))await enqueue(Followup,{kind:"product_tracking",title:"Product update: "+product.name,detail:"Price "+old.price+" -> "+product.price+" "+product.currency+"; availability "+old.availability+" -> "+product.availability+". Verify supplier information."});
   }
   atomicJSON("product-snapshot.json",next);logEvent("product_snapshot",{count:Object.keys(next).length});return {count:Object.keys(next).length};
+ }
+}
+export class DomesticScan extends Job {
+ async run(){
+  const previous=readJSON("domestic-latest.json",{items:[]});
+  const manual=readJSON("domestic-manual.json",[]);
+  const result=await scanDomestic({manual});
+  atomicJSON("domestic-latest.json",result);
+  const known=new Set(Array.isArray(previous.items)?previous.items.map(x=>x.id):[]);
+  const newLeads=result.items.filter(x=>!known.has(x.id));
+  logEvent("domestic_scan",{total:result.summary.total,newLeads:newLeads.length,workingSources:result.summary.workingSources,unavailableSources:result.summary.unavailableSources});
+  if(newLeads.length&&Array.isArray(previous.items)&&previous.checkedAt){
+   const top=newLeads.slice(0,3);
+   await enqueue(Followup,{kind:"domestic_opportunity",title:"Review "+newLeads.length+" new U.S. opportunities",detail:top.map(x=>x.source+": "+x.title).join(" | ").slice(0,440)+". Verify eligibility and financials before any bid."});
+  }
+  if(result.sources.every(x=>!x.ok)){
+   await enqueue(Followup,{kind:"domestic_feeds",title:"Domestic opportunity feeds unavailable",detail:"All configured official feeds returned errors. Inspect the source diagnostics in the 8789 dashboard."});
+  }
+  return {count:result.summary.total,newLeads:newLeads.length,sourceStatus:result.sources.map(x=>({name:x.name,ok:x.ok}))};
  }
 }
 export class Followup extends Job {
