@@ -52,3 +52,16 @@ test("empty GSA response cannot be presented as an official live snapshot",()=>{
  assert.throws(()=>gsaImportDocument({auctions:[{saleNo:"ABC",itemName:"Used equipment",auctionStatus:"Closed"}]}),/NO_ACTIVE/);
  assert.throws(()=>gsaImportDocument({foo:"bar"}),/NO_RECOGNIZED_LOTS/);
 });
+
+test("hundreds of auction observations do not bury previously collected grants",()=>{
+ const lots=Array.from({length:600},(_,i)=>({saleNo:"S-"+i,lotNo:1,itemName:"Surplus fleet truck "+i,auctionStatus:"Active",propertyState:"CA"}));
+ const now=Date.UTC(2026,10,7,3);
+ const imported=gsaImportDocument({auctions:lots},{now});
+ assert.equal(imported.activeCount,600);
+ const combined=combinedOpportunities(base,imported,{now:now+1});
+ assert.equal(combined.items.length,300);
+ assert.equal(combined.summary.auctionCount,299);
+ assert.equal(combined.summary.grantCount,1);
+ assert.equal(combined.gsaSnapshot.importedLots,600);
+ assert.equal(combined.items.at(-1).id,"grant-1");
+});
