@@ -46,10 +46,11 @@ const js=[
 '  (!query||[i.title,i.titleLocal,i.manufacturer,i.model,i.city,i.region,i.description].join(" ").toLowerCase().includes(query)));',
 ' for(const i of found.slice(0,45)){',
 '  const box=fiIntlText("div","","card flat");box.append(fiIntlText("strong",i.title));',
-'  const detail=[i.countryName,i.category,i.manufacturer,i.model,i.city,i.region,i.originPortName,i.quantity?"Quantity "+i.quantity+" "+i.unit:"",i.priceLocal!==null?"Observed "+i.currency+" "+i.priceLocal+" ("+i.priceType+")":"Price unavailable"].filter(Boolean).join(" | ");',
+'  const detail=[i.countryName,i.category,i.manufacturer,i.model,i.city,i.region,i.originPortName,i.quantity?"Quantity "+i.quantity+" "+i.unit:"",i.priceLocal!==null?"Observed "+i.currency+" "+i.priceLocal+" ("+i.priceType+", "+i.priceBasis+")":"Price unavailable"].filter(Boolean).join(" | ");',
 '  box.append(fiIntlText("p",detail,"subtle"),fiIntlText("p",[i.condition,i.description,"Export eligibility "+i.exportEligible].filter(Boolean).join(" — ").slice(0,450),"subtle"));',
 '  if(i.sourceUrl&&i.sourceUrl.startsWith("https://")){const a=document.createElement("a");a.href=i.sourceUrl;a.target="_blank";a.rel="noopener noreferrer";a.textContent="Source listing";box.append(a)}',
-'  items.append(box);',
+'  const last=Date.parse(i.sourceLastImportedAt||i.observedAt||"");if(!Number.isFinite(last)||Date.now()-last>=86400000)box.append(fiIntlText("p","Stale or unverified listing freshness; recheck original source before any financial decision.","subtle"));
+  items.append(box);',
 ' }',
 ' if(!found.length)items.append(fiIntlText("p","No imported listings match. The source directory is not live inventory.","subtle"));',
 ' status.textContent=(x.summary?.total||0)+" imported candidates | "+(x.stale?"IMPORT STALE OR NOT YET PROVIDED":"Last imported "+new Date(x.importedAt).toLocaleString())+" | automatic international feeds: "+(x.autoSourcesActive||0)+" | shown "+Math.min(found.length,45);',
