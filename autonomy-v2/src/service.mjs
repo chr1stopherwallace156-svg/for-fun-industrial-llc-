@@ -1,5 +1,5 @@
 import {Sidequest} from "sidequest";
-import {Discover,Registry,Research,ProductSnapshot} from "./jobs.mjs";
+import {Discover,Registry,Research,ProductSnapshot,DomesticScan} from "./jobs.mjs";
 import {startDashboard} from "./http.mjs";
 import {dataPath,ensureData,logEvent} from "./core.mjs";
 ensureData();
@@ -12,7 +12,8 @@ try{
  await Sidequest.build(Registry).queue(queue).maxAttempts(1).schedule("*/30 * * * *");
  await Sidequest.build(Research).queue(queue).maxAttempts(1).schedule("0 */6 * * *");
  await Sidequest.build(ProductSnapshot).queue(queue).maxAttempts(1).schedule("0 * * * *");
- for(const J of [Discover,Registry,Research,ProductSnapshot])await Sidequest.build(J).queue(queue).maxAttempts(1).enqueue();
+ await Sidequest.build(DomesticScan).queue(queue).maxAttempts(1).schedule("25 */6 * * *");
+ for(const J of [Discover,Registry,Research,ProductSnapshot,DomesticScan])await Sidequest.build(J).queue(queue).maxAttempts(1).enqueue();
  logEvent("service_started",{pid:process.pid,version:"0.2.0",reaCalls:0});
  console.log("AUTONOMY_V2=RUNNING DASHBOARD=http://127.0.0.1:8792 PID="+process.pid);
 }catch(e){console.error("AUTONOMY_START_FAIL",e);process.exitCode=1;if(server)server.close();await Sidequest.stop().catch(()=>{});throw e}
