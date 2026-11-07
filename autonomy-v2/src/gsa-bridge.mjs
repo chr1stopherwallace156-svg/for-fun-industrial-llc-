@@ -26,7 +26,9 @@ export function combinedOpportunities(base,imported,{now=Date.now()}={}){
  for(const item of [...eligible,...items])if(item?.id&&!merged.has(item.id))merged.set(item.id,item);
  // Auctions first, then sort by topical relevance; do not claim these are bargains.
  const ranked=[...merged.values()].sort((a,b)=>Number(b.kind==="surplus_auction")-Number(a.kind==="surplus_auction")||(Number(b.score)||0)-(Number(a.score)||0));
- const displayed=ranked.slice(0,300);
+ const auctionRows=ranked.filter(x=>x.kind==="surplus_auction"),otherRows=ranked.filter(x=>x.kind!=="surplus_auction");
+ const maxAuctions=300-Math.min(40,otherRows.length);
+ const displayed=[...auctionRows.slice(0,maxAuctions),...otherRows.slice(0,300-maxAuctions)];
  const status=valid&&eligible.length?"active":imported?.checkedAt?"expired_or_invalid":"not_imported";
  const supplemental={name:"GSA Auctions / Windows verified snapshot",ok:valid&&eligible.length>0,detail:status==="active"?"Manual official API download; expires "+imported.expiresAt:status==="not_imported"?"Not imported; run approved Windows preview import":"Snapshot expired or invalid — refresh required",count:valid?eligible.length:0};
  return {...original,checkedAt:valid?imported.checkedAt:(original.checkedAt||null),scope:"United States",items:displayed,sources:[...sources.filter(s=>s?.name!==supplemental.name),supplemental],
