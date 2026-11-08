@@ -17,7 +17,7 @@ export function workerHttp(input){
  let s=once(input,'import {DomesticScan} from "./jobs.mjs";\n',"");
  s=once(s,'import {combinedOpportunities} from "./gsa-bridge.mjs";\n',"");
  s=once(s,'import {sourcesForUI,PORTS,CATEGORIES,COUNTRIES} from "./international.mjs";\n',"");
- s=once(s,'  let lastScanRequest=0;\n',"");
+ s=once(s,' let lastScanRequest=0;\n',"");
  s=cut(s,'  if(req.method==="POST"&&req.url==="/api/opportunities/scan"){',
  '  if(req.method!=="GET"||!ALLOWED.has(req.url))',
  '  // FI_SOURCING_RETIRED_V1: archive retained; all opportunity API endpoints disabled.\n'+
