@@ -133,10 +133,18 @@ foreach($name in @('FunIndustrial-US-Opportunities','FunIndustrial-International
  if($LASTEXITCODE -ne 0 -or $remote -notin $approvedRemotes){
   $skipped.Add("ORIGIN_MISMATCH:$folder");continue
  }
- # Refuse to erase ignored/local credentials during repository cleanup.
- $sensitive=@(Get-ChildItem -LiteralPath $folder -Recurse -File -Force -ErrorAction Stop | Where-Object {$_.Name -match '^(?i:\.env(?:\..+)?|credentials\.(?:json|yaml|yml)|secret\.(?:json|yaml|yml)|.*\.(?:pem|key|p12|pfx))
+ # Avoid deletion of ignored secrets or locally created files.
+ $sensitive=@(Get-ChildItem -LiteralPath $folder -Recurse -File -Force -ErrorAction Stop | Where-Object { $_.Name -match '(?i)^(?:\.env(?:\..+)?|credentials\.(?:json|yaml|yml)|secret\.(?:json|yaml|yml)|.*\.(?:pem|key|p12|pfx))$' } | Select-Object -First 1)
+ if($sensitive.Count -gt 0){
+  $skipped.Add("LOCAL_CREDENTIAL_FILES_PRESENT:$folder");continue
+ }
+ $changes=(& git -C $folder status --porcelain=v1 --untracked-files=all 2>&1 | Out-String).Trim()
  if($LASTEXITCODE -ne 0 -or $changes.Length -gt 0){
   $skipped.Add("LOCAL_CHANGES_PRESENT:$folder");continue
+ }
+ $ignored=(& git -C $folder ls-files --others --ignored --exclude-standard 2>&1 | Out-String).Trim()
+ if($LASTEXITCODE -ne 0 -or $ignored.Length -gt 0){
+  $skipped.Add("IGNORED_LOCAL_FILES_PRESENT:$folder");continue
  }
  AddFolder $folder 'Obsolete sourcing Git checkout'
 }
@@ -179,7 +187,7 @@ $receipt=[ordered]@{
  at=(Get-Date).ToString('o');state='PURGE_COMPLETED';filesOrFoldersRemoved=$count
  logicalBytesRemoved=$removed;logicalMiB=[math]::Round($removed/1MB,2)
  diskFreeBytesBefore=$freeBefore;diskFreeBytesAfter=$freeAfter;diskFreeByteChange=($freeAfter-$freeBefore)
- paths=$deleteOrder|ForEach-Object {$_.Path};skipped=@($skipped)
+ paths=@($deleteOrder | ForEach-Object {$_.Path});skipped=@($skipped)
  protected=@('FunIndustrial-REA-MCP-Activation','jobs.sqlite','REA','llama.cpp','Ollama','NetBird','research-sources.json')
 }
 $receiptDir=Join-Path $env:LOCALAPPDATA 'FunIndustrial\Logs'
@@ -238,7 +246,7 @@ $receipt=[ordered]@{
  at=(Get-Date).ToString('o');state='PURGE_COMPLETED';filesOrFoldersRemoved=$count
  logicalBytesRemoved=$removed;logicalMiB=[math]::Round($removed/1MB,2)
  diskFreeBytesBefore=$freeBefore;diskFreeBytesAfter=$freeAfter;diskFreeByteChange=($freeAfter-$freeBefore)
- paths=$deleteOrder|ForEach-Object {$_.Path};skipped=@($skipped)
+ paths=@($deleteOrder | ForEach-Object {$_.Path});skipped=@($skipped)
  protected=@('FunIndustrial-REA-MCP-Activation','jobs.sqlite','REA','llama.cpp','Ollama','NetBird','research-sources.json')
 }
 $receiptDir=Join-Path $env:LOCALAPPDATA 'FunIndustrial\Logs'
