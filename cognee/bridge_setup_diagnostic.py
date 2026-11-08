@@ -45,7 +45,7 @@ def main():
 
 if __name__ == "__main__":
     try:main()
-    except BaseException as error:
+    except Exception as error:
         print("BRIDGE_DIAGNOSTIC=HOLD ERROR_TYPE="+type(error).__name__,flush=True)
         print("ERROR_DETAIL="+str(error)[:400],flush=True)
         traceback.print_exc(limit=16)
