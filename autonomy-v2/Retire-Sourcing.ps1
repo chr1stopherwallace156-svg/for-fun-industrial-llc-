@@ -133,7 +133,19 @@ try{
  Write-Warning "SOURCING_RETIREMENT=HOLD REASON=$why RESTORE_FROM=$backup"
  # Restore all five original files even if a partial copy happened.
  if($uiNew){$uiNew.Refresh();if(-not $uiNew.HasExited){Stop-Process -Id $uiNew.Id -Force -ErrorAction SilentlyContinue}}
- if($workerNew -gt 0){try{$p=Get-CimInstance Win32_Process -Filter "ProcessId=$workerNew" -ErrorAction SilentlyContinue;if($p -and $p.CommandLine -match 'autonomy-v2-github.*service\.mjs'){Stop-Process -Id $workerNew -Force -ErrorAction SilentlyContinue}}catch{}}
+ # A restarted worker may have bound 8792 before its health check succeeded, so
+ # identify and stop it even if the new PID was never captured in $workerNew.
+ if($workerStopped){
+  try{
+   $conn=Get-NetTCPConnection -LocalPort 8792 -State Listen -ErrorAction SilentlyContinue|Where-Object {$_.LocalAddress -eq '127.0.0.1'}|Select-Object -First 1
+   if($conn){
+    $p=Get-CimInstance Win32_Process -Filter "ProcessId=$($conn.OwningProcess)" -ErrorAction SilentlyContinue
+    if($p -and $p.Name -eq 'node.exe' -and $p.CommandLine -match 'autonomy-v2-github.*service\.mjs' -and [int]$p.ProcessId -ne [int]$workerProc.ProcessId){
+     Stop-Process -Id ([int]$p.ProcessId) -Force -ErrorAction SilentlyContinue
+    }
+   }
+  }catch{Write-Warning 'ROLLBACK_WORKER_PROCESS_CHECK_FAILED'}
+ }
  foreach($p in $paths){Copy-Item -LiteralPath (Join-Path $orig ($p.id.Replace('/','_'))) -Destination $p.original -Force -ErrorAction Stop}
  if($workerStopped){
   try{WaitForPortDown 8792;& $ps -NoProfile -ExecutionPolicy Bypass -File $launcher;Write-Warning 'PREVIOUS_WORKER_RESTART_ATTEMPTED'}catch{Write-Warning "WORKER_MANUAL_RECOVERY_FROM=$backup"}
