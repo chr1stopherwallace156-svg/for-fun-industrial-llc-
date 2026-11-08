@@ -37,7 +37,7 @@ test("Cognee defaults off and never starts its Python process during status",asy
 });
 
 test("Windows PowerShell BOM settings are parsed instead of silently disabling Cognee",()=>{
- const cfg=parseMemorySettings("\\uFEFF".replace("\\\\uFEFF","\\uFEFF")+'{"enabled":true,"writesEnabled":true,"automaticIngestion":false}');
+ const cfg=parseMemorySettings(String.fromCharCode(0xFEFF)+'{"enabled":true,"writesEnabled":true,"automaticIngestion":false}');
  assert.equal(cfg.enabled,true);assert.equal(cfg.writesEnabled,true);
  assert.throws(()=>parseMemorySettings("[1,2,3]"),/MEMORY_SETTINGS_OBJECT_REQUIRED/);
 });
