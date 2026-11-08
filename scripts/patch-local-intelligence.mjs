@@ -11,7 +11,7 @@ export function patchIntelligenceServer(source){
  [
  'import {createAutonomyActivator} from "./autonomy-activation.mjs";',
  'import {policySummary,evaluateSituation} from "./intelligence/rules.mjs";',
- 'import {memoryStatus,memoryAction} from "./intelligence/memory.mjs";'
+ 'import {memoryStatus,memoryStorageUsage,memoryAction} from "./intelligence/memory.mjs";'
  ].join("\n"));
  s=once(s,'const server=http.createServer(async(req,res)=>{try{',[
  'let fiMemoryInFlight=false;',
@@ -20,6 +20,10 @@ export function patchIntelligenceServer(source){
  ' if(req.method==="GET"&&req.url==="/api/intelligence/status"){',
  '  if(!localRequest(req,res))return;',
  '  return json(res,200,{rules:policySummary(),memory:memoryStatus()});',
+ ' }',
+ ' if(req.method==="GET"&&req.url==="/api/intelligence/storage"){',
+ '  if(!localRequest(req,res))return;',
+ '  return json(res,200,await memoryStorageUsage());',
  ' }',
  ' if(req.method==="POST"&&req.url==="/api/intelligence/evaluate"){',
  '  if(!localRequest(req,res))return;',
