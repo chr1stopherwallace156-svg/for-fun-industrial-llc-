@@ -108,12 +108,16 @@ if($InstallCognee){
  }
 }else{Write-Host 'COGNEE=ADAPTER_STAGED INSTALLATION_DEFERRED'}
 $settings=@{enabled=[bool]$InstallCognee;writesEnabled=[bool]$EnableMemoryWrites;automaticIngestion=$false;dataset='fun_industrial_operator_memory'}
-$settings|ConvertTo-Json -Depth 4|Set-Content (Join-Path $stagedInt 'settings.json') -Encoding UTF8
+# Use UTF-8 without BOM; old PowerShell 5.1 Set-Content -Encoding UTF8 emits
+# a BOM that JSON.parse does not accept without an explicit decoder.
+$settingsJson=ConvertTo-Json -InputObject $settings -Depth 4
+[IO.File]::WriteAllText((Join-Path $stagedInt 'settings.json'),$settingsJson,[Text.UTF8Encoding]::new($false))
 try{
+ # Even partial copy must trigger rollback; set before the first live write.
+ $changed=$true
  Copy-Item -LiteralPath $stagedInt -Destination $modules -Recurse -ErrorAction Stop
  Copy-Item -LiteralPath $stagedPy -Destination $cogneeFiles -Recurse -ErrorAction Stop
  Copy-Item -LiteralPath $stagedServer -Destination $target -Force -ErrorAction Stop
- $changed=$true
  Write-Host "INTELLIGENCE_INSTALLED=STAGED BACKUP=$backup"
  Stop-Process -Id ([int]$original.ProcessId) -ErrorAction Stop;$oldStopped=$true
  for($i=0;$i -lt 40;$i++){
@@ -124,13 +128,23 @@ try{
  $env:HOST='127.0.0.1';$env:PORT='8789'
  $env:REA_ALLOWED_TOOLS=($reaTools|ForEach-Object {$_.name}) -join ','
  $newUI=Start-Process -FilePath $node -ArgumentList 'src/server.mjs' -WorkingDirectory $Root -PassThru -RedirectStandardOutput (Join-Path $logs 'intelligence.stdout.log') -RedirectStandardError (Join-Path $logs 'intelligence.stderr.log')
- $result=$null
+ $result=$null;$lastStatusError='none'
  for($i=0;$i -lt 55;$i++){
   Start-Sleep -Milliseconds 650
   $newUI.Refresh();if($newUI.HasExited){throw 'INTELLIGENCE_DASHBOARD_PROCESS_EXITED'}
-  try{$result=Invoke-RestMethod "$base/api/intelligence/status" -TimeoutSec 3;if($result.rules.engine -eq 'json-rules-engine'){break}}catch{}
+  try{
+   $result=Invoke-RestMethod "$base/api/intelligence/status" -TimeoutSec 5 -ErrorAction Stop
+   if($result.rules.engine -eq 'json-rules-engine'){break}
+   $lastStatusError='STATUS_RESPONSE_MISSING_EXPECTED_ENGINE'
+  }catch{
+   $lastStatusError=([string]$_.Exception.Message).Substring(0,[math]::Min(300,([string]$_.Exception.Message).Length))
+  }
  }
- if(-not $result -or $result.rules.engine -ne 'json-rules-engine'){throw 'INTELLIGENCE_STATUS_NOT_READY'}
+ if(-not $result -or $result.rules.engine -ne 'json-rules-engine'){
+  Write-Warning "INTELLIGENCE_STATUS_LAST_ERROR=$lastStatusError"
+  Write-Warning "INTELLIGENCE_STDERR_LOG=$(Join-Path $logs 'intelligence.stderr.log')"
+  throw 'INTELLIGENCE_STATUS_NOT_READY'
+ }
  if($InstallCognee -and -not $result.memory.enabled){throw 'COGNEE_NOT_ENABLED_AFTER_INSTALL'}
  $sample='{"mode":"propose","risk_level":"low","source_trusted":true,"context_complete":true,"service_ready":true,"evidence_verified":true,"emergency_stop":false}'
  $decision=Invoke-RestMethod "$base/api/intelligence/evaluate" -Method POST -ContentType 'application/json' -Body $sample -TimeoutSec 15
