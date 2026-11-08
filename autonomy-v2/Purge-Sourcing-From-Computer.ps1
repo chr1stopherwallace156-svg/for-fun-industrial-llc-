@@ -185,6 +185,6 @@ $receiptDir=Join-Path $env:LOCALAPPDATA 'FunIndustrial\Logs'
 New-Item -ItemType Directory -Path $receiptDir -Force|Out-Null
 $receiptPath=Join-Path $receiptDir ('sourcing-purge-receipt-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'.json')
 $receipt|ConvertTo-Json -Depth 6|Set-Content -LiteralPath $receiptPath -Encoding UTF8
-Write-Host "SOURCING_PURGE=PASS REMOVED=$count LOGICAL_RECLAIMED_MIB=$([math]::Round($removed/1MB,2)) DISK_FREE_CHANGE_MIB=$([math]::Round(($freeAfter-$freeBefore)/1MB,2))"
+Write-Host "SOURCING_PURGE=PASS REMOVED=$count SKIPPED=$($skipped.Count) LOGICAL_RECLAIMED_MIB=$([math]::Round($removed/1MB,2)) DISK_FREE_CHANGE_MIB=$([math]::Round(($freeAfter-$freeBefore)/1MB,2))"
 Write-Host "PRESERVED=MAIN_PLATFORM,REA_229,LOCAL_AI,OLLAMA,NETBIRD,SIDEQUEST_SQLITE,GENERAL_RESEARCH"
 Write-Host "RECEIPT=$receiptPath"
