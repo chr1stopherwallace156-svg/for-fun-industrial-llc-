@@ -78,3 +78,21 @@ test("unrecognized source versions fail closed",()=>{
  assert.throws(()=>platformServer('const autonomyPaths={};'),/RETIRE_ANCHOR_NOT_UNIQUE/);
  assert.throws(()=>workerHttp("const x=1"),/RETIRE_ANCHOR_NOT_UNIQUE/);
 });
+
+
+test("Windows CRLF checkout produces the same retired modules as LF",()=>{
+ for(const [name,fn] of [["http",workerHttp],["jobs",workerJobs],["service",workerService]]){
+  const source=file("src/"+name+".mjs");
+  const expected=fn(source);
+  const win=source.replace(/\n/g,"\r\n");
+  assert.equal(fn(win),expected,name+" Windows CRLF mismatch");
+ }
+});
+test("Windows CRLF checkout supports guarded platform/UI transforms",()=>{
+ const serverLF=platformServer(serverFixture);
+ assert.equal(platformServer(serverFixture.replace(/\n/g,"\r\n")),serverLF);
+ for(const intl of [true,false]){
+  const source=fixture(intl);
+  assert.equal(platformUi(source.replace(/\n/g,"\r\n")),platformUi(source));
+ }
+});
