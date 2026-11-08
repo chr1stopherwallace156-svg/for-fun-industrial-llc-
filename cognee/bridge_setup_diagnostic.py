@@ -25,7 +25,10 @@ def stage(label, action):
 
 def main():
     root = Path(os.environ["LOCALAPPDATA"]) / "FunIndustrial" / "CognitiveMemory"
-    bridge_path = Path(__file__).resolve().parent / "memory_bridge.py"
+    bridge_path = Path(os.environ.get("FI_COGNEE_BRIDGE_PATH", str(Path(__file__).resolve().parent / "memory_bridge.py"))).resolve()
+    expected = Path(os.environ["USERPROFILE"]).resolve() / "FunIndustrial-REA-MCP-Activation" / "cognee" / "memory_bridge.py"
+    if bridge_path != expected.resolve():
+        raise ValueError("BRIDGE_PATH_NOT_THE_DEPLOYED_PLATFORM")
     print("MODE=NO_MEMORY_OPERATION NO_REA_TOOLS NO_MODEL_REQUESTS", flush=True)
     print("COGNEE_VERSION_TARGET=1.6.7", flush=True)
     print("EXISTING_BRIDGE_FILE=" + str(bridge_path.is_file()).lower(), flush=True)
