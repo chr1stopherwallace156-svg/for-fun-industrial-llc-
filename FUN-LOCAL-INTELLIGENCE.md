@@ -133,3 +133,15 @@ $ErrorActionPreference='Stop';$d=Join-Path $env:USERPROFILE 'FunIndustrial-Local
 ```
 
 Expected success: `BRIDGE_STAGE_PASS=bridge_setup` and `DEPLOYED_BRIDGE_DIAGNOSTIC=PASS`, with API signatures printed. On failure report `BRIDGE_STAGE_HOLD`, `ERROR_TYPE`, and `ERROR_DETAIL`. No production server restart, Python package reinstall, REA call, memory write, or repeat recall is performed.
+
+## After deployed bridge setup PASS but memory requests still return HTTP 400
+
+Cognee 1.6.7 import, isolated config, bridge import and `bridge_setup` all passed in the operator's Windows run. `remember` and `recall` via HTTP still returned `400`/`{}` in earlier tests. The bridge's function signatures exist and are compatible; this is not yet proof that the memory dataset exists or that either operation has succeeded.
+
+To capture the actual Python exception, use the **separate diagnostic direct-recall program**. It uses the exact deployed bridge, isolated environment and existing Cognee venv, with the original test query but no `remember`, REA tools, generic activation, or platform restart. It may download local embedding/model weights and create Cognee cache/search history entries. It prints the exception and traceback but not retrieved memory text.
+
+```powershell
+$ErrorActionPreference='Stop';$d=Join-Path $env:USERPROFILE 'FunIndustrial-Local-Intelligence';& git -C $d pull --ff-only;if($LASTEXITCODE -ne 0){throw 'GIT_PULL_HOLD'};& node (Join-Path $d 'scripts\trace-cognee-recall.mjs');if($LASTEXITCODE -ne 0){throw 'DIRECT_RECALL_TRACE_HOLD'}
+```
+
+Important markers: `BRIDGE_SETUP=PASS`, `RECALL_SIGNATURE_BIND=PASS`, then either `RECALL_DIRECT=PASS RESULT_COUNT=N` or `RECALL_DIRECT=HOLD EXCEPTION_TYPE=... EXCEPTION_DETAIL=...` plus a Python traceback. If it fails, diagnose the precise Python exception before making any edits to persistent dataset files or retrying remember.
