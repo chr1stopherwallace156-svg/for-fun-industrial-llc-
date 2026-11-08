@@ -31,7 +31,7 @@ jobs:
           node --check src/intelligence/rules.mjs
           node --check src/intelligence/memory.mjs
           node --check scripts/patch-local-intelligence.mjs
-          python3 -m py_compile cognee/memory_bridge.py
+          python3 -m py_compile cognee/memory_bridge.py cognee/probe_local.py
       - name: Read-only rules and patcher tests
         run: node --test intelligence-checks/situational-case.mjs intelligence-checks/patcher-case.mjs
       - name: Confirm source retirement not undone
@@ -49,6 +49,10 @@ jobs:
         run: |
           $tokens=$null
           $errors=$null
-          $null=[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path .\Install-Fun-Intelligence.ps1),[ref]$tokens,[ref]$errors)
-          if($errors.Count -gt 0){$errors|ForEach-Object {Write-Error $_.Message};exit 1}
-          Write-Host "WINDOWS_INSTALLER_SYNTAX=PASS"
+          foreach($path in @('.\Install-Fun-Intelligence.ps1','.\Repair-Fun-Intelligence.ps1')){
+            $tokens=$null
+            $errors=$null
+            $null=[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path),[ref]$tokens,[ref]$errors)
+            if($errors.Count -gt 0){$errors|ForEach-Object {Write-Error $_.Message};exit 1}
+          }
+          Write-Host "WINDOWS_INSTALLER_AND_REPAIR_SYNTAX=PASS"
