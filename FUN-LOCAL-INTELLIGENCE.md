@@ -169,3 +169,19 @@ $ErrorActionPreference='Stop';$d=Join-Path $env:USERPROFILE 'FunIndustrial-Local
 ```
 
 Expected: `ADAPTER_SOURCE_MATCH=true`, `VALIDATION_REJECTION=PASS`, `ADAPTER_ATTESTATION_ONLY=PASS_NO_PYTHON_RECALL`. If files differ, do not overwrite the live installed adapter automatically—inspect differences and preserve current source. If errors are unexpectedly objects, examine `EXCEPTION_KEYS` etc. A separate explicit `--replay-recall` mode is offered for later troubleshooting but is **not** used by the default command. Real remember remains unverified; avoid duplicate writes.
+
+## Root cause confirmed: successful Cognee response rejected as a plain object (Nov 8, 2026)
+
+After verifying deployed adapter SHA-256 `852ee00ac535536f3a91828c01383143d8c8461a0c16a4fc9962bc24235bbd6b` equals the GitHub version, and malformed recall correctly rejects with a native `Error`, the adapter's subprocess completion handler was examined. It called `finish({engine:'cognee',action,...data})` on a successful `FI_MEMORY_RESULT`. `finish(error,result)` interprets its *first* argument as an error, causing the promise to reject with a plain object. The top-level HTTP error handler serialized `error.message` (undefined) to `{}` with HTTP 400. Thus **a successful memory operation was being reported as an error**.
+
+The fix is `finish(null,{engine:'cognee',action,...data})`, exposed via `settleMemoryBridgeResult` with four regression tests covering successful remember, successful recall, real Python operation failures, and exit-code failure. The bridge's existing 1.6.7 API arguments and standalone Python environment are unchanged. **Do not repeat the original `remember`**: its original 400 may have followed a successful write.
+
+### Guarded live fix (not the original installation script)
+
+`Repair-Live-Cognee-Node.ps1` requires the observed original SHA-256, the approved source patch, working 8789 process identity, 229 original REA tools, active intelligence status, and retired sourcing endpoints; tests the new callback; backs up deployed adapter; replaces only `src/intelligence/memory.mjs`; restarts **only** Fun Industrial 8789; reinitializes the REA catalog with `/api/rea/start` but executes **zero** tools; verifies 229 scopes and sourcing retirement; performs **recall-only** verification of the original note; prints count and exact-text match Boolean without printing retrieved content. On HOLD it attempts to restore the old adapter/dashboard and REA catalog. Does not install/reinstall Python or npm, modify data files, or touch Elektron/Ollama/Sidequest.
+
+```powershell
+$ErrorActionPreference='Stop';$d=Join-Path $env:USERPROFILE 'FunIndustrial-Local-Intelligence';& git -C $d pull --ff-only;if($LASTEXITCODE -ne 0){throw 'GIT_PULL_HOLD'};& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $d 'Repair-Live-Cognee-Node.ps1');if($LASTEXITCODE -ne 0){throw 'COGNEE_NODE_MEMORY_FIX_HOLD'}
+```
+
+Required success markers: `COGNEE_NODE_FIX_PREFLIGHT=PASS`, `PATCHED_DASHBOARD=PASS`, `REA_CATALOG=PASS COUNT=229 TOOLS_EXECUTED=0`, `COGNEE_NODE_MEMORY_FIX=PASS HTTP_RECALL=200 RESULT_COUNT=N ORIGINAL_NOTE_TEXT_MATCH=True/False`. An HTTP recall result count >0 is not proof of matching the original text; exact-text matching Boolean is reported separately. Do not claim full memory persistence qualification until a successful remember + exact recall pair is established.
