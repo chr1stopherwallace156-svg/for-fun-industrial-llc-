@@ -15,6 +15,7 @@ $worker=[IO.Path]::GetFullPath((Join-Path $autoRoot 'autonomy-v2-github'))
 $dataDir=Join-Path $worker 'data'
 $logDir=Join-Path $env:LOCALAPPDATA 'FunIndustrial\Logs'
 $expectedRepo='https://github.com/chr1stopherwallace156-svg/for-fun-industrial-llc-'
+$approvedRemotes=@($expectedRepo,($expectedRepo+'.git'),'git@github.com:chr1stopherwallace156-svg/for-fun-industrial-llc-.git')
 $base='http://127.0.0.1:8789'
 $workerBase='http://127.0.0.1:8792'
 # Hard-stop if a custom path points outside the sole known Fun Industrial install.
@@ -129,7 +130,7 @@ foreach($name in @('FunIndustrial-US-Opportunities','FunIndustrial-International
   $skipped.Add("NOT_GIT_CHECKOUT:$folder");continue
  }
  $remote=(& git -C $folder remote get-url origin 2>&1 | Out-String).Trim()
- if($LASTEXITCODE -ne 0 -or $remote -notlike "*chr1stopherwallace156-svg/for-fun-industrial-llc-*"){
+ if($LASTEXITCODE -ne 0 -or $remote -notin $approvedRemotes){
   $skipped.Add("ORIGIN_MISMATCH:$folder");continue
  }
  $changes=(& git -C $folder status --porcelain=v1 --untracked-files=all 2>&1 | Out-String).Trim()
