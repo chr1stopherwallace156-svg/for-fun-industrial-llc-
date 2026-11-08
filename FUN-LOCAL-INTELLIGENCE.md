@@ -145,3 +145,15 @@ $ErrorActionPreference='Stop';$d=Join-Path $env:USERPROFILE 'FunIndustrial-Local
 ```
 
 Important markers: `BRIDGE_SETUP=PASS`, `RECALL_SIGNATURE_BIND=PASS`, then either `RECALL_DIRECT=PASS RESULT_COUNT=N` or `RECALL_DIRECT=HOLD EXCEPTION_TYPE=... EXCEPTION_DETAIL=...` plus a Python traceback. If it fails, diagnose the precise Python exception before making any edits to persistent dataset files or retrying remember.
+
+## Direct Python recall succeeded; isolate the deployed Node adapter (Nov 8, 2026)
+
+The operator verified that `BRIDGE_SETUP=PASS`, `RECALL_SIGNATURE_BIND=PASS`, and direct Cognee `recall` completed with `RECALL_DIRECT=PASS RESULT_COUNT=1` using the isolated FastEmbed local model BAAI/bge-small-en-v1.5. This proves the Python recall path works, **not** that the original test note was stored or matched. The 8789 HTTP memory endpoints previously returned 400 with `{}` and remain unqualified.
+
+Next diagnostic, with **no server restart, new remember operation or REA tool invocation**, imports the *deployed* `src/intelligence/memory.mjs` (not the GitHub checkout copy) and performs the existing recall query through its Node -> Python adapter. It prints status, result count or the actual JavaScript error type/message, and never prints retrieved content. Cognee may update local caches or search-history entries.
+
+```powershell
+$ErrorActionPreference='Stop';$d=Join-Path $env:USERPROFILE 'FunIndustrial-Local-Intelligence';& git -C $d pull --ff-only;if($LASTEXITCODE -ne 0){throw 'GIT_PULL_HOLD'};& node (Join-Path $d 'scripts\diagnose-cognee-node-adapter.mjs');if($LASTEXITCODE -ne 0){throw 'NODE_ADAPTER_RECALL_HOLD'}
+```
+
+Observe `NODE_ADAPTER_RECALL=PASS RESULT_COUNT=...` or `NODE_ADAPTER_RECALL=HOLD ERROR_TYPE=... ERROR_MESSAGE=...`. The exact result distinguishes a Node subprocess/protocol bug from server HTTP error handling. Do not reinstall Cognee or retry remember until that boundary is understood.
