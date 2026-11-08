@@ -31,7 +31,9 @@ jobs:
           node --check src/intelligence/rules.mjs
           node --check src/intelligence/memory.mjs
           node --check scripts/patch-local-intelligence.mjs
-          python3 -m py_compile cognee/memory_bridge.py cognee/probe_local.py
+          node --check scripts/diagnose-cognee-bridge.mjs
+          node --check scripts/diagnose-intelligence-http.mjs
+          python3 -m py_compile cognee/memory_bridge.py cognee/probe_local.py cognee/bridge_setup_diagnostic.py
       - name: Read-only rules and patcher tests
         run: node --test intelligence-checks/situational-case.mjs intelligence-checks/patcher-case.mjs
       - name: Confirm source retirement not undone
