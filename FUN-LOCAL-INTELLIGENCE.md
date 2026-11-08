@@ -57,3 +57,27 @@ Rules do not make decisions involving physical devices or execute API tools. All
 Cognee keyless GLiNER graph extraction is still described by its creators as a demo and has not been independently qualified for a production-critical decision process. The stored graph may contain mistakes. The Windows installer and real memory model retrieval have not yet been tested on the user's PC; no activation is claimed until the install output says `FUN_INTELLIGENCE=PASS`.
 
 Upstream: https://github.com/topoteretes/cognee (Apache-2.0), https://github.com/CacheControl/json-rules-engine (MIT).
+
+## Recovery after Cognee pip installed, Python import failed (November 8, 2026)
+
+The operator's Windows transcript shows `Successfully installed ... cognee-1.6.7 ...` followed by a failing `import cognee` immediately after Cognee initialized logging. At that stage the installer **had not replaced** the Fun Industrial 8789 platform or enabled the intelligence routes. Do not reinstall hundreds of dependencies.
+
+### One-line GitHub repair; reuse installed Python 3.12 venv
+
+```powershell
+$ErrorActionPreference='Stop';$d=Join-Path $env:USERPROFILE 'FunIndustrial-Local-Intelligence';& git -C $d pull --ff-only;if($LASTEXITCODE -ne 0){throw 'GIT_PULL_HOLD'};& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $d 'Repair-Fun-Intelligence.ps1');if($LASTEXITCODE -ne 0){throw 'COGNEE_REPAIR_HOLD'}
+```
+
+`Repair-Fun-Intelligence.ps1` performs an import-only diagnostic first, displaying the complete Python traceback on failure. It pins Cognee's `.env` selection to a zero-byte file under `%LOCALAPPDATA%\FunIndustrial\CognitiveMemory`, configures isolated storage roots, disables file logs and telemetry, and does **not** call `remember`, `recall`, or install/download models. If this probe fails, the command **stops without changing** the active 8789 dashboard, and the Python traceback is the diagnostic needed for a targeted repair.
+
+If the import probe passes, the script runs the full guarded installer with `-SkipCogneePip`, reusing the existing Python packages instead of repeating the multi-hundred-megabyte installation. It still stages/qualifies the local Node rules package, checks REA 229 scope, and restarts only 8789 after passing preflight.
+
+Probe-only option (does not patch 8789):
+
+```powershell
+$d=Join-Path $env:USERPROFILE 'FunIndustrial-Local-Intelligence';& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $d 'Repair-Fun-Intelligence.ps1') -ProbeOnly
+```
+
+Probe success looks like `COGNEE_IMPORT=PASS VERSION=1.6.7` and `COGNEE_STORAGE_ISOLATED=PASS`. Full deployment requires the separate `FUN_INTELLIGENCE=PASS` output. Neither of those has been observed on the user's PC yet.
+
+Memory status now reports separate `storageBytes`, `modelCacheBytes`, and `pythonEnvironmentBytes`; note that the installed Cognee Python environment alone can be large. The memory API rejects URLs and file paths and uses a fixed dataset of operator-provided literal text.
