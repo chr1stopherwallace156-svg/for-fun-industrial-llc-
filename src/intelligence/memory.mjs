@@ -25,11 +25,15 @@ async function bytesUsedAsync(folder,depth=0){
  }
  return sum;
 }
+export function parseMemorySettings(raw){
+ const v=JSON.parse(String(raw).replace(/^\uFEFF/,""));
+ if(!v||typeof v!=="object"||Array.isArray(v))throw Error("MEMORY_SETTINGS_OBJECT_REQUIRED");
+ return v;
+}
 function localSettings(){
  try{
   const source=readFileSync(join(root,"src","intelligence","settings.json"),"utf8");
-  const v=JSON.parse(source.replace(/^\uFEFF/,""));
-  return v&&typeof v==="object"&&!Array.isArray(v)?v:{}
+  return parseMemorySettings(source);
  }catch{return {}}
 }
 export async function memoryStorageUsage(){
