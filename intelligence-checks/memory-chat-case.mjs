@@ -107,3 +107,25 @@ test("real dashboard opt-in patch preserves valid executable inline chat JavaScr
  for(const entry of scripts)new Script(entry[1],{filename:"patched-index-script.js"});
  assert.match(patched,/memory-chat/);
 });
+
+test("dashboard compatibility panel uses real </body>, preserves prior chat, and compiles",()=>{
+ const customized=readFileSync(new URL("../public/index.html",import.meta.url),"utf8")
+  .replace('<div class="actions"><button id="chat-send">Send message</button><button id="chat-clear" class="secondary">Clear conversation</button></div>',
+   '<div class="actions"><button id="chat-clear" class="secondary">Clear conversation</button><button id="chat-send">Send message</button></div>');
+ assert.ok(customized.includes("</body>"),"Test fixture requires body end tag");
+ const patched=patchMemoryChatDashboard(customized);
+ assert.match(patched,/FI_OPT_IN_MEMORY_CHAT_STANDALONE_V1/);
+ assert.match(patched,/id="chat-memory" type="checkbox"/);
+ assert.match(patched,/id="chat-memory-input"/);
+ assert.match(patched,/id="chat-memory-send"/);
+ assert.match(patched,/\/api\/ai\/memory-chat/);
+ assert.match(patched,/\/api\/ai\/chat/);
+ assert.match(patched,/tools:openAITools\(\)/);
+ assert.equal((patched.match(/<\/body>/gi)||[]).length,1);
+ assert.equal((patched.match(/FI_OPT_IN_MEMORY_CHAT_STANDALONE_V1/g)||[]).length,1);
+ const original=customized.match(/<script[^>]*>([\s\S]*?)<\/script>/g);
+ const scripts=[...patched.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)];
+ assert.equal(scripts.length,(original||[]).length+1);
+ for(const entry of scripts)new Script(entry[1],{filename:"memory-fallback-dashboard.js"});
+ assert.throws(()=>patchMemoryChatDashboard(patched),/ALREADY_INSTALLED/);
+});
