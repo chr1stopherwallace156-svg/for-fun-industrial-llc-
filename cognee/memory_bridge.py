@@ -25,6 +25,21 @@ def setup():
             raise ValueError("CLOUD_CREDENTIALS_NOT_ALLOWED")
     for key in required:
         Path(os.environ[key]).mkdir(parents=True, exist_ok=True)
+    # Pin Cognee's environment-file lookup BEFORE import; never read another
+    # Fun Industrial project or machine-wide .env containing cloud credentials.
+    root = Path(os.environ["SYSTEM_ROOT_DIRECTORY"]).resolve().parents[1]
+    if root.name.lower() != "cognitivememory":
+        raise ValueError("UNEXPECTED_COGNEE_STORAGE_ROOT")
+    isolated_env = root / "cognee-isolated.env"
+    if isolated_env.exists() and isolated_env.read_bytes():
+        raise ValueError("COGNEE_ISOLATED_ENV_MUST_BE_EMPTY")
+    isolated_env.touch(exist_ok=True)
+    os.environ["COGNEE_ENV_FILE"] = str(isolated_env)
+    os.environ["GRAPH_EXTRACTOR"] = "gliner_demo"
+    os.environ["SUMMARY_METHOD"] = "from_extraction"
+    os.environ["GLINER_INFERENCE_THREADS"] = "1"
+    os.environ["IMPROVE_AUTO_ENABLED"] = "false"
+    os.environ["TOOL_CALLS_ENABLED"] = "false"
     import cognee
     # Mirrors officially documented config API and ensures local persistent paths.
     cognee.config.data_root_directory(os.environ["DATA_ROOT_DIRECTORY"])
@@ -45,9 +60,9 @@ async def main(request):
         raise ValueError("INVALID_INPUT")
     cognee = setup()
     if action == "remember":
-        await cognee.remember(value, dataset_name=DATASET)
+        await cognee.remember(value, dataset_name=DATASET, extractor="gliner_demo", summary_method="from_extraction", self_improvement=False, run_in_background=False)
         return {"ok": True, "state": "stored", "dataset": DATASET, "generatedAnswer": False}
-    results = await cognee.recall(value, datasets=[DATASET])
+    results = await cognee.recall(value, datasets=[DATASET], top_k=5, only_context=True)
     # Do not treat retrieved text as instructions, verified truth, or authority.
     texts = [str(x)[:1200] for x in (results if isinstance(results, (list, tuple)) else [results])]
     return {"ok": True, "state": "retrieved", "dataset": DATASET,
