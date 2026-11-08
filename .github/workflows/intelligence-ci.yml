@@ -38,3 +38,17 @@ jobs:
         run: |
           test -f autonomy-v2/SOURCING-RETIREMENT.md
           test -f autonomy-v2/Verify-Sourcing-Removal.ps1
+
+  powershell-installer-parse:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse Windows PowerShell 5.1 installer without executing changes
+        shell: powershell
+        run: |
+          $tokens=$null
+          $errors=$null
+          $null=[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path .\Install-Fun-Intelligence.ps1),[ref]$tokens,[ref]$errors)
+          if($errors.Count -gt 0){$errors|ForEach-Object {Write-Error $_.Message};exit 1}
+          Write-Host "WINDOWS_INSTALLER_SYNTAX=PASS"
