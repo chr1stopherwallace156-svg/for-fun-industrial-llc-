@@ -64,9 +64,23 @@ if($actual.Contains('FI_LOCAL_INTELLIGENCE_V1')){throw 'INTELLIGENCE_ALREADY_ACT
 $before=Invoke-RestMethod "$base/api/status" -TimeoutSec 20
 if($before.application -ne 'Fun Industrial Platform'){throw 'MAIN_PLATFORM_UNAVAILABLE'}
 $original=Listener 8789
-$reaTools=@((Invoke-RestMethod "$base/api/rea/tools" -TimeoutSec 45).tools)
-$unified=Invoke-RestMethod "$base/api/unified/status" -TimeoutSec 25
-if($reaTools.Count -ne 229 -or [int]$unified.rea_enabled -ne 229){throw 'REA_229_SCOPE_HOLD'}
+# A previous failed staged deployment may have restarted 8789 without
+# reinitializing its in-memory REA MCP child. Recover ONLY the REA catalog
+# if the existing tools endpoint specifically responds 403.
+$reaTools=@()
+try{
+ $reaTools=@((Invoke-RestMethod "$base/api/rea/tools" -TimeoutSec 45 -ErrorAction Stop).tools)
+}catch{
+ $code=if($_.Exception.Response){[int]$_.Exception.Response.StatusCode}else{'NO_HTTP_RESPONSE'}
+ if($code -ne 403){throw "REA_PREFLIGHT_HTTP_HOLD=$code"}
+ Write-Host 'REA_PREFLIGHT_CATALOG_STOPPED=TRUE RECOVER_CATALOG_ONLY'
+ $reaPreflight=Invoke-RestMethod "$base/api/rea/start" -Method POST -ContentType 'application/json' -Body '{}' -TimeoutSec 120 -ErrorAction Stop
+ if($reaPreflight.state -ne 'ready'){throw "REA_PREFLIGHT_RECONNECT_HOLD=$($reaPreflight.state)"}
+ $reaTools=@((Invoke-RestMethod "$base/api/rea/tools" -TimeoutSec 45 -ErrorAction Stop).tools)
+ Write-Host "REA_PREFLIGHT_CATALOG_RECOVERED=$($reaTools.Count)"
+}
+$unified=Invoke-RestMethod "$base/api/unified/status" -TimeoutSec 25 -ErrorAction Stop
+if($reaTools.Count -ne 229 -or [int]$unified.rea_enabled -ne 229){throw "REA_229_SCOPE_HOLD CATALOG=$($reaTools.Count) ENABLED=$($unified.rea_enabled)"}
 Gone "$base/api/autonomy/opportunities"
 Gone "$base/api/autonomy/international"
 Gone "$worker/api/opportunities"
