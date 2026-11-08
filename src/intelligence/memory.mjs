@@ -1,32 +1,56 @@
 // Fixed interpreter path and fixed Python helper; no shell or operator-supplied paths.
 import {spawn} from "node:child_process";
-import {existsSync,statSync,readdirSync,readFileSync} from "node:fs";
+import {existsSync,readFileSync} from "node:fs";
+import {readdir,stat} from "node:fs/promises";
 import {join,resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
 const dataRoot=join(process.env.LOCALAPPDATA||join(root,".runtime"),"FunIndustrial","CognitiveMemory");
 const py=join(dataRoot,"venv","Scripts","python.exe");
 const bridge=join(root,"cognee","memory_bridge.py");
-function bytesUsed(folder,depth=0){
- if(depth>22||!existsSync(folder))return 0;
- try{return readdirSync(folder,{withFileTypes:true}).reduce((sum,item)=>{
-  const name=join(folder,item.name);
-  if(item.isSymbolicLink())return sum;
-  if(item.isFile())return sum+statSync(name).size;
-  if(item.isDirectory())return sum+bytesUsed(name,depth+1);
-  return sum;
- },0)}catch{return 0}
+// Status MUST stay constant-time: synchronous traversal of the Python venv
+// (>1 GB, many thousands of files) previously blocked the 8789 event loop
+// and caused INTELLIGENCE_STATUS_NOT_READY after the integration restart.
+async function bytesUsedAsync(folder,depth=0){
+ if(depth>28)return 0;
+ let entries;
+ try{entries=await readdir(folder,{withFileTypes:true})}
+ catch(e){if(e.code==="ENOENT")return 0;throw e}
+ let sum=0;
+ for(const entry of entries){
+  if(entry.isSymbolicLink())continue;
+  const name=join(folder,entry.name);
+  if(entry.isFile())sum+=(await stat(name)).size;
+  else if(entry.isDirectory())sum+=await bytesUsedAsync(name,depth+1);
+ }
+ return sum;
 }
-function localSettings(){try{const v=JSON.parse(readFileSync(join(root,"src","intelligence","settings.json"),"utf8"));return v&&typeof v==="object"&&!Array.isArray(v)?v:{}}catch{return {}}}
+function localSettings(){
+ try{
+  const source=readFileSync(join(root,"src","intelligence","settings.json"),"utf8");
+  const v=JSON.parse(source.replace(/^\\uFEFF/,""));
+  return v&&typeof v==="object"&&!Array.isArray(v)?v:{}
+ }catch{return {}}
+}
+export async function memoryStorageUsage(){
+ const [storageBytes,modelCacheBytes,pythonEnvironmentBytes]=await Promise.all([
+  bytesUsedAsync(join(dataRoot,"storage")),
+  bytesUsedAsync(join(dataRoot,"cache")),
+  bytesUsedAsync(join(dataRoot,"venv"))
+ ]);
+ return {engine:"cognee",storagePath:dataRoot,storageBytes,
+  modelCacheBytes,pythonEnvironmentBytes,
+  totalBytes:storageBytes+modelCacheBytes+pythonEnvironmentBytes,
+  measurement:"operator_requested_only"};
+}
 export function memoryStatus(){
  const available=existsSync(py)&&existsSync(bridge),settings=localSettings();
  return {engine:"cognee",versionRequested:"1.6.7",runtime:"python_venv",
   available,enabled:(process.env.FI_COGNEE_ENABLED==="true"||settings.enabled===true)&&available,
   writesEnabled:(process.env.FI_COGNEE_WRITES_ENABLED==="true"||settings.writesEnabled===true)&&available,
   storagePath:dataRoot,
-  storageBytes:bytesUsed(join(dataRoot,"storage")),
-  modelCacheBytes:bytesUsed(join(dataRoot,"cache")),
-  pythonEnvironmentBytes:bytesUsed(join(dataRoot,"venv")),
+  storageBytes:null,modelCacheBytes:null,pythonEnvironmentBytes:null,
+  storageMeasurement:"deferred_use_api_intelligence_storage",
   modelDownloadsOnFirstUse:true,cloudLLMConfigured:false,automaticIngestion:false};
 }
 export async function memoryAction(action,payload){
