@@ -133,6 +133,66 @@ foreach($name in @('FunIndustrial-US-Opportunities','FunIndustrial-International
  if($LASTEXITCODE -ne 0 -or $remote -notin $approvedRemotes){
   $skipped.Add("ORIGIN_MISMATCH:$folder");continue
  }
+ # Refuse to erase ignored/local credentials during repository cleanup.
+ $sensitive=@(Get-ChildItem -LiteralPath $folder -Recurse -File -Force -ErrorAction Stop | Where-Object {$_.Name -match '^(?i:\.env(?:\..+)?|credentials\.(?:json|yaml|yml)|secret\.(?:json|yaml|yml)|.*\.(?:pem|key|p12|pfx))
+ if($LASTEXITCODE -ne 0 -or $changes.Length -gt 0){
+  $skipped.Add("LOCAL_CHANGES_PRESENT:$folder");continue
+ }
+ AddFolder $folder 'Obsolete sourcing Git checkout'
+}
+# Avoid nested paths/duplicates and only delete within exact known roots.
+foreach($a in $manifest){
+ if($a.Path -eq $rootDir -or $a.Path -eq $autoRoot -or $a.Path -eq $worker -or $a.Path -eq $homeDir){
+  throw "PURGE_PROTECTED_ROOT_IN_MANIFEST=$($a.Path)"
+ }
+ if(@($manifest | Where-Object {$_.Path -eq $a.Path}).Count -ne 1){throw 'PURGE_DUPLICATE_PATH_HOLD'}
+}
+[long]$planned=0;foreach($a in $manifest){$planned += $a.Bytes}
+Write-Host "SOURCING_PURGE_PLAN ITEMS=$($manifest.Count) FILE_BYTES=$planned APPROX_MB=$([math]::Round($planned/1MB,2))"
+$manifest|Sort-Object Bytes -Descending|ForEach-Object {Write-Host ("CANDIDATE_MB={0:N2} KIND={1} CATEGORY={2} PATH={3}" -f ($_.Bytes/1MB),$_.Kind,$_.Category,$_.Path)}
+foreach($x in $skipped){Write-Warning "SOURCING_PURGE_SKIPPED=$x"}
+if($PreviewOnly){Write-Host 'SOURCING_PURGE=PREVIEW_ONLY DELETED=0';return}
+$freeBefore=([IO.DriveInfo]::new([IO.Path]::GetPathRoot($homeDir))).AvailableFreeSpace
+# Delete known code, datasets and old clones first; rollback backups are LAST.
+$deleteOrder=@($manifest|Sort-Object @{Expression={if($_.Category -eq 'Obsolete sourcing deployment backups'){1}else{0}}})
+[long]$removed=0;$count=0
+foreach($candidate in $deleteOrder){
+ if(-not(Test-Path -LiteralPath $candidate.Path)){continue}
+ try{
+  Remove-Item -LiteralPath $candidate.Path -Force -Recurse -ErrorAction Stop
+  if(Test-Path -LiteralPath $candidate.Path){throw "DELETE_STILL_EXISTS=$($candidate.Path)"}
+  $count++;$removed += $candidate.Bytes
+  Write-Host "SOURCING_PURGE_REMOVED=$($candidate.Path)"
+ }catch{
+  Write-Warning "SOURCING_PURGE_DELETE_HOLD=$($candidate.Path) REASON=$($_.Exception.Message)"
+  throw
+ }
+}
+# Confirm the running platform remains usable after disk cleanup.
+$after=Invoke-RestMethod "$base/api/status" -TimeoutSec 20
+$side=Invoke-RestMethod "$workerBase/api/status" -TimeoutSec 20
+if($after.application -ne 'Fun Industrial Platform' -or $side.state -ne 'running'){throw 'PURGE_POSTHEALTH_FAILED'}
+$afterRea=@((Invoke-RestMethod "$base/api/rea/tools" -TimeoutSec 40).tools)
+if($afterRea.Count -ne 229){throw 'PURGE_POST_REA_REGISTRY_CHANGED'}
+$freeAfter=([IO.DriveInfo]::new([IO.Path]::GetPathRoot($homeDir))).AvailableFreeSpace
+$receipt=[ordered]@{
+ at=(Get-Date).ToString('o');state='PURGE_COMPLETED';filesOrFoldersRemoved=$count
+ logicalBytesRemoved=$removed;logicalMiB=[math]::Round($removed/1MB,2)
+ diskFreeBytesBefore=$freeBefore;diskFreeBytesAfter=$freeAfter;diskFreeByteChange=($freeAfter-$freeBefore)
+ paths=$deleteOrder|ForEach-Object {$_.Path};skipped=@($skipped)
+ protected=@('FunIndustrial-REA-MCP-Activation','jobs.sqlite','REA','llama.cpp','Ollama','NetBird','research-sources.json')
+}
+$receiptDir=Join-Path $env:LOCALAPPDATA 'FunIndustrial\Logs'
+New-Item -ItemType Directory -Path $receiptDir -Force|Out-Null
+$receiptPath=Join-Path $receiptDir ('sourcing-purge-receipt-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'.json')
+$receipt|ConvertTo-Json -Depth 6|Set-Content -LiteralPath $receiptPath -Encoding UTF8
+Write-Host "SOURCING_PURGE=PASS REMOVED=$count SKIPPED=$($skipped.Count) LOGICAL_RECLAIMED_MIB=$([math]::Round($removed/1MB,2)) DISK_FREE_CHANGE_MIB=$([math]::Round(($freeAfter-$freeBefore)/1MB,2))"
+Write-Host "PRESERVED=MAIN_PLATFORM,REA_229,LOCAL_AI,OLLAMA,NETBIRD,SIDEQUEST_SQLITE,GENERAL_RESEARCH"
+Write-Host "RECEIPT=$receiptPath"
+} | Select-Object -First 1)
+ if($sensitive.Count){
+  $skipped.Add("LOCAL_CREDENTIAL_FILES_PRESENT:$folder");continue
+ }
  $changes=(& git -C $folder status --porcelain=v1 --untracked-files=all 2>&1 | Out-String).Trim()
  if($LASTEXITCODE -ne 0 -or $changes.Length -gt 0){
   $skipped.Add("LOCAL_CHANGES_PRESENT:$folder");continue
