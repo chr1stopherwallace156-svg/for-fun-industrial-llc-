@@ -121,3 +121,15 @@ $ErrorActionPreference='Stop';$d=Join-Path $env:USERPROFILE 'FunIndustrial-Local
 On success, the script should print `INTELLIGENCE_STATUS=PASS`, `INTELLIGENCE_DETERMINISTIC_RULES=PASS`, `REA_READ_ONLY_CATALOG_RECONNECT=PASS`, and `FUN_INTELLIGENCE=PASS`. If a 403 persists, report the more specific `REA_PREFLIGHT_HTTP_HOLD`, `REA_CATALOG_RECONNECT_HTTP_HOLD`, or `REA_229_SCOPE_HOLD` message; those are live diagnostics and **do not** justify broad service activation.
 
 Status: the source repair is committed, but has **not** been tested on the operator's running Windows host. Cognee remember/recall has not yet been exercised; its model download cost remains separate.
+
+## Diagnostics after valid API serialization but both Cognee operations return `{}`
+
+Operator observed `INTELLIGENCE_HTTP=200`, `MEMORY_AVAILABLE=true ENABLED=true WRITES_ENABLED=true`, invalid HTTP 400 produced `{"error":"COGNEE_INPUT_INVALID"}`, and a separate recall request returned HTTP 400 with body `{}`. This establishes that input validation and error serialization work, but does **not** establish whether a memory record was previously stored or that retrieval works.
+
+The initial remember and recall failure may share a Python setup issue. Do **not** repeat a real `remember` while storage status is unknown. A new read-only *deployed-bridge* diagnostic uses the exact whitelisted child process environment (no imported cloud credentials) and invokes `setup()` and inspects the published `remember`/`recall` signatures without making either API call. It may initialize ordinary Cognee log/config files; it does not request local model inference or send a memory note.
+
+```powershell
+$ErrorActionPreference='Stop';$d=Join-Path $env:USERPROFILE 'FunIndustrial-Local-Intelligence';& git -C $d pull --ff-only;if($LASTEXITCODE -ne 0){throw 'GIT_PULL_HOLD'};& node (Join-Path $d 'scripts\diagnose-cognee-bridge.mjs');if($LASTEXITCODE -ne 0){throw 'DEPLOYED_BRIDGE_DIAGNOSTIC_HOLD'}
+```
+
+Expected success: `BRIDGE_STAGE_PASS=bridge_setup` and `DEPLOYED_BRIDGE_DIAGNOSTIC=PASS`, with API signatures printed. On failure report `BRIDGE_STAGE_HOLD`, `ERROR_TYPE`, and `ERROR_DETAIL`. No production server restart, Python package reinstall, REA call, memory write, or repeat recall is performed.
