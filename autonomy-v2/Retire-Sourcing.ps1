@@ -52,9 +52,26 @@ function VerifyRetired([string]$url,[string]$method='GET'){
  if($code -ne 410){throw "SOURCING_ROUTE_NOT_RETIRED=$url HTTP=$code"}
 }
 $uiStatus=Invoke-RestMethod "$uiUrl/api/status" -TimeoutSec 15
-$workerStatus=Invoke-RestMethod "$workerUrl/api/status" -TimeoutSec 15
-if($uiStatus.application -ne 'Fun Industrial Platform' -or $workerStatus.application -ne 'Fun Industrial Autonomous Workers' -or $workerStatus.state -ne 'running'){throw 'LIVE_PLATFORM_IDENTITY_HOLD'}
+if($uiStatus.application -ne 'Fun Industrial Platform'){throw 'PRIMARY_PLATFORM_IDENTITY_HOLD'}
+# Confirm the primary platform is truly our existing loopback Node process before
+# considering an isolated recovery of the 8792 Sidequest service.
 $uiProc=ListenProcess 8789 'src[/\\]server\.mjs'
+$workerStatus=$null
+try{$workerStatus=Invoke-RestMethod "$workerUrl/api/status" -TimeoutSec 15}catch{
+ # Fail closed if another process owns the port, or the worker exists but is hung:
+ # only start the already-installed trusted Sidequest worker when it is ABSENT.
+ $occupied=@(Get-NetTCPConnection -LocalPort 8792 -State Listen -ErrorAction SilentlyContinue)
+ if($occupied.Count){throw 'AUTONOMY_8792_PORT_OCCUPIED_BUT_UNHEALTHY_HOLD'}
+ $hanging=@(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction Stop|Where-Object {
+  $_.CommandLine -match 'autonomy-v2-github.*service\.mjs'
+ })
+ if($hanging.Count){throw 'AUTONOMY_WORKER_PRESENT_BUT_UNHEALTHY_HOLD'}
+ Write-Host 'AUTONOMY_8792=STOPPED RECOVERING_ONLY_SIDEQUEST_WORKER=TRUE'
+ & $ps -NoProfile -ExecutionPolicy Bypass -File $launcher
+ if($LASTEXITCODE -ne 0){throw 'AUTONOMY_WORKER_RECOVERY_FAILED'}
+ $workerStatus=Invoke-RestMethod "$workerUrl/api/status" -TimeoutSec 20
+}
+if($workerStatus.application -ne 'Fun Industrial Autonomous Workers' -or $workerStatus.state -ne 'running'){throw 'LIVE_WORKER_IDENTITY_HOLD'}
 $workerProc=ListenProcess 8792 'autonomy-v2-github.*service\.mjs'
 if([int]$workerProc.ProcessId -ne [int]$workerStatus.pid){throw 'WORKER_STATUS_PID_MISMATCH'}
 $reaTools=@((Invoke-RestMethod "$uiUrl/api/rea/tools" -TimeoutSec 45).tools)
