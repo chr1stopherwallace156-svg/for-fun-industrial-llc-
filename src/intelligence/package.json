@@ -1,0 +1,12 @@
+{
+  "name": "fun-industrial-local-intelligence",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.23.4"
+  },
+  "dependencies": {
+    "json-rules-engine": "7.3.2"
+  }
+}
