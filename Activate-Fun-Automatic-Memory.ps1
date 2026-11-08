@@ -14,7 +14,7 @@ $Patcher=Join-Path $Src "scripts\patch-automatic-memory.mjs"
 $Test=Join-Path $Src "intelligence-checks\automatic-memory-case.mjs"
 $Backup=Join-Path $env:LOCALAPPDATA ("FunIndustrial\AutoMemoryDeployBackups\"+(Get-Date -Format "yyyyMMdd-HHmmss")+"-"+[guid]::NewGuid().ToString("N").Substring(0,8))
 $node=(Get-Command node.exe -ErrorAction Stop).Source
-$changed=$false;$stopped=$false;$newUI=$null;$oldTools=@();$original=$null;$oldAutonomy=$null
+$changed=$false;$stopped=$false;$newUI=$null;$oldTools=@();$original=$null;$oldAutonomy=$null;$step="not_started"
 function Okay([string]$label){if($LASTEXITCODE -ne 0){throw "$label EXIT=$LASTEXITCODE"}}
 function Listener(){
  $list=@(Get-NetTCPConnection -LocalPort 8789 -State Listen -ErrorAction SilentlyContinue|Where-Object {$_.LocalAddress -eq "127.0.0.1"})
@@ -91,10 +91,12 @@ $hash=(Get-FileHash -LiteralPath $stageServer -Algorithm SHA256).Hash
 $moduleHash=(Get-FileHash -LiteralPath $SourceModule -Algorithm SHA256).Hash
 Write-Host "AUTO_MEMORY_PREFLIGHT=PASS REA=229 COGNEE=enabled LLAMA_CPP=ready BACKUP=$Backup"
 try{
+ $step="install_staged_files"
  $changed=$true
  Copy-Item -LiteralPath $SourceModule -Destination $Module -ErrorAction Stop
  Copy-Item -LiteralPath $stageServer -Destination $Server -Force -ErrorAction Stop
  if((Get-FileHash $Server -Algorithm SHA256).Hash -ne $hash -or (Get-FileHash $Module -Algorithm SHA256).Hash -ne $moduleHash){throw "AUTO_MEMORY_HASH_HOLD"}
+ $step="stop_old_dashboard"
  Stop-Process -Id ([int]$original.ProcessId) -ErrorAction Stop
  $stopped=$true
  for($i=0;$i -lt 40;$i++){
@@ -102,27 +104,38 @@ try{
   Start-Sleep -Milliseconds 250
  }
  if(Get-NetTCPConnection -LocalPort 8789 -State Listen -ErrorAction SilentlyContinue){throw "AUTO_MEMORY_PORT_STILL_LISTENING_HOLD"}
+ $step="start_patched_dashboard"
  $newUI=StartDashboard (Join-Path $Backup "patched.stdout.log") (Join-Path $Backup "patched.stderr.log")
+ $step="check_patched_dashboard_readiness"
  if(-not(Ready $newUI $true)){throw "AUTO_MEMORY_DASHBOARD_STARTUP_HOLD"}
+ Write-Host "AUTO_MEMORY_STAGE=dashboard_ready"
+ $step="rea_start"
  $r=Invoke-RestMethod "$Base/api/rea/start" -Method POST -ContentType "application/json" -Body "{}" -TimeoutSec 120 -ErrorAction Stop
  if($r.state -ne "ready"){throw "AUTO_MEMORY_REA_RECONNECT_HOLD"}
+ $step="rea_tools"
  $tools=@((Invoke-RestMethod "$Base/api/rea/tools" -TimeoutSec 45 -ErrorAction Stop).tools)
+ $step="unified_status"
  $unifiedAfter=Invoke-RestMethod "$Base/api/unified/status" -TimeoutSec 25 -ErrorAction Stop
  if($tools.Count -ne $oldTools.Count -or [int]$unifiedAfter.rea_enabled -ne 229){throw "AUTO_MEMORY_REA_REGRESSION_HOLD"}
  $oldNames=@($oldTools|ForEach-Object {$_.name}|Sort-Object)
  $newNames=@($tools|ForEach-Object {$_.name}|Sort-Object)
  if((Compare-Object $oldNames $newNames).Count){throw "AUTO_MEMORY_REA_NAMES_REGRESSION_HOLD"}
+ $step="retired_routes"
  Gone "$Base/api/autonomy/opportunities";Gone "$Base/api/autonomy/international"
  Gone "$Worker/api/opportunities";Gone "$Worker/api/international"
+ $step="platform_status"
  $now=Invoke-RestMethod "$Base/api/status" -TimeoutSec 25 -ErrorAction Stop
  $autonomy=@($now.services|Where-Object {$_.id -eq "autonomy"}|Select-Object -First 1)
  if($oldAutonomy.Count -and $oldAutonomy[0].state -eq "running" -and (!$autonomy.Count -or $autonomy[0].state -ne "running")){throw "AUTO_MEMORY_AUTONOMY_REGRESSION_HOLD"}
+ $step="automatic_memory_status"
  $status=Invoke-RestMethod "$Base/api/ai/automatic-memory/status" -TimeoutSec 15 -ErrorAction Stop
  if($status.mode -ne "automatic_contextual_read_only" -or $status.memoryWrites -ne $false -or $status.memoryGrantsToolAuthority -ne $false){throw "AUTO_MEMORY_POLICY_HOLD"}
  $body=@{messages=@(@{role="user";content="What approval is required before external tool execution at Fun Industrial?"});max_tokens=96;temperature=0;tools=@()}|ConvertTo-Json -Depth 7 -Compress
+ $step="live_chat"
  $reply=Invoke-RestMethod "$Base/api/ai/chat" -Method POST -ContentType "application/json" -Body $body -TimeoutSec 210 -ErrorAction Stop
  if(-not ($reply.reply -is [string]) -or -not $reply.reply.Trim()){throw "AUTO_MEMORY_MODEL_RESPONSE_EMPTY"}
  if(@($reply.tool_calls).Count -gt 0){throw "AUTO_MEMORY_UNEXPECTED_TOOL_PROPOSAL_HOLD"}
+ $step="post_chat_memory_status"
  $verify=Invoke-RestMethod "$Base/api/ai/automatic-memory/status" -TimeoutSec 15 -ErrorAction Stop
  if($verify.lastRecallState -ne "included" -or [int]$verify.lastExcerptsIncluded -lt 1){throw "AUTO_MEMORY_LIVE_RECALL_NOT_INCLUDED_HOLD STATE=$($verify.lastRecallState)"}
  Write-Host "AUTO_MEMORY_DEPLOY=PASS CHAT_HTTP=200 MODE=$($verify.mode) EXCERPTS=$($verify.lastExcerptsIncluded) REA=229 TOOLS_EXECUTED=0 MEMORY_WRITES=0"
@@ -130,6 +143,17 @@ try{
  Write-Host "BACKUP=$Backup"
 }catch{
  $reason=$_.Exception.Message
+ $http="NO_RESPONSE";$httpBody=""
+ if($_.Exception.Response){
+  try{$http=[int]$_.Exception.Response.StatusCode}catch{}
+  try{
+   $responseStream=$_.Exception.Response.GetResponseStream()
+   if($responseStream){$reader=New-Object System.IO.StreamReader($responseStream);$httpBody=$reader.ReadToEnd()}
+  }catch{$httpBody="BODY_READ_FAILED"}
+ }
+ if($httpBody.Length -gt 1800){$httpBody=$httpBody.Substring(0,1800)}
+ Write-Warning "AUTO_MEMORY_FAILURE_STAGE=$step HTTP=$http"
+ if($httpBody){Write-Warning "AUTO_MEMORY_HTTP_RESPONSE=$httpBody"}
  Write-Warning "AUTO_MEMORY_DEPLOY=HOLD REASON=$reason"
  if($newUI){$newUI.Refresh();if(-not $newUI.HasExited){Stop-Process -Id $newUI.Id -Force -ErrorAction SilentlyContinue}}
  if($changed){
