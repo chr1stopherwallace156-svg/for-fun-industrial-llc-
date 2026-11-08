@@ -1,4 +1,4 @@
-"""Import-only Cognee health check. Never remembers, recalls or downloads models.
+r"""Import-only Cognee health check. Never remembers, recalls or downloads models.
 
 Run via the existing dedicated Windows Python 3.12 venv:
     python.exe -I cognee\probe_local.py
