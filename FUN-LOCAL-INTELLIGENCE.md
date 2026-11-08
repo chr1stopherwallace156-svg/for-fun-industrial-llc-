@@ -157,3 +157,15 @@ $ErrorActionPreference='Stop';$d=Join-Path $env:USERPROFILE 'FunIndustrial-Local
 ```
 
 Observe `NODE_ADAPTER_RECALL=PASS RESULT_COUNT=...` or `NODE_ADAPTER_RECALL=HOLD ERROR_TYPE=... ERROR_MESSAGE=...`. The exact result distinguishes a Node subprocess/protocol bug from server HTTP error handling. Do not reinstall Cognee or retry remember until that boundary is understood.
+
+## Node adapter returned plain Object, not Error (Nov 8, 2026)
+
+The operator ran `scripts/diagnose-cognee-node-adapter.mjs` and got `NODE_ADAPTER_RECALL=HOLD`, `ERROR_TYPE=Object`, `ERROR_MESSAGE=[object Object]`, no Error stack, even though direct Python recall passed. The committed `src/intelligence/memory.mjs` uses native `Error(...)` for its rejection paths, so do not assume the deployed adapter matches GitHub or assume a Python failure.
+
+**No-write attestation:** `scripts/attest-cognee-node-adapter.mjs` reports SHA-256 for the checkout and deployed `src/intelligence/memory.mjs`, checks exact byte equivalence, and triggers intentionally invalid `memoryAction('recall',{diagnostic_only:true})` — rejected before spawning Python. The default invocation never starts Cognee Python or recalls memory, and does not restart services or invoke REA tools.
+
+```powershell
+$ErrorActionPreference='Stop';$d=Join-Path $env:USERPROFILE 'FunIndustrial-Local-Intelligence';& git -C $d pull --ff-only;if($LASTEXITCODE -ne 0){throw 'GIT_PULL_HOLD'};& node (Join-Path $d 'scripts\attest-cognee-node-adapter.mjs');if($LASTEXITCODE -ne 0){throw 'NODE_ADAPTER_ATTESTATION_HOLD'}
+```
+
+Expected: `ADAPTER_SOURCE_MATCH=true`, `VALIDATION_REJECTION=PASS`, `ADAPTER_ATTESTATION_ONLY=PASS_NO_PYTHON_RECALL`. If files differ, do not overwrite the live installed adapter automatically—inspect differences and preserve current source. If errors are unexpectedly objects, examine `EXCEPTION_KEYS` etc. A separate explicit `--replay-recall` mode is offered for later troubleshooting but is **not** used by the default command. Real remember remains unverified; avoid duplicate writes.
