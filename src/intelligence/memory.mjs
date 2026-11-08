@@ -57,6 +57,14 @@ export function memoryStatus(){
   storageMeasurement:"deferred_use_api_intelligence_storage",
   modelDownloadsOnFirstUse:true,cloudLLMConfigured:false,automaticIngestion:false};
 }
+// Promise settlement contract: a successful Cognee result is the *second*
+ // argument to finish(error,result). The previous one-argument call rejected
+ // with a plain object, which the HTTP handler serialized as 400 {}.
+export function settleMemoryBridgeResult(finish,action,exitCode,data){
+ if(exitCode!==0||data.ok===false)
+  return finish(Error("COGNEE_OPERATION_FAILED:"+String(data.error||exitCode).slice(0,200)));
+ return finish(null,{engine:"cognee",action,...data});
+}
 export async function memoryAction(action,payload){
  const state=memoryStatus();
  if(!state.enabled)throw Error("COGNEE_NOT_ENABLED");
@@ -90,8 +98,7 @@ export async function memoryAction(action,payload){
    const line=out.split(/\r?\n/).filter(x=>x.startsWith("FI_MEMORY_RESULT=")).at(-1);
    if(!line)return finish(Error("COGNEE_FAILED:"+String(code)+":"+err.slice(0,200)));
    try{const data=JSON.parse(line.slice("FI_MEMORY_RESULT=".length));
-    if(code!==0||data.ok===false)finish(Error("COGNEE_OPERATION_FAILED:"+String(data.error||code).slice(0,200)));
-    else finish({engine:"cognee",action,...data});
+    settleMemoryBridgeResult(finish,action,code,data);
    }catch(e){finish(Error("COGNEE_RESULT_INVALID"))}
   });
   child.stdin.end(JSON.stringify({action,[key]:value}));
