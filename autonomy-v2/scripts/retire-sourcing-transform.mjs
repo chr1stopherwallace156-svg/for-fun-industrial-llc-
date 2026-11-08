@@ -1,5 +1,7 @@
 // Reversible retirement of domestic and international sourcing (not all Autonomy).
-import {readFileSync,mkdirSync,writeFileSync} from "node:fs";
+import {readFileSync,mkdirSync,writeFileSync,rmSync} from "node:fs";
+import {execFileSync} from "node:child_process";
+import {tmpdir} from "node:os";
 import {join,resolve,dirname} from "node:path";
 import {fileURLToPath} from "node:url";
 const once=(s,a,b)=>{if(s.split(a).length!==2)throw Error("RETIRE_ANCHOR_NOT_UNIQUE:"+a.slice(0,70));return s.replace(a,b)};
@@ -94,6 +96,14 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
    const [kind,...relative]=name.split("/");
    const source=join(roots[kind],...relative),out=join(output,name);
    const result=fn(readFileSync(source,"utf8"));mkdirSync(dirname(out),{recursive:true});writeFileSync(out,result,"utf8");
+   if(name.endsWith(".mjs"))execFileSync(process.execPath,["--check",out],{stdio:"pipe"});
+   if(name==="platform/public/index.html"){
+    const m=result.match(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/i);
+    if(!m)throw Error("INLINE_DASHBOARD_JS_NOT_FOUND");
+    const tmp=join(tmpdir(),"fi-retire-check-"+process.pid+".mjs");
+    try{writeFileSync(tmp,m[1],"utf8");execFileSync(process.execPath,["--check",tmp],{stdio:"pipe"})}
+    finally{rmSync(tmp,{force:true})}
+   }
    console.log("RETIRE_STAGE=PASS FILE="+name);
   }
   console.log("RETIRE_STAGE=PASS FILES=5 LIVE_FILES_UNCHANGED=TRUE");
