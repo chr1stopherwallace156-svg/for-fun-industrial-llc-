@@ -103,3 +103,21 @@ Invoke-RestMethod http://127.0.0.1:8789/api/intelligence/storage | ConvertTo-Jso
 ```
 
 Fast status has `storageBytes`, `modelCacheBytes`, and `pythonEnvironmentBytes` set to null until the explicit audit. This avoids blocking AI/REA requests with a recursive venv size calculation.
+
+## Recovery after 10/10 tests and a post-restart HTTP 403 (November 8, 2026)
+
+The third Windows installer attempt passed all **10 intelligence tests**, re-used Cognee's existing Python environment (no pip), and verified the local Cognee import and storage isolation. After staging the new 8789 app, a required API returned **HTTP 403 Forbidden**, and the installer attempted rollback. The precise URL was not printed in that run.
+
+The likely reason is that the new 8789 Node process did not yet have a live REA MCP session. The earlier successful sourcing-retirement installer explicitly called `POST /api/rea/start` after each 8789 restart; the intelligence installer previously omitted that step and immediately checked `/api/rea/tools`, which returns 403 when REA is not ready.
+
+The installer now calls only **`POST /api/rea/start`** (initialize MCP + list tools) before checking 229 tools after the restart. It also recovers an uninitialized REA catalog at preflight if `/api/rea/tools` returns HTTP 403 due to the earlier rollback, and attempts the same catalog reinitialization after rollback. It does **not** call the generic platform `/api/start` or `/api/activate` endpoints, invoke `tools/call`, or change the REA allowlist, llama.cpp, Elektron's Ollama, VPN, or the retired sourcing APIs.
+
+### One-line repair (existing GitHub checkout; reuse installed Cognee)
+
+```powershell
+$ErrorActionPreference='Stop';$d=Join-Path $env:USERPROFILE 'FunIndustrial-Local-Intelligence';& git -C $d pull --ff-only;if($LASTEXITCODE -ne 0){throw 'GIT_PULL_HOLD'};& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $d 'Repair-Fun-Intelligence.ps1');if($LASTEXITCODE -ne 0){throw 'COGNEE_REPAIR_HOLD'}
+```
+
+On success, the script should print `INTELLIGENCE_STATUS=PASS`, `INTELLIGENCE_DETERMINISTIC_RULES=PASS`, `REA_READ_ONLY_CATALOG_RECONNECT=PASS`, and `FUN_INTELLIGENCE=PASS`. If a 403 persists, report the more specific `REA_PREFLIGHT_HTTP_HOLD`, `REA_CATALOG_RECONNECT_HTTP_HOLD`, or `REA_229_SCOPE_HOLD` message; those are live diagnostics and **do not** justify broad service activation.
+
+Status: the source repair is committed, but has **not** been tested on the operator's running Windows host. Cognee remember/recall has not yet been exercised; its model download cost remains separate.
