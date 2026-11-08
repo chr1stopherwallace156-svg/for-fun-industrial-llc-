@@ -185,3 +185,27 @@ $ErrorActionPreference='Stop';$d=Join-Path $env:USERPROFILE 'FunIndustrial-Local
 ```
 
 Required success markers: `COGNEE_NODE_FIX_PREFLIGHT=PASS`, `PATCHED_DASHBOARD=PASS`, `REA_CATALOG=PASS COUNT=229 TOOLS_EXECUTED=0`, `COGNEE_NODE_MEMORY_FIX=PASS HTTP_RECALL=200 RESULT_COUNT=N ORIGINAL_NOTE_TEXT_MATCH=True/False`. An HTTP recall result count >0 is not proof of matching the original text; exact-text matching Boolean is reported separately. Do not claim full memory persistence qualification until a successful remember + exact recall pair is established.
+
+## Next milestone — operator-opt-in Cognee memory in local llama.cpp chat
+
+**Code staged in GitHub; do not claim live activation until the Windows deployment proves it.** This milestone adds an optional checkbox to the existing Fun Industrial dashboard's local AI conversation. The checkbox starts unchecked; ordinary `/api/ai/chat` behavior and its existing operator approval workflow are not modified when unchecked.
+
+When the checkbox is enabled, the dashboard sends a text-only request to `POST /api/ai/memory-chat`. The 8789 Node service validates the existing user/assistant text conversation (maximum 20 messages, a limited total text budget), checks the same VPN gate as ordinary local chat when enabled, invokes only `memoryAction('recall', {query})` against the existing isolated Cognee dataset, and injects at most 2 short quoted snippets as explicitly **untrusted reference data** into the final user message. The result is proxied only to the existing loopback local FastAPI `/ai/chat` connected to llama.cpp. No model configuration, weights, or runtime is replaced; Elektron's Ollama remains untouched.
+
+**Authority boundaries:** The memory-aware route rejects client-supplied `tools` and unexpected fields, never forwards tool definitions or calls REA or stores memory, and returns `tool_calls: []` with `toolExecutionAuthorized: false` regardless of model output. It returns generic 503 and does not call llama.cpp if Cognee recall fails. The deterministic rules engine and standalone, operator-triggered remember/recall APIs remain unchanged. No automatic ingestion or persistent transcript storage. Memory excerpt text is not sent back to the browser as raw context; only counts and policy metadata are returned.
+
+### Guarded live Windows activation
+
+The new `Activate-Fun-Memory-Chat.ps1` checks the existing deployed server and memory bridge, local llama.cpp readiness, REA 229 tools and scope, retired domestic/international sourcing on dashboard/Sidequest; runs focused regression and JavaScript syntax tests; backs up the original 8789 server and dashboard; applies an anchored patch to live copies; restarts **only** the verified 8789 Node process; reconnects the read-only REA catalog; verifies unchanged REA scope and sourcing retirement; rejects a deliberately unauthorized chat `tools` field; and performs one text-only llama.cpp chat with existing Cognee recall. On failure, it attempts to restore the previous server and dashboard with REA reconnection. No npm/pip, no Cognee remember, no generic platform activation, no REA `tools/call`.
+
+```powershell
+$ErrorActionPreference='Stop';$d=Join-Path $env:USERPROFILE 'FunIndustrial-Local-Intelligence';& git -C $d pull --ff-only;if($LASTEXITCODE -ne 0){throw 'GIT_PULL_HOLD'};& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $d 'Activate-Fun-Memory-Chat.ps1');if($LASTEXITCODE -ne 0){throw 'FUN_MEMORY_CHAT_ACTIVATION_HOLD'}
+```
+
+Expected success includes `MEMORY_CHAT_PREFLIGHT=PASS`, `MEMORY_CHAT_DASHBOARD=PASS`, `MEMORY_CHAT_REA=PASS COUNT=229`, `MEMORY_CHAT_LIVE=PASS HTTP=200`, and `MEMORY_CHAT_UI=CHECKBOX_DEFAULT_OFF`. The smoke test prints excerpt count and zero-tool/write proofs, not the response text or retrieved memory content. The smoke test still runs local llama.cpp inference, so it requires that service to be ready before deployment and may use local compute resources. If llama.cpp is not ready, preflight halts without changing files; start the existing model in the Fun Industrial dashboard first.
+
+### API contract
+
+`GET /api/ai/memory-chat/status` reports availability, `enabledByDefault:false`, and tool/REA/write restrictions. `POST /api/ai/memory-chat` takes only `{messages:[{role:'user'|'assistant',content:'...'}], max_tokens?:number, temperature?:number}`; other fields (including tools, actions, role system) are rejected. The response includes `reply`, `tool_calls:[]`, `toolExecutionAuthorized:false`, and `memory` metadata (`excerptsIncluded`, `recallResults`, `memoryWrites:0`, `toolsForwarded:0`, `reaToolsExecuted:0`). A failed Cognee recall does not become a text-only fallback or automatically invoke a tool.
+
+Qualified source tests in `intelligence-checks/memory-chat-case.mjs` cover malicious tool field rejection, invalid messages, untrusted quoting, bounded context, fail-closed errors, patch markers, and real dashboard JavaScript parse. This is a **bounded memory augmentation**, not autonomous knowledge verification or approval delegation.
