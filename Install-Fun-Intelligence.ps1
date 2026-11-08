@@ -50,8 +50,8 @@ foreach($path in @(
  (Join-Path $src 'cognee\memory_bridge.py'),
  (Join-Path $src 'cognee\requirements-local.txt'),
  (Join-Path $src 'scripts\patch-local-intelligence.mjs'),
- (Join-Path $src 'test\intelligence.test.mjs'),
- (Join-Path $src 'test\intelligence-patcher.test.mjs')
+ (Join-Path $src 'intelligence-checks\situational-case.mjs'),
+ (Join-Path $src 'intelligence-checks\patcher-case.mjs')
 )){if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw "SOURCE_PREREQUISITE_MISSING=$path"}}
 if(Test-Path $modules){throw 'INTELLIGENCE_ALREADY_INSTALLED_HOLD'}
 if(Test-Path $cogneeFiles){throw 'COGNEE_PLATFORM_DIRECTORY_ALREADY_EXISTS_HOLD'}
@@ -72,7 +72,7 @@ New-Item -ItemType Directory -Path @($stagedInt,$stagedPy,$tests,(Join-Path $sta
 Copy-Item -LiteralPath $target -Destination (Join-Path $backup 'original-server.mjs') -ErrorAction Stop
 foreach($file in @('rules.mjs','memory.mjs','package.json')){Copy-Item (Join-Path $src "src\intelligence\$file") (Join-Path $stagedInt $file)}
 foreach($file in @('memory_bridge.py','requirements-local.txt')){Copy-Item (Join-Path $src "cognee\$file") (Join-Path $stagedPy $file)}
-foreach($file in @('intelligence.test.mjs','intelligence-patcher.test.mjs')){Copy-Item (Join-Path $src "test\$file") (Join-Path $tests $file)}
+foreach($file in @('situational-case.mjs','patcher-case.mjs')){Copy-Item (Join-Path $src "intelligence-checks\$file") (Join-Path $tests $file)}
 Copy-Item (Join-Path $src 'scripts\patch-local-intelligence.mjs') $patcher
 & $node $patcher $target $stagedServer;CmdOkay 'SOURCE_PATCH_FAILED'
 foreach($js in @($stagedServer,(Join-Path $stagedInt 'rules.mjs'),(Join-Path $stagedInt 'memory.mjs'),$patcher)){
@@ -80,7 +80,7 @@ foreach($js in @($stagedServer,(Join-Path $stagedInt 'rules.mjs'),(Join-Path $st
 }
 Write-Host 'INSTALLING_PINNED_RULES_PACKAGE_TO_ISOLATED_STAGING_DIRECTORY'
 & $npm install --prefix $stagedInt --ignore-scripts --no-audit --no-fund --save-exact;CmdOkay 'JSON_RULES_ENGINE_NPM_INSTALL_HOLD'
-& $node --test (Join-Path $tests 'intelligence.test.mjs') (Join-Path $tests 'intelligence-patcher.test.mjs');CmdOkay 'INTELLIGENCE_TESTS_HOLD'
+& $node --test (Join-Path $tests 'situational-case.mjs') (Join-Path $tests 'patcher-case.mjs');CmdOkay 'INTELLIGENCE_TESTS_HOLD'
 if($InstallCognee){
  Write-Host 'INSTALLING_COGNEE_PYTHON_CPU_EXTRAS_TO_DEDICATED_VENV'
  if(-not(Test-Path $python)){
