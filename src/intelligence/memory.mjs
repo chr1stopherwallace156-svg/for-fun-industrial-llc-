@@ -1,6 +1,6 @@
 // Fixed interpreter path and fixed Python helper; no shell or operator-supplied paths.
 import {spawn} from "node:child_process";
-import {existsSync,statSync,readdirSync} from "node:fs";
+import {existsSync,statSync,readdirSync,readFileSync} from "node:fs";
 import {join,resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 const root=resolve(fileURLToPath(new URL("../../",import.meta.url)));
@@ -17,11 +17,12 @@ function bytesUsed(folder,depth=0){
   return sum;
  },0)}catch{return 0}
 }
+function localSettings(){try{const v=JSON.parse(readFileSync(join(root,"src","intelligence","settings.json"),"utf8"));return v&&typeof v==="object"&&!Array.isArray(v)?v:{}}catch{return {}}}
 export function memoryStatus(){
- const available=existsSync(py)&&existsSync(bridge);
+ const available=existsSync(py)&&existsSync(bridge),settings=localSettings();
  return {engine:"cognee",versionRequested:"1.6.7",runtime:"python_venv",
-  available,enabled:process.env.FI_COGNEE_ENABLED==="true"&&available,
-  writesEnabled:process.env.FI_COGNEE_WRITES_ENABLED==="true",
+  available,enabled:(process.env.FI_COGNEE_ENABLED==="true"||settings.enabled===true)&&available,
+  writesEnabled:(process.env.FI_COGNEE_WRITES_ENABLED==="true"||settings.writesEnabled===true)&&available,
   storagePath:dataRoot,storageBytes:bytesUsed(join(dataRoot,"storage"))+bytesUsed(join(dataRoot,"cache")),
   modelDownloadsOnFirstUse:true,cloudLLMConfigured:false,automaticIngestion:false};
 }
