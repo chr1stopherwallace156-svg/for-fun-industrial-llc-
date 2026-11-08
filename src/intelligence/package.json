@@ -7,6 +7,6 @@
     "node": ">=22.23.4"
   },
   "dependencies": {
-    "json-rules-engine": "7.3.2"
+    "json-rules-engine": "7.3.1"
   }
 }
