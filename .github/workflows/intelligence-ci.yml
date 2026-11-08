@@ -32,6 +32,7 @@ jobs:
           node --check src/intelligence/memory.mjs
           node --check src/intelligence/memory-chat.mjs
           node --check scripts/patch-memory-chat.mjs
+          node --check scripts/diagnose-memory-chat-upstream.mjs
           node --check scripts/patch-local-intelligence.mjs
           node --check scripts/diagnose-cognee-bridge.mjs
           node --check scripts/diagnose-cognee-node-adapter.mjs
