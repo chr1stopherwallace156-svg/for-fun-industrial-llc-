@@ -34,6 +34,8 @@ jobs:
           node --check scripts/diagnose-cognee-bridge.mjs
           node --check scripts/diagnose-intelligence-http.mjs
           python3 -m py_compile cognee/memory_bridge.py cognee/probe_local.py cognee/bridge_setup_diagnostic.py
+      - name: Guard against diagnostic importlib shadowing
+        run: python3 intelligence-checks/bridge-import-scope.py
       - name: Read-only rules and patcher tests
         run: node --test intelligence-checks/situational-case.mjs intelligence-checks/patcher-case.mjs
       - name: Confirm source retirement not undone
