@@ -124,7 +124,7 @@ try{
  if($afterTools.Count -ne 229 -or [int]$afterUnified.rea_enabled -ne 229){throw 'REA_REGRESSION_HOLD'}
  Gone "$base/api/autonomy/opportunities";Gone "$base/api/autonomy/international"
  Gone "$worker/api/opportunities";Gone "$worker/api/international"
- Write-Host "FUN_INTELLIGENCE=PASS JSON_RULES_ENGINE=7.3.2 COGNEE=$(if($InstallCognee){'INSTALLED'}else{'OPTIONAL'})"
+ Write-Host "FUN_INTELLIGENCE=PASS JSON_RULES_ENGINE=7.3.1 COGNEE=$(if($InstallCognee){'INSTALLED'}else{'OPTIONAL'})"
  Write-Host "MEMORY_ENABLED=$($result.memory.enabled) WRITES_ENABLED=$($result.memory.writesEnabled) AUTO_INGESTION=FALSE"
  Write-Host "REA_TOOL_COUNT=$($afterTools.Count) REA_ENABLED=$($afterUnified.rea_enabled) SOURCING_RETIRED=TRUE"
  Write-Host "DASHBOARD=$base/ INTELLIGENCE_STATUS=$base/api/intelligence/status BACKUP=$backup"
