@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {Script} from "node:vm";
 import {composeMemoryChat,normalizeMemoryChatRequest,prepareMemoryChat,memoryChatStatus} from "../src/intelligence/memory-chat.mjs";
 import {patchMemoryChatServer,patchMemoryChatDashboard} from "../scripts/patch-memory-chat.mjs";
 
@@ -94,4 +96,14 @@ test("UI opt-in defaults unchecked and old tool proposal chat preserved",()=>{
  assert.match(patched,/tools:openAITools\(\)/);
  assert.match(patched,/checked\?"/);
  assert.throws(()=>patchMemoryChatDashboard(patched),/ALREADY_INSTALLED/);
+});
+
+test("real dashboard opt-in patch preserves valid executable inline chat JavaScript",()=>{
+ const source=readFileSync(new URL("../public/index.html",import.meta.url),"utf8");
+ const patched=patchMemoryChatDashboard(source);
+ assert.match(patched,/id="chat-memory"/);
+ const scripts=[...patched.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)];
+ assert.ok(scripts.length>=1,"Real dashboard must include inline script");
+ for(const entry of scripts)new Script(entry[1],{filename:"patched-index-script.js"});
+ assert.match(patched,/memory-chat/);
 });
