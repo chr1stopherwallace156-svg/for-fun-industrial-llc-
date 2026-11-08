@@ -60,8 +60,10 @@ try{
      console.log("LLAMA_AUGMENTED_CHAT_ERROR="+errorHint(upstream.data));
      process.exitCode=5;
     }else{
-     console.log("LLAMA_AUGMENTED_CHAT_REPLY_PRESENT="+String(typeof upstream.data?.reply==="string"&&upstream.data.reply.trim().length>0));
-     console.log("LLAMA_AUGMENTED_CHAT_RESULT=PASS REPLY_CONTENT_NOT_PRINTED");
+     const replyOk=typeof upstream.data?.reply==="string"&&upstream.data.reply.trim().length>0;
+     console.log("LLAMA_AUGMENTED_CHAT_REPLY_PRESENT="+String(replyOk));
+     if(replyOk)console.log("LLAMA_AUGMENTED_CHAT_RESULT=PASS REPLY_CONTENT_NOT_PRINTED");
+     else{console.log("LLAMA_AUGMENTED_CHAT_RESULT=HOLD EMPTY_REPLY");process.exitCode=8;}
     }
    }catch(error){
     console.log("LLAMA_AUGMENTED_CHAT=HOLD ERROR_TYPE="+String(error?.name||"unknown")+" ERROR_MESSAGE="+String(error?.message||error).slice(0,260));
