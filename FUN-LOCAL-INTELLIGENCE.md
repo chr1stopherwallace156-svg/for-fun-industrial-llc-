@@ -81,3 +81,25 @@ $d=Join-Path $env:USERPROFILE 'FunIndustrial-Local-Intelligence';& powershell.ex
 Probe success looks like `COGNEE_IMPORT=PASS VERSION=1.6.7` and `COGNEE_STORAGE_ISOLATED=PASS`. Full deployment requires the separate `FUN_INTELLIGENCE=PASS` output. Neither of those has been observed on the user's PC yet.
 
 Memory status now reports separate `storageBytes`, `modelCacheBytes`, and `pythonEnvironmentBytes`; note that the installed Cognee Python environment alone can be large. The memory API rejects URLs and file paths and uses a fixed dataset of operator-provided literal text.
+
+## Recovery after 8/8 tests and `INTELLIGENCE_STATUS_NOT_READY` (November 8, 2026)
+
+The operator's second Windows run verified Cognee 1.6.7 imports twice, local database isolation, 8 Node tests, pip skip, and `INTELLIGENCE_INSTALLED=STAGED`. The live 8789 intelligence status timed out; the installer's rollback was attempted. **This is not proof of successful runtime activation.**
+
+The repair removes a specific synchronous bottleneck: the status function previously walked the entire Python virtual environment (with thousands of installed files), blocking Node's event loop while the readiness poll allowed only 3 seconds. The status response is now constant-time; an optional separate async disk audit is available at `GET /api/intelligence/storage`. It also fixes PowerShell's BOM-encoded `settings.json`: the runtime can now read BOM input, and the installer writes future settings as UTF-8 *without BOM*. If the next live startup still fails, the installer prints the last HTTP error and the stderr log path before attempting rollback.
+
+### One-line repair, no reinstallation of Cognee packages
+
+```powershell
+$ErrorActionPreference='Stop';$d=Join-Path $env:USERPROFILE 'FunIndustrial-Local-Intelligence';& git -C $d pull --ff-only;if($LASTEXITCODE -ne 0){throw 'GIT_PULL_HOLD'};& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $d 'Repair-Fun-Intelligence.ps1');if($LASTEXITCODE -ne 0){throw 'COGNEE_REPAIR_HOLD'}
+```
+
+The repair checks Cognee import with no model downloads and reuses existing 3.12 venv via `-SkipCogneePip`. Rule package installation is isolated in the stage and uses only small npm packages. Activation is confirmed **only** by `FUN_INTELLIGENCE=PASS` plus unchanged REA 229 and SOURCE_RETIRED checks.
+
+After successful activation, disk usage (operator-requested async audit, may need time):
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8789/api/intelligence/storage | ConvertTo-Json -Depth 5
+```
+
+Fast status has `storageBytes`, `modelCacheBytes`, and `pythonEnvironmentBytes` set to null until the explicit audit. This avoids blocking AI/REA requests with a recursive venv size calculation.
