@@ -5,6 +5,7 @@ search, model invocation, or REA tool calls. Cognee import may create small
 logging/configuration files. Never prints memory contents or credentials.
 """
 import importlib.util
+import importlib.metadata
 import inspect
 import os
 from pathlib import Path
@@ -36,7 +37,6 @@ def main():
     spec = stage("bridge_module_spec",lambda:importlib.util.spec_from_file_location("fun_industrial_memory_bridge", str(bridge_path)))
     module = importlib.util.module_from_spec(spec)
     stage("load_bridge_module",lambda:spec.loader.exec_module(module))
-    import importlib.metadata
     print("INSTALLED_COGNEE=" + importlib.metadata.version("cognee"), flush=True)
     c = stage("bridge_setup",module.setup)
     print("REMEMBER_API_SIGNATURE=" + str(inspect.signature(c.remember))[:850], flush=True)
