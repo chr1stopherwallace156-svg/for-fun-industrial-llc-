@@ -6,6 +6,7 @@ or configure OpenAI, Ollama, Elektron, REA, or any sourcing adapters.
 import asyncio
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -60,6 +61,16 @@ async def main(request):
     value = request[name]
     if not isinstance(value, str) or not value.strip() or len(value) > (4000 if action == "remember" else 500):
         raise ValueError("INVALID_INPUT")
+    if action == "remember":
+        # Cognee accepts URL/file path strings. Refuse such values so this
+        # narrow endpoint can only store operator-supplied literal text.
+        candidate = value.strip()
+        if (re.match(r"^[a-z][a-z0-9+.-]*://", candidate, re.I)
+                or re.match(r"^[a-z]:[\\/]", candidate, re.I)
+                or candidate.startswith(("//", "\\\\"))
+                or ("\n" not in candidate and len(candidate) < 240
+                    and Path(candidate).exists())):
+            raise ValueError("LITERAL_TEXT_ONLY_NO_URL_OR_FILE_INGESTION")
     cognee = setup()
     if action == "remember":
         await cognee.remember(value, dataset_name=DATASET, extractor="gliner_demo", summary_method="from_extraction", self_improvement=False, run_in_background=False)
