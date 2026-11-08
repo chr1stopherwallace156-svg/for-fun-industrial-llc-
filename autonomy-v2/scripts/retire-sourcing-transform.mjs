@@ -12,7 +12,7 @@ function cut(s,start,end,replacement=""){
 }
 export function workerHttp(input){
  // Git for Windows may check out the same committed UTF-8 file with CRLF line endings.
- input=input.replace(/\r\n?/g,"\n");
+ input=input.replace(/\r+\n?/g,"\n");
  if(input.includes("FI_SOURCING_RETIRED_V1"))throw Error("ALREADY_RETIRED");
  let s=once(input,'import {DomesticScan} from "./jobs.mjs";\n',"");
  s=once(s,'import {combinedOpportunities} from "./gsa-bridge.mjs";\n',"");
@@ -32,7 +32,7 @@ export function workerHttp(input){
 }
 export function workerService(input){
  // Git for Windows may check out the same committed UTF-8 file with CRLF line endings.
- input=input.replace(/\r\n?/g,"\n");
+ input=input.replace(/\r+\n?/g,"\n");
  if(input.includes("FI_SOURCING_RETIRED_V1"))throw Error("ALREADY_RETIRED");
  let s=once(input,'import {Discover,Registry,Research,ProductSnapshot,DomesticScan} from "./jobs.mjs";',
   'import {Discover,Registry,Research,ProductSnapshot} from "./jobs.mjs";');
@@ -44,7 +44,7 @@ export function workerService(input){
 }
 export function workerJobs(input){
  // Git for Windows may check out the same committed UTF-8 file with CRLF line endings.
- input=input.replace(/\r\n?/g,"\n");
+ input=input.replace(/\r+\n?/g,"\n");
  if(input.includes("FI_SOURCING_RETIRED_V1"))throw Error("ALREADY_RETIRED");
  let s=once(input,'import {scanDomestic} from "./domestic.mjs";\n',"");
  s=cut(s,'export class DomesticScan extends Job {','export class Followup extends Job {',
@@ -54,7 +54,7 @@ export function workerJobs(input){
 }
 export function platformServer(input){
  // Git for Windows may check out the same committed UTF-8 file with CRLF line endings.
- input=input.replace(/\r\n?/g,"\n");
+ input=input.replace(/\r+\n?/g,"\n");
  if(input.includes("FI_SOURCING_RETIRED_V1"))throw Error("ALREADY_RETIRED");
  let s=once(input,',"/api/autonomy/international":"/api/international"',"");
  s=once(s,',"/api/autonomy/opportunities":"/api/opportunities"',"");
@@ -66,7 +66,7 @@ export function platformServer(input){
 }
 export function platformUi(input){
  // Git for Windows may check out the same committed UTF-8 file with CRLF line endings.
- input=input.replace(/\r\n?/g,"\n");
+ input=input.replace(/\r+\n?/g,"\n");
  if(input.includes("FI_SOURCING_RETIRED_V1"))throw Error("ALREADY_RETIRED");
  let s=input;
  const intl=s.includes("<!-- FI_INTERNATIONAL_SOURCE_V1 -->");
