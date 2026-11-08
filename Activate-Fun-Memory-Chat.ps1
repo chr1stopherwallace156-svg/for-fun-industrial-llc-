@@ -141,7 +141,8 @@ try{
  $body=@{messages=@(@{role='user';content=$query});max_tokens=100;temperature=0}|ConvertTo-Json -Depth 5 -Compress
  $response=Invoke-RestMethod "$Base/api/ai/memory-chat" -Method POST -ContentType 'application/json' -Body $body -TimeoutSec 210 -ErrorAction Stop
  if(-not($response.reply -is [string]) -or -not $response.reply.Trim()){throw 'LLAMA_MEMORY_CHAT_REPLY_EMPTY'}
- if($response.memory.mode -ne 'opt_in_read_only' -or $response.memory.toolsForwarded -ne 0 -or $response.memory.reaToolsExecuted -ne 0 -or $response.toolExecutionAuthorized -ne $false -or @($response.tool_calls).Count -ne 0){
+ $toolCallCount=if($null -eq $response.tool_calls){0}else{@($response.tool_calls).Count}
+ if($response.memory.mode -ne 'opt_in_read_only' -or $response.memory.toolsForwarded -ne 0 -or $response.memory.reaToolsExecuted -ne 0 -or $response.toolExecutionAuthorized -ne $false -or $toolCallCount -ne 0){
   throw 'MEMORY_CHAT_BOUNDARY_VIOLATION'
  }
  Write-Host "MEMORY_CHAT_LIVE=PASS HTTP=200 EXCERPTS=$($response.memory.excerptsIncluded) TOOLS=0 MEMORY_WRITES=0"
