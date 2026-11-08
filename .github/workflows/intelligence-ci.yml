@@ -40,7 +40,7 @@ jobs:
       - name: Guard against diagnostic importlib shadowing
         run: python3 intelligence-checks/bridge-import-scope.py
       - name: Read-only rules and patcher tests
-        run: node --test intelligence-checks/situational-case.mjs intelligence-checks/patcher-case.mjs
+        run: node --test intelligence-checks/situational-case.mjs intelligence-checks/patcher-case.mjs intelligence-checks/memory-bridge-settle-case.mjs
       - name: Confirm source retirement not undone
         run: |
           test -f autonomy-v2/SOURCING-RETIREMENT.md
@@ -56,7 +56,7 @@ jobs:
         run: |
           $tokens=$null
           $errors=$null
-          foreach($path in @('.\Install-Fun-Intelligence.ps1','.\Repair-Fun-Intelligence.ps1')){
+          foreach($path in @('.\Install-Fun-Intelligence.ps1','.\Repair-Fun-Intelligence.ps1','.\Repair-Live-Cognee-Node.ps1')){
             $tokens=$null
             $errors=$null
             $null=[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path),[ref]$tokens,[ref]$errors)
