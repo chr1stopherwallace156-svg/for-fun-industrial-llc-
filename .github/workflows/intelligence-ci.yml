@@ -1,0 +1,40 @@
+name: Fun Industrial Local Intelligence Gate
+
+on:
+  push:
+    branches:
+      - feature/fun-local-cognee-rules-20261108
+  pull_request:
+    paths:
+      - "src/intelligence/**"
+      - "cognee/**"
+      - "scripts/patch-local-intelligence.mjs"
+      - "test/intelligence*.test.mjs"
+      - "Install-Fun-Intelligence.ps1"
+
+permissions:
+  contents: read
+
+jobs:
+  rules-and-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.4"
+      - name: Install only isolated json-rules-engine
+        run: npm install --prefix src/intelligence --ignore-scripts --no-audit --no-fund
+      - name: Syntax checks
+        run: |
+          node --check src/intelligence/rules.mjs
+          node --check src/intelligence/memory.mjs
+          node --check scripts/patch-local-intelligence.mjs
+          python3 -m py_compile cognee/memory_bridge.py
+      - name: Read-only rules and patcher tests
+        run: node --test test/intelligence.test.mjs test/intelligence-patcher.test.mjs
+      - name: Confirm source retirement not undone
+        run: |
+          test -f autonomy-v2/SOURCING-RETIREMENT.md
+          test -f autonomy-v2/Verify-Sourcing-Removal.ps1
