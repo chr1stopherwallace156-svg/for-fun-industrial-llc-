@@ -1,7 +1,7 @@
-// Read-only health plus intentionally invalid memory request: never calls Python or stores a note.
-// No external network. Designed for Node 22+ Windows Fun Industrial deployment.
+// Default: HTTP health + intentionally invalid memory request; never starts Python or stores data.
+// --recall-original-note: opt-in read of Cognee memory (starts Python and may download local models).
+// Uses only the existing loopback service. Designed for Node 22+ on Windows.
 const base="http://127.0.0.1:8789";
-const statuses=[];
 async function request(path,options={}){
  const res=await fetch(base+path,{...options,signal:AbortSignal.timeout(15000)});
  const body=await res.text();
