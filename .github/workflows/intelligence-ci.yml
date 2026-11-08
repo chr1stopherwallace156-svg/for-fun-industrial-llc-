@@ -9,7 +9,7 @@ on:
       - "src/intelligence/**"
       - "cognee/**"
       - "scripts/patch-local-intelligence.mjs"
-      - "test/intelligence*.test.mjs"
+      - "intelligence-checks/**"
       - "Install-Fun-Intelligence.ps1"
 
 permissions:
@@ -33,7 +33,7 @@ jobs:
           node --check scripts/patch-local-intelligence.mjs
           python3 -m py_compile cognee/memory_bridge.py
       - name: Read-only rules and patcher tests
-        run: node --test test/intelligence.test.mjs test/intelligence-patcher.test.mjs
+        run: node --test intelligence-checks/situational-case.mjs intelligence-checks/patcher-case.mjs
       - name: Confirm source retirement not undone
         run: |
           test -f autonomy-v2/SOURCING-RETIREMENT.md
