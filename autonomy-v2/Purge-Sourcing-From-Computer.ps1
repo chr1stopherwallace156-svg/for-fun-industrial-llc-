@@ -133,8 +133,12 @@ foreach($name in @('FunIndustrial-US-Opportunities','FunIndustrial-International
  if($LASTEXITCODE -ne 0 -or $remote -notin $approvedRemotes){
   $skipped.Add("ORIGIN_MISMATCH:$folder");continue
  }
- # Avoid deletion of ignored secrets or locally created files.
- $sensitive=@(Get-ChildItem -LiteralPath $folder -Recurse -File -Force -ErrorAction Stop | Where-Object { $_.Name -match '(?i)^(?:\.env(?:\..+)?|credentials\.(?:json|yaml|yml)|secret\.(?:json|yaml|yml)|.*\.(?:pem|key|p12|pfx))$' } | Select-Object -First 1)
+ # Protect real credentials. Tracked .env.example/.env.sample/.env.template
+ # are documentation, not proof of local secrets. Dirty/ignored files are checked below.
+ $sensitive=@(Get-ChildItem -LiteralPath $folder -Recurse -File -Force -ErrorAction Stop | Where-Object {
+  $_.Name -match '(?i)^(?:\.env(?:\..+)?|credentials\.(?:json|yaml|yml)|secret\.(?:json|yaml|yml)|.*\.(?:pem|key|p12|pfx))$' -and
+  $_.Name -notmatch '(?i)^\.env\.(?:example|sample|template|dist)$'
+ } | Select-Object -First 1)
  if($sensitive.Count -gt 0){
   $skipped.Add("LOCAL_CREDENTIAL_FILES_PRESENT:$folder");continue
  }
@@ -183,17 +187,30 @@ if($after.application -ne 'Fun Industrial Platform' -or $side.state -ne 'running
 $afterRea=@((Invoke-RestMethod "$base/api/rea/tools" -TimeoutSec 40).tools)
 if($afterRea.Count -ne 229){throw 'PURGE_POST_REA_REGISTRY_CHANGED'}
 $freeAfter=([IO.DriveInfo]::new([IO.Path]::GetPathRoot($homeDir))).AvailableFreeSpace
+# Build typed arrays explicitly: @($skipped) on a Generic.List[object] can throw
+# System.ArgumentException ("Argument types do not match") in Windows PowerShell 5.1.
+$deletedPaths=New-Object 'System.Collections.Generic.List[string]'
+foreach($entry in $deleteOrder){$deletedPaths.Add([string]$entry.Path)}
+$skippedPaths=New-Object 'System.Collections.Generic.List[string]'
+foreach($entry in $skipped){$skippedPaths.Add([string]$entry)}
 $receipt=[ordered]@{
- at=(Get-Date).ToString('o');state='PURGE_COMPLETED';filesOrFoldersRemoved=$count
- logicalBytesRemoved=$removed;logicalMiB=[math]::Round($removed/1MB,2)
- diskFreeBytesBefore=$freeBefore;diskFreeBytesAfter=$freeAfter;diskFreeByteChange=($freeAfter-$freeBefore)
- paths=@($deleteOrder | ForEach-Object {$_.Path});skipped=@($skipped)
+ at=(Get-Date).ToString('o')
+ state='PURGE_COMPLETED'
+ filesOrFoldersRemoved=[int]$count
+ logicalBytesRemoved=[long]$removed
+ logicalMiB=[math]::Round($removed/1MB,2)
+ diskFreeBytesBefore=[long]$freeBefore
+ diskFreeBytesAfter=[long]$freeAfter
+ diskFreeByteChange=[long]($freeAfter-$freeBefore)
+ paths=$deletedPaths.ToArray()
+ skipped=$skippedPaths.ToArray()
  protected=@('FunIndustrial-REA-MCP-Activation','jobs.sqlite','REA','llama.cpp','Ollama','NetBird','research-sources.json')
 }
 $receiptDir=Join-Path $env:LOCALAPPDATA 'FunIndustrial\Logs'
 New-Item -ItemType Directory -Path $receiptDir -Force|Out-Null
 $receiptPath=Join-Path $receiptDir ('sourcing-purge-receipt-'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'.json')
-$receipt|ConvertTo-Json -Depth 6|Set-Content -LiteralPath $receiptPath -Encoding UTF8
+$receiptJson=ConvertTo-Json -InputObject $receipt -Depth 6
+[IO.File]::WriteAllText($receiptPath,$receiptJson,[Text.UTF8Encoding]::new($false))
 Write-Host "SOURCING_PURGE=PASS REMOVED=$count SKIPPED=$($skipped.Count) LOGICAL_RECLAIMED_MIB=$([math]::Round($removed/1MB,2)) DISK_FREE_CHANGE_MIB=$([math]::Round(($freeAfter-$freeBefore)/1MB,2))"
 Write-Host "PRESERVED=MAIN_PLATFORM,REA_229,LOCAL_AI,OLLAMA,NETBIRD,SIDEQUEST_SQLITE,GENERAL_RESEARCH"
 Write-Host "RECEIPT=$receiptPath"
