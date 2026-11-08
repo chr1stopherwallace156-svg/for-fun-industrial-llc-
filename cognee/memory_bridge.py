@@ -40,6 +40,8 @@ def setup():
     os.environ["GLINER_INFERENCE_THREADS"] = "1"
     os.environ["IMPROVE_AUTO_ENABLED"] = "false"
     os.environ["TOOL_CALLS_ENABLED"] = "false"
+    os.environ["TELEMETRY_DISABLED"] = "1"
+    os.environ["COGNEE_LOG_FILE"] = "false"
     import cognee
     # Mirrors officially documented config API and ensures local persistent paths.
     cognee.config.data_root_directory(os.environ["DATA_ROOT_DIRECTORY"])
