@@ -4,6 +4,7 @@
 param(
  [switch]$InstallCognee,
  [switch]$EnableMemoryWrites,
+ [switch]$SkipCogneePip,
  [string]$Root='C:\Users\alxar\FunIndustrial-REA-MCP-Activation'
 )
 $ErrorActionPreference='Stop'
@@ -11,6 +12,7 @@ $src=[IO.Path]::GetFullPath($PSScriptRoot)
 $Root=[IO.Path]::GetFullPath($Root)
 if($Root -ne (Join-Path $env:USERPROFILE 'FunIndustrial-REA-MCP-Activation')){throw 'WRONG_PLATFORM_ROOT_HOLD'}
 if($EnableMemoryWrites -and -not $InstallCognee){throw 'ENABLE_MEMORY_WRITES_REQUIRES_COGNEE_INSTALL'}
+if($SkipCogneePip -and -not $InstallCognee){throw 'SKIP_COGNEE_PIP_REQUIRES_INSTALL_COGNEE'}
 $node=(Get-Command node.exe -ErrorAction Stop).Source
 $npm=(Get-Command npm.cmd -ErrorAction Stop).Source
 $ps=(Get-Command powershell.exe -ErrorAction Stop).Source
@@ -48,6 +50,7 @@ foreach($path in @(
  (Join-Path $src 'src\intelligence\memory.mjs'),
  (Join-Path $src 'src\intelligence\package.json'),
  (Join-Path $src 'cognee\memory_bridge.py'),
+ (Join-Path $src 'cognee\probe_local.py'),
  (Join-Path $src 'cognee\requirements-local.txt'),
  (Join-Path $src 'scripts\patch-local-intelligence.mjs'),
  (Join-Path $src 'intelligence-checks\situational-case.mjs'),
@@ -71,7 +74,7 @@ Gone "$worker/api/international"
 New-Item -ItemType Directory -Path @($stagedInt,$stagedPy,$tests,(Join-Path $stage 'scripts'),(Join-Path $stage 'src'),$logs) -Force|Out-Null
 Copy-Item -LiteralPath $target -Destination (Join-Path $backup 'original-server.mjs') -ErrorAction Stop
 foreach($file in @('rules.mjs','memory.mjs','package.json')){Copy-Item (Join-Path $src "src\intelligence\$file") (Join-Path $stagedInt $file)}
-foreach($file in @('memory_bridge.py','requirements-local.txt')){Copy-Item (Join-Path $src "cognee\$file") (Join-Path $stagedPy $file)}
+foreach($file in @('memory_bridge.py','probe_local.py','requirements-local.txt')){Copy-Item (Join-Path $src "cognee\$file") (Join-Path $stagedPy $file)}
 foreach($file in @('situational-case.mjs','patcher-case.mjs')){Copy-Item (Join-Path $src "intelligence-checks\$file") (Join-Path $tests $file)}
 Copy-Item (Join-Path $src 'scripts\patch-local-intelligence.mjs') $patcher
 & $node $patcher $target $stagedServer;CmdOkay 'SOURCE_PATCH_FAILED'
@@ -82,14 +85,27 @@ Write-Host 'INSTALLING_PINNED_RULES_PACKAGE_TO_ISOLATED_STAGING_DIRECTORY'
 & $npm install --prefix $stagedInt --ignore-scripts --no-audit --no-fund --save-exact;CmdOkay 'JSON_RULES_ENGINE_NPM_INSTALL_HOLD'
 & $node --test (Join-Path $tests 'situational-case.mjs') (Join-Path $tests 'patcher-case.mjs');CmdOkay 'INTELLIGENCE_TESTS_HOLD'
 if($InstallCognee){
- Write-Host 'INSTALLING_COGNEE_PYTHON_CPU_EXTRAS_TO_DEDICATED_VENV'
- if(-not(Test-Path $python)){
-  & py -3.12 -m venv (Join-Path $memoryRoot 'venv');CmdOkay 'PYTHON_312_VENV_HOLD'
+ if($SkipCogneePip){
+  if(-not(Test-Path -LiteralPath $python -PathType Leaf)){throw 'EXISTING_COGNEE_VENV_REQUIRED'}
+  Write-Host 'COGNEE_PIP=SKIPPED_EXISTING_PYTHON_PACKAGES_REUSED'
+ }else{
+  Write-Host 'INSTALLING_COGNEE_PYTHON_CPU_EXTRAS_TO_DEDICATED_VENV'
+  if(-not(Test-Path $python)){
+   & py -3.12 -m venv (Join-Path $memoryRoot 'venv');CmdOkay 'PYTHON_312_VENV_HOLD'
+  }
+  & $python -m pip install --disable-pip-version-check -r (Join-Path $stagedPy 'requirements-local.txt')
+  CmdOkay 'COGNEE_PIP_INSTALL_HOLD'
  }
- & $python -m pip install --disable-pip-version-check -r (Join-Path $stagedPy 'requirements-local.txt')
- CmdOkay 'COGNEE_PIP_INSTALL_HOLD'
- & $python -c 'import cognee;print("COGNEE_PYTHON_IMPORT=PASS")'
- CmdOkay 'COGNEE_IMPORT_HOLD'
+ # Cognee import is performed with isolated paths and no model downloads.
+ # Any Python traceback goes to this terminal BEFORE live files are changed.
+ $env:FI_COGNEE_ROOT=$memoryRoot
+ try{
+  Write-Host 'COGNEE_IMPORT_DIAGNOSTIC=START NO_PIP NO_MODEL_DOWNLOAD'
+  & $python -I (Join-Path $stagedPy 'probe_local.py')
+  CmdOkay 'COGNEE_IMPORT_DIAGNOSTIC_HOLD'
+ }finally{
+  Remove-Item Env:FI_COGNEE_ROOT -ErrorAction SilentlyContinue
+ }
 }else{Write-Host 'COGNEE=ADAPTER_STAGED INSTALLATION_DEFERRED'}
 $settings=@{enabled=[bool]$InstallCognee;writesEnabled=[bool]$EnableMemoryWrites;automaticIngestion=$false;dataset='fun_industrial_operator_memory'}
 $settings|ConvertTo-Json -Depth 4|Set-Content (Join-Path $stagedInt 'settings.json') -Encoding UTF8
