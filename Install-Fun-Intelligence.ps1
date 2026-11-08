@@ -147,8 +147,24 @@ try{
  }
  if($InstallCognee -and -not $result.memory.enabled){throw 'COGNEE_NOT_ENABLED_AFTER_INSTALL'}
  $sample='{"mode":"propose","risk_level":"low","source_trusted":true,"context_complete":true,"service_ready":true,"evidence_verified":true,"emergency_stop":false}'
+ Write-Host 'INTELLIGENCE_STATUS=PASS MEMORY_CONFIGURATION_VERIFIED'
  $decision=Invoke-RestMethod "$base/api/intelligence/evaluate" -Method POST -ContentType 'application/json' -Body $sample -TimeoutSec 15
  if($decision.decision -ne 'PROPOSE_FOR_OPERATOR_REVIEW' -or $decision.executeAuthorized -ne $false){throw 'RULE_DECISION_TEST_HOLD'}
+ Write-Host 'INTELLIGENCE_DETERMINISTIC_RULES=PASS NO_TOOL_EXECUTION'
+ # REA's MCP child belongs to the old dashboard process. A 8789 restart
+ # loses the in-memory MCP handshake even when the env allowlist is preserved.
+ # Only restore REA catalog on the pre-existing /api/rea/start route.
+ # Never invoke /api/start or /api/activate (they can affect compute/AI/VPN).
+ Write-Host 'REA_READ_ONLY_CATALOG_RECONNECT=START'
+ $reaRestored=$null
+ try{
+  $reaRestored=Invoke-RestMethod "$base/api/rea/start" -Method POST -ContentType 'application/json' -Body '{}' -TimeoutSec 120 -ErrorAction Stop
+ }catch{
+  $code=if($_.Exception.Response){[int]$_.Exception.Response.StatusCode}else{'NO_HTTP_RESPONSE'}
+  throw "REA_CATALOG_RECONNECT_HTTP_HOLD=$code"
+ }
+ if($reaRestored.state -ne 'ready'){throw "REA_CATALOG_RECONNECT_STATE_HOLD=$($reaRestored.state)"}
+ Write-Host 'REA_READ_ONLY_CATALOG_RECONNECT=PASS TOOLS_CALL=NOT_PERFORMED'
  $afterTools=@((Invoke-RestMethod "$base/api/rea/tools" -TimeoutSec 45).tools)
  $afterUnified=Invoke-RestMethod "$base/api/unified/status" -TimeoutSec 20
  if($afterTools.Count -ne 229 -or [int]$afterUnified.rea_enabled -ne 229){throw 'REA_REGRESSION_HOLD'}
@@ -172,6 +188,25 @@ try{
   try{
    $restore=Start-Process -FilePath $node -ArgumentList 'src/server.mjs' -WorkingDirectory $Root -PassThru -RedirectStandardOutput (Join-Path $logs 'intelligence-rollback.stdout.log') -RedirectStandardError (Join-Path $logs 'intelligence-rollback.stderr.log')
    Write-Warning "PREVIOUS_PLATFORM_RESTART_ATTEMPTED_PID=$($restore.Id)"
+   $restoreOnline=$false
+   for($i=0;$i -lt 30;$i++){
+    Start-Sleep -Milliseconds 700
+    $restore.Refresh()
+    if($restore.HasExited){break}
+    try{
+     if((Invoke-RestMethod "$base/api/status" -TimeoutSec 4 -ErrorAction Stop).application -eq 'Fun Industrial Platform'){$restoreOnline=$true;break}
+    }catch{}
+   }
+   if($restoreOnline){
+    try{
+     $restoreRea=Invoke-RestMethod "$base/api/rea/start" -Method POST -Body '{}' -ContentType 'application/json' -TimeoutSec 120 -ErrorAction Stop
+     if($restoreRea.state -eq 'ready'){
+      $restoreTools=@((Invoke-RestMethod "$base/api/rea/tools" -TimeoutSec 45 -ErrorAction Stop).tools)
+      if($restoreTools.Count -eq $reaTools.Count){Write-Warning 'PREVIOUS_PLATFORM_REA_CATALOG_RESTORED=PASS'}
+      else{Write-Warning "PREVIOUS_PLATFORM_REA_SCOPE_RECHECK_REQUIRED=$($restoreTools.Count)"}
+     }else{Write-Warning "PREVIOUS_PLATFORM_REA_RECOVERY_HOLD=$($restoreRea.state)"}
+    }catch{Write-Warning "PREVIOUS_PLATFORM_REA_RECOVERY_HOLD=$($_.Exception.Message)"}
+   }else{Write-Warning 'PREVIOUS_PLATFORM_STARTUP_HEALTH_UNCONFIRMED'}
   }catch{Write-Warning "MANUAL_RESTART_REQUIRED_BACKUP=$backup"}
  }
  throw "INTELLIGENCE_DEPLOY_HOLD=$reason BACKUP=$backup"
