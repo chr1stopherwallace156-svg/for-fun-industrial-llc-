@@ -1,0 +1,68 @@
+name: Fun Industrial Local Intelligence Gate
+
+on:
+  push:
+    branches:
+      - feature/fun-local-cognee-rules-20261108
+  pull_request:
+    paths:
+      - "src/intelligence/**"
+      - "cognee/**"
+      - "scripts/patch-local-intelligence.mjs"
+      - "intelligence-checks/**"
+      - "Install-Fun-Intelligence.ps1"
+
+permissions:
+  contents: read
+
+jobs:
+  rules-and-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.4"
+      - name: Install only isolated json-rules-engine
+        run: npm install --prefix src/intelligence --ignore-scripts --no-audit --no-fund
+      - name: Syntax checks
+        run: |
+          node --check src/intelligence/rules.mjs
+          node --check src/intelligence/memory.mjs
+          node --check src/intelligence/memory-chat.mjs
+          node --check scripts/patch-memory-chat.mjs
+          node --check scripts/diagnose-memory-chat-upstream.mjs
+          node --check scripts/patch-local-intelligence.mjs
+          node --check scripts/diagnose-cognee-bridge.mjs
+          node --check scripts/diagnose-cognee-node-adapter.mjs
+          node --check scripts/attest-cognee-node-adapter.mjs
+          node --check scripts/trace-cognee-recall.mjs
+          node --check scripts/diagnose-intelligence-http.mjs
+          python3 -m py_compile cognee/memory_bridge.py cognee/probe_local.py cognee/bridge_setup_diagnostic.py cognee/trace_recall_diagnostic.py
+      - name: Guard against diagnostic importlib shadowing
+        run: python3 intelligence-checks/bridge-import-scope.py
+      - name: Read-only rules and patcher tests
+        run: node --test intelligence-checks/situational-case.mjs intelligence-checks/patcher-case.mjs intelligence-checks/memory-bridge-settle-case.mjs intelligence-checks/memory-chat-case.mjs
+      - name: Confirm source retirement not undone
+        run: |
+          test -f autonomy-v2/SOURCING-RETIREMENT.md
+          test -f autonomy-v2/Verify-Sourcing-Removal.ps1
+
+  powershell-installer-parse:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse Windows PowerShell 5.1 installer without executing changes
+        shell: powershell
+        run: |
+          $tokens=$null
+          $errors=$null
+          foreach($path in @('.\Install-Fun-Intelligence.ps1','.\Repair-Fun-Intelligence.ps1','.\Repair-Live-Cognee-Node.ps1','.\Activate-Fun-Memory-Chat.ps1')){
+            $tokens=$null
+            $errors=$null
+            $null=[System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path),[ref]$tokens,[ref]$errors)
+            if($errors.Count -gt 0){$errors|ForEach-Object {Write-Error $_.Message};exit 1}
+          }
+          Write-Host "WINDOWS_INSTALLER_AND_REPAIR_SYNTAX=PASS"
