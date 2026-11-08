@@ -11,6 +11,7 @@ test("additive patch inserts intelligence endpoints while preserving retired sou
  assert.match(result,/FI_SOURCING_RETIRED_V1/);
  assert.match(result,/FI_LOCAL_INTELLIGENCE_V1/);
  assert.match(result,/\/api\/intelligence\/status/);
+ assert.match(result,/\/api\/intelligence\/storage/);
  assert.match(result,/\/api\/intelligence\/evaluate/);
  assert.match(result,/\/api\/intelligence\/memory\/remember/);
  assert.match(result,/\/api\/autonomy\/status/);
