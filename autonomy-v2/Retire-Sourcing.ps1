@@ -56,24 +56,19 @@ if($uiStatus.application -ne 'Fun Industrial Platform'){throw 'PRIMARY_PLATFORM_
 # Confirm the primary platform is truly our existing loopback Node process before
 # considering an isolated recovery of the 8792 Sidequest service.
 $uiProc=ListenProcess 8789 'src[/\\]server\.mjs'
-$workerStatus=$null
-try{$workerStatus=Invoke-RestMethod "$workerUrl/api/status" -TimeoutSec 15}catch{
- # Fail closed if another process owns the port, or the worker exists but is hung:
- # only start the already-installed trusted Sidequest worker when it is ABSENT.
- $occupied=@(Get-NetTCPConnection -LocalPort 8792 -State Listen -ErrorAction SilentlyContinue)
- if($occupied.Count){throw 'AUTONOMY_8792_PORT_OCCUPIED_BUT_UNHEALTHY_HOLD'}
- $hanging=@(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction Stop|Where-Object {
-  $_.CommandLine -match 'autonomy-v2-github.*service\.mjs'
- })
+$workerListeners=@(Get-NetTCPConnection -LocalPort 8792 -State Listen -ErrorAction SilentlyContinue)
+$workerOffline=($workerListeners.Count -eq 0)
+$workerProc=$null
+if($workerOffline){
+ $hanging=@(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction Stop|Where-Object { $_.CommandLine -match 'autonomy-v2-github.*service\.mjs' })
  if($hanging.Count){throw 'AUTONOMY_WORKER_PRESENT_BUT_UNHEALTHY_HOLD'}
- Write-Host 'AUTONOMY_8792=STOPPED RECOVERING_ONLY_SIDEQUEST_WORKER=TRUE'
- & $ps -NoProfile -ExecutionPolicy Bypass -File $launcher
- if($LASTEXITCODE -ne 0){throw 'AUTONOMY_WORKER_RECOVERY_FAILED'}
- $workerStatus=Invoke-RestMethod "$workerUrl/api/status" -TimeoutSec 20
+ Write-Host 'AUTONOMY_8792=OFFLINE WILL_START_ONLY_RETIRED_CODE=TRUE'
+}else{
+ $workerProc=ListenProcess 8792 'autonomy-v2-github.*service\.mjs'
+ $workerStatus=Invoke-RestMethod "$workerUrl/api/status" -TimeoutSec 15
+ if($workerStatus.application -ne 'Fun Industrial Autonomous Workers' -or $workerStatus.state -ne 'running'){throw 'LIVE_WORKER_IDENTITY_HOLD'}
+ if([int]$workerProc.ProcessId -ne [int]$workerStatus.pid){throw 'WORKER_STATUS_PID_MISMATCH'}
 }
-if($workerStatus.application -ne 'Fun Industrial Autonomous Workers' -or $workerStatus.state -ne 'running'){throw 'LIVE_WORKER_IDENTITY_HOLD'}
-$workerProc=ListenProcess 8792 'autonomy-v2-github.*service\.mjs'
-if([int]$workerProc.ProcessId -ne [int]$workerStatus.pid){throw 'WORKER_STATUS_PID_MISMATCH'}
 $reaTools=@((Invoke-RestMethod "$uiUrl/api/rea/tools" -TimeoutSec 45).tools)
 $unified=Invoke-RestMethod "$uiUrl/api/unified/status" -TimeoutSec 30
 $reaEnabled=[int]$unified.rea_enabled
@@ -91,7 +86,7 @@ foreach($p in $paths){
 Write-Host "SOURCING_BACKUP=PASS FILES=5 LOCATION=$backup"
 & $node $transform $Root $installed $stage
 if($LASTEXITCODE -ne 0){throw "SOURCING_RETIRE_STAGE_HOLD ORIGINALS_UNTOUCHED=TRUE BACKUP=$backup"}
-$patched=$false;$workerStopped=$false;$uiStopped=$false;$workerNew=0;$uiNew=$null
+$patched=$false;$workerStopped=$false;$workerLaunchAttempted=$false;$uiStopped=$false;$workerNew=0;$uiNew=$null
 try{
  foreach($p in $paths){
   $candidate=Join-Path $stage ($p.id.Replace('/','\'))
@@ -100,9 +95,15 @@ try{
  }
  $patched=$true
  Write-Host "SOURCING_FILES_RETIRED=PASS"
- Write-Host "STOPPING_ONLY_WORKER_PID=$($workerProc.ProcessId)"
- Stop-Process -Id ([int]$workerProc.ProcessId) -Force -ErrorAction Stop;$workerStopped=$true
- WaitForPortDown 8792
+ if(-not $workerOffline){
+  Write-Host "STOPPING_ONLY_WORKER_PID=$($workerProc.ProcessId)"
+  Stop-Process -Id ([int]$workerProc.ProcessId) -Force -ErrorAction Stop;$workerStopped=$true
+  WaitForPortDown 8792
+ }else{
+  if(Get-NetTCPConnection -LocalPort 8792 -State Listen -ErrorAction SilentlyContinue){throw 'UNEXPECTED_8792_PROCESS_DURING_INSTALL'}
+  Write-Host 'WORKER_ALREADY_STOPPED=TRUE NO_OLD_SOURCING_START'
+ }
+ $workerLaunchAttempted=$true
  & $ps -NoProfile -ExecutionPolicy Bypass -File $launcher
  if($LASTEXITCODE -ne 0){throw 'WORKER_RESTART_FAILED'}
  $after=Invoke-RestMethod "$workerUrl/api/status" -TimeoutSec 30
@@ -152,7 +153,7 @@ try{
  if($uiNew){$uiNew.Refresh();if(-not $uiNew.HasExited){Stop-Process -Id $uiNew.Id -Force -ErrorAction SilentlyContinue}}
  # A restarted worker may have bound 8792 before its health check succeeded, so
  # identify and stop it even if the new PID was never captured in $workerNew.
- if($workerStopped){
+ if($workerLaunchAttempted -or $workerStopped){
   try{
    $conn=Get-NetTCPConnection -LocalPort 8792 -State Listen -ErrorAction SilentlyContinue|Where-Object {$_.LocalAddress -eq '127.0.0.1'}|Select-Object -First 1
    if($conn){
@@ -164,8 +165,10 @@ try{
   }catch{Write-Warning 'ROLLBACK_WORKER_PROCESS_CHECK_FAILED'}
  }
  foreach($p in $paths){Copy-Item -LiteralPath (Join-Path $orig ($p.id.Replace('/','_'))) -Destination $p.original -Force -ErrorAction Stop}
- if($workerStopped){
+ if($workerStopped -and -not $workerOffline){
   try{WaitForPortDown 8792;& $ps -NoProfile -ExecutionPolicy Bypass -File $launcher;Write-Warning 'PREVIOUS_WORKER_RESTART_ATTEMPTED'}catch{Write-Warning "WORKER_MANUAL_RECOVERY_FROM=$backup"}
+ }else{
+  Write-Warning 'PREVIOUS_WORKER_WAS_OFFLINE_AND_LEFT_OFFLINE'
  }
  if($uiStopped){
   try{
