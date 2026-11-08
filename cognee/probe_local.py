@@ -43,6 +43,12 @@ def local_environment(root):
         os.environ[key] = str(path)
     for name in KEYS:
         os.environ.pop(name, None)
+    os.environ["TELEMETRY_DISABLED"] = "1"
+    os.environ["COGNEE_LOG_FILE"] = "false"
+    os.environ["GRAPH_EXTRACTOR"] = "gliner_demo"
+    os.environ["SUMMARY_METHOD"] = "from_extraction"
+    os.environ["IMPROVE_AUTO_ENABLED"] = "false"
+    os.environ["TOOL_CALLS_ENABLED"] = "false"
     return paths
 
 def main():
