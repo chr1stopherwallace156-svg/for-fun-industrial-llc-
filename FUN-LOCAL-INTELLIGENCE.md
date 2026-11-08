@@ -4,7 +4,7 @@ Additive integration, **not** Elektron. Existing 8789 Fun Industrial, 8792 Sideq
 
 ## What is installed
 
-- Node `json-rules-engine` **7.3.2**, isolated in `src/intelligence/node_modules`. It evaluates fixed safety/context facts locally with zero LLM calls and zero tool execution.
+- Node `json-rules-engine` **7.3.1**, isolated in `src/intelligence/node_modules`. It evaluates fixed safety/context facts locally with zero LLM calls and zero tool execution.
 - Python `cognee[gliner]==1.6.7` in a dedicated Python 3.12 venv. It builds/queries memory with small CPU-capable models, SQLite + embedded vector/graph stores. Storage is under `%LOCALAPPDATA%\FunIndustrial\CognitiveMemory`. No cloud credentials passed to the subprocess.
 - APIs on the existing local 8789 app: `GET /api/intelligence/status`, `POST /api/intelligence/evaluate`, `POST /api/intelligence/memory/remember`, and `POST /api/intelligence/memory/recall`. No automatic file/chat ingestion or REA execution.
 
