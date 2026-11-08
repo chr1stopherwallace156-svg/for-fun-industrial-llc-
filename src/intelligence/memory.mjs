@@ -8,7 +8,7 @@ const dataRoot=join(process.env.LOCALAPPDATA||join(root,".runtime"),"FunIndustri
 const py=join(dataRoot,"venv","Scripts","python.exe");
 const bridge=join(root,"cognee","memory_bridge.py");
 function bytesUsed(folder,depth=0){
- if(depth>8||!existsSync(folder))return 0;
+ if(depth>22||!existsSync(folder))return 0;
  try{return readdirSync(folder,{withFileTypes:true}).reduce((sum,item)=>{
   const name=join(folder,item.name);
   if(item.isSymbolicLink())return sum;
@@ -23,7 +23,10 @@ export function memoryStatus(){
  return {engine:"cognee",versionRequested:"1.6.7",runtime:"python_venv",
   available,enabled:(process.env.FI_COGNEE_ENABLED==="true"||settings.enabled===true)&&available,
   writesEnabled:(process.env.FI_COGNEE_WRITES_ENABLED==="true"||settings.writesEnabled===true)&&available,
-  storagePath:dataRoot,storageBytes:bytesUsed(join(dataRoot,"storage"))+bytesUsed(join(dataRoot,"cache")),
+  storagePath:dataRoot,
+  storageBytes:bytesUsed(join(dataRoot,"storage")),
+  modelCacheBytes:bytesUsed(join(dataRoot,"cache")),
+  pythonEnvironmentBytes:bytesUsed(join(dataRoot,"venv")),
   modelDownloadsOnFirstUse:true,cloudLLMConfigured:false,automaticIngestion:false};
 }
 export async function memoryAction(action,payload){
