@@ -33,6 +33,7 @@ jobs:
           node --check scripts/patch-local-intelligence.mjs
           node --check scripts/diagnose-cognee-bridge.mjs
           node --check scripts/diagnose-cognee-node-adapter.mjs
+          node --check scripts/attest-cognee-node-adapter.mjs
           node --check scripts/trace-cognee-recall.mjs
           node --check scripts/diagnose-intelligence-http.mjs
           python3 -m py_compile cognee/memory_bridge.py cognee/probe_local.py cognee/bridge_setup_diagnostic.py cognee/trace_recall_diagnostic.py
