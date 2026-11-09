@@ -65,7 +65,10 @@ test("restricted scheduled task metadata must use exact executable and live loop
  assert.match(src,/VERIFIED_EXECUTABLE_AND_ENDPOINTS/);
  assert.match(src,/\$ownerState=Confirm-Owner \$port.pid \$policy/);
  assert.match(src,/Write-Status "hold" \$ownerState/);
- assert.match(src,/EXISTING_OWNER_METADATA_UNAVAILABLE_PRESERVED/);
+ assert.match(src,/EXISTING_OWNER_UNVERIFIED_PRESERVED/);
+ assert.match(src,/"OWNER_PIN_OR_START_TIME_MISMATCH"/);
+ assert.match(src,/Write-Status "waiting" "EXISTING_OWNER_UNVERIFIED_PRESERVED"/);
+ assert.match(src,/Write-Status "hold" \$ownerState/);
  assert.match(src,/OWNER_START_TIME_UNAVAILABLE/);
  assert.doesNotMatch(src,/if\(-not\(Confirm-Owner \$port.pid\)\)/);
 });
@@ -98,4 +101,15 @@ test("full MCP catalogue and permission filtered REA exposure are separate, neve
  assert.match(install,/catalogueNames=\$catalogueNames;allowedTools=\$names/);
  assert.match(watch,/\$env:REA_ALLOWED_TOOLS=\(@\(\$p\.allowedTools\)-join ","\)/);
  assert.doesNotMatch(watch,/\$env:REA_ALLOWED_TOOLS=\(@\(\$p\.catalogueNames\)/);
+});
+
+test("scheduled-token mismatch is a non-mutating waiting state, never owner authorization",()=>{
+ const install=load("Enable-Fun-Dashboard-8789-Autostart.ps1");
+ const watch=load("Watch-Fun-Dashboard-8789.ps1");
+ assert.match(watch,/\$ownerState -in @\([\s\S]*?"OWNER_PIN_OR_START_TIME_MISMATCH"[\s\S]*?\)\)\{/);
+ assert.match(watch,/Write-Status "waiting" "EXISTING_OWNER_UNVERIFIED_PRESERVED"/);
+ assert.match(install,/PASS_REGISTERED_OWNER_METADATA_WAITING/);
+ assert.match(install,/\$status.state -eq "hold"/);
+ assert.match(watch,/Write-Status "hold" \$ownerState/);
+ assert.doesNotMatch(watch,/Stop-Process|Restart-Service|Stop-Service/);
 });
