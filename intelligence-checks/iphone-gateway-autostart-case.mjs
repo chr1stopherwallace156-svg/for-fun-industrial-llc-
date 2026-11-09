@@ -69,7 +69,7 @@ test("scheduled supervisor inspection treats empty stderr as no error and report
 test("synthetic inspection never mistakes local listener for production authorization",()=>{
  const src=load("Watch-Fun-iPhone-HTTPS.ps1");
  const diag=load("Diagnose-Fun-Gateway-Supervisor.ps1");
- assert.match(src,/if\(\$InspectOnce\)\{\s*\/\/ Synthetic test checks status transitions/);
+ assert.match(src,/if\(\$InspectOnce\)\{\s*# Synthetic test checks status transitions/);
  assert.match(src,/Status "waiting" "INSPECT_GATEWAY_PRESENT"/);
  assert.match(diag,/waiting:INSPECT_GATEWAY_PRESENT/);
  assert.match(src,/elseif\(Confirm-GatewayOwner \(\[int\]\$state\.ListenerProcessId\)\)/);
