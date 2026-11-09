@@ -69,8 +69,7 @@ The script:
 2. Checks automatic Cognee memory status, local model, compute and all
    229 REA tool names.
 3. Runs Node tests and syntax checks for the new mobile module and panel.
-4. Stages a surgical patch, preserving the exact existing chat UI and
-   operator tool-approval flow.
+4. Stages a surgical patch that **does not require the original `chat-input` ID**; it appends the mobile voice panel immediately before the sole closing `</body>` tag while preserving the exact existing chat UI and operator tool-approval flow. It rejects missing or ambiguous body anchors, duplicate voice panels, and unsupported Content Security Policy shapes before modifying live files.
 5. Creates a rollback backup, adds the voice module and restarts only
    the 8789 dashboard Node process; existing compute may require the
    existing compute-only recovery script.
