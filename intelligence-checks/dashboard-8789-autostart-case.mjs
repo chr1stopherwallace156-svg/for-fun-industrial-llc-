@@ -58,13 +58,15 @@ test("restricted scheduled task metadata must use exact executable and live loop
  assert.match(src,/Get-Process -Id \$id/);
  assert.match(src,/\$cim.Name -ne "node.exe"/);
  assert.match(src,/UNEXPECTED_DASHBOARD_OWNER_COMMANDLINE/);
- assert.match(src,/OWNER_EXECUTABLE_PATH_UNAVAILABLE/);
+ assert.match(src,/OWNER_PIN_OR_START_TIME_MISMATCH/);
  assert.match(src,/\[IO.Path\]::GetFullPath\(\[string\]\$policy.nodePath\)/);
  assert.match(src,/StringComparison\]::OrdinalIgnoreCase/);
  assert.match(src,/if\(-not\(Endpoint-Ready\)\)/);
  assert.match(src,/VERIFIED_EXECUTABLE_AND_ENDPOINTS/);
  assert.match(src,/\$ownerState=Confirm-Owner \$port.pid \$policy/);
  assert.match(src,/Write-Status "hold" \$ownerState/);
+ assert.match(src,/EXISTING_OWNER_METADATA_UNAVAILABLE_PRESERVED/);
+ assert.match(src,/OWNER_START_TIME_UNAVAILABLE/);
  assert.doesNotMatch(src,/if\(-not\(Confirm-Owner \$port.pid\)\)/);
 });
 test("dashboard PID fallback is bounded by installation-verified process creation timestamp",()=>{
@@ -72,6 +74,8 @@ test("dashboard PID fallback is bounded by installation-verified process creatio
  const supervisor=load("Watch-Fun-Dashboard-8789.ps1");
  assert.match(installer,/verifiedExistingPid=\$before;verifiedExistingStartUtcTicks=\$verifiedStartUtcTicks/);
  assert.match(installer,/\$beforeProcess.StartTime.ToUniversalTime\(\).Ticks/);
+ assert.match(installer,/PASS_REGISTERED_OWNER_METADATA_WAITING/);
+ assert.match(installer,/FI_DASHBOARD_AUTOSTART_RUNTIME_REASON/);
  assert.match(supervisor,/OWNER_START_TIME_UNAVAILABLE/);
  assert.match(supervisor,/OWNER_PIN_OR_START_TIME_MISMATCH/);
  assert.match(supervisor,/\$proc.StartTime.ToUniversalTime\(\).Ticks/);
