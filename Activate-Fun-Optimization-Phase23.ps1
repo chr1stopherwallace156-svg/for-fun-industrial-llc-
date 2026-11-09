@@ -139,8 +139,36 @@ try{
  $newNode=StartDashboard (Join-Path $Backup "new.stdout.log") (Join-Path $Backup "new.stderr.log")
  if(-not(WaitDashboard $newNode $true)){Hold "DASHBOARD_RESTART_HEALTH"}
  $phase="read_only_rea_reinitialize"
- $reaStart=Invoke-RestMethod "$Base/api/rea/start" -Method POST -ContentType "application/json" -Body "{}" -TimeoutSec 120 -ErrorAction Stop
- if($reaStart.state -ne "ready"){Hold "REA_CATALOG_REINITIALIZE"}
+ # REA MCP may still be initializing when the 8789 dashboard comes back.
+ # Retry at most one 503, preserving the 229-name mandatory verification.
+ $reaStart=$null
+ for($reaAttempt=1;$reaAttempt -le 2;$reaAttempt++){
+  try{
+   $reaStart=Invoke-RestMethod "$Base/api/rea/start" -Method POST -ContentType "application/json" -Body "{}" -TimeoutSec 120 -ErrorAction Stop
+   if($reaStart.state -ne "ready"){Hold ("REA_REINITIALIZE_NOT_READY_"+$reaStart.state)}
+   break
+  }catch{
+   $reaError=$_.Exception
+   $reaHttp="NO_HTTP_RESPONSE"
+   $reaBody=""
+   if($reaError.Response){
+    try{$reaHttp=[int]$reaError.Response.StatusCode}catch{}
+    try{
+     $reader=[IO.StreamReader]::new($reaError.Response.GetResponseStream())
+     try{$reaBody=$reader.ReadToEnd()}finally{$reader.Dispose()}
+     if($reaBody.Length -gt 450){$reaBody=$reaBody.Substring(0,450)}
+     $reaBody=$reaBody -replace '[\r\n]',' '
+    }catch{}
+   }
+   Write-Warning ("FUN_OPT_REA_REINITIALIZE=HOLD ATTEMPT="+$reaAttempt+" HTTP="+$reaHttp+" DETAIL="+$reaBody)
+   if($reaAttempt -eq 1 -and [string]$reaHttp -eq "503"){
+    Start-Sleep -Seconds 4
+    continue
+   }
+   Hold ("REA_CATALOG_REINITIALIZE_HTTP_"+$reaHttp)
+  }
+ }
+ if(-not $reaStart -or $reaStart.state -ne "ready"){Hold "REA_CATALOG_REINITIALIZE"}
  $reaAfter=@((Request "$Base/api/rea/tools" 45).tools)
  if($reaAfter.Count -ne 229 -or
    (Compare-Object @($reaBefore|ForEach-Object{$_.name}|Sort-Object) @($reaAfter|ForEach-Object{$_.name}|Sort-Object)).Count){Hold "REA_229_CHANGED"}
