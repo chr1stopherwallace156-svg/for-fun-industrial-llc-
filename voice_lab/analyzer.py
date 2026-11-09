@@ -75,7 +75,8 @@ def analyze_audio(filename: str | Path, *, include_contours: bool = True) -> dic
     # Normalized MFCC moments are useful for general acoustic similarity,
     # but they do NOT verify speaker identity.
     mfcc = librosa.feature.mfcc(y=y, sr=SR, n_mfcc=13, n_fft=1024, hop_length=HOP)
-    selected = mfcc[:, :m][:, speech_proxy[:mfcc.shape[1]]]
+    k = min(m, mfcc.shape[1])
+    selected = mfcc[:, :k][:, speech_proxy[:k]]
     if selected.shape[1] < 3:
         raise ValueError("VOICE_INSUFFICIENT_SPEECH_HOLD")
     audio_sha = hashlib.sha256(path.read_bytes()).hexdigest()
