@@ -21,12 +21,37 @@ function Port-Status(){
  }
  return [pscustomobject]@{state="existing";pid=[int]$all[0].OwningProcess}
 }
-function Confirm-Owner([int]$id){
+# A limited interactive Task Scheduler token may not be allowed to read
+# Win32_Process.CommandLine. Treat a visible, mismatching command line as a
+# hard conflict. Only a missing/unreadable command line may use the fallback:
+# matching Node binary path, private TCP listener, and live dashboard endpoints.
+# Report short reason codes, never raw process arguments or environment.
+function Confirm-Owner([int]$id,$policy){
+ $cim=$null
+ try{$cim=Get-CimInstance Win32_Process -Filter ("ProcessId="+$id) -ErrorAction Stop}catch{}
+ if($cim){
+  if($cim.Name -ne "node.exe"){return "UNEXPECTED_DASHBOARD_OWNER_NAME"}
+  $line=[string]$cim.CommandLine
+  if(-not [string]::IsNullOrWhiteSpace($line)){
+   if($line -match 'src[/\\]server\.mjs'){return "VERIFIED_COMMANDLINE"}
+   return "UNEXPECTED_DASHBOARD_OWNER_COMMANDLINE"
+  }
+ }
+ $proc=$null
+ try{$proc=Get-Process -Id $id -ErrorAction Stop}catch{return "OWNER_PROCESS_QUERY_UNAVAILABLE"}
+ if($proc.ProcessName -ne "node"){return "UNEXPECTED_DASHBOARD_OWNER_NAME"}
+ $exe=[string]$proc.Path
+ if([string]::IsNullOrWhiteSpace($exe) -and $cim){$exe=[string]$cim.ExecutablePath}
+ if([string]::IsNullOrWhiteSpace($exe)){return "OWNER_EXECUTABLE_PATH_UNAVAILABLE"}
  try{
-  $proc=Get-CimInstance Win32_Process -Filter ("ProcessId="+$id) -ErrorAction Stop
-  return $null -ne $proc -and $proc.Name -eq "node.exe" -and
-   $proc.CommandLine -match 'src[/\\]server\.mjs'
- }catch{return $false}
+  if(-not [string]::Equals([IO.Path]::GetFullPath($exe),
+   [IO.Path]::GetFullPath([string]$policy.nodePath),
+   [StringComparison]::OrdinalIgnoreCase)){
+   return "UNEXPECTED_DASHBOARD_OWNER_EXECUTABLE"
+  }
+ }catch{return "OWNER_EXECUTABLE_PATH_INVALID"}
+ if(-not(Endpoint-Ready)){return "OWNER_DASHBOARD_ENDPOINTS_UNAVAILABLE"}
+ return "VERIFIED_EXECUTABLE_AND_ENDPOINTS"
 }
 function Endpoint-Ready(){
  try{
@@ -119,12 +144,17 @@ try{
     if($port.state -eq "conflict"){
      Write-Status "hold" "PORT_8789_CONFLICT"
     }elseif($port.state -eq "existing"){
-     if(-not(Confirm-Owner $port.pid)){
-      Write-Status "hold" "UNEXPECTED_DASHBOARD_OWNER"
-     }elseif(Endpoint-Ready){
-      Write-Status "running" "EXISTING_DASHBOARD_PRESERVED"
-     }else{
+     $ownerState=Confirm-Owner $port.pid $policy
+     if($ownerState -like "VERIFIED_*"){
+      if(Endpoint-Ready){
+       Write-Status "running" "EXISTING_DASHBOARD_PRESERVED"
+      }else{
+       Write-Status "waiting" "EXISTING_DASHBOARD_INITIALIZING"
+      }
+     }elseif($ownerState -eq "OWNER_DASHBOARD_ENDPOINTS_UNAVAILABLE"){
       Write-Status "waiting" "EXISTING_DASHBOARD_INITIALIZING"
+     }else{
+      Write-Status "hold" $ownerState
      }
     }elseif($ProbeOnce){
      Write-Status "probe" "DASHBOARD_STOPPED_NOT_LAUNCHED"
