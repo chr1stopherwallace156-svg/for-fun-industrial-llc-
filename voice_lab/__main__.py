@@ -41,6 +41,12 @@ def run(argv=None):
     r.add_argument("speaker_id")
     p = sub.add_parser("profiles", help="List local authorized profiles")
     sub.add_parser("status", help="Show available engines; no model downloads")
+    tune = sub.add_parser("tune", help="Experimentally correct a selected local voice clip toward a musical key/scale")
+    tune.add_argument("recording")
+    tune.add_argument("--key", choices=("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"), default="C")
+    tune.add_argument("--scale", choices=("chromatic", "major", "minor"), default="chromatic")
+    tune.add_argument("--strength", type=float, default=0.8)
+    tune.add_argument("--output", help="Optional non-existing WAV path inside private VoiceLab exports")
     gen = sub.add_parser("synthesize", help="Operator-authorized single synthetic speech output")
     gen.add_argument("speaker_id")
     texts = gen.add_mutually_exclusive_group(required=True)
@@ -109,6 +115,10 @@ def run(argv=None):
                 "storage": str(home()),
                 "profiles": list_profiles(),
                 "synthesis": synthesis_status()})
+    elif args.command == "tune":
+        from .autotune import auto_tune
+        _print(auto_tune(args.recording, key=args.key, scale=args.scale,
+                         strength=args.strength, output=args.output))
     elif args.command == "synthesize":
         from .openvoice_backend import synthesize
         text = args.text if args.text is not None else Path(args.text_file).read_text(encoding="utf-8")
