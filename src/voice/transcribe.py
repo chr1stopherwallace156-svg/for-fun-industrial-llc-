@@ -38,9 +38,8 @@ def transcribe(wav_file: Path, model_dir: Path) -> dict:
         seconds=wav.getnframes()/16000
         if not 2<=seconds<=30:
             fail("VOICE_STT_DURATION_HOLD")
-    model=WhisperModel("tiny.en",device="cpu",compute_type="int8",
-                       cpu_threads=4,num_workers=1,download_root=str(model_dir),
-                       local_files_only=True)
+    model=WhisperModel(str(model_dir),device="cpu",compute_type="int8",
+                       cpu_threads=4,num_workers=1,local_files_only=True)
     segments,info=model.transcribe(str(wav_file),language="en",
                                   beam_size=2,condition_on_previous_text=False,
                                   vad_filter=False,without_timestamps=True)
