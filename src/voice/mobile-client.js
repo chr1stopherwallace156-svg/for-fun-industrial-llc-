@@ -1,4 +1,4 @@
-/* FI_VOICE_MOBILE_CLIENT_V2_PCM_SAFARI — plain Web APIs, no external dependencies.
+/* FI_VOICE_MOBILE_CLIENT_V3_PCM_PLAYBACK — plain Web APIs, no external dependencies.
  * iOS Safari: getUserMedia -> MediaRecorder -> Web Audio decode/resample -> WAV.
  * Remote HTTPS access must pass the existing NetBird/TLS/authenticated gateway.
  */
@@ -15,6 +15,12 @@
  let stream=null,recorder=null,pieces=[],timer=null,objectUrl=null;
  let pcmSession=null;
  let readyWav=null,working=false,enabled=false;
+ let playbackContext=null,playbackSource=null;
+ const playButton=document.createElement("button");
+ playButton.type="button";playButton.className="secondary";
+ playButton.textContent="Play recorded speech";playButton.disabled=true;
+ if(ui.preview?.insertAdjacentElement)ui.preview.insertAdjacentElement("afterend",playButton);
+ else if(root.appendChild)root.appendChild(playButton);
  let elapsedAt=0;
  function report(msg){ui.action.textContent=String(msg)}
  function setButtons(){
@@ -23,23 +29,73 @@
   ui.stop.disabled=working||!recording;
   ui.upload.disabled=working||!enabled||!readyWav||recording;
   ui.file.disabled=working||!enabled||recording;
+  playButton.disabled=working||!readyWav||recording;
  }
  function cleanupMic(){
   if(timer){clearTimeout(timer);timer=null}
   if(stream){for(const track of stream.getTracks())track.stop();stream=null}
   recorder=null;setButtons();
  }
+ function stopPlayback(){
+  if(playbackSource){
+   const playing=playbackSource;playbackSource=null;
+   try{playing.stop()}catch{}
+  }
+  if(playbackContext){
+   const ctx=playbackContext;playbackContext=null;
+   try{const closing=ctx.close();if(closing?.catch)closing.catch(()=>{})}catch{}
+  }
+  playButton.textContent="Play recorded speech";
+ }
  function resetAudio(){
+  stopPlayback();
   readyWav=null;
   if(objectUrl){URL.revokeObjectURL(objectUrl);objectUrl=null}
-  ui.preview.style.display="none";ui.preview.removeAttribute("src");ui.preview.load();
+  // Native Blob-URL playback is unreliable on some iOS Safari builds.
+  // Keep it hidden; use Web Audio on a button press instead.
+  ui.preview.style.display="none";ui.preview.removeAttribute("src");
   setButtons();
  }
  function showPreview(blob){
-  if(objectUrl)URL.revokeObjectURL(objectUrl);
-  objectUrl=URL.createObjectURL(blob);
-  ui.preview.src=objectUrl;ui.preview.style.display="block";
+  ui.preview.style.display="none";
+  ui.preview.removeAttribute("src");
+  playButton.disabled=false;
  }
+ async function playWavOnGesture(){
+  if(playbackSource){stopPlayback();report("Playback stopped. Your recording remains ready for upload.");return}
+  if(!readyWav)return;
+  const Audio=window.AudioContext||window.webkitAudioContext;
+  if(!Audio){report("VOICE_PLAYBACK_UNSUPPORTED: Web Audio is unavailable. WAV upload still works.");return}
+  let ctx;
+  try{
+   // Create/resume AudioContext while handling an actual user tap.
+   ctx=new Audio();playbackContext=ctx;
+   const resumed=ctx.state==="suspended"&&ctx.resume?ctx.resume():Promise.resolve();
+   const raw=await readyWav.arrayBuffer(),view=new DataView(raw);
+   const frames=(raw.byteLength-44)/2;
+   if(raw.byteLength<44||raw.byteLength>960044||!Number.isInteger(frames)||
+      view.getUint32(24,true)!==16000||view.getUint16(34,true)!==16||
+      view.getUint16(22,true)!==1||view.getUint32(40,true)!==raw.byteLength-44)
+      throw Error("VOICE_PLAYBACK_WAV_INVALID");
+   const audio=ctx.createBuffer(1,frames,16000),channel=audio.getChannelData(0);
+   for(let i=0;i<frames;i++)channel[i]=view.getInt16(44+i*2,true)/32768;
+   await resumed;
+   const source=ctx.createBufferSource();
+   source.buffer=audio;source.connect(ctx.destination);
+   source.onended=()=>{
+    if(playbackSource===source){
+     playbackSource=null;playButton.textContent="Play recorded speech";
+     if(playbackContext===ctx){playbackContext=null;try{const close=ctx.close();if(close?.catch)close.catch(()=>{})}catch{}}
+    }
+   };
+   playbackSource=source;playButton.textContent="Stop playback";
+   source.start();
+   report("Playing locally using Web Audio. Your WAV remains ready for upload.");
+  }catch(e){
+   stopPlayback();report("VOICE_PLAYBACK_HOLD: "+(e?.name||"Error")+": "+(e?.message||e)+". Upload can still work without playback.");
+  }
+ }
+ playButton.addEventListener("click",()=>{void playWavOnGesture()});
  function writeAscii(view,offset,value){
   for(let i=0;i<value.length;i++)view.setUint8(offset+i,value.charCodeAt(i));
  }
@@ -199,6 +255,8 @@
     ?rows.map(x=>x.filename+" · "+Math.round(x.bytes/1024)+" KiB").join("\n")
     :"No iPhone recordings on this PC yet.";
    ui.recordings.style.whiteSpace="pre-wrap";
+   if(rows.length&&ui.action.textContent==="Nothing recorded or uploaded.")
+    report("Most recently stored on Windows: "+rows[0].filename+". Existing server file, not proof of a new upload.");
   }catch(e){ui.recordings.textContent="Recordings unavailable: "+e.message}
  }
  async function refresh(){
@@ -281,6 +339,7 @@
   }
   if(recorder&&recorder.state==="recording")recorder.stop();
   cleanupMic();if(objectUrl)URL.revokeObjectURL(objectUrl);
+  stopPlayback();
  },{once:true});
  refresh();
 })();
