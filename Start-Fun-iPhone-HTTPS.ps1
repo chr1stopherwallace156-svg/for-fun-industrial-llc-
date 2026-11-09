@@ -12,6 +12,8 @@ if($Config.pcIp -ne "100.109.4.20" -or $Config.port -ne 8443 -or
  $Config.publicHost -ne "100.109.4.20:8443"){throw "FI_GATEWAY_PRIVATE_BIND_HOLD"}
 if($Config.iphonePeerIp -notmatch '^100\.\d+\.\d+\.\d+$' -or
  $Config.iphonePeerIp -eq $Config.pcIp){throw "FI_GATEWAY_PEER_ADDRESS_HOLD"}
+$SourceGateway=Join-Path $PSScriptRoot "src\gateway.mjs"
+$GatewayModule=Join-Path $HomeDir "gateway.mjs"
 $SourceEntry=Join-Path $PSScriptRoot "src\voice\private-gateway-entry.mjs"
 $SourceSelftest=Join-Path $PSScriptRoot "src\voice\private-gateway-selftest.mjs"
 $Entry=Join-Path $HomeDir "gateway-entry.mjs"
@@ -25,7 +27,7 @@ if(-not $OpenSSL){
 }
 $SSL=if($OpenSSL.Source){$OpenSSL.Source}else{$OpenSSL.FullName}
 $required=@($Config.source,$Config.caPublicPem,$Config.caPublicCer,$Config.tlsCertificate,
- $Config.tlsPrivateKey,$SourceEntry,$SourceSelftest)
+ $Config.tlsPrivateKey,$SourceGateway,$SourceEntry,$SourceSelftest)
 foreach($f in $required){if(-not(Test-Path -LiteralPath $f -PathType Leaf)){throw "FI_GATEWAY_MISSING_FILE=$f"}}
 $listen=@(Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue)
 if($listen.Count){throw "FI_GATEWAY_PORT_8443_ALREADY_IN_USE"}
@@ -84,8 +86,20 @@ try{
  $env:FI_GATEWAY_PASSWORD=$password
  $env:FI_GATEWAY_LOCAL_CA_PUBLIC_PEM=$Config.caPublicPem
  $env:PORT="8789"
- Copy-Item -LiteralPath $SourceEntry -Destination $Entry -Force
+ # Source entry lives in src/voice and imports ../gateway.mjs; installed
+ # runtime entry lives beside gateway.mjs in VoiceGateway. Keep the module
+ # inside the private gateway directory and rewrite only that exact import.
+ $entryText=[IO.File]::ReadAllText($SourceEntry)
+ $oldImport='from "../gateway.mjs"'
+ if(($entryText.Split([string[]]@($oldImport),[StringSplitOptions]::None).Count-1) -ne 1){
+  throw "FI_GATEWAY_ENTRY_IMPORT_ANCHOR_HOLD"
+ }
+ $entryText=$entryText.Replace($oldImport,'from "./gateway.mjs"')
+ Copy-Item -LiteralPath $SourceGateway -Destination $GatewayModule -Force
+ [IO.File]::WriteAllText($Entry,$entryText,[Text.UTF8Encoding]::new($false))
  Copy-Item -LiteralPath $SourceSelftest -Destination $Selftest -Force
+ & $Node --check $GatewayModule
+ if($LASTEXITCODE -ne 0){throw "FI_GATEWAY_MODULE_SYNTAX_HOLD"}
  & $Node --check $Entry
  if($LASTEXITCODE -ne 0){throw "FI_GATEWAY_NODE_ENTRY_SYNTAX_HOLD"}
  & $Node --check $Selftest
