@@ -103,7 +103,7 @@ $py=Get-Command py.exe -ErrorAction SilentlyContinue
 if($py){
  try{
   $v=(& $py.Source -3.9 -c "import sys; print(sys.version_info[:2] == (3,9))" 2>&1|Out-String).Trim()
-  Write-Host ("FUN_VOICE_PYTHON39_PRESENT="+$($LASTEXITCODE -eq 0 -and $v -eq 'True')")
+  Write-Host ("FUN_VOICE_PYTHON39_PRESENT="+[string]($LASTEXITCODE -eq 0 -and $v -eq 'True'))
  }catch{Write-Host "FUN_VOICE_PYTHON39_PRESENT=False"}
 }else{Write-Host "FUN_VOICE_PYTHON39_PRESENT=False"}
 Write-Host "FUN_VOICE_REPLICATION_ENGINE=NOT_YET_ACTIVATED INFERENCE_RUNTIME=NOT_INSTALLED_OR_TESTED"
