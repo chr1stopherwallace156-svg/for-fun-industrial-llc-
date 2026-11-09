@@ -8,6 +8,7 @@ on:
       - "tests/test_voice_*.py"
       - "requirements-voice.txt"
       - "Setup-Fun-VoiceLab.ps1"
+      - "Prepare-Fun-Voice-Replication-Models.ps1"
       - ".github/workflows/voice-pitch-lab-ci.yml"
   workflow_dispatch:
 permissions:
@@ -38,9 +39,21 @@ jobs:
         shell: pwsh
         run: |
           $tokens=$null;$errors=$null
-          [System.Management.Automation.Language.Parser]::ParseFile(
-            (Join-Path $PWD 'Setup-Fun-VoiceLab.ps1'),
-            [ref]$tokens,[ref]$errors
-          )|Out-Null
-          if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};throw 'FUN_VOICE_INSTALLER_PARSE_HOLD'}
-          Write-Host 'FUN_VOICE_INSTALLER_PARSE=PASS NO_SERVICES_TOUCHED=TRUE'
+          foreach($file in @('Setup-Fun-VoiceLab.ps1','Prepare-Fun-Voice-Replication-Models.ps1')){
+            $tokens=$null;$errors=$null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Join-Path $PWD $file),[ref]$tokens,[ref]$errors
+            )|Out-Null
+            if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};throw ('FUN_VOICE_PARSE_HOLD '+$file)}
+            Write-Host ('FUN_VOICE_SCRIPT_PARSE=PASS FILE='+$file+' NO_SERVICES_TOUCHED=TRUE')
+          }
+          $prepare=Get-Content 'Prepare-Fun-Voice-Replication-Models.ps1' -Raw
+          foreach($needle in @('9652c27e92b6b2a91632590ac9962ef7ae2b712e5c5b7f4c34ec55ee2b37ab9e',
+            '6a3798229b1114f0e9cc137b33211809def7dda5a8a9398d5a112c0b42699177',
+            '959433dc1c6df618922560b4b7bc8c7af0a4b7ceaea267480c5d9ae8a3cfe536')){
+            if(-not $prepare.Contains($needle)){throw 'MODEL_SHA256_EXPECTATION_MISSING'}
+          }
+          if($prepare -match 'Stop-Process|Restart-Service|Register-ScheduledTask|Set-NetFirewallRule'){
+            throw 'MODEL_PREP_UNRELATED_SERVICE_MUTATION_HOLD'
+          }
+          Write-Host 'FUN_VOICE_CHECKPOINT_PINS=PASS EXPECTED_HASHES=3'
