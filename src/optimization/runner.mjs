@@ -25,6 +25,7 @@ export function createOptimizationRunner({checkout=ROOT,python=PYTHON,spawnProce
  let running=false,lastStart=0;
  function status(){
   const source=safeDirectory(cwd)&&
+    safeDirectory(join(cwd,"fun_optimization"))&&
     safeFile(join(cwd,"fun_optimization","__init__.py"))&&
     safeFile(join(cwd,"fun_optimization","bridge.py"))&&
     safeFile(join(cwd,"fun_optimization","core.py"));
