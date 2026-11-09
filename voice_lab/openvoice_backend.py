@@ -56,7 +56,7 @@ def synthesize(speaker_id: str, text: str, *, attestation: str, speed: float = 1
     os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
     try:
         import torch
-        from openvoice.api import ToneColorConverter
+        from openvoice.api import OpenVoiceBaseClass, ToneColorConverter
         from melo.api import TTS
     except ImportError as exc:
         raise RuntimeError("VOICE_SYNTH_DEPENDENCIES_MISSING: install reviewed OpenVoice V2 and MeloTTS in isolated venv") from exc
@@ -64,15 +64,43 @@ def synthesize(speaker_id: str, text: str, *, attestation: str, speed: float = 1
     # Operator-provisioned checkpoint files are trusted inputs. Do not load
     # arbitrary untrusted .pth files; torch serialized weights can be unsafe.
     device = "cpu"
-    converter = ToneColorConverter(str(converter_path / "config.json"),
-                                   device=device, enable_watermark=False)
-    converter.load_ckpt(str(converter_path / "checkpoint.pth"))
+    # Upstream ToneColorConverter forwards enable_watermark to a base
+    # constructor that does not accept it. Its default also initializes
+    # wavmark, which is unnecessary and may fetch additional weights.
+    # Initialize the verified converter class directly without watermark.
+    converter = ToneColorConverter.__new__(ToneColorConverter)
+    OpenVoiceBaseClass.__init__(converter, str(converter_path / "config.json"), device=device)
+    converter.watermark_model = None
+    converter.version = getattr(converter.hps, "_version_", "v1")
+    # Prevent arbitrary pickle deserialization for the approved checkpoint.
+    checkpoint = torch.load(str(converter_path / "checkpoint.pth"),
+                            map_location=torch.device(device), weights_only=True)
+    if not isinstance(checkpoint, dict) or not isinstance(checkpoint.get("model"), dict):
+        raise RuntimeError("VOICE_OPENVOICE_CHECKPOINT_PAYLOAD_INVALID")
+    converter.model.load_state_dict(checkpoint["model"], strict=False)
     target_embedding = converter.extract_se([str(reference)])
     # Explicit paths prevent the MeloTTS API from attempting HF downloads.
     # The official TTS initializer supports use_hf/config_path/ckpt_path.
-    synthesizer = TTS(language="EN_NEWEST", device=device, use_hf=True,
-                      config_path=str(melo_home / "config.json"),
-                      ckpt_path=str(melo_home / "checkpoint.pth"))
+    # The installed MeloTTS loader can use torch.load without weights_only.
+    # Force safe checkpoint loading for this single constructor; then restore
+    # the original module binding before generation. No model downloads.
+    import melo.api as melo_api
+    previous_loader = melo_api.load_or_download_model
+    def _local_model_loader(language, destination, use_hf=True, ckpt_path=None):
+        if language != "EN_NEWEST" or str(ckpt_path) != str(melo_home / "checkpoint.pth"):
+            raise RuntimeError("VOICE_UNEXPECTED_MELO_MODEL_REQUEST")
+        data = torch.load(str(melo_home / "checkpoint.pth"),
+                          map_location=torch.device(destination), weights_only=True)
+        if not isinstance(data, dict) or not isinstance(data.get("model"), dict):
+            raise RuntimeError("VOICE_MELO_CHECKPOINT_PAYLOAD_INVALID")
+        return data
+    try:
+        melo_api.load_or_download_model = _local_model_loader
+        synthesizer = TTS(language="EN_NEWEST", device=device, use_hf=True,
+                          config_path=str(melo_home / "config.json"),
+                          ckpt_path=str(melo_home / "checkpoint.pth"))
+    finally:
+        melo_api.load_or_download_model = previous_loader
     speakers = synthesizer.hps.data.spk2id
     chosen = None
     for name, idx in speakers.items():
