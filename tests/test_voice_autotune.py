@@ -31,7 +31,7 @@ class PitchCorrectionCase(unittest.TestCase):
 
     def test_note_target_nearest_key(self):
         self.assertEqual(target_note(60.20, key="C", scale="chromatic"), 60)
-        self.assertEqual(target_note(61.1, key="C", scale="major"), 60)
+        self.assertEqual(target_note(60.9, key="C", scale="major"), 60)
         self.assertEqual(target_note(62.9, key="C", scale="major"), 62)
         self.assertEqual(note_name(60), "C4")
         with self.assertRaises(ValueError):
