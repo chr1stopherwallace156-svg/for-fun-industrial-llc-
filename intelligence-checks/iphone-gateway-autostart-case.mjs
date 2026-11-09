@@ -13,7 +13,12 @@ test("autostart enrollment is explicitly opt-in, user-only, DPAPI-encrypted, not
  assert.match(src,/New-ScheduledTaskTrigger -AtLogOn -User \$name/);
  assert.match(src,/New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew/);
  assert.match(src,/Start-ScheduledTask/);
- assert.match(src,/GATEWAY_PORT_8443_CONFLICT_OR_WRONG_BIND/);
+ assert.match(src,/FI_GATEWAY_DASHBOARD_PREFLIGHT=WAITING REASON=DASHBOARD_8789_NOT_LISTENING/);
+ assert.doesNotMatch(src,/Hold "DASHBOARD_8789_NOT_LISTENING"/);
+ assert.match(src,/DASHBOARD_8789_UNEXPECTED_BIND_OR_CONFLICT/);
+ assert.match(src,/DASHBOARD_VOICE_ENDPOINT_UNEXPECTED/);
+ assert.match(src,/Copy-Item -LiteralPath \$SourceGateway/);
+  assert.match(src,/GATEWAY_PORT_8443_CONFLICT_OR_WRONG_BIND/);
  assert.match(src,/if\(\$existingGateway\)/);
  assert.match(src,/GATEWAY_RECOVERED=TRUE/);
  assert.match(src,/FI_GATEWAY_SUPERVISOR=WAITING/);
@@ -48,6 +53,9 @@ test("gateway launcher keeps manual default and adds exact policy guarded DPAPI 
  assert.match(src,/ConvertTo-SecureString -String \$secretLine/);
  assert.match(src,/Read-Host "Enter a NEW private iPhone gateway password/);
  assert.match(src,/FI_GATEWAY_STORED_CREDENTIAL_NOT_CONFIGURED/);
- assert.match(src,/FI_GATEWAY_ALLOWED_CLIENT_IPS=\$Config\.iphonePeerIp/);
+ assert.match(src,/\$SourceGateway=Join-Path \$PSScriptRoot "src\\gateway.mjs"/);
+ assert.match(src,/FI_GATEWAY_ENTRY_IMPORT_ANCHOR_HOLD/);
+ assert.match(src,/from "\.\/gateway.mjs"/);
+  assert.match(src,/FI_GATEWAY_ALLOWED_CLIENT_IPS=\$Config\.iphonePeerIp/);
  assert.doesNotMatch(src,/netbird\s+(?:up|down)/);
 });
