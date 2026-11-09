@@ -15,18 +15,33 @@ $TaskName="FunIndustrial-PrivateGateway-Autostart"
 $SourceSupervisor=Join-Path $PSScriptRoot "Watch-Fun-iPhone-HTTPS.ps1"
 $SourceLauncher=Join-Path $PSScriptRoot "Start-Fun-iPhone-HTTPS.ps1"
 $SourceGateway=Join-Path $PSScriptRoot "src\gateway.mjs"
+$SourceAttest=Join-Path $PSScriptRoot "src\voice\private-gateway-attest.mjs"
 $SourceEntry=Join-Path $PSScriptRoot "src\voice\private-gateway-entry.mjs"
 $SourceSelftest=Join-Path $PSScriptRoot "src\voice\private-gateway-selftest.mjs"
 $PortStateSource=Join-Path $PSScriptRoot "src\voice\gateway-port-state.ps1"
 $AutoSupervisor=Join-Path $Auto "Watch-Fun-iPhone-HTTPS.ps1"
 $AutoLauncher=Join-Path $Auto "Start-Fun-iPhone-HTTPS.ps1"
 $AutoPortState=Join-Path $Auto "gateway-port-state.ps1"
+$AutoAttest=Join-Path $Auto "private-gateway-attest.mjs"
 $Node=(Get-Command node.exe -ErrorAction Stop).Source
 $identity=[System.Security.Principal.WindowsIdentity]::GetCurrent()
 $sid=$identity.User.Value
 $name=$identity.Name
 $created=$false;$registered=$false
 function Hold([string]$reason){throw "FI_GATEWAY_AUTOSTART_SETUP_HOLD=$reason"}
+# Strict preservation of an existing Node gateway. A missing command line in
+# Task Scheduler's logon context requires exact TLS certificate and 403
+# attestation. A visible command line for anything else is never accepted.
+function Confirm-GatewayOwner([int]$processId){
+ $owner=Get-CimInstance Win32_Process -Filter ("ProcessId="+$processId) -ErrorAction SilentlyContinue
+ if(-not $owner -or $owner.Name -ne "node.exe"){return $false}
+ if($owner.CommandLine -match 'gateway-entry\.mjs'){return $true}
+ if(-not [string]::IsNullOrWhiteSpace([string]$owner.CommandLine)){return $false}
+ try{
+  $output=@(& $Node $SourceAttest $ConfigFile 2>$null)
+  return $LASTEXITCODE -eq 0 -and @($output|Where-Object{$_ -eq "FI_GATEWAY_PRIVATE_ATTEST=PASS TLS_PIN=EXACT LOCAL_ACCESS_DENIED=403"}).Count -eq 1
+ }catch{return $false}
+}
 function Listener([int]$port,[string]$ip){
  return @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
   Where-Object{$_.LocalAddress -eq $ip})
@@ -45,7 +60,7 @@ if(Test-Path -LiteralPath $Auto){Hold "ALREADY_CONFIGURED_OR_PARTIAL_AUTOSTART_D
 if(Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue){
  Hold "TASK_ALREADY_REGISTERED_DO_NOT_REPLACE"
 }
-foreach($file in @($ConfigFile,$SourceSupervisor,$SourceLauncher,$SourceGateway,$SourceEntry,$SourceSelftest,$PortStateSource)){
+foreach($file in @($ConfigFile,$SourceSupervisor,$SourceLauncher,$SourceGateway,$SourceEntry,$SourceSelftest,$PortStateSource,$SourceAttest)){
  if(-not(Test-Path -LiteralPath $file -PathType Leaf)){Hold "REQUIRED_FILE_NOT_FOUND"}
 }
 ParsePowerShell $SourceSupervisor
@@ -55,6 +70,8 @@ ParsePowerShell $PortStateSource
 if(-not([IO.File]::ReadAllText($SourceLauncher)).Contains('param([switch]$UseStoredCredential)')){
  Hold "LAUNCHER_STORED_CREDENTIAL_MODE_MISSING"
 }
+& $Node --check $SourceAttest
+if($LASTEXITCODE -ne 0){Hold "GATEWAY_ATTEST_SYNTAX_FAILED"}
 & $Node --check $SourceGateway
 if($LASTEXITCODE -ne 0){Hold "GATEWAY_MODULE_SYNTAX_FAILED"}
 & $Node --check $SourceEntry
@@ -82,7 +99,7 @@ if($portState.State -eq "conflict"){
 }
 if($existingGateway){
  $gp=Get-CimInstance Win32_Process -Filter ("ProcessId="+[int]$portState.ListenerProcessId) -ErrorAction Stop
- if($gp.Name -ne "node.exe" -or $gp.CommandLine -notmatch 'gateway-entry\.mjs'){
+ if(-not(Confirm-GatewayOwner ([int]$portState.ListenerProcessId))){
   Hold "UNEXPECTED_PROCESS_OWNS_GATEWAY_PORT"
  }
 }
@@ -150,6 +167,7 @@ try{
  Copy-Item -LiteralPath $SourceSupervisor -Destination $AutoSupervisor -ErrorAction Stop
  Copy-Item -LiteralPath $SourceLauncher -Destination $AutoLauncher -ErrorAction Stop
  Copy-Item -LiteralPath $PortStateSource -Destination $AutoPortState -ErrorAction Stop
+ Copy-Item -LiteralPath $SourceAttest -Destination $AutoAttest -ErrorAction Stop
  Copy-Item -LiteralPath $SourceGateway -Destination (Join-Path $Auto "src\gateway.mjs") -ErrorAction Stop
  Copy-Item -LiteralPath $SourceEntry -Destination (Join-Path $subdir "private-gateway-entry.mjs") -ErrorAction Stop
  Copy-Item -LiteralPath $SourceSelftest -Destination (Join-Path $subdir "private-gateway-selftest.mjs") -ErrorAction Stop
