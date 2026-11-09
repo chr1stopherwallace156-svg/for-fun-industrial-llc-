@@ -32,6 +32,9 @@ export function patchMobileVoiceServer(input){
   ' }'
  ].join("\n");
  result=replaceOnce(result,anchor,anchor+"\n"+routes);
+ // Existing dashboard CSP permits inline only. Permit this dashboard's own local
+ // recording script, not remote origins or arbitrary domains.
+ result=replaceOnce(result,"script-src 'unsafe-inline';","script-src 'self' 'unsafe-inline';");
  return result;
 }
 export function patchMobileVoiceUi(html,panel){
