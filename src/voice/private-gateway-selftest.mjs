@@ -25,9 +25,19 @@ const result=await new Promise((resolve,reject)=>{
  req.on("error",reject);
  req.end();
 });
-if(result.http!==200)throw Error("FI_GATEWAY_SELFTEST_HTTP_"+result.http);
-let status;try{status=JSON.parse(result.body)}catch{throw Error("FI_GATEWAY_SELFTEST_INVALID_JSON")}
-if(status.code!=="FI_VOICE_MOBILE_UPLOAD_V1"||status.enabled!==true||status.gatewayHttpsRequest!==true)
- throw Error("FI_GATEWAY_SELFTEST_VOICE_STATUS_HOLD");
-console.log("FI_IPHONE_GATEWAY_HTTPS_SELFTEST=PASS TLS=TRUSTED_LOCAL_CA HTTP=200 VOICE_UPLOAD=ENABLED");
-console.log("FI_IPHONE_SAFARI_CERT_TRUST=STILL_REQUIRES_PHONE_VERIFICATION");
+// The gateway accepts ONLY the iPhone peer's NetBird source address.
+// A request from this Windows host to its own NetBird IP must be denied
+// *after* the TLS certificate is validated. Do not widen the allowlist
+// to make a local smoke test pass.
+if(result.http!==403||!result.body.includes("VPN client address not allowed"))
+ throw Error("FI_GATEWAY_SELFTEST_LOCAL_IP_MUST_BE_DENIED_HTTP_"+result.http);
+// Independently verify the existing LOOPBACK voice endpoint is enabled.
+// This does not claim the iPhone can reach the gateway until tested on iOS.
+const local=await fetch("http://127.0.0.1:8789/api/voice/mobile/status",{
+ signal:AbortSignal.timeout(10000)});
+if(local.status!==200)throw Error("FI_GATEWAY_BACKEND_VOICE_STATUS_HTTP_"+local.status);
+const status=await local.json();
+if(status.code!=="FI_VOICE_MOBILE_UPLOAD_V1"||status.enabled!==true)
+ throw Error("FI_GATEWAY_BACKEND_VOICE_NOT_ENABLED");
+console.log("FI_IPHONE_GATEWAY_HTTPS_SELFTEST=PASS TLS=TRUSTED_LOCAL_CA LOCAL_PC_IP_DENIED=403 BACKEND_VOICE_UPLOAD=ENABLED");
+console.log("FI_IPHONE_SAFARI_AUTHENTICATED_ACCESS=NOT_YET_TESTED_ON_PHONE");
