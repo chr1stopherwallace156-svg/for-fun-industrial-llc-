@@ -29,7 +29,14 @@ def _check_local_assets():
             raise FileNotFoundError("VOICE_OPENVOICE_CHECKPOINT_MISSING: " + str(file))
     if not base.is_dir() or not list(base.glob("*.pth")):
         raise FileNotFoundError("VOICE_OPENVOICE_SOURCE_SPEAKER_CHECKPOINTS_MISSING")
-    return converter, base
+    raw_melo = os.environ.get("FUN_VOICE_MELO_EN_NEWEST_HOME", "")
+    if not raw_melo:
+        raise RuntimeError("VOICE_MELO_MODEL_NOT_CONFIGURED: set FUN_VOICE_MELO_EN_NEWEST_HOME")
+    melo_home = Path(raw_melo).expanduser().resolve()
+    for file in (melo_home / "config.json", melo_home / "checkpoint.pth"):
+        if not file.is_file() or file.stat().st_size < 100:
+            raise FileNotFoundError("VOICE_MELO_LOCAL_CHECKPOINT_MISSING: " + str(file))
+    return converter, base, melo_home
 
 
 def synthesize(speaker_id: str, text: str, *, attestation: str, speed: float = 1.0):
@@ -40,7 +47,7 @@ def synthesize(speaker_id: str, text: str, *, attestation: str, speed: float = 1
     if not isinstance(speed, (int, float)) or not .8 <= speed <= 1.2:
         raise ValueError("VOICE_SPEED_OUTSIDE_0.8_TO_1.2")
     profile, reference = load_authorized(speaker_id)
-    converter_path, base_ses_path = _check_local_assets()
+    converter_path, base_ses_path, melo_home = _check_local_assets()
 
     # Force local inference; fail instead of downloading a model.
     os.environ["HF_HUB_OFFLINE"] = "1"
@@ -61,7 +68,11 @@ def synthesize(speaker_id: str, text: str, *, attestation: str, speed: float = 1
                                    device=device, enable_watermark=False)
     converter.load_ckpt(str(converter_path / "checkpoint.pth"))
     target_embedding = converter.extract_se([str(reference)])
-    synthesizer = TTS(language="EN_NEWEST", device=device)
+    # Explicit paths prevent the MeloTTS API from attempting HF downloads.
+    # The official TTS initializer supports use_hf/config_path/ckpt_path.
+    synthesizer = TTS(language="EN_NEWEST", device=device, use_hf=True,
+                      config_path=str(melo_home / "config.json"),
+                      ckpt_path=str(melo_home / "checkpoint.pth"))
     speakers = synthesizer.hps.data.spk2id
     chosen = None
     for name, idx in speakers.items():
@@ -117,9 +128,10 @@ def synthesize(speaker_id: str, text: str, *, attestation: str, speed: float = 1
 
 def synthesis_status():
     try:
-        a, b = _check_local_assets()
+        a, b, c = _check_local_assets()
         return {"configured": True, "converter_path": str(a),
                 "base_speaker_checkpoints": len(list(b.glob("*.pth"))),
+                "melo_model_path": str(c),
                 "downloads_attempted": 0, "model_loaded": False}
     except (FileNotFoundError, RuntimeError) as exc:
         return {"configured": False, "reason": str(exc),
