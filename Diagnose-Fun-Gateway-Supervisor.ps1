@@ -7,6 +7,7 @@ $root=Join-Path $env:TEMP $name
 $auto=Join-Path $root "autostart"
 $report=Join-Path $root "report.txt"
 $registered=$false
+$stage="SETUP"
 $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
 Write-Host "FI_GATEWAY_SUPERVISOR_INSPECT=START NO_PASSWORD=TRUE SERVICE_CHANGES=NONE"
 try {
@@ -35,6 +36,7 @@ try {
    " EXIT="+$code+" STATUS="+$state+" LIVE_SERVICES_UNCHANGED=TRUE")
   return
  }
+ $stage="GENERATE_WRAPPER"
  $wrapper=@'
 $ErrorActionPreference="Stop"
 $root=$PSScriptRoot
@@ -56,35 +58,53 @@ try{
  $wrapperPath=Join-Path $root "wrapper.ps1"
  [IO.File]::WriteAllText($wrapperPath,$wrapper,[Text.UTF8Encoding]::new($false))
  $exe=Join-Path $PSHOME "powershell.exe"
+ $stage="CREATE_TASK_ACTION"
  $action=New-ScheduledTaskAction -Execute $exe -Argument ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$wrapperPath+'"')
  $trigger=New-ScheduledTaskTrigger -AtLogOn -User $identity.Name
  $principal=New-ScheduledTaskPrincipal -UserId $identity.Name -LogonType Interactive -RunLevel Limited
  $settings=New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::FromMinutes(2)) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+ $stage="REGISTER_TASK"
  Register-ScheduledTask -TaskName $name -Action $action -Trigger $trigger -Principal $principal -Settings $settings -ErrorAction Stop|Out-Null
  $registered=$true
+ $stage="START_TASK"
  Start-ScheduledTask -TaskName $name -ErrorAction Stop
+ $stage="WAIT_REPORT"
  for($i=0;$i -lt 40;$i++){
   if(Test-Path -LiteralPath $report -PathType Leaf){break}
   Start-Sleep -Milliseconds 500
  }
+ $stage="READ_TASK_INFO"
  $info=Get-ScheduledTaskInfo -TaskName $name -ErrorAction Stop
+ $stage="READ_WRAPPER_REPORT"
  $rc=if(Test-Path $report){(Get-Content $report -Raw).Trim()}else{"MISSING"}
+ $stage="READ_SUPERVISOR_STATUS"
  $st=Get-Content (Join-Path $auto "supervisor-status.json") -Raw|ConvertFrom-Json
  $status=([string]$st.state+":"+ [string]$st.reason)
+ $stage="READ_STDERR"
  $errorCode="NONE"
  $err=Join-Path $root "stderr.txt"
- if(Test-Path $err){
-  $errText=Get-Content $err -Raw
-  if($errText -match "FI_GATEWAY_[A-Z0-9_]+"){$errorCode=$Matches[0]}
-  elseif($errText -match "Exception calling ""([A-Za-z]+)"""){$errorCode="DOTNET_"+$Matches[1]}
-  elseif($errText.Trim()){$errorCode="ERROR_PRESENT"}
+ if(Test-Path $err -PathType Leaf){
+  $errText=[IO.File]::ReadAllText($err)
+  if(-not [string]::IsNullOrWhiteSpace($errText)){
+   if($errText -match "FI_GATEWAY_[A-Z0-9_]+"){$errorCode=$Matches[0]}
+   elseif($errText -match "Exception calling ""([A-Za-z]+)"""){$errorCode="DOTNET_"+$Matches[1]}
+   else{$errorCode="ERROR_PRESENT"}
+  }
  }
+ $stage="ASSESS_HEALTH"
  $healthyStatus=$status -in @("running:EXISTING_GATEWAY_PRESERVED","waiting:INSPECT_GATEWAY_STOPPED")
  $pass=$rc -eq "EXIT_0" -and $healthyStatus -and $errorCode -eq "NONE"
  Write-Host ("FI_GATEWAY_SUPERVISOR_SCHEDULED_INSPECT="+$(if($pass){"PASS"}else{"HOLD"})+
   " TASK_RESULT="+$info.LastTaskResult+" WRAPPER="+$rc+" STATUS="+$status+" ERROR="+$errorCode)
 }catch{
- Write-Host ("FI_GATEWAY_SUPERVISOR_SCHEDULED_INSPECT=HOLD ERROR_TYPE="+$_.Exception.GetType().Name)
+ # Synthetic-only diagnostic: identify exact failing code path without echoing
+ # usernames, file paths, credentials, environment variables or raw exceptions.
+ $kind=$_.Exception.GetType().Name
+ $id=if($_.FullyQualifiedErrorId){($_.FullyQualifiedErrorId -split ',')[0]}else{"UNAVAILABLE"}
+ if($id -notmatch '^[A-Za-z0-9_.-]{1,100}$'){$id="UNAVAILABLE"}
+ $h=if($_.Exception.HResult){$_.Exception.HResult}else{0}
+ Write-Host ("FI_GATEWAY_SUPERVISOR_SCHEDULED_INSPECT=HOLD STAGE="+$stage+
+  " ERROR_TYPE="+$kind+" ERROR_ID="+$id+" HRESULT="+$h)
 }finally{
  if($registered){Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue}
  Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
