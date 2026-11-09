@@ -2,9 +2,20 @@
 # Runs ONLY in the signed-in user's session. DPAPI-protected password is used
 # by the existing launcher, never read or echoed by this supervisor.
 # Does not run a VPN login, change firewall, touch Elektron or restart dashboard.
-[CmdletBinding()]param([switch]$ProbeOnce)
+[CmdletBinding()]param([switch]$ProbeOnce,[switch]$InspectOnce,[string]$DiagnosticBase="")
 $ErrorActionPreference="Stop"
-$Auto=Join-Path $env:LOCALAPPDATA "FunIndustrial\VoiceGateway\autostart"
+if($InspectOnce){
+ if(-not $DiagnosticBase){throw "FI_GATEWAY_INSPECT_REQUIRES_TEMP_ROOT"}
+ $tempRoot=[IO.Path]::GetFullPath($env:TEMP).TrimEnd('\')
+ $testRoot=[IO.Path]::GetFullPath($DiagnosticBase).TrimEnd('\')
+ if(-not $testRoot.StartsWith($tempRoot+'\',[StringComparison]::OrdinalIgnoreCase)){
+  throw "FI_GATEWAY_INSPECT_ROOT_MUST_BE_UNDER_TEMP"
+ }
+ $Auto=Join-Path $testRoot "autostart"
+}else{
+ if($DiagnosticBase){throw "FI_GATEWAY_PRODUCTION_FORBIDS_TEST_ROOT"}
+ $Auto=Join-Path $env:LOCALAPPDATA "FunIndustrial\VoiceGateway\autostart"
+}
 $HomeDir=Split-Path $Auto -Parent
 $Policy=Join-Path $Auto "supervisor-policy.json"
 $Config=Join-Path $HomeDir "private-gateway.json"
@@ -124,6 +135,9 @@ try{
    if($owner -and $owner.Name -eq "node.exe" -and $owner.CommandLine -match 'gateway-entry\.mjs'){
     Status "running" "EXISTING_GATEWAY_PRESERVED"
    }else{Status "hold" "UNEXPECTED_PROCESS_ON_PRIVATE_PORT"}
+  }elseif($InspectOnce){
+   # Inspection never launches a gateway and never reads or decrypts secrets.
+   Status "waiting" "INSPECT_GATEWAY_STOPPED"
   }elseif(-not(DashboardReady)){
    Status "waiting" "DASHBOARD_8789_UNAVAILABLE"
   }elseif(-not(NetBirdReady $g.pcIp $g.iphonePeerIp)){
@@ -148,6 +162,12 @@ try{
     elseif((Get-FunPrivateGatewayPortState -Listeners @(Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue) -ExpectedIp $g.pcIp).State -eq "existing"){Status "running" "AUTOSTART_GATEWAY_PASS"}
     else{Status "hold" "LAUNCH_NO_LISTENER"}
    }catch{Status "hold" "LAUNCH_FAILED"}
+  }
+  if($InspectOnce){
+   $inspectResult=Get-Content -LiteralPath $StatusFile -Raw -ErrorAction Stop|ConvertFrom-Json
+   if($inspectResult.state -notin @("running","waiting","hold")){throw "FI_GATEWAY_INSPECT_STATUS_HOLD"}
+   Write-Host ("FI_GATEWAY_SUPERVISOR_INSPECT=PASS STATE="+$inspectResult.state+" REASON="+$inspectResult.reason)
+   break
   }
   Start-Sleep -Seconds 20
  }
