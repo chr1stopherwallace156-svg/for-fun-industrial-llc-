@@ -23,6 +23,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: requirements-voice.txt
       - name: Install only CPU acoustic analysis packages
         run: python -m pip install --disable-pip-version-check -r requirements-voice.txt
       - name: Python source compilation
