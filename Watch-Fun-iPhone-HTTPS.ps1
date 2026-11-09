@@ -2,7 +2,7 @@
 # Runs ONLY in the signed-in user's session. DPAPI-protected password is used
 # by the existing launcher, never read or echoed by this supervisor.
 # Does not run a VPN login, change firewall, touch Elektron or restart dashboard.
-[CmdletBinding()]param()
+[CmdletBinding()]param([switch]$ProbeOnce)
 $ErrorActionPreference="Stop"
 $Auto=Join-Path $env:LOCALAPPDATA "FunIndustrial\VoiceGateway\autostart"
 $HomeDir=Split-Path $Auto -Parent
@@ -72,6 +72,36 @@ try{
   Status "hold" "POLICY_OR_IDENTITY_MISMATCH";exit 3
  }
  $powerShell=(Get-Command powershell.exe -ErrorAction Stop).Source
+ if($ProbeOnce){
+  # The installer runs this synchronously using the caller's Windows identity
+  # BEFORE scheduling anything. It verifies policy, process ownership and
+  # status-file writes without touching gateway, password, dashboard or VPN.
+  $snap=@(Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue)
+  $probeState=Get-FunPrivateGatewayPortState -Listeners $snap -ExpectedIp $g.pcIp
+  if($probeState.State -eq "conflict"){
+   Status "hold" "PROBE_PRIVATE_PORT_CONFLICT"
+   throw "FI_GATEWAY_SUPERVISOR_PROBE_PORT_CONFLICT"
+  }
+  if($probeState.State -eq "existing"){
+   $owner=Get-CimInstance Win32_Process -Filter ("ProcessId="+[int]$probeState.ListenerProcessId) -ErrorAction Stop
+   if(-not $owner -or $owner.Name -ne "node.exe" -or
+      $owner.CommandLine -notmatch 'gateway-entry\.mjs'){
+    Status "hold" "PROBE_GATEWAY_PROCESS_MISMATCH"
+    throw "FI_GATEWAY_SUPERVISOR_PROBE_IDENTITY_HOLD"
+   }
+  }
+  $reason=if($probeState.State -eq "existing"){"PROBE_EXISTING_GATEWAY"}else{"PROBE_GATEWAY_STOPPED"}
+  Status "probe" $reason
+  if(-not(Test-Path -LiteralPath $StatusFile -PathType Leaf)){
+   throw "FI_GATEWAY_SUPERVISOR_PROBE_STATUS_WRITE_HOLD"
+  }
+  $written=Get-Content -LiteralPath $StatusFile -Raw -ErrorAction Stop|ConvertFrom-Json
+  if($written.state -ne "probe" -or $written.reason -ne $reason){
+   throw "FI_GATEWAY_SUPERVISOR_PROBE_STATUS_MISMATCH"
+  }
+  Write-Host "FI_GATEWAY_SUPERVISOR_PROBE=PASS STATE=$reason GATEWAY_PROCESS_UNCHANGED=TRUE"
+  exit 0
+ }
  while($true){
   # Classify a single port snapshot (do not race separate queries).
   $snapshot=@(Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue)
