@@ -48,7 +48,7 @@ if($settings.ContainsKey("COMPUTE_COMMAND") -and $settings["COMPUTE_COMMAND"]){
   $cmd=Get-Command python.exe -ErrorAction SilentlyContinue
   if($cmd){$paths.Add($cmd.Source)}
  }else{
-  if(-not[IO.Path]::IsPathRooted($given)){$given=Join-Path $Root $given}
+  if(-not [IO.Path]::IsPathRooted($given)){$given=Join-Path $Root $given}
   $paths.Add($given)
  }
 }
@@ -56,10 +56,14 @@ foreach($p in @(
  (Join-Path $Root ".venv\Scripts\python.exe"),
  (Join-Path $Root "venv\Scripts\python.exe"),
  (Join-Path $Root ".runtime\venv\Scripts\python.exe"),
+ (Join-Path $env:USERPROFILE "FunIndustrial-LocalFirst\.venv\Scripts\python.exe"),
+ (Join-Path $env:USERPROFILE "FunIndustrial-Local-Intelligence\.venv\Scripts\python.exe"),
  (Join-Path $env:USERPROFILE "FunIndustrial\.venv\Scripts\python.exe"),
  (Join-Path $env:USERPROFILE "FunIndustrial\venv\Scripts\python.exe"),
  (Join-Path $env:USERPROFILE "FunIndustrial\.runtime\venv\Scripts\python.exe")
 )){$paths.Add($p)}
+$systemPython=Get-Command python.exe -ErrorAction SilentlyContinue
+if($systemPython){$paths.Add($systemPython.Source)}
 $python=$null
 Push-Location $Root
 try{
