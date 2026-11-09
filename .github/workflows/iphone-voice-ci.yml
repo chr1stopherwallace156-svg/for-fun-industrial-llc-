@@ -15,6 +15,7 @@ on:
       - "src/voice/conversation.mjs"
       - "src/voice/conversation-client.js"
       - "src/voice/transcribe.py"
+      - "src/voice/setup-whisper-model.py"
       - "Activate-Fun-iPhone-Voice.ps1"
       - "Prepare-Fun-iPhone-HTTPS.ps1"
       - "Repair-Fun-iPhone-Safari-Recorder.ps1"
@@ -46,6 +47,9 @@ jobs:
           node --check scripts/check-iphone-voice-live.mjs
           node --check src/voice/private-gateway-entry.mjs
           node --check src/voice/private-gateway-selftest.mjs
+      - name: Check offline Python speech modules compile
+        run: |
+          python -c "import ast;from pathlib import Path;[ast.parse(Path(p).read_text(encoding=\'utf-8\'),filename=p) for p in (\'src/voice/transcribe.py\',\'src/voice/setup-whisper-model.py\')]"
       - name: Synthetic WAV format, upload, security and dashboard-preservation tests
         run: node --test intelligence-checks/iphone-voice-case.mjs intelligence-checks/iphone-safari-pcm-case.mjs intelligence-checks/iphone-conversation-case.mjs
 
