@@ -1,0 +1,3 @@
+# Optional CPU speaker embedding comparison, installed only when requested.
+# Review all model package licenses and weights before use.
+resemblyzer>=0.1.4,<1
