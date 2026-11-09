@@ -74,9 +74,9 @@ export function injectMemory(body,recalled){
  // Preserve original model tool definitions and all other request fields unchanged.
  return {payload:{...body,messages},count:passages.length,state:"included"};
 }
-export function createAutomaticMemoryDecorator(recall,{budgetMs=7000}={}){
+export function createAutomaticMemoryDecorator(recall,{budgetMs=90000}={}){
  if(typeof recall!=="function")throw Error("RECALL_FUNCTION_REQUIRED");
- if(!Number.isInteger(budgetMs)||budgetMs<1||budgetMs>60000)throw Error("MEMORY_BUDGET_INVALID");
+ if(!Number.isInteger(budgetMs)||budgetMs<1||budgetMs>180000)throw Error("MEMORY_BUDGET_INVALID");
  let pending=null,lastState="never_called",lastExcerpts=0;
  async function decorate(body,enabled){
   if(!shouldRecall(body)){lastState="not_needed";lastExcerpts=0;return {payload:body,state:lastState,count:0}}
