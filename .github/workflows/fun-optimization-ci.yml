@@ -9,6 +9,11 @@ on:
       - "requirements-optimization.txt"
       - "Setup-Fun-Optimization.ps1"
       - "FUN-OPTIMIZATION-CAPABILITIES.md"
+      - "fun_optimization/bridge.py"
+      - "src/optimization/**"
+      - "scripts/patch-optimization-dashboard.mjs"
+      - "intelligence-checks/optimization-phase23-case.mjs"
+      - "Activate-Fun-Optimization-Phase23.ps1"
       - ".github/workflows/fun-optimization-ci.yml"
   workflow_dispatch:
 
@@ -62,3 +67,35 @@ jobs:
             throw 'OPTIMIZATION_INSTALLER_SERVICE_MUTATION_HOLD'
           }
           Write-Host 'FUN_OPTIMIZATION_INSTALLER_PARSE=PASS PROTECTED_SERVICE_MUTATIONS=NONE'
+
+  phase23-node-security:
+    name: Phase 2/3 staging and approval-boundary tests
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Parse Node modules
+        shell: pwsh
+        run: |
+          node --check src/optimization/runner.mjs
+          node --check src/optimization/client.js
+          node --check scripts/patch-optimization-dashboard.mjs
+      - name: Adversarial patch and execution-boundary tests
+        run: node --test intelligence-checks/optimization-phase23-case.mjs
+      - name: Parse live deployment PowerShell without applying
+        shell: pwsh
+        run: |
+          $tokens=$null;$errorsFound=$null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'Activate-Fun-Optimization-Phase23.ps1'),
+            [ref]$tokens,[ref]$errorsFound
+          )|Out-Null
+          if($errorsFound.Count){$errorsFound|ForEach-Object{Write-Error $_.Message};throw 'OPTIMIZATION_PHASE23_POWERSHELL_PARSE_HOLD'}
+          $script=Get-Content 'Activate-Fun-Optimization-Phase23.ps1' -Raw
+          foreach($needle in @('FUN_OPTIMIZATION_PHASE2=PASS','FUN_OPTIMIZATION_PHASE3=ADVISORY_UI_READY','FUN_OPTIMIZATION_ROLLBACK_FILES=RESTORED','FUN_OPTIMIZATION_UNAPPROVED_RUN_DENIAL=PASS')){
+            if(-not $script.Contains($needle)){throw 'OPTIMIZATION_PHASE23_DEPLOYMENT_GUARD_HOLD'}
+          }
+          Write-Host 'FUN_OPTIMIZATION_PHASE23_INSTALLER_PARSE=PASS ROLLBACK=SOURCE_BACKUP'
