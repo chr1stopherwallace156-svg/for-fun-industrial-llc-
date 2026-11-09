@@ -38,9 +38,14 @@ def transcribe(wav_file: Path, model_dir: Path) -> dict:
         seconds=wav.getnframes()/16000
         if not 2<=seconds<=30:
             fail("VOICE_STT_DURATION_HOLD")
+    # Feed the already-validated PCM directly as numpy samples. Bypasses
+    # PyAV file decoders, whose APIs vary by installed PyAV version.
+    import numpy as np
+    with wave.open(str(wav_file),"rb") as wav:
+        audio=np.frombuffer(wav.readframes(wav.getnframes()),dtype="<i2").astype(np.float32)/32768.0
     model=WhisperModel(str(model_dir),device="cpu",compute_type="int8",
                        cpu_threads=4,num_workers=1,local_files_only=True)
-    segments,info=model.transcribe(str(wav_file),language="en",
+    segments,info=model.transcribe(audio,language="en",
                                   beam_size=2,condition_on_previous_text=False,
                                   vad_filter=False,without_timestamps=True)
     parts=[]
