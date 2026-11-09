@@ -21,8 +21,11 @@ def main() -> None:
     os.environ["HF_HUB_DISABLE_TELEMETRY"]="1"
     os.environ["HF_HUB_DISABLE_PROGRESS_BARS"]="1"
     if mode=="download":
-        from faster_whisper.utils import download_model
-        download_model("tiny.en",output_dir=str(folder),local_files_only=False)
+        from huggingface_hub import snapshot_download
+        snapshot_download("Systran/faster-whisper-tiny.en",local_dir=str(folder),
+                          local_files_only=False,
+                          allow_patterns=["model.bin","config.json","tokenizer.json",
+                                          "preprocessor_config.json","vocabulary.*"])
         print("FI_STT_MODEL_DOWNLOADED=PASS")
     missing=[name for name in REQUIRED if not (folder/name).is_file()]
     if missing:
