@@ -27,16 +27,12 @@ $root=$PSScriptRoot
 $exe=Join-Path $PSHOME "powershell.exe"
 $script=Join-Path $root "autostart\Watch-Fun-iPhone-HTTPS.ps1"
 try{
- $proc=Start-Process -FilePath $exe -ArgumentList @("-NoProfile","-NonInteractive",
- "-ExecutionPolicy","Bypass","-File",('"'+$script+'"'),"-InspectOnce",
- "-DiagnosticBase",('"'+$root+'"')) -PassThru -RedirectStandardOutput (Join-Path $root "stdout.txt") -RedirectStandardError (Join-Path $root "stderr.txt") -ErrorAction Stop
- if(-not $proc.WaitForExit(15000)){
-  Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
-  [IO.File]::WriteAllText((Join-Path $root "report.txt"),"TIMEOUT")
-  exit 7
- }
- [IO.File]::WriteAllText((Join-Path $root "report.txt"),("EXIT_"+$proc.ExitCode))
- if($proc.ExitCode -ne 0){exit 8}
+ # Direct child invocation gives a reliable LASTEXITCODE. The prior diagnostic
+ # saw an empty ExitCode property on a Start-Process wrapper (EXIT_).
+ & $exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $script -InspectOnce -DiagnosticBase $root 1> (Join-Path $root "stdout.txt") 2> (Join-Path $root "stderr.txt")
+ $code=$LASTEXITCODE
+ [IO.File]::WriteAllText((Join-Path $root "report.txt"),("EXIT_"+$code))
+ if($code -ne 0){exit 8}
  exit 0
 }catch{
  [IO.File]::WriteAllText((Join-Path $root "report.txt"),("WRAPPER_"+$_.Exception.GetType().Name))
@@ -69,7 +65,9 @@ try{
   elseif($errText -match "Exception calling ""([A-Za-z]+)"""){$errorCode="DOTNET_"+$Matches[1]}
   elseif($errText.Trim()){$errorCode="ERROR_PRESENT"}
  }
- Write-Host ("FI_GATEWAY_SUPERVISOR_SCHEDULED_INSPECT="+$(if($rc -eq "EXIT_0"){"PASS"}else{"HOLD"})+
+ $healthyStatus=$status -in @("running:EXISTING_GATEWAY_PRESERVED","waiting:INSPECT_GATEWAY_STOPPED")
+ $pass=$rc -eq "EXIT_0" -and $healthyStatus -and $errorCode -eq "NONE"
+ Write-Host ("FI_GATEWAY_SUPERVISOR_SCHEDULED_INSPECT="+$(if($pass){"PASS"}else{"HOLD"})+
   " TASK_RESULT="+$info.LastTaskResult+" WRAPPER="+$rc+" STATUS="+$status+" ERROR="+$errorCode)
 }catch{
  Write-Host ("FI_GATEWAY_SUPERVISOR_SCHEDULED_INSPECT=HOLD ERROR_TYPE="+$_.Exception.GetType().Name)
