@@ -21,6 +21,9 @@ def run(argv=None):
     parser = argparse.ArgumentParser(prog="python -m voice_lab",
         description="Fun Industrial local spoken voice analysis and authorized synthesis")
     sub = parser.add_subparsers(dest="command", required=True)
+    rec = sub.add_parser("record", help="Record local spoken audio from a microphone, no network")
+    rec.add_argument("--seconds", type=int, default=8)
+    rec.add_argument("--output", required=True)
     a = sub.add_parser("analyze", help="Pitch, digital loudness, spectral and energy-based speech timing")
     a.add_argument("recording")
     a.add_argument("--no-contours", action="store_true")
@@ -45,7 +48,33 @@ def run(argv=None):
     texts.add_argument("--text-file")
     gen.add_argument("--speed", type=float, default=1.0)
     args = parser.parse_args(argv)
-    if args.command == "analyze":
+    if args.command == "record":
+        if not 2 <= args.seconds <= 30:
+            raise ValueError("VOICE_RECORD_SECONDS_HOLD")
+        from pathlib import Path
+        import numpy as np
+        import soundfile as sf
+        try:
+            import sounddevice as sd
+        except ImportError as exc:
+            raise RuntimeError("VOICE_MICROPHONE_DEPENDENCY_MISSING: pip install sounddevice") from exc
+        from .profiles import home
+        root = home() / "recordings"
+        root.mkdir(parents=True, exist_ok=True)
+        target = Path(args.output).expanduser().resolve()
+        if target.suffix.lower() != ".wav" or not target.is_relative_to(root.resolve()):
+            raise ValueError("VOICE_RECORD_OUTPUT_MUST_BE_UNDER_PRIVATE_RECORDINGS_FOLDER")
+        if target.exists():
+            raise FileExistsError("VOICE_RECORD_OUTPUT_EXISTS")
+        print("VOICE_MICROPHONE_RECORDING=START seconds=" + str(args.seconds), file=sys.stderr)
+        samples = sd.rec(int(args.seconds * 16000), samplerate=16000, channels=1,
+                         dtype="float32", blocking=True)
+        if not np.isfinite(samples).all():
+            raise ValueError("VOICE_RECORD_NONFINITE_HOLD")
+        sf.write(str(target), samples, 16000, subtype="PCM_16")
+        _print({"state":"recorded","file":str(target),"seconds":args.seconds,
+                "microphone_only":True,"network_requests":0})
+    elif args.command == "analyze":
         from .analyzer import analyze_audio
         _print(analyze_audio(args.recording, include_contours=not args.no_contours))
     elif args.command == "match":
