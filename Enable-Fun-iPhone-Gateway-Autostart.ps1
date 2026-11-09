@@ -14,6 +14,7 @@ $StatusFile=Join-Path $Auto "supervisor-status.json"
 $TaskName="FunIndustrial-PrivateGateway-Autostart"
 $SourceSupervisor=Join-Path $PSScriptRoot "Watch-Fun-iPhone-HTTPS.ps1"
 $SourceLauncher=Join-Path $PSScriptRoot "Start-Fun-iPhone-HTTPS.ps1"
+$SourceGateway=Join-Path $PSScriptRoot "src\gateway.mjs"
 $SourceEntry=Join-Path $PSScriptRoot "src\voice\private-gateway-entry.mjs"
 $SourceSelftest=Join-Path $PSScriptRoot "src\voice\private-gateway-selftest.mjs"
 $PortStateSource=Join-Path $PSScriptRoot "src\voice\gateway-port-state.ps1"
@@ -44,7 +45,7 @@ if(Test-Path -LiteralPath $Auto){Hold "ALREADY_CONFIGURED_OR_PARTIAL_AUTOSTART_D
 if(Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue){
  Hold "TASK_ALREADY_REGISTERED_DO_NOT_REPLACE"
 }
-foreach($file in @($ConfigFile,$SourceSupervisor,$SourceLauncher,$SourceEntry,$SourceSelftest,$PortStateSource)){
+foreach($file in @($ConfigFile,$SourceSupervisor,$SourceLauncher,$SourceGateway,$SourceEntry,$SourceSelftest,$PortStateSource)){
  if(-not(Test-Path -LiteralPath $file -PathType Leaf)){Hold "REQUIRED_FILE_NOT_FOUND"}
 }
 ParsePowerShell $SourceSupervisor
@@ -54,6 +55,8 @@ ParsePowerShell $PortStateSource
 if(-not([IO.File]::ReadAllText($SourceLauncher)).Contains('param([switch]$UseStoredCredential)')){
  Hold "LAUNCHER_STORED_CREDENTIAL_MODE_MISSING"
 }
+& $Node --check $SourceGateway
+if($LASTEXITCODE -ne 0){Hold "GATEWAY_MODULE_SYNTAX_FAILED"}
 & $Node --check $SourceEntry
 if($LASTEXITCODE -ne 0){Hold "GATEWAY_ENTRY_SYNTAX_FAILED"}
 & $Node --check $SourceSelftest
@@ -147,6 +150,7 @@ try{
  Copy-Item -LiteralPath $SourceSupervisor -Destination $AutoSupervisor -ErrorAction Stop
  Copy-Item -LiteralPath $SourceLauncher -Destination $AutoLauncher -ErrorAction Stop
  Copy-Item -LiteralPath $PortStateSource -Destination $AutoPortState -ErrorAction Stop
+ Copy-Item -LiteralPath $SourceGateway -Destination (Join-Path $Auto "src\gateway.mjs") -ErrorAction Stop
  Copy-Item -LiteralPath $SourceEntry -Destination (Join-Path $subdir "private-gateway-entry.mjs") -ErrorAction Stop
  Copy-Item -LiteralPath $SourceSelftest -Destination (Join-Path $subdir "private-gateway-selftest.mjs") -ErrorAction Stop
  $policy=[ordered]@{
