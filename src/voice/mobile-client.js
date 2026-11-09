@@ -1,4 +1,4 @@
-/* FI_VOICE_MOBILE_CLIENT_V1 — plain Web APIs, no external dependencies.
+/* FI_VOICE_MOBILE_CLIENT_V2_PCM_SAFARI — plain Web APIs, no external dependencies.
  * iOS Safari: getUserMedia -> MediaRecorder -> Web Audio decode/resample -> WAV.
  * Remote HTTPS access must pass the existing NetBird/TLS/authenticated gateway.
  */
@@ -13,14 +13,16 @@
   recordings:el("saved-recordings")};
  const URI="/api/voice/mobile/";
  let stream=null,recorder=null,pieces=[],timer=null,objectUrl=null;
+ let pcmSession=null;
  let readyWav=null,working=false,enabled=false;
  let elapsedAt=0;
  function report(msg){ui.action.textContent=String(msg)}
  function setButtons(){
-  ui.record.disabled=working||!enabled||!!recorder||!navigator.mediaDevices?.getUserMedia||!window.isSecureContext;
-  ui.stop.disabled=!recorder;
-  ui.upload.disabled=working||!enabled||!readyWav||!!recorder;
-  ui.file.disabled=working||!enabled||!!recorder;
+  const recording=!!recorder||!!pcmSession;
+  ui.record.disabled=working||!enabled||recording||!navigator.mediaDevices?.getUserMedia||!window.isSecureContext;
+  ui.stop.disabled=working||!recording;
+  ui.upload.disabled=working||!enabled||!readyWav||recording;
+  ui.file.disabled=working||!enabled||recording;
  }
  function cleanupMic(){
   if(timer){clearTimeout(timer);timer=null}
@@ -56,6 +58,103 @@
   }
   return buffer;
  }
+ // Capture directly from iPhone microphone samples, bypassing MediaRecorder
+ // fragmented MP4, short timeslices and Safari decodeAudioData failures.
+ function pcmToMono16(chunks,rate,maxSec=30){
+  const frames=chunks.reduce((n,c)=>n+c.length,0);
+  if(!Number.isFinite(rate)||rate<8000||rate>192000)throw Error("Unsupported microphone sample rate: "+rate);
+  const seconds=frames/rate;
+  if(seconds<2)throw Error("Audio capture was too short ("+seconds.toFixed(2)+"s); record at least 3 seconds.");
+  const limit=Math.min(frames,Math.floor(maxSec*rate));
+  const input=new Float32Array(limit);let pos=0;
+  for(const chunk of chunks){
+   if(pos>=limit)break;
+   const count=Math.min(limit-pos,chunk.length);
+   input.set(chunk.subarray(0,count),pos);pos+=count;
+  }
+  // Weighted interval averaging for common 44.1/48-kHz microphone rates.
+  const destRate=16000,outputFrames=Math.floor(limit*destRate/rate);
+  if(outputFrames<32000||outputFrames>480000)throw Error("PCM recording duration outside 2–30 seconds");
+  const result=new Float32Array(outputFrames);
+  for(let j=0;j<outputFrames;j++){
+   const start=j*rate/destRate,end=(j+1)*rate/destRate;
+   const left=Math.floor(start),right=Math.min(limit,Math.ceil(end));
+   let sum=0,weights=0;
+   for(let k=left;k<right;k++){
+    const w=Math.min(end,k+1)-Math.max(start,k);
+    if(w>0){sum+=input[k]*w;weights+=w}
+   }
+   result[j]=weights>0?sum/weights:0;
+  }
+  return new Blob([encodePcm16(result)],{type:"audio/wav"});
+ }
+ async function acceptPreparedWav(wav,method){
+  working=true;setButtons();
+  try{
+   if(wav.size<64044||wav.size>960044)throw Error("Prepared WAV duration out of range");
+   readyWav=wav;showPreview(wav);
+   report("Ready ("+method+"): "+((wav.size-44)/32000).toFixed(1)+" seconds. Tap Upload prepared audio.");
+  }catch(e){
+   resetAudio();report("PCM preparation failed: "+(e?.name||"Error")+": "+(e?.message||e));
+  }finally{working=false;setButtons()}
+ }
+ async function stopPcmCapture(){
+  const session=pcmSession;
+  if(!session)return;
+  pcmSession=null;
+  working=true;
+  if(timer){clearTimeout(timer);timer=null}
+  try{
+   if(session.processor){session.processor.onaudioprocess=null;session.processor.disconnect()}
+   if(session.source)session.source.disconnect();
+   if(stream){for(const track of stream.getTracks())track.stop();stream=null}
+   const wav=pcmToMono16(session.chunks,session.sampleRate);
+   if(session.context)await session.context.close();
+   await acceptPreparedWav(wav,"direct PCM");
+  }catch(e){
+   if(session.context)try{await session.context.close()}catch{}
+   resetAudio();
+   report("VOICE_PCM_CAPTURE_HOLD: "+(e?.name||"Error")+": "+(e?.message||e));
+  }finally{working=false;setButtons()}
+ }
+ async function startPcmCapture(){
+  const Audio=window.AudioContext||window.webkitAudioContext;
+  if(!Audio)return false;
+  const ctx=new Audio();
+  if(typeof ctx.createScriptProcessor!=="function"){
+   try{await ctx.close()}catch{}
+   return false;
+  }
+  try{
+   if(ctx.state==="suspended"&&ctx.resume)await ctx.resume();
+   const source=ctx.createMediaStreamSource(stream);
+   const processor=ctx.createScriptProcessor(4096,1,1);
+   const chunks=[];
+   const session={context:ctx,source,processor,chunks,sampleRate:ctx.sampleRate,frames:0};
+   processor.onaudioprocess=e=>{
+    if(pcmSession!==session)return;
+    const data=e.inputBuffer.getChannelData(0);
+    if(session.frames<session.sampleRate*30){
+     const remaining=Math.ceil(session.sampleRate*30-session.frames);
+     const chunk=new Float32Array(data.subarray(0,remaining));
+     chunks.push(chunk);session.frames+=chunk.length;
+    }
+    // Connected output stays silent: no microphone feedback or playback.
+    if(e.outputBuffer){for(let c=0;c<e.outputBuffer.numberOfChannels;c++)
+     e.outputBuffer.getChannelData(c).fill(0)}
+   };
+   pcmSession=session;source.connect(processor);processor.connect(ctx.destination);
+   elapsedAt=Date.now();
+   timer=setTimeout(()=>{if(pcmSession===session)void stopPcmCapture()},30000);
+   report("Recording iPhone microphone (direct PCM). Speak for 3–30 seconds, then tap Stop.");
+   setButtons();return true;
+  }catch(e){
+   if(pcmSession?.context===ctx)pcmSession=null;
+   try{await ctx.close()}catch{}
+   throw e;
+  }
+ }
+
  async function makeWav(file){
   if(!file||file.size===0||file.size>25*1024*1024)throw Error("Audio file must be between 1 byte and 25 MiB");
   const ac=window.AudioContext||window.webkitAudioContext;
@@ -115,10 +214,12 @@
   }finally{setButtons()}
  }
  ui.record.addEventListener("click",async()=>{
-  if(!enabled||working||recorder)return;
+  if(!enabled||working||recorder||pcmSession)return;
   resetAudio();
   try{
    stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true},video:false});
+   // First choice: Web Audio direct PCM, no Safari MP4 encode/decode roundtrip.
+   if(await startPcmCapture())return;
    pieces=[];
    const formats=["audio/mp4","audio/webm;codecs=opus","audio/webm","audio/ogg;codecs=opus"];
    const chosen=formats.find(t=>window.MediaRecorder?.isTypeSupported?.(t));
@@ -126,14 +227,15 @@
    recorder=new MediaRecorder(stream,chosen?{mimeType:chosen}:{});
    elapsedAt=Date.now();
    recorder.addEventListener("dataavailable",e=>{if(e.data?.size)pieces.push(e.data)});
-   recorder.addEventListener("error",e=>{report("Recording error; try a different Safari version or an audio file.");cleanupMic()});
+   recorder.addEventListener("error",e=>{report("VOICE_MEDIARECORDER_HOLD: "+(e?.error?.name||e?.error?.message||"Unknown recording error")+". Try choosing a file instead.");cleanupMic()});
    recorder.addEventListener("stop",async()=>{
     const result=new Blob(pieces,{type:recorder?.mimeType||chosen||"audio/mp4"});
     cleanupMic();
     if(result.size>0)await acceptAudio(result,"microphone recording");
     else report("Recording contained no usable audio.");
    },{once:true});
-   recorder.start(250);
+   // One complete Blob on stop avoids Safari short-timeslice errors.
+   recorder.start();
    timer=setTimeout(()=>{if(recorder?.state==="recording")recorder.stop()},30000);
    report("Recording with iPhone microphone. Speak for 2–30 seconds, then tap Stop recording.");
   }catch(e){
@@ -142,9 +244,14 @@
   setButtons();
  });
  ui.stop.addEventListener("click",()=>{
+  if(pcmSession){
+   if(Date.now()-elapsedAt<2000){report("Record at least 3 seconds before stopping.");return}
+   ui.stop.disabled=true;report("Preparing direct PCM audio…");
+   void stopPcmCapture();return;
+  }
   if(!recorder||recorder.state!=="recording")return;
-  if(Date.now()-elapsedAt<2000){report("Record for at least 2 seconds before stopping.");return}
-  ui.stop.disabled=true;recorder.stop();report("Processing microphone recording…");
+  if(Date.now()-elapsedAt<2000){report("Record for at least 3 seconds before stopping.");return}
+  ui.stop.disabled=true;recorder.stop();report("Processing MediaRecorder fallback…");
  });
  ui.file.addEventListener("change",async()=>{
   const chosen=ui.file.files?.[0];
@@ -167,6 +274,13 @@
   finally{working=false;setButtons()}
  });
  ui.refresh.addEventListener("click",refresh);
- window.addEventListener("pagehide",()=>{if(recorder&&recorder.state==="recording")recorder.stop();cleanupMic();if(objectUrl)URL.revokeObjectURL(objectUrl)},{once:true});
+ window.addEventListener("pagehide",()=>{
+  if(pcmSession){
+   const active=pcmSession;pcmSession=null;
+   try{active.processor.onaudioprocess=null;active.processor.disconnect();active.source.disconnect();active.context.close()}catch{}
+  }
+  if(recorder&&recorder.state==="recording")recorder.stop();
+  cleanupMic();if(objectUrl)URL.revokeObjectURL(objectUrl);
+ },{once:true});
  refresh();
 })();
