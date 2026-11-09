@@ -1,0 +1,46 @@
+name: Fun Industrial Offline Voice Pitch Lab CI
+on:
+  push:
+    branches:
+      - feature/fun-iphone-voice-dashboard-20261108
+    paths:
+      - "voice_lab/**"
+      - "tests/test_voice_*.py"
+      - "requirements-voice.txt"
+      - "Setup-Fun-VoiceLab.ps1"
+      - ".github/workflows/voice-pitch-lab-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-pitch-qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install CPU-only voice analysis dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-voice.txt
+      - name: Compile offline voice source
+        run: python -m compileall -q voice_lab
+      - name: Test synthetic voice pitch correction, acoustic analysis, and consent gates
+        run: python -m unittest discover -s tests -p "test_voice_*.py" -v
+      - name: Verify no-model-download local CLI
+        run: python -m voice_lab status
+  windows-powershell-parse:
+    runs-on: windows-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate isolated voice installer syntax without executing it
+        shell: pwsh
+        run: |
+          $tokens=$null;$errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'Setup-Fun-VoiceLab.ps1'),
+            [ref]$tokens,[ref]$errors
+          )|Out-Null
+          if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};throw 'FUN_VOICE_INSTALLER_PARSE_HOLD'}
+          Write-Host 'FUN_VOICE_INSTALLER_PARSE=PASS NO_SERVICES_TOUCHED=TRUE'
