@@ -45,7 +45,8 @@ function StartDashboard([string]$stdout,[string]$stderr){
  $env:HOST="127.0.0.1";$env:PORT="8789";$env:COMPUTE_PORT="8791"
  $env:FI_COGNEE_RECALL_BUDGET_MS=[string]$MemoryBudget
  $env:FUN_VOICE_HOME=Join-Path $env:LOCALAPPDATA "FunIndustrial\VoiceLab"
- $env:REA_ALLOWED_TOOLS=($reaBefore|ForEach-Object{$_.name}) -join ","
+ # Preserve REA_ALLOWED_TOOLS from existing environment/config; never expand
+ # execution permissions merely because 229 catalogue names were observed.
  return Start-Process -FilePath $Node -ArgumentList @("src/server.mjs") -WorkingDirectory $Live -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
 }
 function WaitDashboard([System.Diagnostics.Process]$process,[bool]$optimization){
