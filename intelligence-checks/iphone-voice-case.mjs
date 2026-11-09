@@ -157,3 +157,23 @@ test("CSP adding same-origin script preserves stricter unrelated directives",()=
  assert.match(changed,/style-src 'self';/);
  assert.match(changed,/default-src 'none';/);
 });
+
+test("private HTTPS preparer handles OpenSSL progress on stderr and still gates exits",()=>{
+ const script=readFileSync(new URL("../Prepare-Fun-iPhone-HTTPS.ps1",import.meta.url),"utf8");
+ assert.match(script,/function Invoke-OpenSSL/);
+ assert.match(script,/\$ErrorActionPreference="Continue"/);
+ assert.match(script,/\$ErrorActionPreference=\$prior/);
+ assert.match(script,/\$exitCode=\$LASTEXITCODE/);
+ assert.match(script,/if\(\$exitCode -ne 0\)\{Hold/);
+ for(const stage of ["CREATE_CA","CREATE_SERVER_KEY_AND_CSR","SIGN_SERVER"])
+  assert.match(script,new RegExp('Invoke-OpenSSL "'+stage+'"'));
+ assert.match(script,/Remove-Item -LiteralPath \$caKey,\$serverCsr -Force/);
+});
+test("gateway HTTPS self-test expects Windows PC denial instead of widening iPhone-only peer allowlist",()=>{
+ const script=readFileSync(new URL("../src/voice/private-gateway-selftest.mjs",import.meta.url),"utf8");
+ assert.match(script,/result\.http!==403/);
+ assert.match(script,/VPN client address not allowed/);
+ assert.match(script,/TLS=TRUSTED_LOCAL_CA LOCAL_PC_IP_DENIED=403/);
+ assert.match(script,/http:\/\/127\.0\.0\.1:8789\/api\/voice\/mobile\/status/);
+ assert.doesNotMatch(script,/if\(result\.http!==200\)/);
+});
