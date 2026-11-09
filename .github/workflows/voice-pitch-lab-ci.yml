@@ -9,6 +9,8 @@ on:
       - "requirements-voice.txt"
       - "Setup-Fun-VoiceLab.ps1"
       - "Prepare-Fun-Voice-Replication-Models.ps1"
+      - "Setup-Fun-Voice-Replication-Runtime.ps1"
+      - "Test-Fun-Voice-Replication-First-Wav.ps1"
       - ".github/workflows/voice-pitch-lab-ci.yml"
   workflow_dispatch:
 permissions:
@@ -39,7 +41,7 @@ jobs:
         shell: pwsh
         run: |
           $tokens=$null;$errors=$null
-          foreach($file in @('Setup-Fun-VoiceLab.ps1','Prepare-Fun-Voice-Replication-Models.ps1')){
+          foreach($file in @('Setup-Fun-VoiceLab.ps1','Prepare-Fun-Voice-Replication-Models.ps1','Setup-Fun-Voice-Replication-Runtime.ps1','Test-Fun-Voice-Replication-First-Wav.ps1')){
             $tokens=$null;$errors=$null
             [System.Management.Automation.Language.Parser]::ParseFile(
               (Join-Path $PWD $file),[ref]$tokens,[ref]$errors
@@ -57,3 +59,15 @@ jobs:
             throw 'MODEL_PREP_UNRELATED_SERVICE_MUTATION_HOLD'
           }
           Write-Host 'FUN_VOICE_CHECKPOINT_PINS=PASS EXPECTED_HASHES=3'
+          $install=Get-Content 'Setup-Fun-Voice-Replication-Runtime.ps1' -Raw
+          $test=Get-Content 'Test-Fun-Voice-Replication-First-Wav.ps1' -Raw
+          foreach($code in @($install,$test)){
+            if($code -match 'Stop-Process|Restart-Service|Register-ScheduledTask|Set-NetFirewallRule|netbird\s+(up|down)'){
+              throw 'REPLICATION_SERVICE_MUTATION_HOLD'
+            }
+          }
+          if(-not $install.Contains('74a1d147b17a8c3092dd5430504bd83ef6c7eb23') -or
+             -not $test.Contains('SYNTHESIZE VOICE ')){
+            throw 'REPLICATION_UPSTREAM_OR_APPROVAL_INVARIANT_HOLD'
+          }
+          Write-Host 'FUN_VOICE_REPLICATION_WINDOWS_SAFETY=PASS NO_SERVICE_MUTATIONS=TRUE'
