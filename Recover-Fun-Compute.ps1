@@ -69,8 +69,10 @@ Push-Location $Root
 try{
  foreach($candidate in ($paths|Select-Object -Unique)){
   if(-not(Test-Path -LiteralPath $candidate -PathType Leaf)){continue}
-  & $candidate -c "import uvicorn,fastapi,networkx,quimb,torch; print('COMPUTE_PYTHON_READY')" 2>$null | Out-Null
-  if($LASTEXITCODE -eq 0){$python=$candidate;break}
+  try{
+   & $candidate -c "import uvicorn,fastapi,networkx,quimb,torch; print('COMPUTE_PYTHON_READY')" 2>$null | Out-Null
+   if($LASTEXITCODE -eq 0){$python=$candidate;break}
+  }catch{continue}
  }
 }finally{Pop-Location}
 if(-not $python){Fail "PYTHON_WITH_COMPUTE_DEPENDENCIES_NOT_FOUND_CHECK_COMPUTE_COMMAND"}
