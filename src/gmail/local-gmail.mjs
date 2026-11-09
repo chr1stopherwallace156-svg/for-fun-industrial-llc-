@@ -143,7 +143,7 @@ export async function connectGmail(){
    const profile=await gmailRequest(GMAIL_API+"/profile",oauth.access_token);
    if(String(profile.emailAddress||"").toLowerCase()!==EXPECTED_GMAIL_ACCOUNT)
     throw Error("GMAIL_ACCOUNT_MISMATCH_REFUSED");
-   if(!(String(oauth.scope||"").split(" ").includes(GMAIL_SCOPE)))
+   if(oauth.scope && !(String(oauth.scope).split(" ").includes(GMAIL_SCOPE)))
     throw Error("GMAIL_READONLY_SCOPE_NOT_GRANTED");
    protectToken({email:EXPECTED_GMAIL_ACCOUNT,access_token:oauth.access_token,refresh_token:oauth.refresh_token,
     expiry:Date.now()+Number(oauth.expires_in||3600)*1000,scope:GMAIL_SCOPE});
