@@ -1,0 +1,4 @@
+# Isolated Python 3.12, CPU-only optimization stack
+# No extra AI runtime, no REA permissions, no GPU requirement.
+optuna==4.6.0
+ortools==9.14.6206
