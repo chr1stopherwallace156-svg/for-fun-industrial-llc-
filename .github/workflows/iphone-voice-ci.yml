@@ -28,6 +28,8 @@ jobs:
           node --check src/voice/mobile-client.js
           node --check scripts/patch-iphone-voice-dashboard.mjs
           node --check scripts/check-iphone-voice-live.mjs
+          node --check src/voice/private-gateway-entry.mjs
+          node --check src/voice/private-gateway-selftest.mjs
       - name: Synthetic WAV format, upload, security and dashboard-preservation tests
         run: node --test intelligence-checks/iphone-voice-case.mjs
 
@@ -39,7 +41,7 @@ jobs:
       - name: Parse deployment and compute recovery scripts without executing them
         shell: pwsh
         run: |
-          foreach ($name in @('Activate-Fun-iPhone-Voice.ps1', 'Recover-Fun-Compute.ps1', 'Diagnose-Fun-iPhone-HTTPS.ps1')) {
+          foreach ($name in @('Activate-Fun-iPhone-Voice.ps1', 'Recover-Fun-Compute.ps1', 'Diagnose-Fun-iPhone-HTTPS.ps1', 'Prepare-Fun-iPhone-HTTPS.ps1', 'Start-Fun-iPhone-HTTPS.ps1')) {
             $tokens = $null
             $parseErrors = $null
             [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $name), [ref]$tokens, [ref]$parseErrors) | Out-Null
