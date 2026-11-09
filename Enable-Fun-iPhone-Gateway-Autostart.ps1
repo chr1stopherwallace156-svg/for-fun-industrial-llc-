@@ -16,8 +16,10 @@ $SourceSupervisor=Join-Path $PSScriptRoot "Watch-Fun-iPhone-HTTPS.ps1"
 $SourceLauncher=Join-Path $PSScriptRoot "Start-Fun-iPhone-HTTPS.ps1"
 $SourceEntry=Join-Path $PSScriptRoot "src\voice\private-gateway-entry.mjs"
 $SourceSelftest=Join-Path $PSScriptRoot "src\voice\private-gateway-selftest.mjs"
+$PortStateSource=Join-Path $PSScriptRoot "src\voice\gateway-port-state.ps1"
 $AutoSupervisor=Join-Path $Auto "Watch-Fun-iPhone-HTTPS.ps1"
 $AutoLauncher=Join-Path $Auto "Start-Fun-iPhone-HTTPS.ps1"
+$AutoPortState=Join-Path $Auto "gateway-port-state.ps1"
 $Node=(Get-Command node.exe -ErrorAction Stop).Source
 $identity=[System.Security.Principal.WindowsIdentity]::GetCurrent()
 $sid=$identity.User.Value
@@ -42,11 +44,13 @@ if(Test-Path -LiteralPath $Auto){Hold "ALREADY_CONFIGURED_OR_PARTIAL_AUTOSTART_D
 if(Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue){
  Hold "TASK_ALREADY_REGISTERED_DO_NOT_REPLACE"
 }
-foreach($file in @($ConfigFile,$SourceSupervisor,$SourceLauncher,$SourceEntry,$SourceSelftest)){
+foreach($file in @($ConfigFile,$SourceSupervisor,$SourceLauncher,$SourceEntry,$SourceSelftest,$PortStateSource)){
  if(-not(Test-Path -LiteralPath $file -PathType Leaf)){Hold "REQUIRED_FILE_NOT_FOUND"}
 }
 ParsePowerShell $SourceSupervisor
 ParsePowerShell $SourceLauncher
+ParsePowerShell $PortStateSource
+. $PortStateSource
 if(-not([IO.File]::ReadAllText($SourceLauncher)).Contains('param([switch]$UseStoredCredential)')){
  Hold "LAUNCHER_STORED_CREDENTIAL_MODE_MISSING"
 }
@@ -65,15 +69,16 @@ if($cfg.schema -ne "fun.voice.gateway.private.v1" -or
 foreach($file in @($cfg.caPublicPem,$cfg.tlsCertificate,$cfg.tlsPrivateKey,$cfg.source)){
  if(-not(Test-Path -LiteralPath $file -PathType Leaf)){Hold "PREPARED_CERTIFICATE_OR_GATEWAY_FILE_MISSING"}
 }
-$gateway=Listener 8443 "100.109.4.20"
-$all8443=@(Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue)
-$existingGateway=$all8443.Count -eq 1 -and $gateway.Count -eq 1
+# One snapshot avoids race/shape issues across two independent listener queries.
+$portSnapshot=@(Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue)
+$portState=Get-FunPrivateGatewayPortState -Listeners $portSnapshot -ExpectedIp $cfg.pcIp
+$existingGateway=$portState.State -eq "existing"
 $gp=$null
-if($all8443.Count -gt 0 -and -not $existingGateway){
+if($portState.State -eq "conflict"){
  Hold "GATEWAY_PORT_8443_CONFLICT_OR_WRONG_BIND"
 }
 if($existingGateway){
- $gp=Get-CimInstance Win32_Process -Filter ("ProcessId="+[int]$gateway[0].OwningProcess) -ErrorAction Stop
+ $gp=Get-CimInstance Win32_Process -Filter ("ProcessId="+[int]$portState.ListenerProcessId) -ErrorAction Stop
  if($gp.Name -ne "node.exe" -or $gp.CommandLine -notmatch 'gateway-entry\.mjs'){
   Hold "UNEXPECTED_PROCESS_OWNS_GATEWAY_PORT"
  }
@@ -122,6 +127,7 @@ try{
  if($LASTEXITCODE -ne 0){Hold "DPAPI_CREDENTIAL_ACL_FAIL"}
  Copy-Item -LiteralPath $SourceSupervisor -Destination $AutoSupervisor -ErrorAction Stop
  Copy-Item -LiteralPath $SourceLauncher -Destination $AutoLauncher -ErrorAction Stop
+ Copy-Item -LiteralPath $PortStateSource -Destination $AutoPortState -ErrorAction Stop
  Copy-Item -LiteralPath $SourceEntry -Destination (Join-Path $subdir "private-gateway-entry.mjs") -ErrorAction Stop
  Copy-Item -LiteralPath $SourceSelftest -Destination (Join-Path $subdir "private-gateway-selftest.mjs") -ErrorAction Stop
  $policy=[ordered]@{
@@ -163,20 +169,22 @@ try{
  }
  if(-not $seen){Hold "SUPERVISOR_INITIAL_STATUS_NOT_CONFIRMED"}
  if($status.state -eq "hold"){Hold ("SUPERVISOR_REPORTED_"+$status.reason)}
- $after=Listener 8443 "100.109.4.20"
+ $afterSnapshot=@(Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue)
+ $afterState=Get-FunPrivateGatewayPortState -Listeners $afterSnapshot -ExpectedIp $cfg.pcIp
  if($existingGateway){
-  if($after.Count -ne 1 -or [int]$after[0].OwningProcess -ne [int]$gateway[0].OwningProcess){
+  if($afterState.State -ne "existing" -or
+     $afterState.ListenerProcessId -ne $portState.ListenerProcessId){
    Hold "EXISTING_GATEWAY_PROCESS_CHANGED"
   }
  }elseif($status.state -eq "running"){
-  if($after.Count -ne 1){Hold "GATEWAY_AUTOSTART_LISTENER_NOT_PRESENT"}
- }elseif($after.Count -gt 0){Hold "WAITING_STATE_WITH_UNEXPECTED_GATEWAY_LISTENER"}
+  if($afterState.State -ne "existing"){Hold "GATEWAY_AUTOSTART_LISTENER_NOT_PRESENT"}
+ }elseif($afterState.State -ne "stopped"){Hold "WAITING_STATE_WITH_UNEXPECTED_GATEWAY_LISTENER"}
  Write-Host "FI_GATEWAY_AUTOSTART_SETUP=PASS TASK=$TaskName"
  Write-Host "FI_GATEWAY_CREDENTIAL_STORAGE=DPAPI_CURRENT_USER_ENCRYPTED NO_PLAINTEXT_FILE=TRUE"
  if($existingGateway){
   Write-Host "FI_GATEWAY_SUPERVISOR=RUNNING CURRENT_GATEWAY_PRESERVED=TRUE PID=$($gp.ProcessId)"
  }elseif($status.state -eq "running"){
-  Write-Host "FI_GATEWAY_SUPERVISOR=RUNNING GATEWAY_RECOVERED=TRUE PID=$($after[0].OwningProcess)"
+  Write-Host "FI_GATEWAY_SUPERVISOR=RUNNING GATEWAY_RECOVERED=TRUE PID=$($afterState.ListenerProcessId)"
  }else{
   Write-Host "FI_GATEWAY_SUPERVISOR=WAITING DEPENDENCY=$($status.reason) GATEWAY_RECOVERED=FALSE"
  }
