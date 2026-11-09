@@ -127,9 +127,10 @@ try{
  Copy-Item -LiteralPath $SourceClient -Destination $Client -ErrorAction Stop
  Copy-Item -LiteralPath $StageServer -Destination $Server -Force -ErrorAction Stop
  Copy-Item -LiteralPath $StagePage -Destination $Page -Force -ErrorAction Stop
- foreach($pair in @(@($SourceModule,$Module),@($SourceClient,$Client),@($StageServer,$Server),@($StagePage,$Page))){
-  if((Get-FileHash $pair[0]).Hash -ne (Get-FileHash $pair[1]).Hash){Hold "STAGED_FILE_HASH_MISMATCH"}
- }
+ if((Get-FileHash $SourceModule).Hash -ne (Get-FileHash $Module).Hash -or
+    (Get-FileHash $SourceClient).Hash -ne (Get-FileHash $Client).Hash -or
+    (Get-FileHash $StageServer).Hash -ne (Get-FileHash $Server).Hash -or
+    (Get-FileHash $StagePage).Hash -ne (Get-FileHash $Page).Hash){Hold "STAGED_FILE_HASH_MISMATCH"}
  $phase="restart_only_8789"
  Stop-Process -Id ([int]$old.ProcessId) -ErrorAction Stop;$stopped=$true
  for($i=0;$i -lt 40;$i++){if(-not(Snapshot 8789)){break};Start-Sleep -Milliseconds 250}
