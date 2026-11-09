@@ -70,4 +70,11 @@ jobs:
              -not $test.Contains('SYNTHESIZE VOICE ')){
             throw 'REPLICATION_UPSTREAM_OR_APPROVAL_INVARIANT_HOLD'
           }
+          if(-not $test.Contains('[string]$ApprovalPhrase=') -or
+             -not $test.Contains('OPERATOR_APPROVAL_NOT_GRANTED') -or
+             -not $test.Contains('PSBoundParameters.ContainsKey("ApprovalPhrase")') -or
+             $test.Contains('if(-not [Environment]::UserInteractive)')){
+            throw 'REPLICATION_SSH_APPROVAL_GUARD_HOLD'
+          }
+          Write-Host 'FUN_VOICE_REPLICATION_SSH_APPROVAL=PASS EXPLICIT_OR_READHOST_ONLY=TRUE'
           Write-Host 'FUN_VOICE_REPLICATION_WINDOWS_SAFETY=PASS NO_SERVICE_MUTATIONS=TRUE'
