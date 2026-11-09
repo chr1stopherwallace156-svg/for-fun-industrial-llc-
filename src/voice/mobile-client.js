@@ -109,7 +109,7 @@
    if(session.source)session.source.disconnect();
    if(stream){for(const track of stream.getTracks())track.stop();stream=null}
    const wav=pcmToMono16(session.chunks,session.sampleRate);
-   if(session.context)await session.context.close();
+   if(session.context)try{await session.context.close()}catch{}
    await acceptPreparedWav(wav,"direct PCM");
   }catch(e){
    if(session.context)try{await session.context.close()}catch{}
