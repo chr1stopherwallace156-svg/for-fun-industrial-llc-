@@ -68,6 +68,14 @@ jobs:
       - name: Synthetic private HTTPS listener classification (no sockets changed)
         shell: pwsh
         run: ./intelligence-checks/iphone-gateway-port-case.ps1
+      - name: Validate isolated scheduled supervisor (no secrets, no gateway changes)
+        shell: pwsh
+        run: |
+          $results = @( & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PWD 'Diagnose-Fun-Gateway-Supervisor.ps1') 2>&1 )
+          $results | ForEach-Object { Write-Host $_ }
+          if (-not @($results | Where-Object { $_ -match '^FI_GATEWAY_SUPERVISOR_SCHEDULED_INSPECT=PASS\b' }).Count) {
+            throw 'FI_GATEWAY_WINDOWS_SCHEDULED_SUPERVISOR_REGRESSION_HOLD'
+          }
       - name: Parse deployment and compute recovery scripts without executing them
         shell: pwsh
         run: |
