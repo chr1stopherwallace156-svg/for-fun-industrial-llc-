@@ -166,6 +166,20 @@ try{
  $check=ConvertTo-SecureString -String $recovered.Trim() -ErrorAction Stop
  if(-not $check -or $check.Length -lt 24){Hold "DPAPI_CREDENTIAL_SELFTEST_FAIL"}
  $check=$null;$recovered=$null
+ # Synchronous, read-only supervisor probe in the enrolling Windows account.
+ # Check status writes and ownership BEFORE registering any scheduled task.
+ $probeExe=(Get-Command powershell.exe -ErrorAction Stop).Source
+ & $probeExe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $AutoSupervisor -ProbeOnce
+ if($LASTEXITCODE -ne 0){Hold ("SUPERVISOR_FOREGROUND_PROBE_FAILED_EXIT_"+$LASTEXITCODE)}
+ if(-not(Test-Path -LiteralPath $StatusFile -PathType Leaf)){Hold "SUPERVISOR_PROBE_DID_NOT_WRITE_STATUS"}
+ $probe=Get-Content -LiteralPath $StatusFile -Raw -ErrorAction Stop|ConvertFrom-Json
+ if($probe.state -ne "probe" -or $probe.reason -notin @("PROBE_EXISTING_GATEWAY","PROBE_GATEWAY_STOPPED")){
+  Hold "SUPERVISOR_PROBE_WRONG_STATUS"
+ }
+ if($existingGateway -and $probe.reason -ne "PROBE_EXISTING_GATEWAY"){
+  Hold "SUPERVISOR_PROBE_EXISTING_GATEWAY_UNCONFIRMED"
+ }
+ Write-Host ("FI_GATEWAY_SUPERVISOR_FOREGROUND_PROBE=PASS REASON="+$probe.reason)
  # User-logon task, no elevated privilege and no stored Windows logon password.
  $action=New-ScheduledTaskAction -Execute ((Get-Command powershell.exe -ErrorAction Stop).Source) -Argument ('-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$AutoSupervisor+'"')
  $trigger=New-ScheduledTaskTrigger -AtLogOn -User $name
@@ -175,27 +189,35 @@ try{
  $registered=$true
  $task=Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
  if($task.State -eq "Disabled"){Hold "TASK_DISABLED"}
- # Start the supervisor immediately. It never stops an existing gateway;
- # if 8443 is free, it starts one only after dashboard and NetBird readiness.
- Start-ScheduledTask -TaskName $TaskName -ErrorAction Stop
+ # Try to start the interactive-logon task immediately. Over SSH there
+ # may be no interactive desktop token: task registration can still be valid
+ # for the NEXT desktop sign-in. Never erase DPAPI enrollment solely because
+ # the supervisor cannot report "running" from this session.
+ $taskStart="REQUESTED"
+ try{Start-ScheduledTask -TaskName $TaskName -ErrorAction Stop}
+ catch{$taskStart="NOT_STARTED_FROM_CURRENT_SESSION"}
  $seen=$false;$status=$null
- for($i=0;$i -lt 120;$i++){
+ for($i=0;$i -lt 20;$i++){
   Start-Sleep -Milliseconds 500
   if(Test-Path -LiteralPath $StatusFile -PathType Leaf){
    try{$status=Get-Content -LiteralPath $StatusFile -Raw|ConvertFrom-Json}catch{continue}
-   if($existingGateway -and $status.state -eq "hold"){$seen=$true;break}
-   if($existingGateway -and $status.state -eq "running" -and
-       $status.reason -eq "EXISTING_GATEWAY_PRESERVED"){$seen=$true;break}
-   if(-not $existingGateway -and $status.state -in @("running","waiting","hold")){
-    $seen=$true;break
-   }
+   if($status.state -in @("running","waiting","hold")){$seen=$true;break}
   }
  }
- if(-not $seen){
-  $summary=if($status){[string]$status.state+":"+[string]$status.reason}else{"STATUS_MISSING"}
-  Hold ("SUPERVISOR_INITIAL_STATUS_NOT_CONFIRMED_"+$summary)
+ if($seen -and $status.state -eq "hold"){Hold ("SUPERVISOR_REPORTED_"+$status.reason)}
+ $scheduled=Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
+ if($scheduled.State -eq "Disabled"){Hold "TASK_BECAME_DISABLED"}
+ $taskDetails=Get-ScheduledTaskInfo -TaskName $TaskName -ErrorAction SilentlyContinue
+ $lastResult=if($taskDetails){[int64]$taskDetails.LastTaskResult}else{0}
+ # 0x41303 = not yet run; 0x41301 = currently running.
+ if(-not $seen -and $lastResult -notin @(0,267011,267009)){
+  Hold ("TASK_STARTUP_FAILED_RESULT_"+$lastResult)
  }
- if($status.state -eq "hold"){Hold ("SUPERVISOR_REPORTED_"+$status.reason)}
+ $pendingSignIn=-not $seen
+ if($pendingSignIn){
+  Write-Warning ("FI_GATEWAY_AUTOSTART_PENDING_DESKTOP_SIGNIN TASK_STATE="+$scheduled.State+
+   " TASK_START="+$taskStart+" LAST_TASK_RESULT="+$lastResult)
+ }
  $afterSnapshot=@(Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue)
  $afterState=Get-FunPrivateGatewayPortState -Listeners $afterSnapshot -ExpectedIp $cfg.pcIp
  if($existingGateway){
@@ -203,13 +225,23 @@ try{
      $afterState.ListenerProcessId -ne $portState.ListenerProcessId){
    Hold "EXISTING_GATEWAY_PROCESS_CHANGED"
   }
- }elseif($status.state -eq "running"){
+ }elseif($seen -and $status.state -eq "running"){
   if($afterState.State -ne "existing"){Hold "GATEWAY_AUTOSTART_LISTENER_NOT_PRESENT"}
- }elseif($afterState.State -ne "stopped"){Hold "WAITING_STATE_WITH_UNEXPECTED_GATEWAY_LISTENER"}
- Write-Host "FI_GATEWAY_AUTOSTART_SETUP=PASS TASK=$TaskName"
+ }elseif($seen -and $status.state -eq "waiting" -and $afterState.State -ne "stopped"){
+  Hold "WAITING_STATE_WITH_UNEXPECTED_GATEWAY_LISTENER"
+ }
+ if($pendingSignIn){
+  Write-Host "FI_GATEWAY_AUTOSTART_SETUP=PASS_REGISTERED_PENDING_SIGNIN TASK=$TaskName"
+ }else{
+  Write-Host "FI_GATEWAY_AUTOSTART_SETUP=PASS TASK=$TaskName"
+ }
  Write-Host "FI_GATEWAY_CREDENTIAL_STORAGE=DPAPI_CURRENT_USER_ENCRYPTED NO_PLAINTEXT_FILE=TRUE"
- if($existingGateway){
+ if($existingGateway -and $pendingSignIn){
+  Write-Host "FI_GATEWAY_SUPERVISOR=PENDING_DESKTOP_SIGNIN CURRENT_GATEWAY_PRESERVED=TRUE PID=$($gp.ProcessId)"
+ }elseif($existingGateway){
   Write-Host "FI_GATEWAY_SUPERVISOR=RUNNING CURRENT_GATEWAY_PRESERVED=TRUE PID=$($gp.ProcessId)"
+ }elseif($pendingSignIn){
+  Write-Host "FI_GATEWAY_SUPERVISOR=PENDING_DESKTOP_SIGNIN GATEWAY_RECOVERED=FALSE"
  }elseif($status.state -eq "running"){
   Write-Host "FI_GATEWAY_SUPERVISOR=RUNNING GATEWAY_RECOVERED=TRUE PID=$($afterState.ListenerProcessId)"
  }else{
