@@ -9,6 +9,11 @@ on:
       - "scripts/check-iphone-voice-live.mjs"
       - "intelligence-checks/iphone-voice-case.mjs"
       - "Activate-Fun-iPhone-Voice.ps1"
+      - "Prepare-Fun-iPhone-HTTPS.ps1"
+      - "Start-Fun-iPhone-HTTPS.ps1"
+      - "Diagnose-Fun-iPhone-HTTPS.ps1"
+      - "FUN-IPHONE-HTTPS-SETUP.md"
+      - "src/gateway.mjs"
       - ".github/workflows/iphone-voice-ci.yml"
   workflow_dispatch:
 permissions:
