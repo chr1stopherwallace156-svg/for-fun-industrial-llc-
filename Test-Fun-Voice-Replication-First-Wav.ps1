@@ -2,7 +2,11 @@
 # using Windows SpeechSynthesizer as the base and OpenVoice V2 conversion.
 # No microphone, external network listener, REA, Cognee or Electron/Ollama.
 [CmdletBinding()]param(
- [string]$Text="Hello, this is a locally generated Fun Industrial voice replication test."
+ [string]$Text="Hello, this is a locally generated Fun Industrial voice replication test.",
+ # Optional explicit authorization for Windows SSH / Termius sessions, where
+ # [Environment]::UserInteractive is False even though the operator typed
+ # the command. This parameter is never stored and authorizes ONE run only.
+ [string]$ApprovalPhrase=""
 )
 $ErrorActionPreference="Stop"
 $SpeakerId="selfvoice"
@@ -22,7 +26,11 @@ function CurrentPorts(){
  }
  return $states
 }
-if(-not [Environment]::UserInteractive){Hold "INTERACTIVE_OPERATOR_REQUIRED"}
+# Do not use [Environment]::UserInteractive to detect Termius/SSH input:
+# remote sessions commonly report False even with a human operator.
+# Fail closed unless this invocation explicitly supplies or prompts the
+# exact authorization phrase. A missing phrase in redirected/non-console
+# sessions must not silently approve the operation.
 if($Text.Length -lt 5 -or $Text.Length -gt 180 -or $Text -match '[\x00-\x1F]'){Hold "TEXT_LENGTH_OR_CONTROLS_REJECTED"}
 foreach($file in @($Python,$Module,$Profile,(Join-Path $Models "verified-manifest.json"))){
  if(-not(Test-Path -LiteralPath $file -PathType Leaf)){Hold "RUNTIME_OR_ENROLLMENT_MISSING"}
@@ -48,8 +56,17 @@ $phrase="SYNTHESIZE VOICE "+$SpeakerId
 Write-Host "FUN_VOICE_REPLICATION_MODEL=OPENVOICE_V2 CPU_ONLY=TRUE BASE=WINDOWS_OFFLINE_SPEECH"
 Write-Host "FUN_VOICE_REPLICATION_DISCLOSURE=THIS_IS_SYNTHETIC_AUDIO_NOT_AN_IDENTITY_CREDENTIAL"
 Write-Host ("FUN_VOICE_REPLICATION_TEST_SENTENCE="+$Text)
-$entered=Read-Host ("Type exactly ["+$phrase+"] to authorize ONE new WAV")
+if($PSBoundParameters.ContainsKey("ApprovalPhrase")){
+ $entered=$ApprovalPhrase
+ Write-Host "FUN_VOICE_REPLICATION_APPROVAL_MODE=EXPLICIT_COMMAND_ARGUMENT ONE_OUTPUT_ONLY=TRUE"
+}else{
+ if([Console]::IsInputRedirected){Hold "EXPLICIT_APPROVAL_PHRASE_REQUIRED_FOR_REDIRECTED_INPUT"}
+ try{
+  $entered=Read-Host ("Type exactly ["+$phrase+"] to authorize ONE new WAV")
+ }catch{Hold "OPERATOR_APPROVAL_INPUT_UNAVAILABLE"}
+}
 if($entered -cne $phrase){Hold "OPERATOR_APPROVAL_NOT_GRANTED"}
+Write-Host "FUN_VOICE_REPLICATION_APPROVAL=PASS SELFVOICE_ONE_OUTPUT_ONLY"
 $base=Join-Path $Root "base"
 New-Item -ItemType Directory -Force -Path $base|Out-Null
 if((Get-Item -LiteralPath $base).Attributes -band [IO.FileAttributes]::ReparsePoint){Hold "BASE_DIRECTORY_LINK_REJECTED"}
