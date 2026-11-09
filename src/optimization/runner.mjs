@@ -7,7 +7,8 @@ import {existsSync,lstatSync} from "node:fs";
 import {join,resolve} from "node:path";
 import os from "node:os";
 
-const ROOT=join(process.env.USERPROFILE||os.homedir(),"FunIndustrial-Optimization-20261109");
+const ROOT=join(process.env.LOCALAPPDATA||join(os.homedir(),"AppData","Local"),
+ "FunIndustrial","OptimizationRuntime","source");
 const PYTHON=join(process.env.LOCALAPPDATA||join(os.homedir(),"AppData","Local"),
  "FunIndustrial","OptimizationRuntime","venv","Scripts","python.exe");
 const INPUT_MAX=32768,OUTPUT_MAX=32768;
