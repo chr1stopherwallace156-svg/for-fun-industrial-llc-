@@ -1,0 +1,32 @@
+name: Fun Industrial iPhone Voice Dashboard — guarded upload CI
+on:
+  push:
+    branches:
+      - feature/fun-iphone-voice-dashboard-20261108
+    paths:
+      - "src/voice/**"
+      - "scripts/patch-iphone-voice-dashboard.mjs"
+      - "scripts/check-iphone-voice-live.mjs"
+      - "intelligence-checks/iphone-voice-case.mjs"
+      - "Activate-Fun-iPhone-Voice.ps1"
+      - ".github/workflows/iphone-voice-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mobile-voice-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Check source modules and browser script syntax
+        run: |
+          node --check src/voice/mobile-upload.mjs
+          node --check src/voice/mobile-client.js
+          node --check scripts/patch-iphone-voice-dashboard.mjs
+          node --check scripts/check-iphone-voice-live.mjs
+      - name: Synthetic WAV format, upload, security and dashboard-preservation tests
+        run: node --test intelligence-checks/iphone-voice-case.mjs
