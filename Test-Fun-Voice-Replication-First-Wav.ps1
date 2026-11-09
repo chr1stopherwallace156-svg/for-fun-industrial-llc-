@@ -38,6 +38,12 @@ if($enrolled.speaker_id -ne $SpeakerId -or $enrolled.status -ne "authorized" -or
  Hold "ORIGINAL_AUTHORIZED_SELFVOICE_PROFILE_CHANGED"
 }
 $before=CurrentPorts
+$knownReplicaFiles=@{}
+if(Test-Path -LiteralPath $OutRoot){
+ foreach($file in @(Get-ChildItem -LiteralPath $OutRoot -Filter "selfvoice-replica-*.wav" -File -ErrorAction SilentlyContinue)){
+  $knownReplicaFiles[$file.FullName]=$true
+ }
+}
 $phrase="SYNTHESIZE VOICE "+$SpeakerId
 Write-Host "FUN_VOICE_REPLICATION_MODEL=OPENVOICE_V2 CPU_ONLY=TRUE BASE=WINDOWS_OFFLINE_SPEECH"
 Write-Host "FUN_VOICE_REPLICATION_DISCLOSURE=THIS_IS_SYNTHETIC_AUDIO_NOT_AN_IDENTITY_CREDENTIAL"
@@ -71,14 +77,13 @@ $env:HF_HUB_OFFLINE="1";$env:TRANSFORMERS_OFFLINE="1";$env:HF_DATASETS_OFFLINE="
 $env:FUN_VOICE_OPENVOICE_CHECKPOINTS=Join-Path $Models "OpenVoiceV2"
 $env:FUN_VOICE_MELO_EN_NEWEST_HOME=Join-Path $Models "MeloTTS-English-v3"
 $env:FUN_VOICE_HOME=Join-Path $env:LOCALAPPDATA "FunIndustrial\VoiceLab"
-$original=$env:PYTHONPATH
 Push-Location $PSScriptRoot
 try{
  & $Python -m voice_lab.openvoice_windows_backend $SpeakerId --base $baseWav --runtime-root $Root --operator-attested $phrase
  if($LASTEXITCODE -ne 0){Hold "OPENVOICE_CONVERSION_FAILED"}
 }finally{Pop-Location}
-$last=@(Get-ChildItem -LiteralPath $OutRoot -Filter "selfvoice-replica-*.wav" -File -ErrorAction SilentlyContinue|Sort-Object LastWriteTimeUtc -Descending|Select-Object -First 1)
-if($last.Count -ne 1){Hold "REPLICA_FILE_NOT_FOUND"}
+$last=@(Get-ChildItem -LiteralPath $OutRoot -Filter "selfvoice-replica-*.wav" -File -ErrorAction SilentlyContinue|Where-Object{-not $knownReplicaFiles.ContainsKey($_.FullName)})
+if($last.Count -ne 1){Hold "NEW_REPLICA_FILE_MISSING_OR_AMBIGUOUS"}
 $meta=[IO.Path]::ChangeExtension($last[0].FullName,".json")
 if(-not(Test-Path -LiteralPath $meta)){Hold "REPLICA_PROVENANCE_MISSING"}
 $record=Get-Content -LiteralPath $meta -Raw|ConvertFrom-Json
