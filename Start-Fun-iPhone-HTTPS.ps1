@@ -86,17 +86,16 @@ try{
  $env:FI_GATEWAY_PASSWORD=$password
  $env:FI_GATEWAY_LOCAL_CA_PUBLIC_PEM=$Config.caPublicPem
  $env:PORT="8789"
- # Source entry lives in src/voice and imports ../gateway.mjs; installed
- # runtime entry lives beside gateway.mjs in VoiceGateway. Keep the module
- # inside the private gateway directory and rewrite only that exact import.
+ # The entry source already imports ./gateway.mjs. Both module and entry
+ # are staged together at VoiceGateway root. Do not rewrite a valid import
+ # or require a nonexistent ../gateway.mjs anchor.
  $entryText=[IO.File]::ReadAllText($SourceEntry)
- $oldImport='from "../gateway.mjs"'
- if(-not $entryText.Contains($oldImport) -or
-    $entryText.IndexOf($oldImport,[StringComparison]::Ordinal) -ne
-    $entryText.LastIndexOf($oldImport,[StringComparison]::Ordinal)){
+ $correctImport='from "./gateway.mjs"'
+ if(-not $entryText.Contains($correctImport) -or
+    $entryText.IndexOf($correctImport,[StringComparison]::Ordinal) -ne
+    $entryText.LastIndexOf($correctImport,[StringComparison]::Ordinal)){
   throw "FI_GATEWAY_ENTRY_IMPORT_ANCHOR_HOLD"
  }
- $entryText=$entryText.Replace($oldImport,'from "./gateway.mjs"')
  Copy-Item -LiteralPath $SourceGateway -Destination $GatewayModule -Force
  [IO.File]::WriteAllText($Entry,$entryText,[Text.UTF8Encoding]::new($false))
  Copy-Item -LiteralPath $SourceSelftest -Destination $Selftest -Force
