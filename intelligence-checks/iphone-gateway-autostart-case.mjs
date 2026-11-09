@@ -1,0 +1,46 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const load=name=>readFileSync(new URL("../"+name,import.meta.url),"utf8");
+test("autostart enrollment is explicitly opt-in, user-only, DPAPI-encrypted, not plaintext",()=>{
+ const src=load("Enable-Fun-iPhone-Gateway-Autostart.ps1");
+ assert.match(src,/Read-Host "Existing fiiphone password" -AsSecureString/);
+ assert.match(src,/Read-Host "Confirm existing fiiphone password" -AsSecureString/);
+ assert.match(src,/ConvertFrom-SecureString/);
+ assert.match(src,/ConvertTo-SecureString/);
+ assert.match(src,/DPAPI_CURRENT_USER_ENCRYPTED/);
+ assert.match(src,/New-ScheduledTaskPrincipal -UserId \$name -LogonType Interactive -RunLevel Limited/);
+ assert.match(src,/New-ScheduledTaskTrigger -AtLogOn -User \$name/);
+ assert.match(src,/New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew/);
+ assert.match(src,/Start-ScheduledTask/);
+ assert.match(src,/FI_GATEWAY_OTHER_SERVICES=NOT_RESTARTED/);
+ assert.match(src,/Stop-ScheduledTask -TaskName \$TaskName/);
+ assert.doesNotMatch(src,/Set-Content.*password|password\s*=\s*"[^"]{24}/i);
+ assert.doesNotMatch(src,/Stop-Process -Id|netbird\s+up|netbird\s+down|Stop-Computer/);
+});
+test("supervisor is single instance, fail-closed on identity, waits for private NetBird peer and dashboard",()=>{
+ const src=load("Watch-Fun-iPhone-HTTPS.ps1");
+ assert.match(src,/System\.Threading\.Mutex/);
+ assert.match(src,/WaitOne\(0\)/);
+ assert.match(src,/FI_VOICE_MOBILE_UPLOAD_V1/);
+ assert.match(src,/NETBIRD_IPHONE_PEER_UNAVAILABLE/);
+ assert.match(src,/Get-NetIPAddress/);
+ assert.match(src,/100\.109\.4\.20/);
+ assert.match(src,/100\.109\.87\.100/);
+ assert.match(src,/PORT_CONFLICT_OR_WRONG_BIND/);
+ assert.match(src,/EXISTING_GATEWAY_PRESERVED/);
+ assert.match(src,/UseStoredCredential/);
+ assert.doesNotMatch(src,/Remove-Item .*gateway-password|netbird\s+(?:up|down)|Stop-Process/);
+});
+test("gateway launcher keeps manual default and adds exact policy guarded DPAPI mode",()=>{
+ const src=load("Start-Fun-iPhone-HTTPS.ps1");
+ assert.match(src,/param\(\[switch\]\$UseStoredCredential\)/);
+ assert.match(src,/if\(\$UseStoredCredential\)/);
+ assert.match(src,/supervisor-policy\.json/);
+ assert.match(src,/gateway-password\.dpapi/);
+ assert.match(src,/ConvertTo-SecureString -String \$secretLine/);
+ assert.match(src,/Read-Host "Enter a NEW private iPhone gateway password/);
+ assert.match(src,/FI_GATEWAY_STORED_CREDENTIAL_NOT_CONFIGURED/);
+ assert.match(src,/FI_GATEWAY_ALLOWED_CLIENT_IPS=\$Config\.iphonePeerIp/);
+ assert.doesNotMatch(src,/netbird\s+(?:up|down)/);
+});
