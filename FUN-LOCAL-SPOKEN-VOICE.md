@@ -100,6 +100,42 @@ Revoking deletes the local enrolled profile and reference; prior exported
 audio is not deleted automatically. Do not enroll third-party voices
 without explicit rights to reproduce them.
 
+## Experimental offline pitch correction (new; no cloning models)
+
+The `voice_lab tune` command detects voiced pitch with librosa YIN, maps each
+short block to the nearest note in a specified musical key and scale, and
+renders a corrected local WAV using `librosa.effects.pitch_shift` and
+overlap fades. This is **experimental audio processing**, not studio-quality
+Auto-Tune, formant-preserving singing synthesis, or real-time streaming.
+Transitions, consonants, and sustained vibrato can sound artificial.
+Spoken voices do not normally follow fixed musical notes.
+
+Use the **iPhone voice dashboard** branch for this feature. Setup in a
+separate directory; do not use the original spoken-voice branch clone:
+
+```powershell
+$src=Join-Path $env:USERPROFILE 'FunIndustrial-VoiceLab-Pitch';git clone --depth 1 --single-branch --branch feature/fun-iphone-voice-dashboard-20261108 https://github.com/chr1stopherwallace156-svg/for-fun-industrial-llc-.git $src;& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $src 'Setup-Fun-VoiceLab.ps1')
+```
+
+After your iPhone has explicitly recorded and uploaded a 2–30 second WAV to
+the existing private VoiceLab recordings directory, inspect and correct
+that exact chosen file (do not automatically choose a voice without review):
+
+```powershell
+$src=Join-Path $env:USERPROFILE 'FunIndustrial-VoiceLab-Pitch';$vp=Join-Path $env:LOCALAPPDATA 'FunIndustrial\VoiceLab\venv\Scripts\python.exe';Set-Location $src;& $vp -m voice_lab analyze 'C:\PATH\TO\YOUR-AUTHORIZED.wav';& $vp -m voice_lab tune 'C:\PATH\TO\YOUR-AUTHORIZED.wav' --key C --scale major --strength 0.8
+```
+
+`--key` accepts C/C#/D/.../B; `--scale` is chromatic, major, or
+minor; `--strength` is 0 to 1. Source files are never changed.
+Every export is a new WAV and JSON report under
+`%LOCALAPPDATA%\FunIndustrial\VoiceLab\exports`.
+Inputs are explicitly selected, short, authorized local recordings.
+No model weight downloads, always-listening microphone, network service,
+Cognee writes, REA execution, or Elektron/Ollama integration.
+Neural **voice replication** is separately handled by the optional
+OpenVoice V2 adapter, and still requires reviewed model checkpoints
+and explicit per-output operator consent.
+
 ## Optional speaker embeddings
 
 Run the installer again with \`-WithSpeakerComparison\`. It installs the
