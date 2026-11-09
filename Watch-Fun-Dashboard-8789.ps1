@@ -8,6 +8,8 @@ $PolicyFile=Join-Path $Auto "policy.json"
 $StatusFile=Join-Path $Auto "status.json"
 $mutex=[Threading.Mutex]::new($false,"Local\FunIndustrial-Dashboard8789-Autostart-v1")
 $owns=$false
+# Only this running supervisor may establish an additional trusted child PID.
+$script:spawnedDashboardPid=0
 
 function Write-Status([string]$state,[string]$reason){
  $data=[ordered]@{schema="fun.dashboard.autostart.status.v1";state=$state;reason=$reason;checkedUtc=[DateTime]::UtcNow.ToString("o")}
@@ -42,7 +44,21 @@ function Confirm-Owner([int]$id,$policy){
  if($proc.ProcessName -ne "node"){return "UNEXPECTED_DASHBOARD_OWNER_NAME"}
  $exe=[string]$proc.Path
  if([string]::IsNullOrWhiteSpace($exe) -and $cim){$exe=[string]$cim.ExecutablePath}
- if([string]::IsNullOrWhiteSpace($exe)){return "OWNER_EXECUTABLE_PATH_UNAVAILABLE"}
+ if([string]::IsNullOrWhiteSpace($exe)){
+  # The installer established the EXACT running PID after checking the
+  # executable's command line from the operator's own Windows session.
+  # The limited scheduled token can read neither CommandLine nor Path.
+  # Do not trust any other existing process on 8789; self-launched Node
+  # children are separately bound to the PID returned by Start-Process.
+  $operatorPin=[int]$policy.verifiedExistingPid
+  $trustedByOperator=$operatorPin -gt 0 -and $id -eq $operatorPin
+  $trustedBySupervisor=$script:spawnedDashboardPid -gt 0 -and $id -eq $script:spawnedDashboardPid
+  if(-not($trustedByOperator -or $trustedBySupervisor)){
+   return "OWNER_EXECUTABLE_PATH_UNAVAILABLE"
+  }
+  if(-not(Endpoint-Ready)){return "OWNER_DASHBOARD_ENDPOINTS_UNAVAILABLE"}
+  return "VERIFIED_PINNED_PROCESS_AND_ENDPOINTS"
+ }
  try{
   if(-not [string]::Equals([IO.Path]::GetFullPath($exe),
    [IO.Path]::GetFullPath([string]$policy.nodePath),
@@ -68,6 +84,7 @@ function Policy-Ready($p){
     $p.host -ne "127.0.0.1" -or [int]$p.port -ne 8789 -or
     [int]$p.computePort -ne 8791 -or
     [int]$p.memoryBudgetMs -lt 12000 -or [int]$p.memoryBudgetMs -gt 180000 -or
+    [int]$p.verifiedExistingPid -le 0 -or
     @($p.catalogueNames).Count -ne 229 -or
     @($p.allowedTools).Count -gt 229 -or
     $p.voiceHome -ne (Join-Path $env:LOCALAPPDATA "FunIndustrial\VoiceLab") -or
@@ -120,7 +137,10 @@ function Start-Dashboard($p){
   if($port.state -eq "conflict"){return "DASHBOARD_PORT_CONFLICT"}
   if($port.state -eq "existing"){
    if($port.pid -ne $child.Id){return "UNEXPECTED_DASHBOARD_PROCESS"}
-   if(Endpoint-Ready){return "DASHBOARD_AUTOSTART_PASS"}
+   if(Endpoint-Ready){
+    $script:spawnedDashboardPid=[int]$child.Id
+    return "DASHBOARD_AUTOSTART_PASS"
+   }
   }
  }
  return "DASHBOARD_NOT_READY"
