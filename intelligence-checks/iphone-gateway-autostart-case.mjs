@@ -4,8 +4,8 @@ import {readFileSync} from "node:fs";
 const load=name=>readFileSync(new URL("../"+name,import.meta.url),"utf8");
 test("autostart enrollment is explicitly opt-in, user-only, DPAPI-encrypted, not plaintext",()=>{
  const src=load("Enable-Fun-iPhone-Gateway-Autostart.ps1");
- assert.match(src,/Read-Host "Existing fiiphone password" -AsSecureString/);
- assert.match(src,/Read-Host "Confirm existing fiiphone password" -AsSecureString/);
+ assert.match(src,/Read-Host "fiiphone password for automatic gateway startup" -AsSecureString/);
+ assert.match(src,/Read-Host "Confirm fiiphone startup password" -AsSecureString/);
  assert.match(src,/ConvertFrom-SecureString/);
  assert.match(src,/ConvertTo-SecureString/);
  assert.match(src,/DPAPI_CURRENT_USER_ENCRYPTED/);
@@ -13,6 +13,11 @@ test("autostart enrollment is explicitly opt-in, user-only, DPAPI-encrypted, not
  assert.match(src,/New-ScheduledTaskTrigger -AtLogOn -User \$name/);
  assert.match(src,/New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew/);
  assert.match(src,/Start-ScheduledTask/);
+ assert.match(src,/GATEWAY_PORT_8443_CONFLICT_OR_WRONG_BIND/);
+ assert.match(src,/if\(\$existingGateway\)/);
+ assert.match(src,/GATEWAY_RECOVERED=TRUE/);
+ assert.match(src,/FI_GATEWAY_SUPERVISOR=WAITING/);
+ assert.doesNotMatch(src,/CURRENT_PRIVATE_GATEWAY_NOT_LISTENING/);
  assert.match(src,/FI_GATEWAY_OTHER_SERVICES=NOT_RESTARTED/);
  assert.match(src,/Stop-ScheduledTask -TaskName \$TaskName/);
  assert.doesNotMatch(src,/Set-Content.*password|password\s*=\s*"[^"]{24}/i);
