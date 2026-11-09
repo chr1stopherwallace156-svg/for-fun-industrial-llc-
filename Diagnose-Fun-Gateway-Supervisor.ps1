@@ -1,6 +1,6 @@
 # Isolated read-only test of the actual gateway supervisor in Task Scheduler.
 # Synthetic config and dummy files; no passwords and no service changes.
-[CmdletBinding()]param()
+[CmdletBinding()]param([switch]$NoScheduler)
 $ErrorActionPreference="Stop"
 $name="FunIndustrial-SupervisorInspect-"+[guid]::NewGuid().ToString("N").Substring(0,10)
 $root=Join-Path $env:TEMP $name
@@ -21,6 +21,20 @@ try {
  [IO.File]::WriteAllText((Join-Path $auto "Start-Fun-iPhone-HTTPS.ps1"),"#SYNTHETIC_NEVER_EXECUTED",[Text.UTF8Encoding]::new($false))
  $probe=[ordered]@{state="probe";reason="SYNTHETIC_PREEXISTING_FILE"}
  [IO.File]::WriteAllText((Join-Path $auto "supervisor-status.json"),($probe|ConvertTo-Json),[Text.UTF8Encoding]::new($false))
+ if($NoScheduler){
+  # CI can validate real Windows status overwrites without requiring Task
+  # Scheduler access on the hosted runner. This mode remains isolated.
+  $ps=(Get-Command powershell.exe -ErrorAction Stop).Source
+  $supervisor=Join-Path $auto "Watch-Fun-iPhone-HTTPS.ps1"
+  $messages=@(& $ps -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $supervisor -InspectOnce -DiagnosticBase $root 2>&1)
+  $code=$LASTEXITCODE
+  $st=Get-Content -LiteralPath (Join-Path $auto "supervisor-status.json") -Raw -ErrorAction Stop|ConvertFrom-Json
+  $state=[string]$st.state+":"+[string]$st.reason
+  $good=$code -eq 0 -and $state -in @("running:EXISTING_GATEWAY_PRESERVED","waiting:INSPECT_GATEWAY_STOPPED")
+  Write-Host ("FI_GATEWAY_SUPERVISOR_FOREGROUND_INSPECT="+$(if($good){"PASS"}else{"HOLD"})+
+   " EXIT="+$code+" STATUS="+$state+" LIVE_SERVICES_UNCHANGED=TRUE")
+  return
+ }
  $wrapper=@'
 $ErrorActionPreference="Stop"
 $root=$PSScriptRoot
