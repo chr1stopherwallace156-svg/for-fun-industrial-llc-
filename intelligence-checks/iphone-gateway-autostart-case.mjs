@@ -39,7 +39,9 @@ test("supervisor is single instance, fail-closed on identity, waits for private 
  assert.match(src,/System\.Threading\.Mutex/);
  assert.match(src,/WaitOne\(0\)/);
  assert.match(src,/FI_VOICE_MOBILE_UPLOAD_V1/);
- assert.match(src,/NETBIRD_IPHONE_PEER_UNAVAILABLE/);
+ assert.match(src,/NETBIRD_HOST_IP_UNAVAILABLE/);
+ assert.match(src,/return \$current -eq \$ip/);
+ assert.doesNotMatch(src,/NETBIRD_IPHONE_PEER_UNAVAILABLE/);
  assert.match(src,/Get-NetIPAddress/);
  assert.match(src,/100\.109\.4\.20/);
  assert.match(src,/100\.109\.87\.100/);
@@ -92,6 +94,30 @@ test("production fallback only accepts Node, missing command line, matching priv
  assert.match(attestor,/VPN client address not allowed/);
  assert.match(installer,/Copy-Item -LiteralPath \$SourceAttest -Destination \$AutoAttest/);
  assert.match(supervisor,/FI_GATEWAY_PRODUCTION_FORBIDS_TEST_ROOT/);
+});
+test("offline iPhone never blocks private NetBird host startup but remains the only authorized peer",()=>{
+ const supervisor=load("Watch-Fun-iPhone-HTTPS.ps1");
+ const launcher=load("Start-Fun-iPhone-HTTPS.ps1");
+ const gateway=load("src/gateway.mjs");
+ assert.match(supervisor,/NETBIRD_HOST_IP_UNAVAILABLE/);
+ assert.doesNotMatch(supervisor,/NetBirdReady \$g\.pcIp \$g\.iphonePeerIp/);
+ assert.doesNotMatch(launcher,/FI_GATEWAY_AUTHORIZED_IPHONE_PEER_NOT_CONNECTED/);
+ assert.match(launcher,/FI_GATEWAY_AUTHORIZED_IPHONE_PEER_CONFIG_HOLD/);
+ assert.match(launcher,/\$Config\.iphonePeerIp -ne "100\.109\.87\.100"/);
+ assert.match(gateway,/config\.allowed\.has\(ip\)/);
+ assert.match(gateway,/VPN client address not allowed/);
+});
+test("existing autostart updates scripts and optional current-user DPAPI without re-registering task or killing gateway",()=>{
+ const src=load("Update-Fun-iPhone-Gateway-Autostart.ps1");
+ assert.match(src,/param\(\[switch\]\$SyncCredential\)/);
+ assert.match(src,/TASK_UNCHANGED=TRUE/);
+ assert.match(src,/GATEWAY_PID_PRESERVED/);
+ assert.match(src,/NETBIRD_HOST_IP_UNAVAILABLE/);
+ assert.match(src,/ConvertFrom-SecureString/);
+ assert.match(src,/Read-Host "Enter SAME fiiphone password currently working in iPhone Safari" -AsSecureString/);
+ assert.match(src,/Get-FileHash/);
+ assert.match(src,/FI_GATEWAY_AUTOSTART_NEW_CODE=NEXT_WINDOWS_SIGNIN/);
+ assert.doesNotMatch(src,/Register-ScheduledTask|Unregister-ScheduledTask|Stop-ScheduledTask|Stop-Process|Stop-Computer|netbird\s+(?:up|down)/i);
 });
 test("gateway launcher keeps manual default and adds exact policy guarded DPAPI mode",()=>{
  const src=load("Start-Fun-iPhone-HTTPS.ps1");
