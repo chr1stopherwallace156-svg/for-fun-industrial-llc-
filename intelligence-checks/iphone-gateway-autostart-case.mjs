@@ -47,7 +47,9 @@ test("supervisor is single instance, fail-closed on identity, waits for private 
  assert.match(src,/EXISTING_GATEWAY_PRESERVED/);
  assert.match(src,/ProbeOnce/);
  assert.match(src,/FI_GATEWAY_SUPERVISOR_PROBE=PASS/);
- assert.match(src,/\[IO\.File\]::Replace\(\$tmp,\$StatusFile,\$null\)/);
+ assert.match(src,/\[IO\.File\]::WriteAllText\(\$StatusFile,/);
+ assert.doesNotMatch(src,/\[IO\.File\]::Replace\(/);
+ assert.match(src,/TYPE="\+\$kind/);
  assert.match(src,/FI_GATEWAY_SUPERVISOR_STATUS_WRITE_HOLD/);
   assert.match(src,/UseStoredCredential/);
  assert.match(src,/\$proc\.WaitForExit\(60000\)/);
