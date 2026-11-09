@@ -67,6 +67,21 @@ test("restricted scheduled task metadata must use exact executable and live loop
  assert.match(src,/Write-Status "hold" \$ownerState/);
  assert.doesNotMatch(src,/if\(-not\(Confirm-Owner \$port.pid\)\)/);
 });
+test("dashboard PID fallback is bounded by installation-verified process creation timestamp",()=>{
+ const installer=load("Enable-Fun-Dashboard-8789-Autostart.ps1");
+ const supervisor=load("Watch-Fun-Dashboard-8789.ps1");
+ assert.match(installer,/verifiedExistingPid=\$before;verifiedExistingStartUtcTicks=\$verifiedStartUtcTicks/);
+ assert.match(installer,/\$beforeProcess.StartTime.ToUniversalTime\(\).Ticks/);
+ assert.match(supervisor,/OWNER_START_TIME_UNAVAILABLE/);
+ assert.match(supervisor,/OWNER_PIN_OR_START_TIME_MISMATCH/);
+ assert.match(supervisor,/\$proc.StartTime.ToUniversalTime\(\).Ticks/);
+ assert.match(supervisor,/\$cim.CreationDate.ToUniversalTime\(\).Ticks/);
+ assert.match(supervisor,/\$actualStart -eq \$operatorStart/);
+ assert.match(supervisor,/\$actualStart -eq \$script:spawnedDashboardStartUtcTicks/);
+ assert.match(supervisor,/verifiedExistingStartUtcTicks -le 0/);
+ assert.match(supervisor,/\$script:spawnedDashboardPid=\[int\]\$child.Id/);
+ assert.doesNotMatch(supervisor,/\$trustedByOperator=\$operatorPin -gt 0 -and \$id -eq \$operatorPin\s*$/m);
+});
 test("full MCP catalogue and permission filtered REA exposure are separate, never auto-grant inventory",()=>{
  const install=load("Enable-Fun-Dashboard-8789-Autostart.ps1");
  const watch=load("Watch-Fun-Dashboard-8789.ps1");
