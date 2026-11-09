@@ -38,9 +38,12 @@ $nbExe=if($NB.Source){$NB.Source}else{$NB.FullName}
 $NBHost=((& $nbExe status --ipv4 2>$null|Out-String).Trim())
 if($NBHost -ne $Config.pcIp){throw "FI_GATEWAY_NETBIRD_HOST_IP_CHANGED"}
 if(-not(Get-NetIPAddress -IPAddress $Config.pcIp -AddressFamily IPv4 -ErrorAction SilentlyContinue)){throw "FI_GATEWAY_BIND_IP_NOT_ASSIGNED"}
-$peerRows=@(((& $nbExe status --table --filter-by-status connected 2>$null|Out-String) -split "\r?\n")|
- Where-Object{$_ -match ('^\s*\S+\s+'+[regex]::Escape($Config.iphonePeerIp)+'\s+Connected\b')})
-if($peerRows.Count -ne 1){throw "FI_GATEWAY_AUTHORIZED_IPHONE_PEER_NOT_CONNECTED"}
+# Starting the private gateway must not require the authorized iPhone to
+# already be online. The server enforces the immutable configured allowlist
+# on every incoming connection; do not widen it or bind to a public address.
+if($Config.iphonePeerIp -ne "100.109.87.100"){
+ throw "FI_GATEWAY_AUTHORIZED_IPHONE_PEER_CONFIG_HOLD"
+}
 $chain=((& $SSL verify -CAfile $Config.caPublicPem $Config.tlsCertificate 2>&1)|Out-String)
 if($LASTEXITCODE -ne 0 -or $chain -notmatch '\bOK\b'){throw "FI_GATEWAY_TLS_CHAIN_HOLD"}
 $callerOld=@{}
