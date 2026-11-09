@@ -23,7 +23,13 @@ test("autostart enrollment is explicitly opt-in, user-only, DPAPI-encrypted, not
  assert.match(src,/GATEWAY_RECOVERED=TRUE/);
  assert.match(src,/FI_GATEWAY_SUPERVISOR=WAITING/);
  assert.doesNotMatch(src,/CURRENT_PRIVATE_GATEWAY_NOT_LISTENING/);
- assert.match(src,/FI_GATEWAY_OTHER_SERVICES=NOT_RESTARTED/);
+ assert.match(src,/SUPERVISOR_FOREGROUND_PROBE_FAILED_EXIT_/);
+ assert.match(src,/FI_GATEWAY_SUPERVISOR_FOREGROUND_PROBE=PASS/);
+ assert.match(src,/FI_GATEWAY_AUTOSTART_SETUP=PASS_REGISTERED_PENDING_SIGNIN/);
+ assert.match(src,/FI_GATEWAY_AUTOSTART_PENDING_DESKTOP_SIGNIN/);
+ assert.match(src,/Start-ScheduledTask -TaskName \$TaskName/);
+ assert.doesNotMatch(src,/Hold \("SUPERVISOR_INITIAL_STATUS_NOT_CONFIRMED/);
+  assert.match(src,/FI_GATEWAY_OTHER_SERVICES=NOT_RESTARTED/);
  assert.match(src,/Stop-ScheduledTask -TaskName \$TaskName/);
  assert.doesNotMatch(src,/Set-Content.*password|password\s*=\s*"[^"]{24}/i);
  assert.doesNotMatch(src,/Stop-Process -Id|netbird\s+up|netbird\s+down|Stop-Computer/);
@@ -39,7 +45,11 @@ test("supervisor is single instance, fail-closed on identity, waits for private 
  assert.match(src,/100\.109\.87\.100/);
  assert.match(src,/PORT_CONFLICT_OR_WRONG_BIND/);
  assert.match(src,/EXISTING_GATEWAY_PRESERVED/);
- assert.match(src,/UseStoredCredential/);
+ assert.match(src,/ProbeOnce/);
+ assert.match(src,/FI_GATEWAY_SUPERVISOR_PROBE=PASS/);
+ assert.match(src,/\[IO\.File\]::Replace\(\$tmp,\$StatusFile,\$null\)/);
+ assert.match(src,/FI_GATEWAY_SUPERVISOR_STATUS_WRITE_HOLD/);
+  assert.match(src,/UseStoredCredential/);
  assert.match(src,/\$proc\.WaitForExit\(60000\)/);
  assert.match(src,/Stop-Process -Id \$proc\.Id/);
  assert.doesNotMatch(src,/Remove-Item .*gateway-password|netbird\s+(?:up|down)|Stop-Process -Id \$gateway/);
