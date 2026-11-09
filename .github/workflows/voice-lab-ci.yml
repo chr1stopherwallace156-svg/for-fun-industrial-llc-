@@ -1,0 +1,36 @@
+name: Fun Industrial Local Spoken Voice — synthetic CPU qualification
+on:
+  push:
+    branches:
+      - feature/fun-local-spoken-voice-20261108
+    paths:
+      - "voice_lab/**"
+      - "tests/test_voice_lab.py"
+      - "requirements-voice.txt"
+      - ".github/workflows/voice-lab-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  voice-lab-synthetic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install only CPU acoustic analysis packages
+        run: python -m pip install --disable-pip-version-check -r requirements-voice.txt
+      - name: Python source compilation
+        run: python -m compileall -q voice_lab tests/test_voice_lab.py
+      - name: Run offline synthetic audio and consent tests
+        env:
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
+        run: python -m unittest discover -s tests -p test_voice_lab.py -v
+      - name: Status must not start a server or download models
+        run: python -m voice_lab status
