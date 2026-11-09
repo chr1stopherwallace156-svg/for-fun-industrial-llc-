@@ -12,6 +12,7 @@ $Module=Join-Path $Root "src\intelligence\automatic-memory.mjs"
 $SourceModule=Join-Path $Src "src\intelligence\automatic-memory.mjs"
 $Patcher=Join-Path $Src "scripts\patch-automatic-memory.mjs"
 $Test=Join-Path $Src "intelligence-checks\automatic-memory-case.mjs"
+$Recovery=Join-Path $Src "Recover-Fun-Compute.ps1"
 $Backup=Join-Path $env:LOCALAPPDATA ("FunIndustrial\AutoMemoryDeployBackups\"+(Get-Date -Format "yyyyMMdd-HHmmss")+"-"+[guid]::NewGuid().ToString("N").Substring(0,8))
 $node=(Get-Command node.exe -ErrorAction Stop).Source
 $changed=$false;$stopped=$false;$newUI=$null;$oldTools=@();$original=$null;$oldAutonomy=$null;$step="not_started"
@@ -25,6 +26,13 @@ function CheckCompute(){
 }
 
 function Okay([string]$label){if($LASTEXITCODE -ne 0){throw "$label EXIT=$LASTEXITCODE"}}
+function RecoverCompute(){
+ Write-Warning "AUTO_MEMORY_COMPUTE_UNAVAILABLE PORT=$ComputePort; attempting isolated compute recovery"
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Recovery
+ Okay "AUTO_MEMORY_COMPUTE_RECOVERY_FAILED"
+ if(-not(CheckCompute)){throw "AUTO_MEMORY_RECOVERY_UNHEALTHY_PORT=$ComputePort"}
+ Write-Host "AUTO_MEMORY_COMPUTE_RECOVERY=PASS PORT=$ComputePort"
+}
 function Listener(){
  $list=@(Get-NetTCPConnection -LocalPort 8789 -State Listen -ErrorAction SilentlyContinue|Where-Object {$_.LocalAddress -eq "127.0.0.1"})
  if($list.Count -ne 1){throw "AUTO_MEMORY_LISTENER_HOLD COUNT=$($list.Count)"}
@@ -61,7 +69,7 @@ function Ready([System.Diagnostics.Process]$p,[bool]$requireAuto){
  }
  return $false
 }
-foreach($f in @($Server,$SourceModule,$Patcher,$Test,(Join-Path $Root "src\intelligence\memory.mjs"))){
+foreach($f in @($Server,$SourceModule,$Patcher,$Test,$Recovery,(Join-Path $Root "src\intelligence\memory.mjs"))){
  if(-not(Test-Path -LiteralPath $f -PathType Leaf)){throw "AUTO_MEMORY_REQUIRED_FILE_HOLD=$f"}
 }
 if(Test-Path -LiteralPath $Module){throw "AUTO_MEMORY_MODULE_ALREADY_EXISTS_HOLD"}
@@ -128,6 +136,11 @@ try{
  if(-not(Ready $newUI $true)){throw "AUTO_MEMORY_DASHBOARD_STARTUP_HOLD"}
  Write-Host "AUTO_MEMORY_STAGE=dashboard_ready"
  $step="compute_ready_after_restart"
+ if(-not(CheckCompute)){
+  $step="recover_compute_after_restart"
+  RecoverCompute
+ }
+ $step="verify_recovered_compute"
  $computeReady=$false
  for($i=0;$i -lt 45;$i++){
   if(CheckCompute){
@@ -197,6 +210,10 @@ try{
    $restore=StartDashboard (Join-Path $Backup "rollback.stdout.log") (Join-Path $Backup "rollback.stderr.log")
    if(Ready $restore $false){
     Write-Warning "PREVIOUS_DASHBOARD_RESTART=PASS PID=$($restore.Id)"
+    if(-not(CheckCompute)){
+     try{RecoverCompute}catch{Write-Warning "ROLLBACK_COMPUTE_RECOVERY_HOLD=$($_.Exception.Message)"}
+    }
+    if(CheckCompute){Write-Warning "ROLLBACK_COMPUTE_HEALTH=PASS PORT=$ComputePort"}
     try{
      $re=Invoke-RestMethod "$Base/api/rea/start" -Method POST -Body "{}" -ContentType "application/json" -TimeoutSec 120 -ErrorAction Stop
      $count=@((Invoke-RestMethod "$Base/api/rea/tools" -TimeoutSec 45 -ErrorAction Stop).tools).Count
