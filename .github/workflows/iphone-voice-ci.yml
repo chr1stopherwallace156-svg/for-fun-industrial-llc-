@@ -23,6 +23,9 @@ on:
       - "Watch-Fun-iPhone-HTTPS.ps1"
       - "Enable-Fun-iPhone-Gateway-Autostart.ps1"
       - "Update-Fun-iPhone-Gateway-Autostart.ps1"
+      - "Enable-Fun-Dashboard-8789-Autostart.ps1"
+      - "Watch-Fun-Dashboard-8789.ps1"
+      - "intelligence-checks/dashboard-8789-autostart-case.mjs"
       - "Diagnose-Fun-Gateway-Scheduler.ps1"
       - "Diagnose-Fun-Gateway-Supervisor.ps1"
       - "intelligence-checks/iphone-gateway-autostart-case.mjs"
@@ -61,7 +64,7 @@ jobs:
         run: |
           python -m py_compile src/voice/transcribe.py src/voice/setup-whisper-model.py
       - name: Synthetic WAV format, upload, security and dashboard-preservation tests
-        run: node --test intelligence-checks/iphone-voice-case.mjs intelligence-checks/iphone-safari-pcm-case.mjs intelligence-checks/iphone-conversation-case.mjs intelligence-checks/iphone-gateway-autostart-case.mjs
+        run: node --test intelligence-checks/iphone-voice-case.mjs intelligence-checks/iphone-safari-pcm-case.mjs intelligence-checks/iphone-conversation-case.mjs intelligence-checks/iphone-gateway-autostart-case.mjs intelligence-checks/dashboard-8789-autostart-case.mjs
 
   powershell-parse:
     runs-on: windows-latest
@@ -82,7 +85,7 @@ jobs:
       - name: Parse deployment and compute recovery scripts without executing them
         shell: pwsh
         run: |
-          foreach ($name in @('Activate-Fun-iPhone-Voice.ps1', 'Recover-Fun-Compute.ps1', 'Diagnose-Fun-iPhone-HTTPS.ps1', 'Prepare-Fun-iPhone-HTTPS.ps1', 'Start-Fun-iPhone-HTTPS.ps1', 'Repair-Fun-iPhone-Safari-Recorder.ps1', 'Setup-Fun-Voice-Conversation.ps1', 'Watch-Fun-iPhone-HTTPS.ps1', 'Enable-Fun-iPhone-Gateway-Autostart.ps1', 'Update-Fun-iPhone-Gateway-Autostart.ps1', 'Diagnose-Fun-Gateway-Scheduler.ps1', 'Diagnose-Fun-Gateway-Supervisor.ps1', 'src/voice/gateway-port-state.ps1', 'intelligence-checks/iphone-gateway-port-case.ps1')) {
+          foreach ($name in @('Activate-Fun-iPhone-Voice.ps1', 'Recover-Fun-Compute.ps1', 'Diagnose-Fun-iPhone-HTTPS.ps1', 'Prepare-Fun-iPhone-HTTPS.ps1', 'Start-Fun-iPhone-HTTPS.ps1', 'Repair-Fun-iPhone-Safari-Recorder.ps1', 'Setup-Fun-Voice-Conversation.ps1', 'Watch-Fun-iPhone-HTTPS.ps1', 'Enable-Fun-iPhone-Gateway-Autostart.ps1', 'Update-Fun-iPhone-Gateway-Autostart.ps1', 'Enable-Fun-Dashboard-8789-Autostart.ps1', 'Watch-Fun-Dashboard-8789.ps1', 'Diagnose-Fun-Gateway-Scheduler.ps1', 'Diagnose-Fun-Gateway-Supervisor.ps1', 'src/voice/gateway-port-state.ps1', 'intelligence-checks/iphone-gateway-port-case.ps1')) {
             $tokens = $null
             $parseErrors = $null
             [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $name), [ref]$tokens, [ref]$parseErrors) | Out-Null
