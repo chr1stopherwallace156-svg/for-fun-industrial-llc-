@@ -105,6 +105,41 @@ class OfflineOptimizationTests(unittest.TestCase):
             file.write_text(json.dumps(DEMO_ROUTE), encoding="utf-8")
             self.assertEqual(parse_json_file(str(file))["depot"], 0)
 
+    def test_stdin_bridge_returns_sanitized_allocation_result(self):
+        import subprocess
+        import sys
+        problem = {"action": "allocation", "problem": DEMO_ALLOCATION}
+        run = subprocess.run(
+            [sys.executable, "-m", "fun_optimization.bridge"],
+            input=json.dumps(problem), capture_output=True, text=True,
+            timeout=15,
+        )
+        self.assertEqual(run.returncode, 0, run.stderr)
+        output = json.loads(run.stdout)
+        self.assertEqual(output["schema"], "fun.optimization.result.v1")
+        self.assertEqual(output["action"], "allocation")
+        self.assertTrue(output["result"]["optimality_proven"])
+        self.assertEqual(output["rea_tools_executed"], 0)
+        self.assertEqual(output["external_actions_executed"], 0)
+
+    def test_stdin_bridge_rejects_tool_calls_and_extra_fields(self):
+        import subprocess
+        import sys
+        for invalid in (
+            {"action": "shell", "problem": {"cmd": "whoami"}},
+            {"action": "allocation", "problem": DEMO_ALLOCATION, "execute": True},
+            {"action": "allocation", "problem": {"budget": 10, "labor_capacity": 10, "projects": [], "shell": "cmd"}},
+        ):
+            with self.subTest(invalid=invalid):
+                run = subprocess.run(
+                    [sys.executable, "-m", "fun_optimization.bridge"],
+                    input=json.dumps(invalid), capture_output=True, text=True,
+                    timeout=15,
+                )
+                self.assertNotEqual(run.returncode, 0)
+                self.assertEqual(run.stdout.strip(), "")
+                self.assertIn("FUN_OPTIMIZATION_BRIDGE_HOLD", run.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
