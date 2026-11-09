@@ -9,6 +9,12 @@ on:
       - "scripts/check-iphone-voice-live.mjs"
       - "intelligence-checks/iphone-voice-case.mjs"
       - "intelligence-checks/iphone-safari-pcm-case.mjs"
+      - "intelligence-checks/iphone-conversation-case.mjs"
+      - "scripts/patch-iphone-conversation.mjs"
+      - "Setup-Fun-Voice-Conversation.ps1"
+      - "src/voice/conversation.mjs"
+      - "src/voice/conversation-client.js"
+      - "src/voice/transcribe.py"
       - "Activate-Fun-iPhone-Voice.ps1"
       - "Prepare-Fun-iPhone-HTTPS.ps1"
       - "Repair-Fun-iPhone-Safari-Recorder.ps1"
@@ -33,12 +39,15 @@ jobs:
         run: |
           node --check src/voice/mobile-upload.mjs
           node --check src/voice/mobile-client.js
+          node --check src/voice/conversation.mjs
+          node --check src/voice/conversation-client.js
+          node --check scripts/patch-iphone-conversation.mjs
           node --check scripts/patch-iphone-voice-dashboard.mjs
           node --check scripts/check-iphone-voice-live.mjs
           node --check src/voice/private-gateway-entry.mjs
           node --check src/voice/private-gateway-selftest.mjs
       - name: Synthetic WAV format, upload, security and dashboard-preservation tests
-        run: node --test intelligence-checks/iphone-voice-case.mjs intelligence-checks/iphone-safari-pcm-case.mjs
+        run: node --test intelligence-checks/iphone-voice-case.mjs intelligence-checks/iphone-safari-pcm-case.mjs intelligence-checks/iphone-conversation-case.mjs
 
   powershell-parse:
     runs-on: windows-latest
