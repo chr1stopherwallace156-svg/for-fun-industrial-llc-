@@ -123,3 +123,19 @@ test("deployment recovers compute after restart without invoking model stop",()=
  assert.match(recovery,/EXISTING_LLAMA_8088_NOT_LISTENING/);
  assert.doesNotMatch(recovery,/\/admin\/shutdown|\/ai\/runtime\/llama-cpp\/stop/);
 });
+
+test("deployment calibrates Cognee latency before touching the dashboard",()=>{
+ const script=readFileSync(new URL("../Activate-Fun-Automatic-Memory.ps1",import.meta.url),"utf8");
+ const patcher=readFileSync(new URL("../scripts/patch-automatic-memory.mjs",import.meta.url),"utf8");
+ const src=readFileSync(new URL("../src/intelligence/automatic-memory.mjs",import.meta.url),"utf8");
+ const timing=script.indexOf("AUTO_MEMORY_RECALL_PREFLIGHT=PASS");
+ const firstMutation=script.indexOf(' $changed=$true');
+ assert.ok(timing>0 && firstMutation>timing);
+ assert.match(script,/AUTO_MEMORY_COGNEE_RECALL_PREFLIGHT_HOLD/);
+ assert.match(script,/AUTO_MEMORY_COGNEE_LATENCY_HOLD/);
+ assert.match(script,/COGNEE_BUDGET_MS=\$CogneeBudgetMs/);
+ assert.match(script,/FI_COGNEE_RECALL_BUDGET_MS=\[string\]\$CogneeBudgetMs/);
+ assert.match(patcher,/FI_COGNEE_RECALL_BUDGET_MS/);
+ assert.match(src,/budgetMs>180000/);
+ assert.doesNotMatch(patcher,/budgetMs:12000/);
+});
