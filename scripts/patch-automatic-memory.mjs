@@ -21,7 +21,7 @@ export function patchAutomaticMemory(source){
   'import {createAutomaticMemoryDecorator} from "./intelligence/automatic-memory.mjs";');
  const server='const server=http.createServer(async(req,res)=>{try{';
  s=once(s,server,
-  'const fiAutomaticMemory=createAutomaticMemoryDecorator(query=>memoryAction("recall",{query}),{budgetMs:12000});\n'+
+  'const fiAutomaticMemory=createAutomaticMemoryDecorator(query=>memoryAction("recall",{query}),{budgetMs:Math.max(15000,Math.min(180000,Number(process.env.FI_COGNEE_RECALL_BUDGET_MS)||90000))});\n'+
   server);
  const route=' if(aiRoutes[req.url]&&req.method===aiRoutes[req.url].method){';
  const patch=[
