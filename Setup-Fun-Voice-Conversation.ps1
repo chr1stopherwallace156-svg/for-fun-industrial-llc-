@@ -29,6 +29,18 @@ $changed=$false;$stopped=$false;$started=$null;$oldUi=$null
 $stage="preflight";$oldTools=@();$memoryBudget=0
 function Fail([string]$reason){throw "FI_VOICE_CONVERSATION_HOLD STAGE=$stage REASON=$reason"}
 function Check([string]$name){if($LASTEXITCODE -ne 0){Fail ("$name EXIT="+$LASTEXITCODE)}}
+# Windows PowerShell 5.1 can treat harmless pip/Whisper progress on stderr
+# as a fatal NativeCommandError. Keep exit codes authoritative.
+function RunNative([string]$exe,[string]$phase,[string[]]$items){
+ $oldPreference=$ErrorActionPreference
+ $nativeExit=$null
+ try{
+  $ErrorActionPreference="Continue"
+  & $exe @items
+  $nativeExit=$LASTEXITCODE
+ }finally{$ErrorActionPreference=$oldPreference}
+ if($nativeExit -ne 0){Fail ("$phase EXIT="+$nativeExit)}
+}
 function PortPid([int]$port,[string]$ip){
  $listeners=@(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
   Where-Object{$_.LocalAddress -eq $ip})
@@ -123,25 +135,23 @@ if(Test-Path -LiteralPath $ConvHome){
 }
 New-Item -ItemType Directory -Path $ConvHome,$Models -Force|Out-Null
 if(-not(Test-Path -LiteralPath $Py -PathType Leaf)){
- & $Boot -m venv $Venv;Check "CREATE_SEPARATE_STT_VENV"
+ RunNative $Boot "CREATE_SEPARATE_STT_VENV" @("-m","venv",$Venv)
 }
-& $Py -m pip install --disable-pip-version-check --no-input "faster-whisper==1.2.1"
-Check "INSTALL_LOCAL_CPU_STT"
+RunNative $Py "INSTALL_LOCAL_CPU_STT" @("-m","pip","install","--disable-pip-version-check","--no-input","faster-whisper==1.2.1")
 # This one-time step downloads the tiny.en model into a bounded local folder.
 # All transcript requests later use the installed directory with offline mode.
 $env:HF_HUB_DISABLE_TELEMETRY="1";$env:HF_HUB_DISABLE_PROGRESS_BARS="1"
-& $Py -c 'from faster_whisper.utils import download_model;import sys;download_model("tiny.en",output_dir=sys.argv[1]);print("FI_STT_MODEL_DOWNLOADED=PASS")' $Models
-Check "DOWNLOAD_STT_MODEL"
+$env:HF_HUB_OFFLINE="0"
+RunNative $Py "DOWNLOAD_STT_MODEL" @("-c",'from faster_whisper.utils import download_model;import sys;download_model("tiny.en",output_dir=sys.argv[1]);print("FI_STT_MODEL_DOWNLOADED=PASS")',$Models)
 foreach($file in @("model.bin","config.json","tokenizer.json")){
  if(-not(Test-Path -LiteralPath (Join-Path $Models $file) -PathType Leaf)){
   Fail "STT_MODEL_FILE_MISSING=$file"
  }
 }
 $env:HF_HUB_OFFLINE="1"
-& $Py -c 'import sys;from faster_whisper import WhisperModel;WhisperModel(sys.argv[1],device="cpu",compute_type="int8",local_files_only=True);print("FI_STT_OFFLINE_MODEL_LOAD=PASS")' $Models
-Check "STT_OFFLINE_MODEL_LOAD"
+RunNative $Py "STT_OFFLINE_MODEL_LOAD" @("-c",'import sys;from faster_whisper import WhisperModel;WhisperModel(sys.argv[1],device="cpu",compute_type="int8",local_files_only=True);print("FI_STT_OFFLINE_MODEL_LOAD=PASS")',$Models)
 Copy-Item -LiteralPath $SttSource -Destination $Transcript -ErrorAction Stop
-& $Py -m py_compile $Transcript;Check "STT_PYTHON_SYNTAX"
+RunNative $Py "STT_PYTHON_SYNTAX" @("-m","py_compile",$Transcript)
 Write-Host "FI_VOICE_STT_PREPARED=PASS MODEL=tiny.en LOCAL_ONLY=TRUE PYTHON_ISOLATED=TRUE"
 $stage="stage_dashboard"
 New-Item -ItemType Directory -Path $Backup -Force|Out-Null
