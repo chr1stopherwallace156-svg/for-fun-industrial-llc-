@@ -55,7 +55,9 @@ foreach($p in @($S,$H,$SM,$SC,$Panel,$Patch,$Test,$Probe,$Recovery,(Join-Path $V
 foreach($p in @($TM,$TC,$Flag)){if(Test-Path -LiteralPath $p){throw "FI_VOICE_EXISTING_DEPLOYMENT_HOLD=$p"}}
 $txt=[IO.File]::ReadAllText($S);$html=[IO.File]::ReadAllText($H)
 if(-not $txt.Contains("FI_AUTO_COGNEE_CHAT_V1") -or -not $txt.Contains("FI_SOURCING_RETIRED_V1") -or $txt.Contains("FI_VOICE_MOBILE_DASHBOARD_V1")){throw "FI_VOICE_SERVER_BASELINE_HOLD"}
-if(-not $html.Contains('id="chat-input"') -or $html.Contains("FI_VOICE_MOBILE_PANEL_V1")){throw "FI_VOICE_UI_BASELINE_HOLD"}
+if($html.Contains("FI_VOICE_MOBILE_PANEL_V1")){throw "FI_VOICE_UI_ALREADY_PATCHED_HOLD"}
+if(-not($html -match '(?is)<body(?:\s[^>]*)?>') -or -not($html -match '(?is)</body\s*>')){throw "FI_VOICE_UI_BODY_ANCHOR_HOLD"}
+Write-Host "FI_VOICE_UI_COMPATIBILITY=PASS MODE=ADDITIVE BODY_ANCHOR=FOUND CHAT_INPUT_NOT_REQUIRED"
 $old=Listener
 $m=Invoke-RestMethod "$B/api/ai/automatic-memory/status" -TimeoutSec 15 -ErrorAction Stop
 if($m.mode -ne "automatic_contextual_read_only" -or $m.enabledByDefault -ne $true -or $m.memoryAvailable -ne $true){throw "FI_VOICE_AUTOMATIC_MEMORY_PRECHECK_HOLD"}
