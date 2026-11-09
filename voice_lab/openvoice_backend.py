@@ -17,6 +17,22 @@ from pathlib import Path
 from .profiles import home, load_authorized
 
 
+_EXPECTED_SHA256 = {
+    "converter": "9652c27e92b6b2a91632590ac9962ef7ae2b712e5c5b7f4c34ec55ee2b37ab9e",
+    "speaker_en_newest": "6a3798229b1114f0e9cc137b33211809def7dda5a8a9398d5a112c0b42699177",
+    "melo_en_newest": "959433dc1c6df618922560b4b7bc8c7af0a4b7ceaea267480c5d9ae8a3cfe536",
+}
+
+
+def _assert_pinned_hash(file: Path, expected: str) -> None:
+    checksum = hashlib.sha256()
+    with file.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            checksum.update(chunk)
+    if checksum.hexdigest() != expected:
+        raise RuntimeError("VOICE_MODEL_CHECKPOINT_SHA256_MISMATCH")
+
+
 def _check_local_assets():
     raw = os.environ.get("FUN_VOICE_OPENVOICE_CHECKPOINTS", "")
     if not raw:
@@ -27,8 +43,8 @@ def _check_local_assets():
     for file in (converter / "config.json", converter / "checkpoint.pth"):
         if not file.is_file():
             raise FileNotFoundError("VOICE_OPENVOICE_CHECKPOINT_MISSING: " + str(file))
-    if not base.is_dir() or not list(base.glob("*.pth")):
-        raise FileNotFoundError("VOICE_OPENVOICE_SOURCE_SPEAKER_CHECKPOINTS_MISSING")
+    if not (base / "en-newest.pth").is_file():
+        raise FileNotFoundError("VOICE_OPENVOICE_EN_NEWEST_SPEAKER_CHECKPOINT_MISSING")
     raw_melo = os.environ.get("FUN_VOICE_MELO_EN_NEWEST_HOME", "")
     if not raw_melo:
         raise RuntimeError("VOICE_MELO_MODEL_NOT_CONFIGURED: set FUN_VOICE_MELO_EN_NEWEST_HOME")
@@ -36,6 +52,9 @@ def _check_local_assets():
     for file in (melo_home / "config.json", melo_home / "checkpoint.pth"):
         if not file.is_file() or file.stat().st_size < 100:
             raise FileNotFoundError("VOICE_MELO_LOCAL_CHECKPOINT_MISSING: " + str(file))
+    _assert_pinned_hash(converter / "checkpoint.pth", _EXPECTED_SHA256["converter"])
+    _assert_pinned_hash(base / "en-newest.pth", _EXPECTED_SHA256["speaker_en_newest"])
+    _assert_pinned_hash(melo_home / "checkpoint.pth", _EXPECTED_SHA256["melo_en_newest"])
     return converter, base, melo_home
 
 
@@ -102,15 +121,11 @@ def synthesize(speaker_id: str, text: str, *, attestation: str, speed: float = 1
     finally:
         melo_api.load_or_download_model = previous_loader
     speakers = synthesizer.hps.data.spk2id
-    chosen = None
-    for name, idx in speakers.items():
-        candidate = base_ses_path / (name.lower().replace("_", "-") + ".pth")
-        if candidate.is_file():
-            chosen = (name, idx, candidate)
-            break
-    if chosen is None:
+    if "EN-Newest" not in speakers:
         raise RuntimeError("VOICE_BASE_SPEAKER_MISMATCH")
-    name, speaker_idx, source_embedding_path = chosen
+    name = "EN-Newest"
+    speaker_idx = speakers[name]
+    source_embedding_path = base_ses_path / "en-newest.pth"
     # Only weights-only loading; incompatible assets fail closed.
     source_embedding = torch.load(str(source_embedding_path), map_location=device, weights_only=True)
     dest = home() / "exports"
