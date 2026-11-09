@@ -183,6 +183,7 @@ try{
   Start-Sleep -Milliseconds 500
   if(Test-Path -LiteralPath $StatusFile -PathType Leaf){
    try{$status=Get-Content -LiteralPath $StatusFile -Raw|ConvertFrom-Json}catch{continue}
+   if($existingGateway -and $status.state -eq "hold"){$seen=$true;break}
    if($existingGateway -and $status.state -eq "running" -and
        $status.reason -eq "EXISTING_GATEWAY_PRESERVED"){$seen=$true;break}
    if(-not $existingGateway -and $status.state -in @("running","waiting","hold")){
@@ -190,7 +191,10 @@ try{
    }
   }
  }
- if(-not $seen){Hold "SUPERVISOR_INITIAL_STATUS_NOT_CONFIRMED"}
+ if(-not $seen){
+  $summary=if($status){[string]$status.state+":"+[string]$status.reason}else{"STATUS_MISSING"}
+  Hold ("SUPERVISOR_INITIAL_STATUS_NOT_CONFIRMED_"+$summary)
+ }
  if($status.state -eq "hold"){Hold ("SUPERVISOR_REPORTED_"+$status.reason)}
  $afterSnapshot=@(Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue)
  $afterState=Get-FunPrivateGatewayPortState -Listeners $afterSnapshot -ExpectedIp $cfg.pcIp
@@ -217,6 +221,25 @@ try{
  Write-Host "FI_GATEWAY_OTHER_SERVICES=NOT_RESTARTED"
 }catch{
  $reason=$_.Exception.Message
+ # Capture only nonsecret task state and supervisor status BEFORE rollback.
+ # Do not log credentials, raw task arguments, environment variables, or keys.
+ $statusCode="STATUS_NOT_WRITTEN"
+ try{
+  if(Test-Path -LiteralPath $StatusFile -PathType Leaf){
+   $last=Get-Content -LiteralPath $StatusFile -Raw -ErrorAction Stop|ConvertFrom-Json
+   $statusCode=[string]$last.state+":"+[string]$last.reason
+  }
+ }catch{$statusCode="STATUS_NOT_READABLE"}
+ $taskState="TASK_NOT_FOUND";$lastResult="NONE"
+ try{
+  $current=Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+  if($current){
+   $taskState=[string]$current.State
+   $taskInfo=Get-ScheduledTaskInfo -TaskName $TaskName -ErrorAction SilentlyContinue
+   if($taskInfo){$lastResult=[string]$taskInfo.LastTaskResult}
+  }
+ }catch{$taskState="TASK_DIAGNOSTIC_UNAVAILABLE"}
+ Write-Warning ("FI_GATEWAY_AUTOSTART_DIAG STATUS="+$statusCode+" TASK_STATE="+$taskState+" LAST_TASK_RESULT="+$lastResult)
  if($registered){
   try{
    Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
