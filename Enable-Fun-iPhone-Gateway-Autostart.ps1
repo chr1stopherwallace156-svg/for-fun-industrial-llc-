@@ -83,12 +83,31 @@ if($existingGateway){
   Hold "UNEXPECTED_PROCESS_OWNS_GATEWAY_PORT"
  }
 }
-$dashboard=Listener 8789 "127.0.0.1"
-if($dashboard.Count -ne 1){Hold "DASHBOARD_8789_NOT_LISTENING"}
-try{$voice=Invoke-RestMethod "http://127.0.0.1:8789/api/voice/mobile/status" -TimeoutSec 10 -ErrorAction Stop}
-catch{Hold "DASHBOARD_VOICE_ENDPOINT_UNAVAILABLE"}
-if($voice.enabled -ne $true -or $voice.code -ne "FI_VOICE_MOBILE_UPLOAD_V1"){
- Hold "DASHBOARD_VOICE_UPLOAD_NOT_READY"
+# The dashboard is a RUNTIME prerequisite, not an ENROLLMENT prerequisite.
+# A missing 8789 listener is safe: register the task and let the supervisor
+# wait until Fun Industrial starts. Refuse unexpected listeners/bindings.
+$dashboardSnapshot=@(Get-NetTCPConnection -LocalPort 8789 -State Listen -ErrorAction SilentlyContinue)
+$dashboardLocal=@($dashboardSnapshot|Where-Object{$_.LocalAddress -eq "127.0.0.1"})
+$dashboardReady=$false
+if($dashboardSnapshot.Count -eq 0){
+ Write-Host "FI_GATEWAY_DASHBOARD_PREFLIGHT=WAITING REASON=DASHBOARD_8789_NOT_LISTENING"
+}elseif($dashboardSnapshot.Count -ne 1 -or $dashboardLocal.Count -ne 1){
+ Hold "DASHBOARD_8789_UNEXPECTED_BIND_OR_CONFLICT"
+}else{
+ $dashboardProcess=Get-CimInstance Win32_Process -Filter ("ProcessId="+[int]$dashboardLocal[0].OwningProcess) -ErrorAction Stop
+ if(-not $dashboardProcess -or $dashboardProcess.Name -ne "node.exe" -or
+    $dashboardProcess.CommandLine -notmatch 'src[/\\]server\.mjs'){
+  Hold "DASHBOARD_8789_PROCESS_IDENTITY_HOLD"
+ }
+ try{$voice=Invoke-RestMethod "http://127.0.0.1:8789/api/voice/mobile/status" -TimeoutSec 10 -ErrorAction Stop}
+ catch{$voice=$null}
+ if($voice -and $voice.code -ne "FI_VOICE_MOBILE_UPLOAD_V1"){Hold "DASHBOARD_VOICE_ENDPOINT_UNEXPECTED"}
+ if($voice -and $voice.enabled -eq $true){
+  $dashboardReady=$true
+  Write-Host "FI_GATEWAY_DASHBOARD_PREFLIGHT=PASS PORT=8789"
+ }else{
+  Write-Host "FI_GATEWAY_DASHBOARD_PREFLIGHT=WAITING REASON=VOICE_ENDPOINT_NOT_READY"
+ }
 }
 # Password can never be retrieved from a running gateway. If it is already
 # running, require its SAME password. If it is stopped, this password becomes
