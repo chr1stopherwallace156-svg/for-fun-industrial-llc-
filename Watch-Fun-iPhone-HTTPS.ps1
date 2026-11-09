@@ -22,8 +22,19 @@ function Status([string]$state,[string]$code){
  $tmp=Join-Path $Auto ("status-"+[guid]::NewGuid().ToString("N")+".tmp")
  try{
   [IO.File]::WriteAllText($tmp,($log|ConvertTo-Json -Compress),[Text.UTF8Encoding]::new($false))
-  Move-Item -LiteralPath $tmp -Destination $StatusFile -Force -ErrorAction Stop
- }catch{Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue}
+  # Use atomic replacement, including after the one-shot probe has already
+  # created a status file. Move-Item -Force may not reliably replace a file
+  # in every Windows PowerShell context.
+  if(Test-Path -LiteralPath $StatusFile -PathType Leaf){
+   [IO.File]::Replace($tmp,$StatusFile,$null)
+  }else{
+   [IO.File]::Move($tmp,$StatusFile)
+  }
+ }catch{
+  throw "FI_GATEWAY_SUPERVISOR_STATUS_WRITE_HOLD"
+ }finally{
+  Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+ }
 }
 function Listener([int]$port,[string]$ip){
  return @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
