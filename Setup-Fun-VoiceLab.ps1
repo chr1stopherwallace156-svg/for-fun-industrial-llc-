@@ -20,7 +20,7 @@ function Pids(){
  return $result
 }
 function Check([string]$stage){if($LASTEXITCODE -ne 0){throw "FUN_VOICE_DEPENDENCY_OR_TEST_HOLD STAGE=$stage EXIT=$LASTEXITCODE"}}
-foreach($f in @("voice_lab\__main__.py","voice_lab\analyzer.py","voice_lab\profiles.py","tests\test_voice_lab.py","requirements-voice.txt")){
+foreach($f in @("voice_lab\__main__.py","voice_lab\analyzer.py","voice_lab\profiles.py","tests\test_voice_lab.py","tests\test_voice_autotune.py","voice_lab\autotune.py","requirements-voice.txt")){
  if(-not(Test-Path -LiteralPath (Join-Path $Source $f) -PathType Leaf)){throw "FUN_VOICE_SOURCE_MISSING=$f"}
 }
 $before=Pids
@@ -53,7 +53,7 @@ New-Item -ItemType Directory -Path (Join-Path $Root "profiles") -Force|Out-Null
 New-Item -ItemType Directory -Path (Join-Path $Root "exports") -Force|Out-Null
 Push-Location $Source
 try{
- & $Python -m unittest discover -s tests -p test_voice_lab.py -v
+ & $Python -m unittest discover -s tests -p test_voice_*.py -v
  Check "TESTS"
  & $Python -m voice_lab status
  Check "CLI_STATUS"
