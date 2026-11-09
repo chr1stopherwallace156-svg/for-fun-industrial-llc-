@@ -1,3 +1,4 @@
+import {readFileSync} from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {createAutomaticMemoryDecorator,injectMemory,memoryPassage,shouldRecall} from "../src/intelligence/automatic-memory.mjs";
@@ -91,4 +92,18 @@ test("server patch reuses existing normal chat tools and explicit VPN gate",()=>
  assert.throws(()=>patchAutomaticMemory(patched),/ALREADY_INSTALLED/);
  assert.throws(()=>patchAutomaticMemory(fixture.replace("FI_SOURCING_RETIRED_V1","retired")),/BASELINE_MISSING/);
  assert.throws(()=>patchAutomaticMemory(fixture.replace('if(aiRoutes[req.url]&&req.method===aiRoutes[req.url].method){','missing route')),/ANCHOR_HOLD/);
+});
+
+test("deployment pins observed compute port and refuses dashboard-owned compute",()=>{
+ const script=readFileSync(new URL("../Activate-Fun-Automatic-Memory.ps1",import.meta.url),"utf8");
+ assert.match(script,/\$ComputePort=8791/);
+ assert.match(script,/COMPUTE_PORT=\[string\]\$ComputePort/);
+ assert.match(script,/AUTO_MEMORY_COMPUTE_CHILD_OF_DASHBOARD_HOLD/);
+ assert.match(script,/AUTO_MEMORY_COMPUTE_PREFLIGHT_HOLD/);
+ const readiness=script.indexOf("AUTO_MEMORY_COMPUTE_AFTER_RESTART=PASS");
+ const chat=script.indexOf('$step="live_chat"');
+ assert.ok(readiness>0&&chat>readiness,"compute readiness must precede chat test");
+ assert.match(script,/AUTO_MEMORY_COMPUTE_NOT_READY_AFTER_RESTART/);
+ assert.match(script,/AUTO_MEMORY_ROLLBACK_FILES=RESTORED/);
+ assert.doesNotMatch(script,/admin\/shutdown/);
 });
