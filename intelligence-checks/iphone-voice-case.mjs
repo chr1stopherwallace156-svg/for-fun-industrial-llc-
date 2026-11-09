@@ -91,6 +91,7 @@ test("upload rejects untrusted intent, unsupported media, cross-site fetch and n
 test("dashboard source patch preserves existing chat/REA/Cognee and has fail-closed baseline",()=>{
  const original=[
   'const root=path.dirname(fileURLToPath(import.meta.url));',
+  "const csp=\"script-src 'unsafe-inline';\";",
   'const marker="FI_LOCAL_INTELLIGENCE_V1";',
   'const seal="FI_SOURCING_RETIRED_V1";',
   'const auto="FI_AUTO_COGNEE_CHAT_V1";',
@@ -103,6 +104,7 @@ test("dashboard source patch preserves existing chat/REA/Cognee and has fail-clo
  assert.match(changed,/mobileVoiceHandler\(req,res\)/);
  assert.match(changed,/mobile\/client\.js/);
  assert.match(changed,/FI_AUTO_COGNEE_CHAT_V1/);
+ assert.match(changed,/script-src 'self' 'unsafe-inline';/);
  assert.equal(original.includes("FI_VOICE_MOBILE_DASHBOARD_V1"),false);
  assert.throws(()=>patchMobileVoiceServer(changed),/ALREADY_PATCHED/);
  assert.throws(()=>patchMobileVoiceServer(original.replace("FI_AUTO_COGNEE_CHAT_V1","missing")),/BASELINE_HOLD/);
