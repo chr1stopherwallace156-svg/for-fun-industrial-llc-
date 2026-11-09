@@ -56,6 +56,16 @@ test("supervisor is single instance, fail-closed on identity, waits for private 
  assert.match(src,/Stop-Process -Id \$proc\.Id/);
  assert.doesNotMatch(src,/Remove-Item .*gateway-password|netbird\s+(?:up|down)|Stop-Process -Id \$gateway/);
 });
+test("scheduled supervisor inspection treats empty stderr as no error and reports diagnostic stage safely",()=>{
+ const src=load("Diagnose-Fun-Gateway-Supervisor.ps1");
+ assert.match(src,/IsNullOrWhiteSpace\(\$errText\)/);
+ assert.match(src,/STAGE="\+\$stage/);
+ assert.match(src,/ERROR_TYPE="\+\$kind/);
+ assert.match(src,/ERROR_ID="\+\$id/);
+ assert.match(src,/HRESULT="\+\$h/);
+ assert.match(src,/\$healthyStatus=\$status -in/);
+ assert.doesNotMatch(src,/elseif\(\$errText\.Trim\(\)\)/);
+});
 test("gateway launcher keeps manual default and adds exact policy guarded DPAPI mode",()=>{
  const src=load("Start-Fun-iPhone-HTTPS.ps1");
  assert.match(src,/param\(\[switch\]\$UseStoredCredential\)/);
