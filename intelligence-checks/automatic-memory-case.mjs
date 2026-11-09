@@ -107,3 +107,19 @@ test("deployment pins observed compute port and refuses dashboard-owned compute"
  assert.match(script,/AUTO_MEMORY_ROLLBACK_FILES=RESTORED/);
  assert.doesNotMatch(script,/admin\/shutdown/);
 });
+
+test("deployment recovers compute after restart without invoking model stop",()=>{
+ const script=readFileSync(new URL("../Activate-Fun-Automatic-Memory.ps1",import.meta.url),"utf8");
+ const recovery=readFileSync(new URL("../Recover-Fun-Compute.ps1",import.meta.url),"utf8");
+ assert.match(script,/\$Recovery=Join-Path \$Src "Recover-Fun-Compute\.ps1"/);
+ assert.match(script,/AUTO_MEMORY_COMPUTE_UNAVAILABLE/);
+ assert.match(script,/AUTO_MEMORY_COMPUTE_RECOVERY=PASS/);
+ assert.match(script,/recover_compute_after_restart/);
+ assert.match(script,/ROLLBACK_COMPUTE_HEALTH=PASS/);
+ assert.match(script,/ROLLBACK_COMPUTE_RECOVERY_HOLD/);
+ assert.match(recovery,/FUN_COMPUTE_RECOVERY=ALREADY_RUNNING/);
+ assert.match(recovery,/FUN_COMPUTE_RECOVERY=PASS/);
+ assert.match(recovery,/compute_service\.app:app/);
+ assert.match(recovery,/EXISTING_LLAMA_8088_NOT_LISTENING/);
+ assert.doesNotMatch(recovery,/\/admin\/shutdown|\/ai\/runtime\/llama-cpp\/stop/);
+});
