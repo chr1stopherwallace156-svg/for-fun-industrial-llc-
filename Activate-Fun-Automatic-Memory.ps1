@@ -15,6 +15,15 @@ $Test=Join-Path $Src "intelligence-checks\automatic-memory-case.mjs"
 $Backup=Join-Path $env:LOCALAPPDATA ("FunIndustrial\AutoMemoryDeployBackups\"+(Get-Date -Format "yyyyMMdd-HHmmss")+"-"+[guid]::NewGuid().ToString("N").Substring(0,8))
 $node=(Get-Command node.exe -ErrorAction Stop).Source
 $changed=$false;$stopped=$false;$newUI=$null;$oldTools=@();$original=$null;$oldAutonomy=$null;$step="not_started"
+# This Windows deployment has an independently verified compute endpoint at 8791.
+$ComputePort=8791
+function CheckCompute(){
+ try{
+  $c=Invoke-RestMethod "http://127.0.0.1:$ComputePort/health" -TimeoutSec 5 -ErrorAction Stop
+  return $c.state -eq "running"
+ }catch{return $false}
+}
+
 function Okay([string]$label){if($LASTEXITCODE -ne 0){throw "$label EXIT=$LASTEXITCODE"}}
 function Listener(){
  $list=@(Get-NetTCPConnection -LocalPort 8789 -State Listen -ErrorAction SilentlyContinue|Where-Object {$_.LocalAddress -eq "127.0.0.1"})
@@ -29,7 +38,7 @@ function Gone([string]$url){
  if($code -ne 410){throw "RETIRED_SOURCING_CHANGED URL=$url CODE=$code"}
 }
 function StartDashboard([string]$out,[string]$err){
- $env:HOST="127.0.0.1";$env:PORT="8789"
+ $env:HOST="127.0.0.1";$env:PORT="8789";$env:COMPUTE_PORT=[string]$ComputePort
  # Preserve the catalog exposure observed before restart, matching legacy deployment.
  $env:REA_ALLOWED_TOOLS=($oldTools|ForEach-Object {$_.name}) -join ","
  return Start-Process -FilePath $node -ArgumentList "src/server.mjs" -WorkingDirectory $Root -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
@@ -64,6 +73,15 @@ if($serverText.Contains("FI_AUTO_COGNEE_CHAT_V1") -or $serverText.Contains("FI_O
  throw "AUTO_MEMORY_PATCH_CONFLICT_HOLD"
 }
 $original=Listener
+if(-not(CheckCompute)){throw "AUTO_MEMORY_COMPUTE_PREFLIGHT_HOLD PORT=$ComputePort"}
+$computeListeners=@(Get-NetTCPConnection -LocalPort $ComputePort -State Listen -ErrorAction Stop|Where-Object {$_.LocalAddress -eq "127.0.0.1"})
+if($computeListeners.Count -ne 1){throw "AUTO_MEMORY_COMPUTE_LISTENER_HOLD"}
+$computePid=[int]$computeListeners[0].OwningProcess
+$computeProcess=Get-CimInstance Win32_Process -Filter "ProcessId=$computePid" -ErrorAction Stop
+if([int]$computeProcess.ParentProcessId -eq [int]$original.ProcessId){
+ throw "AUTO_MEMORY_COMPUTE_CHILD_OF_DASHBOARD_HOLD PID=$computePid"
+}
+Write-Host "AUTO_MEMORY_COMPUTE_PREFLIGHT=PASS PORT=$ComputePort PID=$computePid"
 $before=Invoke-RestMethod "$Base/api/status" -TimeoutSec 25 -ErrorAction Stop
 if($before.application -ne "Fun Industrial Platform"){throw "AUTO_MEMORY_PLATFORM_NOT_RUNNING"}
 $oldAutonomy=@($before.services|Where-Object {$_.id -eq "autonomy"}|Select-Object -First 1)
@@ -89,7 +107,7 @@ $stagedText=[IO.File]::ReadAllText($stageServer)
 if(-not $stagedText.Contains("FI_AUTO_COGNEE_CHAT_V1") -or -not $stagedText.Contains("FI_SOURCING_RETIRED_V1")){throw "AUTO_MEMORY_STAGING_HOLD"}
 $hash=(Get-FileHash -LiteralPath $stageServer -Algorithm SHA256).Hash
 $moduleHash=(Get-FileHash -LiteralPath $SourceModule -Algorithm SHA256).Hash
-Write-Host "AUTO_MEMORY_PREFLIGHT=PASS REA=229 COGNEE=enabled LLAMA_CPP=ready BACKUP=$Backup"
+Write-Host "AUTO_MEMORY_PREFLIGHT=PASS REA=229 COGNEE=enabled LLAMA_CPP=ready COMPUTE_PORT=$ComputePort BACKUP=$Backup"
 try{
  $step="install_staged_files"
  $changed=$true
@@ -109,6 +127,19 @@ try{
  $step="check_patched_dashboard_readiness"
  if(-not(Ready $newUI $true)){throw "AUTO_MEMORY_DASHBOARD_STARTUP_HOLD"}
  Write-Host "AUTO_MEMORY_STAGE=dashboard_ready"
+ $step="compute_ready_after_restart"
+ $computeReady=$false
+ for($i=0;$i -lt 45;$i++){
+  if(CheckCompute){
+   try{
+    $readyAI=Invoke-RestMethod "$Base/api/ai/status" -TimeoutSec 6 -ErrorAction Stop
+    if($readyAI.state -eq "ready"){$computeReady=$true;break}
+   }catch{}
+  }
+  Start-Sleep -Seconds 1
+ }
+ if(-not $computeReady){throw "AUTO_MEMORY_COMPUTE_NOT_READY_AFTER_RESTART PORT=$ComputePort"}
+ Write-Host "AUTO_MEMORY_COMPUTE_AFTER_RESTART=PASS PORT=$ComputePort"
  $step="rea_start"
  $r=Invoke-RestMethod "$Base/api/rea/start" -Method POST -ContentType "application/json" -Body "{}" -TimeoutSec 120 -ErrorAction Stop
  if($r.state -ne "ready"){throw "AUTO_MEMORY_REA_RECONNECT_HOLD"}
