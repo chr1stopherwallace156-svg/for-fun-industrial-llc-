@@ -30,3 +30,22 @@ jobs:
           node --check scripts/check-iphone-voice-live.mjs
       - name: Synthetic WAV format, upload, security and dashboard-preservation tests
         run: node --test intelligence-checks/iphone-voice-case.mjs
+
+  powershell-parse:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse deployment and compute recovery scripts without executing them
+        shell: pwsh
+        run: |
+          foreach ($name in @('Activate-Fun-iPhone-Voice.ps1', 'Recover-Fun-Compute.ps1')) {
+            $tokens = $null
+            $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $name), [ref]$tokens, [ref]$parseErrors) | Out-Null
+            if ($parseErrors.Count) {
+              $parseErrors | ForEach-Object { Write-Error $_.Message }
+              throw "SCRIPT_PARSE_HOLD=$name"
+            }
+            Write-Host "POWERSHELL_PARSE=PASS FILE=$name"
+          }
