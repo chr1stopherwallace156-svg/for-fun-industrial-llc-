@@ -3,7 +3,7 @@
 // The Node control plane is accessible remotely ONLY via its existing authenticated
 // HTTPS/NetBird gateway, which rewrites Host and validates Origin before proxying.
 import {randomBytes} from "node:crypto";
-import {existsSync,lstatSync} from "node:fs";
+import {existsSync,lstatSync,readFileSync} from "node:fs";
 import {mkdir,readdir,readFile,writeFile,stat} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -32,20 +32,13 @@ export function isVoiceMobileEnabled(env=process.env){
   return requireMarker(flag);
  }catch{return false;}
 }
-function requireMarker(flag){
- // Only an explicit local operator deployment enables mobile upload.
- const data=requireMarker.read?requireMarker.read(flag):null;
- return data===ENABLED_MARKER;
-}
-// Synchronous read is isolated in this configurable getter for deterministic tests.
-import {readFileSync} from "node:fs";
-requireMarker.read=flag=>readFileSync(flag,"utf8");
-
+function requireMarker(flag){return readFileSync(flag,"utf8")===ENABLED_MARKER;}
 function json(res,code,payload){
  res.writeHead(code,{"content-type":"application/json; charset=utf-8",
   "cache-control":"no-store","x-content-type-options":"nosniff",
   "referrer-policy":"no-referrer"});
  res.end(JSON.stringify(payload));
+ return true;
 }
 function error(res,code,value){json(res,code,{error:value})}
 export function validateVoiceWav(buffer){
