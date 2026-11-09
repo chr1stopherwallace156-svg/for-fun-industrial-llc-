@@ -30,21 +30,17 @@ $ownsMutex=$false
 function Status([string]$state,[string]$code){
  $log=[ordered]@{schema="fun.voice.gateway.supervisor.status.v1";
   state=$state;reason=$code;checkedUtc=[DateTime]::UtcNow.ToString("o")}
- $tmp=Join-Path $Auto ("status-"+[guid]::NewGuid().ToString("N")+".tmp")
+ # A previous isolated Windows scheduled test showed that File.Replace
+ # fails when the foreground probe has already created this status file.
+ # This small, non-secret status record needs reliable overwriting, not
+ # replace-by-rename semantics. The reader tolerates a brief partial read.
  try{
-  [IO.File]::WriteAllText($tmp,($log|ConvertTo-Json -Compress),[Text.UTF8Encoding]::new($false))
-  # Use atomic replacement, including after the one-shot probe has already
-  # created a status file. Move-Item -Force may not reliably replace a file
-  # in every Windows PowerShell context.
-  if(Test-Path -LiteralPath $StatusFile -PathType Leaf){
-   [IO.File]::Replace($tmp,$StatusFile,$null)
-  }else{
-   [IO.File]::Move($tmp,$StatusFile)
-  }
+  [IO.File]::WriteAllText($StatusFile,($log|ConvertTo-Json -Compress),
+   [Text.UTF8Encoding]::new($false))
  }catch{
-  throw "FI_GATEWAY_SUPERVISOR_STATUS_WRITE_HOLD"
- }finally{
-  Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+  # Report only exception TYPE to avoid disclosing local paths or secrets.
+  $kind=$_.Exception.GetType().Name
+  throw ("FI_GATEWAY_SUPERVISOR_STATUS_WRITE_HOLD TYPE="+$kind)
  }
 }
 function Listener([int]$port,[string]$ip){
