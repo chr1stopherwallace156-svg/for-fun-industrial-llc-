@@ -77,11 +77,11 @@ extendedKeyUsage=serverAuth
 subjectAltName=IP:$ip
 "@
  [IO.File]::WriteAllText($extFile,$extensions,[Text.UTF8Encoding]::new($false))
- & $ssl req -new -x509 -newkey rsa:3072 -sha256 -days 365 -nodes -keyout $caKey -out $caPem -subj "/CN=Fun Industrial Private iPhone Root" -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" 2>&1 | Out-Null
+ & $ssl req -new -x509 -newkey rsa:3072 -sha256 -days 365 -nodes -keyout $caKey -out $caPem -subj "/CN=Fun Industrial Private iPhone Root" -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" 2>$null | Out-Null
  Check "CREATE_CA"
- & $ssl req -new -newkey rsa:3072 -sha256 -nodes -keyout $serverKey -out $serverCsr -subj ("/CN="+$ip) 2>&1 | Out-Null
+ & $ssl req -new -newkey rsa:3072 -sha256 -nodes -keyout $serverKey -out $serverCsr -subj ("/CN="+$ip) 2>$null | Out-Null
  Check "CREATE_SERVER_KEY_AND_CSR"
- & $ssl x509 -req -in $serverCsr -CA $caPem -CAkey $caKey -CAcreateserial -out $serverCert -days 180 -sha256 -extfile $extFile -extensions v3_server 2>&1 | Out-Null
+ & $ssl x509 -req -in $serverCsr -CA $caPem -CAkey $caKey -CAcreateserial -out $serverCert -days 180 -sha256 -extfile $extFile -extensions v3_server 2>$null | Out-Null
  Check "SIGN_SERVER"
  $verify=((& $ssl verify -CAfile $caPem $serverCert 2>&1)|Out-String)
  Check "CERTIFICATE_CHAIN"
