@@ -29,7 +29,7 @@ class OfflineReplicatorGuardsCase(unittest.TestCase):
                 me / "checkpoint.pth",
             ):
                 filename.parent.mkdir(parents=True, exist_ok=True)
-                filename.write_bytes(b"synthetic-invalid-model-checkpoint-do-not-load")
+                filename.write_bytes(b"synthetic-invalid-model-checkpoint-do-not-load" * 5)
             with patch.dict(os.environ, {
                 "FUN_VOICE_OPENVOICE_CHECKPOINTS": str(ov),
                 "FUN_VOICE_MELO_EN_NEWEST_HOME": str(me),
