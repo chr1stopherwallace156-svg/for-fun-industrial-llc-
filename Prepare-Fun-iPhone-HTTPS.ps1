@@ -11,6 +11,22 @@ $ExpectedPC="100.109.4.20"
 $Port=8443
 function Hold([string]$reason){throw "FI_IPHONE_HTTPS_PREPARE_HOLD=$reason"}
 function Check([string]$stage){if($LASTEXITCODE -ne 0){Hold "$stage EXIT=$LASTEXITCODE"}}
+# Windows PowerShell 5.1 turns OpenSSL's harmless RSA key-generation
+# progress on stderr into NativeCommandError under ErrorActionPreference=Stop.
+# Temporarily relax error-record handling ONLY around this native executable;
+# preserve fail-closed exit-code checks for every invocation.
+function Invoke-OpenSSL([string]$stage,[string[]]$Arguments){
+ $prior=$ErrorActionPreference
+ $exitCode=$null
+ try{
+  $ErrorActionPreference="Continue"
+  & $ssl @Arguments 2>$null | Out-Null
+  $exitCode=$LASTEXITCODE
+ }finally{
+  $ErrorActionPreference=$prior
+ }
+ if($exitCode -ne 0){Hold "$stage EXIT=$exitCode"}
+}
 if(-not (Test-Path -LiteralPath $Source -PathType Leaf)){Hold "GATEWAY_SOURCE_MISSING"}
 if(Test-Path -LiteralPath $Root){Hold "GATEWAY_ROOT_ALREADY_EXISTS_REFUSE_OVERWRITE"}
 if(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue){Hold "PORT_8443_ALREADY_IN_USE"}
@@ -77,12 +93,9 @@ extendedKeyUsage=serverAuth
 subjectAltName=IP:$ip
 "@
  [IO.File]::WriteAllText($extFile,$extensions,[Text.UTF8Encoding]::new($false))
- & $ssl req -new -x509 -newkey rsa:3072 -sha256 -days 365 -nodes -keyout $caKey -out $caPem -subj "/CN=Fun Industrial Private iPhone Root" -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" 2>$null | Out-Null
- Check "CREATE_CA"
- & $ssl req -new -newkey rsa:3072 -sha256 -nodes -keyout $serverKey -out $serverCsr -subj ("/CN="+$ip) 2>$null | Out-Null
- Check "CREATE_SERVER_KEY_AND_CSR"
- & $ssl x509 -req -in $serverCsr -CA $caPem -CAkey $caKey -CAcreateserial -out $serverCert -days 180 -sha256 -extfile $extFile -extensions v3_server 2>$null | Out-Null
- Check "SIGN_SERVER"
+ Invoke-OpenSSL "CREATE_CA" @("req","-new","-x509","-newkey","rsa:3072","-sha256","-days","365","-nodes","-keyout",$caKey,"-out",$caPem,"-subj","/CN=Fun Industrial Private iPhone Root","-addext","basicConstraints=critical,CA:TRUE","-addext","keyUsage=critical,keyCertSign,cRLSign")
+ Invoke-OpenSSL "CREATE_SERVER_KEY_AND_CSR" @("req","-new","-newkey","rsa:3072","-sha256","-nodes","-keyout",$serverKey,"-out",$serverCsr,"-subj",("/CN="+$ip))
+ Invoke-OpenSSL "SIGN_SERVER" @("x509","-req","-in",$serverCsr,"-CA",$caPem,"-CAkey",$caKey,"-CAcreateserial","-out",$serverCert,"-days","180","-sha256","-extfile",$extFile,"-extensions","v3_server")
  $verify=((& $ssl verify -CAfile $caPem $serverCert 2>&1)|Out-String)
  Check "CERTIFICATE_CHAIN"
  if($verify -notmatch '\bOK\b'){Hold "SERVER_CERT_CHAIN_NOT_VALID"}
