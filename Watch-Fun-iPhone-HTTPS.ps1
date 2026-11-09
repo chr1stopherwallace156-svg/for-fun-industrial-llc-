@@ -72,17 +72,18 @@ function DashboardReady(){
   return $v.enabled -eq $true -and $v.code -eq "FI_VOICE_MOBILE_UPLOAD_V1"
  }catch{return $false}
 }
-function NetBirdReady([string]$ip,[string]$peer){
+function NetBirdReady([string]$ip){
+ # The PC's private interface must be present, and NetBird must advertise
+ # that exact IP. The iPhone need not be online during gateway STARTUP:
+ # the gateway itself still enforces the fixed authorized iPhone source IP,
+ # trusted TLS and HTTP Basic authentication on every connection.
  if(-not(Get-NetIPAddress -IPAddress $ip -AddressFamily IPv4 -ErrorAction SilentlyContinue)){return $false}
  $nb=Get-Command netbird.exe -ErrorAction SilentlyContinue
  $exe=if($nb){$nb.Source}else{"C:\Program Files\NetBird\netbird.exe"}
  if(-not(Test-Path -LiteralPath $exe -PathType Leaf)){return $false}
  try{
   $current=(& $exe status --ipv4 2>$null|Out-String).Trim()
-  if($current -ne $ip){return $false}
-  $rows=@((& $exe status --table --filter-by-status connected 2>$null|Out-String) -split "\r?\n"|
-   Where-Object{$_ -match ('^\s*\S+\s+'+[regex]::Escape($peer)+'\s+Connected\b')})
-  return $rows.Count -eq 1
+  return $current -eq $ip
  }catch{return $false}
 }
 try{
@@ -154,8 +155,8 @@ try{
    Status "waiting" "INSPECT_GATEWAY_STOPPED"
   }elseif(-not(DashboardReady)){
    Status "waiting" "DASHBOARD_8789_UNAVAILABLE"
-  }elseif(-not(NetBirdReady $g.pcIp $g.iphonePeerIp)){
-   Status "waiting" "NETBIRD_IPHONE_PEER_UNAVAILABLE"
+  }elseif(-not(NetBirdReady $g.pcIp)){
+   Status "waiting" "NETBIRD_HOST_IP_UNAVAILABLE"
   }else{
    Status "starting" "PRIVATE_GATEWAY_LAUNCH"
    # Launch one short-lived PowerShell; actual gateway stays in a separate
