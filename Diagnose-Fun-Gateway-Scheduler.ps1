@@ -24,7 +24,7 @@ try{
  $encrypted=$test|ConvertFrom-SecureString -ErrorAction Stop
  $opened=ConvertTo-SecureString -String $encrypted -ErrorAction Stop
  if($opened.Length -ne $test.Length){throw "DPAPI_TEST_FAILED"}
- [IO.File]::WriteAllText($marker,("PASS|SID="+$identity.User.Value+"|DPAPI=PASS"),[Text.UTF8Encoding]::new($false))
+ [IO.File]::WriteAllText($marker,("PASS|IDENTITY=AVAILABLE|DPAPI=PASS"),[Text.UTF8Encoding]::new($false))
 }catch{
  [IO.File]::WriteAllText($marker,("FAIL|TYPE="+$_.Exception.GetType().Name),[Text.UTF8Encoding]::new($false))
  exit 9
@@ -57,7 +57,7 @@ try{
  $taskState=[string]$task.State
  if(Test-Path -LiteralPath $ProbeResult -PathType Leaf){
   $result=(Get-Content -LiteralPath $ProbeResult -Raw).Trim()
-  if($result -match '^PASS\|SID='){
+  if($result -match '^PASS\|IDENTITY='){
    $report="FI_TASK_LAUNCH_PROBE=PASS TASK_STATE=$taskState LAST_TASK_RESULT=$taskResult STATUS=$result"
   }else{
    $report="FI_TASK_LAUNCH_PROBE=FAIL_TASK_CODE TASK_STATE=$taskState LAST_TASK_RESULT=$taskResult STATUS=$result"
