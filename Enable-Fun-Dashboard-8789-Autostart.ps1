@@ -56,28 +56,46 @@ try{
  $mobile=Invoke-RestMethod "http://127.0.0.1:8789/api/voice/mobile/status" -TimeoutSec 8 -ErrorAction Stop
  $memory=Invoke-RestMethod "http://127.0.0.1:8789/api/ai/automatic-memory/status" -TimeoutSec 8 -ErrorAction Stop
  $rea=Invoke-RestMethod "http://127.0.0.1:8789/api/rea/tools" -TimeoutSec 40 -ErrorAction Stop
+ $catalog=Invoke-RestMethod "http://127.0.0.1:8789/api/rea/catalog" -TimeoutSec 40 -ErrorAction Stop
 }catch{Hold "LIVE_DASHBOARD_RUNTIME_UNAVAILABLE"}
 if($mobile.enabled -ne $true -or $mobile.code -ne "FI_VOICE_MOBILE_UPLOAD_V1" -or
    $memory.mode -ne "automatic_contextual_read_only" -or
    $memory.enabledByDefault -ne $true){Hold "LIVE_VOICE_OR_MEMORY_STATUS_MISMATCH"}
 $budget=[int]$memory.recallBudgetMs
 if($budget -lt 12000 -or $budget -gt 180000){Hold "MEMORY_RECALL_BUDGET_UNBOUNDED"}
-$names=@($rea.tools|ForEach-Object{$_.name})
-if($names.Count -ne 229 -or @($names|Select-Object -Unique).Count -ne 229 -or
-   @($names|Where-Object{$_ -notmatch '^rea__[A-Za-z0-9_]{1,120}$'}).Count){
- Hold "REA_229_TOOL_LIST_MISMATCH"
+# The FULL MCP catalogue is distinct from /api/rea/tools (operator
+# permission-filtered). Capture each separately; never grant 229 execution
+# permissions merely to satisfy a catalogue-size assertion.
+$catalogueNames=@($catalog.tools|ForEach-Object{[string]$_.name})
+$names=@($rea.tools|ForEach-Object{[string]$_.name})
+$badCatalogue=@($catalogueNames|Where-Object{$_ -notmatch '^[-A-Za-z0-9_./:]{1,128}$'})
+$badAllowed=@($names|Where-Object{$_ -notmatch '^[-A-Za-z0-9_./:]{1,128}$'})
+$uniqueCatalogue=@($catalogueNames|Sort-Object -Unique)
+$uniqueAllowed=@($names|Sort-Object -Unique)
+$unexpectedAllowed=@($names|Where-Object{$_ -cnotin $catalogueNames})
+Write-Host ("FI_DASHBOARD_REA_INVENTORY CATALOGUE_COUNT="+$catalogueNames.Count+
+ " PERMISSION_FILTERED_COUNT="+$names.Count+
+ " CATALOGUE_DUPLICATES="+($catalogueNames.Count-$uniqueCatalogue.Count)+
+ " ALLOWED_OUTSIDE_CATALOGUE="+$unexpectedAllowed.Count)
+if($catalogueNames.Count -ne 229 -or $uniqueCatalogue.Count -ne 229 -or
+   $badCatalogue.Count -ne 0){
+ Hold "REA_229_CATALOGUE_INTEGRITY_HOLD"
+}
+if($names.Count -gt 229 -or $names.Count -ne $uniqueAllowed.Count -or
+   $badAllowed.Count -ne 0 -or $unexpectedAllowed.Count -ne 0){
+ Hold "REA_PERMISSION_FILTER_INTEGRITY_HOLD"
 }
 $policy=[ordered]@{
  schema="fun.dashboard.autostart.v1";sid=$User.User.Value;
  deployedRoot=$Root;nodePath=$Node;host="127.0.0.1";port=8789;
  computePort=8791;voiceHome=$Voice;
- memoryBudgetMs=$budget;allowedTools=$names;
+ memoryBudgetMs=$budget;catalogueNames=$catalogueNames;allowedTools=$names;
  serverSha256=(Get-FileHash -LiteralPath $Server -Algorithm SHA256).Hash;
  htmlSha256=(Get-FileHash -LiteralPath $Html -Algorithm SHA256).Hash;
  noProcessReplacement=$true;noOtherServiceStart=$true;
  capturedUtc=[DateTime]::UtcNow.ToString("o")
 }
-Write-Host "FI_DASHBOARD_AUTOSTART_PREFLIGHT=PASS LIVE_PID=$before REA_CATALOGUE=229 MEMORY=READ_ONLY VOICE=ENABLED"
+Write-Host "FI_DASHBOARD_AUTOSTART_PREFLIGHT=PASS LIVE_PID=$before REA_CATALOGUE=229 REA_EXPOSED=$($names.Count) MEMORY=READ_ONLY VOICE=ENABLED"
 try{
  New-Item -ItemType Directory -Path $Auto -ErrorAction Stop|Out-Null
  $created=$true
@@ -120,7 +138,7 @@ try{
  if($after -ne $before){Hold "LIVE_DASHBOARD_PID_CHANGED"}
  Write-Host ("FI_DASHBOARD_AUTOSTART_SETUP="+$(if($seen){"PASS"}else{"PASS_REGISTERED_PENDING_SIGNIN"})+" TASK="+$Name)
  Write-Host ("FI_DASHBOARD_AUTOSTART_SUPERVISOR="+$(if($seen){"RUNNING"}else{"PENDING_SIGNIN"})+" CURRENT_DASHBOARD_PRESERVED=TRUE PID="+$after)
- Write-Host "FI_DASHBOARD_AUTOSTART_ENV=CAPTURED_HOST_PORT_COMPUTE_VOICE_COGNEE_REA229"
+ Write-Host "FI_DASHBOARD_AUTOSTART_ENV=CAPTURED_HOST_PORT_COMPUTE_VOICE_COGNEE_REA_CATALOGUE229_WITH_EXISTING_PERMISSIONS"
  Write-Host "FI_DASHBOARD_AUTOSTART_GATEWAY_TASK=UNCHANGED"
  Write-Host "FI_DASHBOARD_AUTOSTART_OTHER_SERVICES=NOT_RESTARTED"
  Write-Host "FI_DASHBOARD_AUTOSTART_TRIGGER=WINDOWS_USER_SIGNIN WATCH_EVERY_20_SECONDS"
