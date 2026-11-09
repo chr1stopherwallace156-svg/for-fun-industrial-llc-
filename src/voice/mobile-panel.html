@@ -1,0 +1,20 @@
+<!-- FI_VOICE_MOBILE_PANEL_V1: separate operator-controlled iPhone microphone interface. -->
+<section id="fi-voice-mobile" class="panel">
+  <h2>Spoken Voice Lab — iPhone microphone</h2>
+  <p class="muted">Record with Safari on your phone, or choose a recording from Files. The audio stays on your Windows PC after upload; analysis and voice reproduction remain separate operator actions.</p>
+  <p id="fi-voice-mobile-status" class="muted small" aria-live="polite">Checking secure voice upload…</p>
+  <div class="actions">
+    <button type="button" id="fi-voice-record" disabled>Record iPhone microphone</button>
+    <button type="button" id="fi-voice-stop" class="secondary" disabled>Stop recording</button>
+    <button type="button" id="fi-voice-upload" class="secondary" disabled>Upload prepared audio</button>
+    <button type="button" id="fi-voice-refresh" class="secondary">Refresh recordings</button>
+  </div>
+  <p><label for="fi-voice-file">Or choose an existing voice recording (WAV, M4A, MP3 where supported by Safari)</label>
+    <input type="file" id="fi-voice-file" accept="audio/*,.m4a,.wav" style="display:block;margin-top:7px;max-width:100%"></p>
+  <audio id="fi-voice-preview" controls preload="none" style="width:100%;margin:10px 0;display:none"></audio>
+  <p id="fi-voice-action-status" class="muted small" aria-live="polite">Nothing recorded or uploaded.</p>
+  <pre id="fi-voice-upload-result" aria-label="Upload result and Windows analysis command" style="min-height:0"></pre>
+  <div class="muted small">Recording is manual, limited to 2–30 seconds and stored as 16-kHz mono PCM WAV. No automatic AI tools, Cognee memory writes or voice reproduction. Use the authenticated NetBird HTTPS gateway on iPhone; ordinary HTTP IP addresses cannot grant Safari microphone access.</div>
+  <h3>Saved recordings on Windows</h3>
+  <div id="fi-voice-saved-recordings" class="muted small" aria-live="polite">No recordings loaded.</div>
+</section>
