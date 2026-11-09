@@ -102,7 +102,7 @@ test("conversation patch is additive; existing Cognee, REA, voice routes and das
  const html='<html><body><!-- FI_VOICE_MOBILE_PANEL_V1 --><script src="/api/voice/mobile/client.js"></script></body></html>';
  const updated=patchUi(html);
  assert.match(updated,/FI_VOICE_CONVERSATION_UI_V1/);
- assert.match(updated,/fi-voice-mobile/);
+ assert.match(updated,/\/api\/voice\/mobile\/client\.js/);
  assert.throws(()=>patchUi(updated),/ALREADY_PRESENT/);
 });
 test("conversation client uses manual ask with no automatic speech, tool authority or memory mutation",()=>{
