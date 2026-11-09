@@ -2,7 +2,7 @@
 # Does NOT restart dashboard, compute, llama.cpp, Cognee, REA, VPN or Ollama.
 # Credentials are entered interactively, inherited by one child process only,
 # then removed from the calling PowerShell environment. Never stored in .env.
-[CmdletBinding()]param()
+[CmdletBinding()]param([switch]$UseStoredCredential)
 $ErrorActionPreference="Stop"
 $HomeDir=Join-Path $env:LOCALAPPDATA "FunIndustrial\VoiceGateway"
 $CfgPath=Join-Path $HomeDir "private-gateway.json"
@@ -48,7 +48,24 @@ $vars=@("FI_GATEWAY_BIND_IP","FI_GATEWAY_ALLOWED_CLIENT_IPS","FI_GATEWAY_PORT",
 foreach($k in $vars){$callerOld[$k]=[Environment]::GetEnvironmentVariable($k,"Process")}
 $start=$null;$password=$null;$secure=$null
 try{
- $secure=Read-Host "Enter a NEW private iPhone gateway password (24+ characters, not your Gmail password)" -AsSecureString
+ if($UseStoredCredential){
+  $secretFile=Join-Path $HomeDir "autostart\gateway-password.dpapi"
+  $policyFile=Join-Path $HomeDir "autostart\supervisor-policy.json"
+  if(-not(Test-Path -LiteralPath $secretFile -PathType Leaf) -or
+     -not(Test-Path -LiteralPath $policyFile -PathType Leaf)){throw "FI_GATEWAY_STORED_CREDENTIAL_NOT_CONFIGURED"}
+  $policy=Get-Content -LiteralPath $policyFile -Raw -ErrorAction Stop|ConvertFrom-Json
+  $currentSid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+  if($policy.schema -ne "fun.voice.gateway.autostart.v1" -or
+     $policy.sid -ne $currentSid -or
+     $policy.pcIp -ne $Config.pcIp -or
+     $policy.iphonePeerIp -ne $Config.iphonePeerIp -or
+     $policy.gatewayPort -ne [int]$Config.port){throw "FI_GATEWAY_AUTOSTART_POLICY_HOLD"}
+  $secretLine=(Get-Content -LiteralPath $secretFile -Raw -ErrorAction Stop).Trim()
+  if(-not $secretLine -or $secretLine -notmatch '^[a-fA-F0-9]+$'){throw "FI_GATEWAY_ENCRYPTED_CREDENTIAL_FORMAT_HOLD"}
+  $secure=ConvertTo-SecureString -String $secretLine -ErrorAction Stop
+ }else{
+  $secure=Read-Host "Enter a NEW private iPhone gateway password (24+ characters, not your Gmail password)" -AsSecureString
+ }
  if(-not $secure){throw "FI_GATEWAY_PASSWORD_REQUIRED"}
  $ptr=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
  try{$password=[Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)}
@@ -88,7 +105,7 @@ try{
  & $Node $Selftest
  if($LASTEXITCODE -ne 0){throw "FI_GATEWAY_TLS_SELFTEST_HOLD"}
  Write-Host "FI_IPHONE_GATEWAY_START=PASS PID=$($start.Id) BIND=$($Config.pcIp):8443 PEER=$($Config.iphonePeerIp)"
- Write-Host "FI_IPHONE_GATEWAY_USERNAME=fiiphone PASSWORD=OPERATOR_HELD_NOT_SAVED"
+ Write-Host ("FI_IPHONE_GATEWAY_USERNAME=fiiphone PASSWORD="+$(if($UseStoredCredential){"DPAPI_PROTECTED_AT_REST"}else{"OPERATOR_HELD_NOT_SAVED"}))
  Write-Host ("FI_IPHONE_SAFARI_URL=https://"+$Config.publicHost)
  Write-Host "FI_IPHONE_GATEWAY_FIREWALL_AND_NETBIRD_POLICIES=NOT_CHANGED"
  Write-Host "FI_IPHONE_GATEWAY_TRUST_ON_PHONE=REQUIRES_SAFARI_VERIFICATION"
