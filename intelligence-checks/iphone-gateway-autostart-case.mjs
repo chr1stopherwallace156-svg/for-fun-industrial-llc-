@@ -65,6 +65,10 @@ test("gateway launcher keeps manual default and adds exact policy guarded DPAPI 
  assert.match(src,/FI_GATEWAY_STORED_CREDENTIAL_NOT_CONFIGURED/);
  assert.match(src,/\$SourceGateway=Join-Path \$PSScriptRoot "src\\gateway.mjs"/);
  assert.match(src,/FI_GATEWAY_ENTRY_IMPORT_ANCHOR_HOLD/);
+ const entry=load("src/voice/private-gateway-entry.mjs");
+ assert.match(entry,/from "\.\/gateway.mjs"/);
+ assert.match(src,/\$correctImport='from "\.\/gateway.mjs"'/);
+ assert.doesNotMatch(src,/\$oldImport='from "\.\.\/gateway.mjs"'/);
  assert.match(src,/from "\.\/gateway.mjs"/);
   assert.match(src,/FI_GATEWAY_ALLOWED_CLIENT_IPS=\$Config\.iphonePeerIp/);
  assert.doesNotMatch(src,/netbird\s+(?:up|down)/);
