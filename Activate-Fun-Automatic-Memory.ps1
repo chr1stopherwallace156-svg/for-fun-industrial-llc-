@@ -18,6 +18,7 @@ $node=(Get-Command node.exe -ErrorAction Stop).Source
 $changed=$false;$stopped=$false;$newUI=$null;$oldTools=@();$original=$null;$oldAutonomy=$null;$step="not_started"
 # This Windows deployment has an independently verified compute endpoint at 8791.
 $ComputePort=8791
+$CogneeBudgetMs=90000
 function CheckCompute(){
  try{
   $c=Invoke-RestMethod "http://127.0.0.1:$ComputePort/health" -TimeoutSec 5 -ErrorAction Stop
@@ -46,7 +47,7 @@ function Gone([string]$url){
  if($code -ne 410){throw "RETIRED_SOURCING_CHANGED URL=$url CODE=$code"}
 }
 function StartDashboard([string]$out,[string]$err){
- $env:HOST="127.0.0.1";$env:PORT="8789";$env:COMPUTE_PORT=[string]$ComputePort
+ $env:HOST="127.0.0.1";$env:PORT="8789";$env:COMPUTE_PORT=[string]$ComputePort;$env:FI_COGNEE_RECALL_BUDGET_MS=[string]$CogneeBudgetMs
  # Preserve the catalog exposure observed before restart, matching legacy deployment.
  $env:REA_ALLOWED_TOOLS=($oldTools|ForEach-Object {$_.name}) -join ","
  return Start-Process -FilePath $node -ArgumentList "src/server.mjs" -WorkingDirectory $Root -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
@@ -102,6 +103,23 @@ $unified=Invoke-RestMethod "$Base/api/unified/status" -TimeoutSec 25 -ErrorActio
 if($oldTools.Count -ne 229 -or [int]$unified.rea_enabled -ne 229){throw "AUTO_MEMORY_REA_SCOPE_HOLD"}
 Gone "$Base/api/autonomy/opportunities";Gone "$Base/api/autonomy/international"
 Gone "$Worker/api/opportunities";Gone "$Worker/api/international"
+# Measure a real read-only recall BEFORE replacing any running files/processes.
+# Python startup / local graph-completion can exceed a fixed 12-second deadline.
+$recallQuery="What approval is required before external tool execution at Fun Industrial?"
+$recallBody=@{query=$recallQuery}|ConvertTo-Json -Compress
+$clock=[Diagnostics.Stopwatch]::StartNew()
+try{
+ $recallProbe=Invoke-RestMethod "$Base/api/intelligence/memory/recall" -Method POST -ContentType "application/json" -Body $recallBody -TimeoutSec 280 -ErrorAction Stop
+}finally{$clock.Stop()}
+if($recallProbe.ok -ne $true -or $recallProbe.state -ne "retrieved" -or @($recallProbe.results).Count -lt 1){
+ throw "AUTO_MEMORY_COGNEE_RECALL_PREFLIGHT_HOLD"
+}
+$observedMs=[int][Math]::Ceiling($clock.Elapsed.TotalMilliseconds)
+if($observedMs -gt 140000){
+ throw "AUTO_MEMORY_COGNEE_LATENCY_HOLD OBSERVED_MS=$observedMs LIMIT_MS=140000"
+}
+$CogneeBudgetMs=[int][Math]::Min(180000,[Math]::Max(30000,$observedMs*2+20000))
+Write-Host "AUTO_MEMORY_RECALL_PREFLIGHT=PASS DURATION_MS=$observedMs BUDGET_MS=$CogneeBudgetMs RESULTS=$(@($recallProbe.results).Count) WRITES=0 TOOLS=0"
 & $node --check $SourceModule;Okay "AUTO_MEMORY_MODULE_SYNTAX_HOLD"
 & $node --check $Patcher;Okay "AUTO_MEMORY_PATCHER_SYNTAX_HOLD"
 & $node --test $Test;Okay "AUTO_MEMORY_TESTS_HOLD"
@@ -115,7 +133,7 @@ $stagedText=[IO.File]::ReadAllText($stageServer)
 if(-not $stagedText.Contains("FI_AUTO_COGNEE_CHAT_V1") -or -not $stagedText.Contains("FI_SOURCING_RETIRED_V1")){throw "AUTO_MEMORY_STAGING_HOLD"}
 $hash=(Get-FileHash -LiteralPath $stageServer -Algorithm SHA256).Hash
 $moduleHash=(Get-FileHash -LiteralPath $SourceModule -Algorithm SHA256).Hash
-Write-Host "AUTO_MEMORY_PREFLIGHT=PASS REA=229 COGNEE=enabled LLAMA_CPP=ready COMPUTE_PORT=$ComputePort BACKUP=$Backup"
+Write-Host "AUTO_MEMORY_PREFLIGHT=PASS REA=229 COGNEE=enabled LLAMA_CPP=ready COMPUTE_PORT=$ComputePort COGNEE_BUDGET_MS=$CogneeBudgetMs BACKUP=$Backup"
 try{
  $step="install_staged_files"
  $changed=$true
@@ -176,7 +194,7 @@ try{
  if($status.mode -ne "automatic_contextual_read_only" -or $status.memoryWrites -ne $false -or $status.memoryGrantsToolAuthority -ne $false){throw "AUTO_MEMORY_POLICY_HOLD"}
  $body=@{messages=@(@{role="user";content="What approval is required before external tool execution at Fun Industrial?"});max_tokens=96;temperature=0;tools=@()}|ConvertTo-Json -Depth 7 -Compress
  $step="live_chat"
- $reply=Invoke-RestMethod "$Base/api/ai/chat" -Method POST -ContentType "application/json" -Body $body -TimeoutSec 210 -ErrorAction Stop
+ $reply=Invoke-RestMethod "$Base/api/ai/chat" -Method POST -ContentType "application/json" -Body $body -TimeoutSec 310 -ErrorAction Stop
  if(-not ($reply.reply -is [string]) -or -not $reply.reply.Trim()){throw "AUTO_MEMORY_MODEL_RESPONSE_EMPTY"}
  if(@($reply.tool_calls).Count -gt 0){throw "AUTO_MEMORY_UNEXPECTED_TOOL_PROPOSAL_HOLD"}
  $step="post_chat_memory_status"
