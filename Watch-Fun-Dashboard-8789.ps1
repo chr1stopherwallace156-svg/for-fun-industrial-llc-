@@ -187,6 +187,12 @@ try{
       }
      }elseif($ownerState -eq "OWNER_DASHBOARD_ENDPOINTS_UNAVAILABLE"){
       Write-Status "waiting" "EXISTING_DASHBOARD_INITIALIZING"
+     }elseif($ownerState -in @("OWNER_PROCESS_QUERY_UNAVAILABLE","OWNER_START_TIME_UNAVAILABLE")){
+      # Limited Task Scheduler tokens may not see process metadata. An
+      # occupied loopback port must not be killed, replaced, or implicitly
+      # trusted. Leave it intact; when vacant, the task can launch its own
+      # exact configured Node binary and verify the returned child PID.
+      Write-Status "waiting" "EXISTING_OWNER_METADATA_UNAVAILABLE_PRESERVED"
      }else{
       Write-Status "hold" $ownerState
      }
