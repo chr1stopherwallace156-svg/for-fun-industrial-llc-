@@ -66,6 +66,33 @@ test("scheduled supervisor inspection treats empty stderr as no error and report
  assert.match(src,/\$healthyStatus=\$status -in/);
  assert.doesNotMatch(src,/elseif\(\$errText\.Trim\(\)\)/);
 });
+test("synthetic inspection never mistakes local listener for production authorization",()=>{
+ const src=load("Watch-Fun-iPhone-HTTPS.ps1");
+ const diag=load("Diagnose-Fun-Gateway-Supervisor.ps1");
+ assert.match(src,/if\(\$InspectOnce\)\{\s*\/\/ Synthetic test checks status transitions/);
+ assert.match(src,/Status "waiting" "INSPECT_GATEWAY_PRESENT"/);
+ assert.match(diag,/waiting:INSPECT_GATEWAY_PRESENT/);
+ assert.match(src,/elseif\(Confirm-GatewayOwner \(\[int\]\$state\.ListenerProcessId\)\)/);
+ assert.match(src,/Status "hold" "UNEXPECTED_PROCESS_ON_PRIVATE_PORT"/);
+});
+test("production fallback only accepts Node, missing command line, matching private certificate and local 403 deny",()=>{
+ const supervisor=load("Watch-Fun-iPhone-HTTPS.ps1");
+ const installer=load("Enable-Fun-iPhone-Gateway-Autostart.ps1");
+ const attestor=load("src/voice/private-gateway-attest.mjs");
+ for(const src of [supervisor,installer]){
+  assert.match(src,/function Confirm-GatewayOwner/);
+  assert.match(src,/\$owner\.Name -ne "node\.exe"/);
+  assert.match(src,/IsNullOrWhiteSpace\(\[string\]\$owner\.CommandLine\)/);
+  assert.match(src,/FI_GATEWAY_PRIVATE_ATTEST=PASS TLS_PIN=EXACT LOCAL_ACCESS_DENIED=403/);
+ }
+ assert.match(attestor,/getPeerCertificate\(true\)/);
+ assert.match(attestor,/fingerprint256!==expectedCert\.fingerprint256/);
+ assert.match(attestor,/rejectUnauthorized:true/);
+ assert.match(attestor,/response\.code!==403/);
+ assert.match(attestor,/VPN client address not allowed/);
+ assert.match(installer,/Copy-Item -LiteralPath \$SourceAttest -Destination \$AutoAttest/);
+ assert.match(supervisor,/FI_GATEWAY_PRODUCTION_FORBIDS_TEST_ROOT/);
+});
 test("gateway launcher keeps manual default and adds exact policy guarded DPAPI mode",()=>{
  const src=load("Start-Fun-iPhone-HTTPS.ps1");
  assert.match(src,/param\(\[switch\]\$UseStoredCredential\)/);
