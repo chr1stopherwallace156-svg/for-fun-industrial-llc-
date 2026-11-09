@@ -31,7 +31,7 @@ try {
   $code=$LASTEXITCODE
   $st=Get-Content -LiteralPath (Join-Path $auto "supervisor-status.json") -Raw -ErrorAction Stop|ConvertFrom-Json
   $state=[string]$st.state+":"+[string]$st.reason
-  $good=$code -eq 0 -and $state -in @("running:EXISTING_GATEWAY_PRESERVED","waiting:INSPECT_GATEWAY_STOPPED")
+  $good=$code -eq 0 -and $state -in @("waiting:INSPECT_GATEWAY_PRESENT","waiting:INSPECT_GATEWAY_STOPPED")
   Write-Host ("FI_GATEWAY_SUPERVISOR_FOREGROUND_INSPECT="+$(if($good){"PASS"}else{"HOLD"})+
    " EXIT="+$code+" STATUS="+$state+" LIVE_SERVICES_UNCHANGED=TRUE")
   return
@@ -92,7 +92,7 @@ try{
   }
  }
  $stage="ASSESS_HEALTH"
- $healthyStatus=$status -in @("running:EXISTING_GATEWAY_PRESERVED","waiting:INSPECT_GATEWAY_STOPPED")
+ $healthyStatus=$status -in @("waiting:INSPECT_GATEWAY_PRESENT","waiting:INSPECT_GATEWAY_STOPPED")
  $pass=$rc -eq "EXIT_0" -and $healthyStatus -and $errorCode -eq "NONE"
  Write-Host ("FI_GATEWAY_SUPERVISOR_SCHEDULED_INSPECT="+$(if($pass){"PASS"}else{"HOLD"})+
   " TASK_RESULT="+$info.LastTaskResult+" WRAPPER="+$rc+" STATUS="+$status+" ERROR="+$errorCode)
