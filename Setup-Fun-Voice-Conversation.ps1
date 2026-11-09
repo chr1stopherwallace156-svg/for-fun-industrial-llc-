@@ -18,6 +18,7 @@ $S=Join-Path $R "src\server.mjs"
 $H=Join-Path $R "public\index.html"
 $LiveVoice=Join-Path $R "src\voice"
 $SttSource=Join-Path $PSScriptRoot "src\voice\transcribe.py"
+$ModelSetup=Join-Path $PSScriptRoot "src\voice\setup-whisper-model.py"
 $ModuleSource=Join-Path $PSScriptRoot "src\voice\conversation.mjs"
 $ClientSource=Join-Path $PSScriptRoot "src\voice\conversation-client.js"
 $ModuleLive=Join-Path $LiveVoice "conversation.mjs"
@@ -84,7 +85,7 @@ function WaitDashboard([System.Diagnostics.Process]$p,[bool]$newVersion){
  }
  return $false
 }
-foreach($f in @($S,$H,$Boot,$SttSource,$ModuleSource,$ClientSource,$Patcher,$Tests,
+foreach($f in @($S,$H,$Boot,$SttSource,$ModelSetup,$ModuleSource,$ClientSource,$Patcher,$Tests,
  (Join-Path $LiveVoice "mobile-client.js"),
  (Join-Path $LiveVoice "mobile-upload.mjs"))){
  if(-not(Test-Path -LiteralPath $f -PathType Leaf)){Fail "REQUIRED_FILE_MISSING=$f"}
@@ -142,14 +143,14 @@ RunNative $Py "INSTALL_LOCAL_CPU_STT" @("-m","pip","install","--disable-pip-vers
 # All transcript requests later use the installed directory with offline mode.
 $env:HF_HUB_DISABLE_TELEMETRY="1";$env:HF_HUB_DISABLE_PROGRESS_BARS="1"
 $env:HF_HUB_OFFLINE="0"
-RunNative $Py "DOWNLOAD_STT_MODEL" @("-c",'from faster_whisper.utils import download_model;import sys;download_model("tiny.en",output_dir=sys.argv[1]);print("FI_STT_MODEL_DOWNLOADED=PASS")',$Models)
+RunNative $Py "DOWNLOAD_STT_MODEL" @($ModelSetup,"download",$Models)
 foreach($file in @("model.bin","config.json","tokenizer.json")){
  if(-not(Test-Path -LiteralPath (Join-Path $Models $file) -PathType Leaf)){
   Fail "STT_MODEL_FILE_MISSING=$file"
  }
 }
 $env:HF_HUB_OFFLINE="1"
-RunNative $Py "STT_OFFLINE_MODEL_LOAD" @("-c",'import sys;from faster_whisper import WhisperModel;WhisperModel(sys.argv[1],device="cpu",compute_type="int8",local_files_only=True);print("FI_STT_OFFLINE_MODEL_LOAD=PASS")',$Models)
+RunNative $Py "STT_OFFLINE_MODEL_LOAD" @($ModelSetup,"verify",$Models)
 Copy-Item -LiteralPath $SttSource -Destination $Transcript -ErrorAction Stop
 RunNative $Py "STT_PYTHON_SYNTAX" @("-m","py_compile",$Transcript)
 Write-Host "FI_VOICE_STT_PREPARED=PASS MODEL=tiny.en LOCAL_ONLY=TRUE PYTHON_ISOLATED=TRUE"
