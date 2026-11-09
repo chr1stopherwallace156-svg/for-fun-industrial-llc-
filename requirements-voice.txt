@@ -1,0 +1,5 @@
+# Core CPU-only voice analysis (no PyTorch, REA, Cognee, Ollama or voice-generation model)
+numpy>=1.26,<3
+scipy>=1.12,<2
+librosa>=0.10.2,<0.12
+soundfile>=0.12,<1
