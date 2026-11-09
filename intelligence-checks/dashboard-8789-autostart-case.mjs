@@ -58,7 +58,7 @@ test("full MCP catalogue and permission filtered REA exposure are separate, neve
  assert.match(p,/async reaCatalog\(\)/);
  assert.match(p,/async reaTools\(\)/);
  assert.match(p,/allowedTools\.slice\(0,14\)/);
- assert.match(install,/\$catalogue=Invoke-RestMethod "http:\/\/127\.0\.0\.1:8789\/api\/rea\/catalog"/);
+ assert.match(install,/\$catalog=Invoke-RestMethod "http:\/\/127\.0\.0\.1:8789\/api\/rea\/catalog"/);
  assert.match(install,/\$rea=Invoke-RestMethod "http:\/\/127\.0\.0\.1:8789\/api\/rea\/tools"/);
  assert.match(install,/catalogueNames=\$catalogueNames;allowedTools=\$names/);
  assert.match(watch,/\$env:REA_ALLOWED_TOOLS=\(@\(\$p\.allowedTools\)-join ","\)/);
