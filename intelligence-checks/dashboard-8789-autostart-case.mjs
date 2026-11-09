@@ -51,6 +51,22 @@ test("dashboard supervisor preserves a verified existing process and fails close
  assert.doesNotMatch(src,/Stop-Process|Stop-ScheduledTask|netbird\s+(up|down)|Stop-Computer|Stop-Service/i);
 });
 
+test("restricted scheduled task metadata must use exact executable and live loopback health, never arbitrary process",()=>{
+ const src=load("Watch-Fun-Dashboard-8789.ps1");
+ assert.match(src,/function Confirm-Owner\(\[int\]\$id,\$policy\)/);
+ assert.match(src,/Get-CimInstance Win32_Process/);
+ assert.match(src,/Get-Process -Id \$id/);
+ assert.match(src,/\$cim.Name -ne "node.exe"/);
+ assert.match(src,/UNEXPECTED_DASHBOARD_OWNER_COMMANDLINE/);
+ assert.match(src,/OWNER_EXECUTABLE_PATH_UNAVAILABLE/);
+ assert.match(src,/\[IO.Path\]::GetFullPath\(\[string\]\$policy.nodePath\)/);
+ assert.match(src,/StringComparison\]::OrdinalIgnoreCase/);
+ assert.match(src,/if\(-not\(Endpoint-Ready\)\)/);
+ assert.match(src,/VERIFIED_EXECUTABLE_AND_ENDPOINTS/);
+ assert.match(src,/\$ownerState=Confirm-Owner \$port.pid \$policy/);
+ assert.match(src,/Write-Status "hold" \$ownerState/);
+ assert.doesNotMatch(src,/if\(-not\(Confirm-Owner \$port.pid\)\)/);
+});
 test("full MCP catalogue and permission filtered REA exposure are separate, never auto-grant inventory",()=>{
  const install=load("Enable-Fun-Dashboard-8789-Autostart.ps1");
  const watch=load("Watch-Fun-Dashboard-8789.ps1");
