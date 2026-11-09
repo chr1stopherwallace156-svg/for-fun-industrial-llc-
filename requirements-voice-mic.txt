@@ -1,0 +1,2 @@
+# Optional microphone capture on operator command
+sounddevice>=0.4.7,<1
