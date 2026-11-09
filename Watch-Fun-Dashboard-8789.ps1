@@ -187,12 +187,17 @@ try{
       }
      }elseif($ownerState -eq "OWNER_DASHBOARD_ENDPOINTS_UNAVAILABLE"){
       Write-Status "waiting" "EXISTING_DASHBOARD_INITIALIZING"
-     }elseif($ownerState -in @("OWNER_PROCESS_QUERY_UNAVAILABLE","OWNER_START_TIME_UNAVAILABLE")){
-      # Limited Task Scheduler tokens may not see process metadata. An
-      # occupied loopback port must not be killed, replaced, or implicitly
-      # trusted. Leave it intact; when vacant, the task can launch its own
-      # exact configured Node binary and verify the returned child PID.
-      Write-Status "waiting" "EXISTING_OWNER_METADATA_UNAVAILABLE_PRESERVED"
+     }elseif($ownerState -in @(
+      "OWNER_PROCESS_QUERY_UNAVAILABLE",
+      "OWNER_START_TIME_UNAVAILABLE",
+      "OWNER_PIN_OR_START_TIME_MISMATCH",
+      "OWNER_EXECUTABLE_PATH_INVALID")){
+      # The task's token may supply missing or inconsistent process metadata.
+      # A PIN/timestamp mismatch is NEVER proof of ownership. We preserve
+      # the occupied loopback port, do not restart/replace/trust its process,
+      # and register a WAITING state. Once 8789 is vacant the supervisor can
+      # start its own Node child and require the exact returned child PID.
+      Write-Status "waiting" "EXISTING_OWNER_UNVERIFIED_PRESERVED"
      }else{
       Write-Status "hold" $ownerState
      }
