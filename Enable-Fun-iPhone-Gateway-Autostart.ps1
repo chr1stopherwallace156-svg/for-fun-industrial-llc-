@@ -1,0 +1,172 @@
+# Enroll current user's private Fun Industrial HTTPS gateway in Windows Task Scheduler.
+# Explicit opt-in: SAME existing password is typed twice and stored encrypted by
+# user-scoped DPAPI (not in repo, env, logs, or plaintext config).
+# Does not restart the running gateway or other Fun Industrial/Elektron services.
+[CmdletBinding()]param()
+$ErrorActionPreference="Stop"
+$Root=Join-Path $env:LOCALAPPDATA "FunIndustrial\VoiceGateway"
+$ConfigFile=Join-Path $Root "private-gateway.json"
+$Auto=Join-Path $Root "autostart"
+$PolicyFile=Join-Path $Auto "supervisor-policy.json"
+$CredentialFile=Join-Path $Auto "gateway-password.dpapi"
+$StatusFile=Join-Path $Auto "supervisor-status.json"
+$TaskName="FunIndustrial-PrivateGateway-Autostart"
+$SourceSupervisor=Join-Path $PSScriptRoot "Watch-Fun-iPhone-HTTPS.ps1"
+$SourceLauncher=Join-Path $PSScriptRoot "Start-Fun-iPhone-HTTPS.ps1"
+$SourceEntry=Join-Path $PSScriptRoot "src\voice\private-gateway-entry.mjs"
+$SourceSelftest=Join-Path $PSScriptRoot "src\voice\private-gateway-selftest.mjs"
+$AutoSupervisor=Join-Path $Auto "Watch-Fun-iPhone-HTTPS.ps1"
+$AutoLauncher=Join-Path $Auto "Start-Fun-iPhone-HTTPS.ps1"
+$Node=(Get-Command node.exe -ErrorAction Stop).Source
+$identity=[System.Security.Principal.WindowsIdentity]::GetCurrent()
+$sid=$identity.User.Value
+$name=$identity.Name
+$created=$false;$registered=$false
+function Hold([string]$reason){throw "FI_GATEWAY_AUTOSTART_SETUP_HOLD=$reason"}
+function Listener([int]$port,[string]$ip){
+ return @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
+  Where-Object{$_.LocalAddress -eq $ip})
+}
+function Plain([System.Security.SecureString]$secret){
+ $ptr=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
+ try{return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)}
+ finally{[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)}
+}
+function ParsePowerShell([string]$file){
+ $tokens=$null;$errors=$null
+ [System.Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$errors)|Out-Null
+ if($errors.Count){Hold "POWERSHELL_SOURCE_PARSE_FAIL"}
+}
+if(Test-Path -LiteralPath $Auto){Hold "ALREADY_CONFIGURED_OR_PARTIAL_AUTOSTART_DIRECTORY_EXISTS"}
+if(Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue){
+ Hold "TASK_ALREADY_REGISTERED_DO_NOT_REPLACE"
+}
+foreach($file in @($ConfigFile,$SourceSupervisor,$SourceLauncher,$SourceEntry,$SourceSelftest)){
+ if(-not(Test-Path -LiteralPath $file -PathType Leaf)){Hold "REQUIRED_FILE_NOT_FOUND"}
+}
+ParsePowerShell $SourceSupervisor
+ParsePowerShell $SourceLauncher
+if(-not([IO.File]::ReadAllText($SourceLauncher)).Contains('param([switch]$UseStoredCredential)')){
+ Hold "LAUNCHER_STORED_CREDENTIAL_MODE_MISSING"
+}
+& $Node --check $SourceEntry
+if($LASTEXITCODE -ne 0){Hold "GATEWAY_ENTRY_SYNTAX_FAILED"}
+& $Node --check $SourceSelftest
+if($LASTEXITCODE -ne 0){Hold "GATEWAY_SELFTEST_SYNTAX_FAILED"}
+$cfg=Get-Content -LiteralPath $ConfigFile -Raw -ErrorAction Stop|ConvertFrom-Json
+if($cfg.schema -ne "fun.voice.gateway.private.v1" -or
+ $cfg.pcIp -ne "100.109.4.20" -or
+ $cfg.iphonePeerIp -ne "100.109.87.100" -or
+ [int]$cfg.port -ne 8443 -or
+ $cfg.publicHost -ne "100.109.4.20:8443"){
+ Hold "CONFIGURATION_OR_PEER_MISMATCH"
+}
+foreach($file in @($cfg.caPublicPem,$cfg.tlsCertificate,$cfg.tlsPrivateKey,$cfg.source)){
+ if(-not(Test-Path -LiteralPath $file -PathType Leaf)){Hold "PREPARED_CERTIFICATE_OR_GATEWAY_FILE_MISSING"}
+}
+$gateway=Listener 8443 "100.109.4.20"
+$all8443=@(Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue)
+if($gateway.Count -ne 1 -or $all8443.Count -ne 1){Hold "CURRENT_PRIVATE_GATEWAY_NOT_LISTENING"}
+$gp=Get-CimInstance Win32_Process -Filter ("ProcessId="+[int]$gateway[0].OwningProcess) -ErrorAction Stop
+if($gp.Name -ne "node.exe" -or $gp.CommandLine -notmatch 'gateway-entry\.mjs'){
+ Hold "UNEXPECTED_PROCESS_OWNS_GATEWAY_PORT"
+}
+$dashboard=Listener 8789 "127.0.0.1"
+if($dashboard.Count -ne 1){Hold "DASHBOARD_8789_NOT_LISTENING"}
+try{$voice=Invoke-RestMethod "http://127.0.0.1:8789/api/voice/mobile/status" -TimeoutSec 10 -ErrorAction Stop}
+catch{Hold "DASHBOARD_VOICE_ENDPOINT_UNAVAILABLE"}
+if($voice.enabled -ne $true -or $voice.code -ne "FI_VOICE_MOBILE_UPLOAD_V1"){
+ Hold "DASHBOARD_VOICE_UPLOAD_NOT_READY"
+}
+# A password cannot be retrieved from a running gateway process. Request the
+# SAME password the user currently enters into iPhone Safari, twice, to avoid
+# silently enrolling a mistyped password for the next unattended startup.
+Write-Host "FI_GATEWAY_AUTOSTART_ENROLL=EXPLICIT_PRIVATE_CREDENTIAL_STORAGE"
+Write-Host "Enter the SAME password currently used to log in as fiiphone (24+ characters)."
+Write-Host "The existing gateway stays running. Windows cannot verify this password against the current iPhone-only listener."
+$a=Read-Host "Existing fiiphone password" -AsSecureString
+$b=Read-Host "Confirm existing fiiphone password" -AsSecureString
+if(-not $a -or -not $b){Hold "GATEWAY_PASSWORD_REQUIRED"}
+$pa=Plain $a;$pb=Plain $b
+try{
+ if($pa.Length -lt 24 -or $pa.Length -gt 200 -or
+    $pa.Contains([char]10) -or $pa.Contains([char]13)){Hold "GATEWAY_PASSWORD_FORMAT_HOLD"}
+ if($pa -cne $pb){Hold "PASSWORD_CONFIRMATION_MISMATCH"}
+}finally{$pa=$null;$pb=$null;$b=$null}
+$encrypted=$a|ConvertFrom-SecureString -ErrorAction Stop
+$a=$null
+if($encrypted -notmatch '^[0-9a-fA-F]{100,}$'){Hold "CURRENT_USER_DPAPI_ENCRYPTION_FAILED"}
+try{
+ New-Item -ItemType Directory -Path $Auto -ErrorAction Stop|Out-Null
+ $created=$true
+ $aclArg=("*"+$sid+":(OI)(CI)F")
+ & icacls.exe $Auto /inheritance:r /grant:r $aclArg "SYSTEM:(OI)(CI)F"|Out-Null
+ if($LASTEXITCODE -ne 0){Hold "AUTOSTART_DIRECTORY_ACL_FAIL"}
+ $subdir=Join-Path $Auto "src\voice"
+ New-Item -ItemType Directory -Path $subdir -Force -ErrorAction Stop|Out-Null
+ [IO.File]::WriteAllText($CredentialFile,$encrypted,[Text.UTF8Encoding]::new($false))
+ $encrypted=$null
+ & icacls.exe $CredentialFile /inheritance:r /grant:r ("*"+$sid+":F") "SYSTEM:F"|Out-Null
+ if($LASTEXITCODE -ne 0){Hold "DPAPI_CREDENTIAL_ACL_FAIL"}
+ Copy-Item -LiteralPath $SourceSupervisor -Destination $AutoSupervisor -ErrorAction Stop
+ Copy-Item -LiteralPath $SourceLauncher -Destination $AutoLauncher -ErrorAction Stop
+ Copy-Item -LiteralPath $SourceEntry -Destination (Join-Path $subdir "private-gateway-entry.mjs") -ErrorAction Stop
+ Copy-Item -LiteralPath $SourceSelftest -Destination (Join-Path $subdir "private-gateway-selftest.mjs") -ErrorAction Stop
+ $policy=[ordered]@{
+  schema="fun.voice.gateway.autostart.v1";
+  sid=$sid;pcIp=$cfg.pcIp;iphonePeerIp=$cfg.iphonePeerIp;
+  gatewayPort=8443;dashboardPort=8789;credentialProtection="Windows-DPAPI-current-user";
+  taskName=$TaskName;userLogonOnly=$true;firewallUnchanged=$true;
+  credentialSavedUtc=[DateTime]::UtcNow.ToString("o")
+ }
+ [IO.File]::WriteAllText($PolicyFile,($policy|ConvertTo-Json -Depth 5),[Text.UTF8Encoding]::new($false))
+ # Verify the stored secret is decryptable only in the current Windows user context.
+ $recovered=Get-Content -LiteralPath $CredentialFile -Raw -ErrorAction Stop
+ $check=ConvertTo-SecureString -String $recovered.Trim() -ErrorAction Stop
+ if(-not $check -or $check.Length -lt 24){Hold "DPAPI_CREDENTIAL_SELFTEST_FAIL"}
+ $check=$null;$recovered=$null
+ # User-logon task, no elevated privilege and no stored Windows logon password.
+ $action=New-ScheduledTaskAction -Execute ((Get-Command powershell.exe -ErrorAction Stop).Source) -Argument ('-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$AutoSupervisor+'"')
+ $trigger=New-ScheduledTaskTrigger -AtLogOn -User $name
+ $principal=New-ScheduledTaskPrincipal -UserId $name -LogonType Interactive -RunLevel Limited
+ $settings=New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit ([TimeSpan]::Zero) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+ Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description "Fun Industrial iPhone-only private HTTPS gateway at user sign-in, DPAPI protected, no firewall changes." -ErrorAction Stop|Out-Null
+ $registered=$true
+ $task=Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
+ if($task.State -eq "Disabled"){Hold "TASK_DISABLED"}
+ # Start the supervisor immediately to monitor the existing gateway without
+ # restarting it; Task Scheduler will start it again at future Windows logins.
+ Start-ScheduledTask -TaskName $TaskName -ErrorAction Stop
+ $seen=$false
+ for($i=0;$i -lt 16;$i++){
+  Start-Sleep -Milliseconds 500
+  if(Test-Path -LiteralPath $StatusFile -PathType Leaf){
+   $status=Get-Content -LiteralPath $StatusFile -Raw|ConvertFrom-Json
+   if($status.state -eq "running" -and $status.reason -eq "EXISTING_GATEWAY_PRESERVED"){$seen=$true;break}
+  }
+ }
+ if(-not $seen){Hold "SUPERVISOR_INITIAL_STATUS_NOT_CONFIRMED"}
+ $after=Listener 8443 "100.109.4.20"
+ if($after.Count -ne 1 -or [int]$after[0].OwningProcess -ne [int]$gateway[0].OwningProcess){
+  Hold "EXISTING_GATEWAY_PROCESS_CHANGED"
+ }
+ Write-Host "FI_GATEWAY_AUTOSTART_SETUP=PASS TASK=$TaskName"
+ Write-Host "FI_GATEWAY_CREDENTIAL_STORAGE=DPAPI_CURRENT_USER_ENCRYPTED NO_PLAINTEXT_FILE=TRUE"
+ Write-Host "FI_GATEWAY_SUPERVISOR=RUNNING CURRENT_GATEWAY_PRESERVED=TRUE PID=$($gp.ProcessId)"
+ Write-Host "FI_GATEWAY_TRIGGER=WINDOWS_USER_SIGNIN WATCH=EVERY_20_SECONDS"
+ Write-Host "FI_GATEWAY_PRIVATE_ACCESS=100.109.4.20:8443 IPHONE_ONLY=100.109.87.100"
+ Write-Host "FI_GATEWAY_AUTOSTART_NOTE=PASSWORD_MATCH_WITH_CURRENT_IPHONE_LOGIN_UNVERIFIED_UNTIL_NEXT_RESTART"
+ Write-Host "FI_GATEWAY_OTHER_SERVICES=NOT_RESTARTED"
+}catch{
+ $reason=$_.Exception.Message
+ if($registered){
+  try{
+   Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+   Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
+  }catch{}
+ }
+ if($created){
+  Remove-Item -LiteralPath $Auto -Recurse -Force -ErrorAction SilentlyContinue
+ }
+ throw "FI_GATEWAY_AUTOSTART_SETUP_HOLD=$reason EXISTING_GATEWAY_UNCHANGED_EXPECTED"
+}finally{$encrypted=$null;$a=$null;$b=$null;$pa=$null;$pb=$null}
