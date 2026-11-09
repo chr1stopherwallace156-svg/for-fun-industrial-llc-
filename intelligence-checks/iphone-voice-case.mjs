@@ -118,3 +118,42 @@ test("UI patch preserves existing script and appends one mobile panel",()=>{
  assert.match(changed,/src="\/api\/voice\/mobile\/client\.js"/);
  assert.throws(()=>patchMobileVoiceUi(changed,panel),/ALREADY_PRESENT/);
 });
+
+test("real-world customized UI compatibility does not require chat-input, inline scripts, or original panel layout",()=>{
+ const panel='<section id="fi-voice-mobile"><!-- FI_VOICE_MOBILE_PANEL_V1 --></section>';
+ const originals=[
+  '<!doctype html><html lang="en"><body class="custom"><main><h1>Operations</h1><div id="memory-chat"></div></main></body></html>',
+  '<html><HEAD><title>Fun</title></HEAD><BODY data-local="true"><div id="advanced-chat">Existing operator tools</div></BODY></html>',
+  '<html><body>Existing text without script tags</body></html>'
+ ];
+ for(const html of originals){
+  const transformed=patchMobileVoiceUi(html,panel);
+  assert.match(transformed,/FI_VOICE_MOBILE_PANEL_V1/);
+  const removeAddition=transformed.replace('\n'+panel+'\n<script src="/api/voice/mobile/client.js" defer></script>\n','');
+  assert.equal(removeAddition,html);
+  assert.throws(()=>patchMobileVoiceUi(transformed,panel),/ALREADY_PRESENT/);
+ }
+ assert.throws(()=>patchMobileVoiceUi('<html><main>invalid</main></html>',panel),/BODY_ANCHOR_HOLD/);
+ assert.throws(()=>patchMobileVoiceUi('<html><body><body></body></html>',panel),/BODY_ANCHOR_HOLD/);
+});
+test("deployment no longer hardcodes original chat input ID",()=>{
+ const ps=readFileSync(new URL("../Activate-Fun-iPhone-Voice.ps1",import.meta.url),"utf8");
+ assert.match(ps,/FI_VOICE_UI_COMPATIBILITY=PASS/);
+ assert.match(ps,/CHAT_INPUT_NOT_REQUIRED/);
+ assert.doesNotMatch(ps,/Contains\('id="chat-input"'\)/);
+ assert.match(ps,/FI_VOICE_UI_ALREADY_PATCHED_HOLD/);
+});
+test("CSP adding same-origin script preserves stricter unrelated directives",()=>{
+ const baseline=[
+ 'const root=path.dirname(fileURLToPath(import.meta.url));',
+ 'const policy="default-src \\'none\\'; script-src \\'nonce-abc\\'; style-src \\'self\\';";',
+ 'const marker="FI_LOCAL_INTELLIGENCE_V1";',
+ 'const seal="FI_SOURCING_RETIRED_V1";',
+ 'const auto="FI_AUTO_COGNEE_CHAT_V1";',
+ 'const server=http.createServer(async(req,res)=>{try{'
+ ].join("\n");
+ const changed=patchMobileVoiceServer(baseline);
+ assert.match(changed,/script-src 'self' 'nonce-abc';/);
+ assert.match(changed,/style-src 'self';/);
+ assert.match(changed,/default-src 'none';/);
+});
