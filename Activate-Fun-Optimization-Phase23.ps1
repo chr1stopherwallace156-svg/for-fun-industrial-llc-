@@ -6,7 +6,9 @@
 $ErrorActionPreference="Stop"
 $Source=$PSScriptRoot
 $Live=Join-Path $env:USERPROFILE "FunIndustrial-REA-MCP-Activation"
-$Opt=Join-Path $env:USERPROFILE "FunIndustrial-Optimization-20261109"
+$OptHome=Join-Path $env:LOCALAPPDATA "FunIndustrial\OptimizationRuntime"
+$OptSource=Join-Path $OptHome "source"
+$OptPackage=Join-Path $OptSource "fun_optimization"
 $Py=Join-Path $env:LOCALAPPDATA "FunIndustrial\OptimizationRuntime\venv\Scripts\python.exe"
 $Node=(Get-Command node.exe -ErrorAction Stop).Source
 $Server=Join-Path $Live "src\server.mjs"
@@ -42,6 +44,8 @@ function Request([string]$url,[int]$timeout=15){
 function StartDashboard([string]$stdout,[string]$stderr){
  $env:HOST="127.0.0.1";$env:PORT="8789";$env:COMPUTE_PORT="8791"
  $env:FI_COGNEE_RECALL_BUDGET_MS=[string]$MemoryBudget
+ $env:FUN_VOICE_HOME=Join-Path $env:LOCALAPPDATA "FunIndustrial\VoiceLab"
+ $env:REA_ALLOWED_TOOLS=($reaBefore|ForEach-Object{$_.name}) -join ","
  return Start-Process -FilePath $Node -ArgumentList @("src/server.mjs") -WorkingDirectory $Live -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
 }
 function WaitDashboard([System.Diagnostics.Process]$process,[bool]$optimization){
@@ -60,13 +64,15 @@ function WaitDashboard([System.Diagnostics.Process]$process,[bool]$optimization)
  return $false
 }
 foreach($p in @($Server,$Page,$Py,$SourceModule,$SourceClient,$Panel,$Patcher,$Test,
- (Join-Path $Opt "fun_optimization\bridge.py"),
- (Join-Path $Opt "fun_optimization\core.py"))){
+ (Join-Path $Source "fun_optimization\__init__.py"),
+ (Join-Path $Source "fun_optimization\bridge.py"),
+ (Join-Path $Source "fun_optimization\core.py"))){
  if(-not(Test-Path -LiteralPath $p -PathType Leaf)){Hold "REQUIRED_FILE_MISSING"}
  if((Get-Item -LiteralPath $p).Attributes -band [IO.FileAttributes]::ReparsePoint){Hold "SYMLINK_FILE_DENIED"}
 }
 if(Test-Path -LiteralPath $ModuleDir){Hold "OPTIMIZATION_ALREADY_OR_PARTIALLY_DEPLOYED"}
-foreach($p in @($Source,$Live,$Opt)){
+if(Test-Path -LiteralPath $OptSource){Hold "OPTIMIZATION_PERSISTENT_SOURCE_ALREADY_EXISTS"}
+foreach($p in @($Source,$Live,$OptHome)){
  if((Get-Item -LiteralPath $p).Attributes -band [IO.FileAttributes]::ReparsePoint){Hold "SYMLINK_DIR_DENIED"}
 }
 if(-not([IO.File]::ReadAllText($Server)).Contains("FI_VOICE_MOBILE_DASHBOARD_V1") -or
@@ -113,6 +119,10 @@ try{
  $phase="copy_staged_files"
  $changed=$true
  New-Item -ItemType Directory -Path $ModuleDir -Force|Out-Null
+ New-Item -ItemType Directory -Path $OptPackage -Force|Out-Null
+ foreach($name in @("__init__.py","core.py","bridge.py")){
+  Copy-Item -LiteralPath (Join-Path $Source ("fun_optimization\"+$name)) -Destination (Join-Path $OptPackage $name) -ErrorAction Stop
+ }
  Copy-Item -LiteralPath $SourceModule -Destination $Module -ErrorAction Stop
  Copy-Item -LiteralPath $SourceClient -Destination $Client -ErrorAction Stop
  Copy-Item -LiteralPath $StageServer -Destination $Server -Force -ErrorAction Stop
@@ -171,6 +181,7 @@ try{
   Copy-Item -LiteralPath $OldServer -Destination $Server -Force -ErrorAction SilentlyContinue
   Copy-Item -LiteralPath $OldPage -Destination $Page -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $ModuleDir -Recurse -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $OptSource -Recurse -Force -ErrorAction SilentlyContinue
   Write-Warning "FUN_OPTIMIZATION_ROLLBACK_FILES=RESTORED"
  }
  if($stopped){
