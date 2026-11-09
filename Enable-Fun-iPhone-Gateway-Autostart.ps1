@@ -138,7 +138,7 @@ try{
  # restarting it; Task Scheduler will start it again at future Windows logins.
  Start-ScheduledTask -TaskName $TaskName -ErrorAction Stop
  $seen=$false
- for($i=0;$i -lt 16;$i++){
+ for($i=0;$i -lt 40;$i++){
   Start-Sleep -Milliseconds 500
   if(Test-Path -LiteralPath $StatusFile -PathType Leaf){
    $status=Get-Content -LiteralPath $StatusFile -Raw|ConvertFrom-Json
