@@ -52,6 +52,12 @@ if(-not $txt.Contains("FI_AUTO_COGNEE_CHAT_V1") -or
 }
 $before=OnlyListener
 VerifyOwner $before
+# Pin both PID and process creation time. PID alone can be reused following
+# a Windows restart and is not an adequate trusted-process identity.
+$beforeProcess=Get-Process -Id $before -ErrorAction Stop
+try{$verifiedStartUtcTicks=[int64]$beforeProcess.StartTime.ToUniversalTime().Ticks}
+catch{Hold "DASHBOARD_START_TIME_UNAVAILABLE"}
+if($verifiedStartUtcTicks -le 0){Hold "DASHBOARD_START_TIME_INVALID"}
 try{
  $mobile=Invoke-RestMethod "http://127.0.0.1:8789/api/voice/mobile/status" -TimeoutSec 8 -ErrorAction Stop
  $memory=Invoke-RestMethod "http://127.0.0.1:8789/api/ai/automatic-memory/status" -TimeoutSec 8 -ErrorAction Stop
@@ -90,6 +96,7 @@ $policy=[ordered]@{
  deployedRoot=$Root;nodePath=$Node;host="127.0.0.1";port=8789;
  computePort=8791;voiceHome=$Voice;
  memoryBudgetMs=$budget;catalogueNames=$catalogueNames;allowedTools=$names;
+ verifiedExistingPid=$before;verifiedExistingStartUtcTicks=$verifiedStartUtcTicks;
  serverSha256=(Get-FileHash -LiteralPath $Server -Algorithm SHA256).Hash;
  htmlSha256=(Get-FileHash -LiteralPath $Html -Algorithm SHA256).Hash;
  noProcessReplacement=$true;noOtherServiceStart=$true;
