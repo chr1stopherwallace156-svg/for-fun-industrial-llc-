@@ -11,6 +11,9 @@ $Config=Join-Path $HomeDir "private-gateway.json"
 $Launcher=Join-Path $Auto "Start-Fun-iPhone-HTTPS.ps1"
 $Credential=Join-Path $Auto "gateway-password.dpapi"
 $StatusFile=Join-Path $Auto "supervisor-status.json"
+$PortStateSource=Join-Path $Auto "gateway-port-state.ps1"
+if(-not(Test-Path -LiteralPath $PortStateSource -PathType Leaf)){throw "FI_GATEWAY_PORT_CLASSIFIER_MISSING"}
+. $PortStateSource
 $mutex=[System.Threading.Mutex]::new($false,"Local\FunIndustrial-PrivateGateway-Supervisor-v1")
 $ownsMutex=$false
 function Status([string]$state,[string]$code){
@@ -70,17 +73,16 @@ try{
  }
  $powerShell=(Get-Command powershell.exe -ErrorAction Stop).Source
  while($true){
-  $gateway=Listener 8443 $g.pcIp
-  $anyPort=@(Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue)
-  if($anyPort.Count){
-   if($gateway.Count -ne 1 -or $anyPort.Count -ne 1){
-    Status "hold" "PORT_CONFLICT_OR_WRONG_BIND"
-   }else{
-    $owner=Get-CimInstance Win32_Process -Filter ("ProcessId="+[int]$gateway[0].OwningProcess) -ErrorAction SilentlyContinue
-    if($owner -and $owner.Name -eq "node.exe" -and $owner.CommandLine -match 'gateway-entry\.mjs'){
-     Status "running" "EXISTING_GATEWAY_PRESERVED"
-    }else{Status "hold" "UNEXPECTED_PROCESS_ON_PRIVATE_PORT"}
-   }
+  # Classify a single port snapshot (do not race separate queries).
+  $snapshot=@(Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue)
+  $state=Get-FunPrivateGatewayPortState -Listeners $snapshot -ExpectedIp $g.pcIp
+  if($state.State -eq "conflict"){
+   Status "hold" "PORT_CONFLICT_OR_WRONG_BIND"
+  }elseif($state.State -eq "existing"){
+   $owner=Get-CimInstance Win32_Process -Filter ("ProcessId="+[int]$state.ListenerProcessId) -ErrorAction SilentlyContinue
+   if($owner -and $owner.Name -eq "node.exe" -and $owner.CommandLine -match 'gateway-entry\.mjs'){
+    Status "running" "EXISTING_GATEWAY_PRESERVED"
+   }else{Status "hold" "UNEXPECTED_PROCESS_ON_PRIVATE_PORT"}
   }elseif(-not(DashboardReady)){
    Status "waiting" "DASHBOARD_8789_UNAVAILABLE"
   }elseif(-not(NetBirdReady $g.pcIp $g.iphonePeerIp)){
@@ -102,7 +104,7 @@ try{
      Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
      Status "hold" "LAUNCHER_TIMEOUT"
     }elseif($proc.ExitCode -ne 0){Status "hold" ("LAUNCH_EXIT_"+$proc.ExitCode)}
-    elseif((Listener 8443 $g.pcIp).Count -eq 1){Status "running" "AUTOSTART_GATEWAY_PASS"}
+    elseif((Get-FunPrivateGatewayPortState -Listeners @(Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue) -ExpectedIp $g.pcIp).State -eq "existing"){Status "running" "AUTOSTART_GATEWAY_PASS"}
     else{Status "hold" "LAUNCH_NO_LISTENER"}
    }catch{Status "hold" "LAUNCH_FAILED"}
   }
