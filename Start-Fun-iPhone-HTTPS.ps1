@@ -91,7 +91,9 @@ try{
  # inside the private gateway directory and rewrite only that exact import.
  $entryText=[IO.File]::ReadAllText($SourceEntry)
  $oldImport='from "../gateway.mjs"'
- if(($entryText.Split([string[]]@($oldImport),[StringSplitOptions]::None).Count-1) -ne 1){
+ if(-not $entryText.Contains($oldImport) -or
+    $entryText.IndexOf($oldImport,[StringComparison]::Ordinal) -ne
+    $entryText.LastIndexOf($oldImport,[StringComparison]::Ordinal)){
   throw "FI_GATEWAY_ENTRY_IMPORT_ANCHOR_HOLD"
  }
  $entryText=$entryText.Replace($oldImport,'from "./gateway.mjs"')
