@@ -1,0 +1,64 @@
+name: Fun Industrial Optimization CI
+on:
+  push:
+    branches:
+      - feature/fun-iphone-voice-dashboard-20261108
+    paths:
+      - "fun_optimization/**"
+      - "tests/test_fun_optimization.py"
+      - "requirements-optimization.txt"
+      - "Setup-Fun-Optimization.ps1"
+      - "FUN-OPTIMIZATION-CAPABILITIES.md"
+      - ".github/workflows/fun-optimization-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-optimization:
+    name: CPU optimization tests on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pinned Optuna and OR-Tools (no AI dependencies)
+        run: python -m pip install --disable-pip-version-check -r requirements-optimization.txt
+      - name: Syntax check
+        run: python -m compileall -q fun_optimization tests/test_fun_optimization.py
+      - name: Run bounded optimization tests
+        run: python -m unittest discover -s tests -p test_fun_optimization.py -v
+      - name: Run CLI status and all three synthetic examples
+        run: |
+          python -m fun_optimization status
+          python -m fun_optimization demo
+  windows-installer-guard:
+    name: Parse installer without executing any commands
+    runs-on: windows-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell and verify service boundaries
+        shell: pwsh
+        run: |
+          $tokens=$null;$parseErrors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'Setup-Fun-Optimization.ps1'),
+            [ref]$tokens,[ref]$parseErrors
+          )|Out-Null
+          if($parseErrors.Count){$parseErrors | ForEach-Object { Write-Error $_.Message }; throw 'OPTIMIZATION_INSTALLER_PARSE_HOLD'}
+          $body=Get-Content 'Setup-Fun-Optimization.ps1' -Raw
+          foreach($needle in @('FUN_OPTIMIZATION_SETUP=PASS','fun_optimization demo','FUN_OPTIMIZATION_SERVICES=UNCHANGED','test_fun_optimization.py')){
+            if(-not $body.Contains($needle)){throw 'OPTIMIZATION_INSTALLER_INVARIANT_HOLD'}
+          }
+          if($body -match 'Stop-Process|Stop-Service|Restart-Service|Register-ScheduledTask|Set-NetFirewallRule'){
+            throw 'OPTIMIZATION_INSTALLER_SERVICE_MUTATION_HOLD'
+          }
+          Write-Host 'FUN_OPTIMIZATION_INSTALLER_PARSE=PASS PROTECTED_SERVICE_MUTATIONS=NONE'
