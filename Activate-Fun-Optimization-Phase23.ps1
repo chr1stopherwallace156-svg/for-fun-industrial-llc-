@@ -169,9 +169,31 @@ try{
   }
  }
  if(-not $reaStart -or $reaStart.state -ne "ready"){Hold "REA_CATALOG_REINITIALIZE"}
- $reaAfter=@((Request "$Base/api/rea/tools" 45).tools)
- if($reaAfter.Count -ne 229 -or
-   (Compare-Object @($reaBefore|ForEach-Object{$_.name}|Sort-Object) @($reaAfter|ForEach-Object{$_.name}|Sort-Object)).Count){Hold "REA_229_CHANGED"}
+ Write-Host "FUN_OPT_REA_INITIALIZE=PASS STATE=ready"
+ $phase="read_only_rea_catalogue_verify"
+ # The catalogue endpoint can return a transient 503 immediately after the
+ # successful MCP initialize. Poll only GET /api/rea/tools, never tools/call.
+ # Fail closed if the complete original 229 names cannot be recovered.
+ $reaAfter=@()
+ $reaToolsVerified=$false
+ for($catalogAttempt=1;$catalogAttempt -le 5;$catalogAttempt++){
+  try{
+   $reaAfter=@((Request "$Base/api/rea/tools" 45).tools)
+   if($reaAfter.Count -eq 229){
+    $reaToolsVerified=$true
+    Write-Host "FUN_OPT_REA_CATALOGUE=READY ATTEMPT=$catalogAttempt COUNT=229"
+    break
+   }
+   Write-Warning ("FUN_OPT_REA_CATALOGUE=HOLD ATTEMPT="+$catalogAttempt+" COUNT="+$reaAfter.Count+" EXPECTED=229")
+  }catch{
+   $reaStatus="NO_HTTP_RESPONSE"
+   if($_.Exception.Response){try{$reaStatus=[int]$_.Exception.Response.StatusCode}catch{}}
+   Write-Warning ("FUN_OPT_REA_CATALOGUE=HOLD ATTEMPT="+$catalogAttempt+" HTTP="+$reaStatus)
+  }
+  if($catalogAttempt -lt 5){Start-Sleep -Seconds 3}
+ }
+ if(-not $reaToolsVerified){Hold "REA_TOOLS_UNAVAILABLE_AFTER_START"}
+ if((Compare-Object @($reaBefore|ForEach-Object{$_.name}|Sort-Object) @($reaAfter|ForEach-Object{$_.name}|Sort-Object)).Count){Hold "REA_229_CHANGED"}
  $memAfter=Request "$Base/api/ai/automatic-memory/status" 15
  if($memAfter.mode -ne $memory.mode -or $memAfter.enabledByDefault -ne $true -or
     [int]$memAfter.recallBudgetMs -ne $MemoryBudget){Hold "COGNEE_MEMORY_REGRESSION"}
