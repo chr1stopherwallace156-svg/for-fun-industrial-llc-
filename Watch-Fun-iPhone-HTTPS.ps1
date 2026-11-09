@@ -95,8 +95,13 @@ try{
    try{
     $proc=Start-Process -FilePath $powerShell -ArgumentList @(
      "-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass",
-     "-File",('"'+$Launcher+'"'),"-UseStoredCredential") -Wait -PassThru -WindowStyle Hidden -RedirectStandardOutput $out -RedirectStandardError $err -ErrorAction Stop
-    if($proc.ExitCode -ne 0){Status "hold" ("LAUNCH_EXIT_"+$proc.ExitCode)}
+     "-File",('"'+$Launcher+'"'),"-UseStoredCredential") -PassThru -WindowStyle Hidden -RedirectStandardOutput $out -RedirectStandardError $err -ErrorAction Stop
+    # Process.WaitForExit waits only for this short-lived PowerShell launcher,
+    # unlike Start-Process -Wait (which may wait for its long-lived Node child).
+    if(-not $proc.WaitForExit(60000)){
+     Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+     Status "hold" "LAUNCHER_TIMEOUT"
+    }elseif($proc.ExitCode -ne 0){Status "hold" ("LAUNCH_EXIT_"+$proc.ExitCode)}
     elseif((Listener 8443 $g.pcIp).Count -eq 1){Status "running" "AUTOSTART_GATEWAY_PASS"}
     else{Status "hold" "LAUNCH_NO_LISTENER"}
    }catch{Status "hold" "LAUNCH_FAILED"}
