@@ -30,7 +30,9 @@ test("supervisor is single instance, fail-closed on identity, waits for private 
  assert.match(src,/PORT_CONFLICT_OR_WRONG_BIND/);
  assert.match(src,/EXISTING_GATEWAY_PRESERVED/);
  assert.match(src,/UseStoredCredential/);
- assert.doesNotMatch(src,/Remove-Item .*gateway-password|netbird\s+(?:up|down)|Stop-Process/);
+ assert.match(src,/\$proc\.WaitForExit\(60000\)/);
+ assert.match(src,/Stop-Process -Id \$proc\.Id/);
+ assert.doesNotMatch(src,/Remove-Item .*gateway-password|netbird\s+(?:up|down)|Stop-Process -Id \$gateway/);
 });
 test("gateway launcher keeps manual default and adds exact policy guarded DPAPI mode",()=>{
  const src=load("Start-Fun-iPhone-HTTPS.ps1");
