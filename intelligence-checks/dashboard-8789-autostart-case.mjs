@@ -11,8 +11,12 @@ test("dashboard install captures known 8789 process and memory, voice, and exact
  assert.match(src,/api\/voice\/mobile\/status/);
  assert.match(src,/api\/ai\/automatic-memory\/status/);
  assert.match(src,/api\/rea\/tools/);
- assert.match(src,/\$names\.Count -ne 229/);
- assert.match(src,/memoryBudgetMs=\$budget;allowedTools=\$names/);
+ assert.match(src,/api\/rea\/catalog/);
+ assert.match(src,/FI_DASHBOARD_REA_INVENTORY/);
+ assert.match(src,/\$catalogueNames\.Count -ne 229/);
+ assert.match(src,/REA_229_CATALOGUE_INTEGRITY_HOLD/);
+ assert.match(src,/REA_PERMISSION_FILTER_INTEGRITY_HOLD/);
+ assert.match(src,/memoryBudgetMs=\$budget;catalogueNames=\$catalogueNames;allowedTools=\$names/);
  assert.match(src,/serverSha256=/);
  assert.match(src,/htmlSha256=/);
  assert.match(src,/New-ScheduledTaskPrincipal -UserId \$User\.Name -LogonType Interactive -RunLevel Limited/);
@@ -39,7 +43,24 @@ test("dashboard supervisor preserves a verified existing process and fails close
  assert.match(src,/if\(\$ProbeOnce\)/);
  assert.match(src,/\$env:FI_COGNEE_RECALL_BUDGET_MS=/);
  assert.match(src,/\$env:REA_ALLOWED_TOOLS=/);
+ assert.match(src,/@\(\$p\.catalogueNames\)\.Count -ne 229/);
+ assert.match(src,/@\(\$p\.allowedTools\)\.Count -gt 229/);
+ assert.match(src,/\$names\|Where-Object\{\$_ -cnotin \$catalogueNames\}/);
  assert.match(src,/\$env:FUN_VOICE_HOME=/);
  assert.match(src,/Start-Process -FilePath \$p\.nodePath/);
  assert.doesNotMatch(src,/Stop-Process|Stop-ScheduledTask|netbird\s+(up|down)|Stop-Computer|Stop-Service/i);
+});
+
+test("full MCP catalogue and permission filtered REA exposure are separate, never auto-grant inventory",()=>{
+ const install=load("Enable-Fun-Dashboard-8789-Autostart.ps1");
+ const watch=load("Watch-Fun-Dashboard-8789.ps1");
+ const p=load("src/platform.mjs");
+ assert.match(p,/async reaCatalog\(\)/);
+ assert.match(p,/async reaTools\(\)/);
+ assert.match(p,/allowedTools\.slice\(0,14\)/);
+ assert.match(install,/\$catalogue=Invoke-RestMethod "http:\/\/127\.0\.0\.1:8789\/api\/rea\/catalog"/);
+ assert.match(install,/\$rea=Invoke-RestMethod "http:\/\/127\.0\.0\.1:8789\/api\/rea\/tools"/);
+ assert.match(install,/catalogueNames=\$catalogueNames;allowedTools=\$names/);
+ assert.match(watch,/\$env:REA_ALLOWED_TOOLS=\(@\(\$p\.allowedTools\)-join ","\)/);
+ assert.doesNotMatch(watch,/\$env:REA_ALLOWED_TOOLS=\(@\(\$p\.catalogueNames\)/);
 });
