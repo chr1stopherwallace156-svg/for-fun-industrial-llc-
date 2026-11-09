@@ -1,7 +1,8 @@
 # Enroll current user's private Fun Industrial HTTPS gateway in Windows Task Scheduler.
-# Explicit opt-in: SAME existing password is typed twice and stored encrypted by
+# Explicit opt-in: chosen password is typed twice and stored encrypted by
 # user-scoped DPAPI (not in repo, env, logs, or plaintext config).
-# Does not restart the running gateway or other Fun Industrial/Elektron services.
+# Supports both gateway stopped and gateway already running. Never replaces a
+# listening process or restarts other Fun Industrial/Elektron services.
 [CmdletBinding()]param()
 $ErrorActionPreference="Stop"
 $Root=Join-Path $env:LOCALAPPDATA "FunIndustrial\VoiceGateway"
@@ -66,10 +67,16 @@ foreach($file in @($cfg.caPublicPem,$cfg.tlsCertificate,$cfg.tlsPrivateKey,$cfg.
 }
 $gateway=Listener 8443 "100.109.4.20"
 $all8443=@(Get-NetTCPConnection -LocalPort 8443 -State Listen -ErrorAction SilentlyContinue)
-if($gateway.Count -ne 1 -or $all8443.Count -ne 1){Hold "CURRENT_PRIVATE_GATEWAY_NOT_LISTENING"}
-$gp=Get-CimInstance Win32_Process -Filter ("ProcessId="+[int]$gateway[0].OwningProcess) -ErrorAction Stop
-if($gp.Name -ne "node.exe" -or $gp.CommandLine -notmatch 'gateway-entry\.mjs'){
- Hold "UNEXPECTED_PROCESS_OWNS_GATEWAY_PORT"
+$existingGateway=$all8443.Count -eq 1 -and $gateway.Count -eq 1
+$gp=$null
+if($all8443.Count -gt 0 -and -not $existingGateway){
+ Hold "GATEWAY_PORT_8443_CONFLICT_OR_WRONG_BIND"
+}
+if($existingGateway){
+ $gp=Get-CimInstance Win32_Process -Filter ("ProcessId="+[int]$gateway[0].OwningProcess) -ErrorAction Stop
+ if($gp.Name -ne "node.exe" -or $gp.CommandLine -notmatch 'gateway-entry\.mjs'){
+  Hold "UNEXPECTED_PROCESS_OWNS_GATEWAY_PORT"
+ }
 }
 $dashboard=Listener 8789 "127.0.0.1"
 if($dashboard.Count -ne 1){Hold "DASHBOARD_8789_NOT_LISTENING"}
@@ -78,14 +85,19 @@ catch{Hold "DASHBOARD_VOICE_ENDPOINT_UNAVAILABLE"}
 if($voice.enabled -ne $true -or $voice.code -ne "FI_VOICE_MOBILE_UPLOAD_V1"){
  Hold "DASHBOARD_VOICE_UPLOAD_NOT_READY"
 }
-# A password cannot be retrieved from a running gateway process. Request the
-# SAME password the user currently enters into iPhone Safari, twice, to avoid
-# silently enrolling a mistyped password for the next unattended startup.
+# Password can never be retrieved from a running gateway. If it is already
+# running, require its SAME password. If it is stopped, this password becomes
+# the new password when the supervisor next starts the gateway.
 Write-Host "FI_GATEWAY_AUTOSTART_ENROLL=EXPLICIT_PRIVATE_CREDENTIAL_STORAGE"
-Write-Host "Enter the SAME password currently used to log in as fiiphone (24+ characters)."
-Write-Host "The existing gateway stays running. Windows cannot verify this password against the current iPhone-only listener."
-$a=Read-Host "Existing fiiphone password" -AsSecureString
-$b=Read-Host "Confirm existing fiiphone password" -AsSecureString
+if($existingGateway){
+ Write-Host "Gateway is running. Enter the SAME fiiphone password currently used in Safari."
+ Write-Host "The gateway will NOT be restarted. Current-password match is not verifiable from the local PC."
+}else{
+ Write-Host "Gateway is STOPPED. Choose the fiiphone password to use from now on (24+ characters)."
+ Write-Host "If the dashboard/NetBird prerequisites are ready, the supervisor can start the gateway automatically."
+}
+$a=Read-Host "fiiphone password for automatic gateway startup" -AsSecureString
+$b=Read-Host "Confirm fiiphone startup password" -AsSecureString
 if(-not $a -or -not $b){Hold "GATEWAY_PASSWORD_REQUIRED"}
 $pa=Plain $a;$pb=Plain $b
 try{
@@ -134,28 +146,43 @@ try{
  $registered=$true
  $task=Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
  if($task.State -eq "Disabled"){Hold "TASK_DISABLED"}
- # Start the supervisor immediately to monitor the existing gateway without
- # restarting it; Task Scheduler will start it again at future Windows logins.
+ # Start the supervisor immediately. It never stops an existing gateway;
+ # if 8443 is free, it starts one only after dashboard and NetBird readiness.
  Start-ScheduledTask -TaskName $TaskName -ErrorAction Stop
- $seen=$false
- for($i=0;$i -lt 40;$i++){
+ $seen=$false;$status=$null
+ for($i=0;$i -lt 120;$i++){
   Start-Sleep -Milliseconds 500
   if(Test-Path -LiteralPath $StatusFile -PathType Leaf){
-   $status=Get-Content -LiteralPath $StatusFile -Raw|ConvertFrom-Json
-   if($status.state -eq "running" -and $status.reason -eq "EXISTING_GATEWAY_PRESERVED"){$seen=$true;break}
+   try{$status=Get-Content -LiteralPath $StatusFile -Raw|ConvertFrom-Json}catch{continue}
+   if($existingGateway -and $status.state -eq "running" -and
+       $status.reason -eq "EXISTING_GATEWAY_PRESERVED"){$seen=$true;break}
+   if(-not $existingGateway -and $status.state -in @("running","waiting","hold")){
+    $seen=$true;break
+   }
   }
  }
  if(-not $seen){Hold "SUPERVISOR_INITIAL_STATUS_NOT_CONFIRMED"}
+ if($status.state -eq "hold"){Hold ("SUPERVISOR_REPORTED_"+$status.reason)}
  $after=Listener 8443 "100.109.4.20"
- if($after.Count -ne 1 -or [int]$after[0].OwningProcess -ne [int]$gateway[0].OwningProcess){
-  Hold "EXISTING_GATEWAY_PROCESS_CHANGED"
- }
+ if($existingGateway){
+  if($after.Count -ne 1 -or [int]$after[0].OwningProcess -ne [int]$gateway[0].OwningProcess){
+   Hold "EXISTING_GATEWAY_PROCESS_CHANGED"
+  }
+ }elseif($status.state -eq "running"){
+  if($after.Count -ne 1){Hold "GATEWAY_AUTOSTART_LISTENER_NOT_PRESENT"}
+ }elseif($after.Count -gt 0){Hold "WAITING_STATE_WITH_UNEXPECTED_GATEWAY_LISTENER"}
  Write-Host "FI_GATEWAY_AUTOSTART_SETUP=PASS TASK=$TaskName"
  Write-Host "FI_GATEWAY_CREDENTIAL_STORAGE=DPAPI_CURRENT_USER_ENCRYPTED NO_PLAINTEXT_FILE=TRUE"
- Write-Host "FI_GATEWAY_SUPERVISOR=RUNNING CURRENT_GATEWAY_PRESERVED=TRUE PID=$($gp.ProcessId)"
+ if($existingGateway){
+  Write-Host "FI_GATEWAY_SUPERVISOR=RUNNING CURRENT_GATEWAY_PRESERVED=TRUE PID=$($gp.ProcessId)"
+ }elseif($status.state -eq "running"){
+  Write-Host "FI_GATEWAY_SUPERVISOR=RUNNING GATEWAY_RECOVERED=TRUE PID=$($after[0].OwningProcess)"
+ }else{
+  Write-Host "FI_GATEWAY_SUPERVISOR=WAITING DEPENDENCY=$($status.reason) GATEWAY_RECOVERED=FALSE"
+ }
  Write-Host "FI_GATEWAY_TRIGGER=WINDOWS_USER_SIGNIN WATCH=EVERY_20_SECONDS"
  Write-Host "FI_GATEWAY_PRIVATE_ACCESS=100.109.4.20:8443 IPHONE_ONLY=100.109.87.100"
- Write-Host "FI_GATEWAY_AUTOSTART_NOTE=PASSWORD_MATCH_WITH_CURRENT_IPHONE_LOGIN_UNVERIFIED_UNTIL_NEXT_RESTART"
+ Write-Host "FI_GATEWAY_AUTOSTART_NOTE=USE_THE_PASSWORD_JUST_ENROLLED_IF_GATEWAY_WAS_STOPPED"
  Write-Host "FI_GATEWAY_OTHER_SERVICES=NOT_RESTARTED"
 }catch{
  $reason=$_.Exception.Message
