@@ -159,7 +159,8 @@ def compare_analyses(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
     loudness_gap = abs(a["loudness"]["mean_dbfs_rms"]-b["loudness"]["mean_dbfs_rms"])
     dynamic1=l1-l1.mean();dynamic2=l2-l2.mean()
     energy_shape_diff=float(np.mean(np.abs(dynamic1-dynamic2)))
-    mfcc1=np.array(a["spectral"]["mfcc_mean_13"]),mfcc2=np.array(b["spectral"]["mfcc_mean_13"])
+    mfcc1=np.array(a["spectral"]["mfcc_mean_13"])
+    mfcc2=np.array(b["spectral"]["mfcc_mean_13"])
     mfcc_dist=float(np.linalg.norm((mfcc1-mfcc2)/np.maximum(np.abs(mfcc1)+np.abs(mfcc2),1.0)))
     duration_ratio=b["duration_seconds"]/max(a["duration_seconds"],0.001)
     return {
