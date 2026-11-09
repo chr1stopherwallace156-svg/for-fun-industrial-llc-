@@ -1,0 +1,30 @@
+<!-- FI_OPTIMIZATION_PHASE23_PANEL_V1: additive decision-support workspace -->
+<section id="fi-optimization" class="panel">
+  <h2>Optimization workspace — Optuna + Google OR-Tools</h2>
+  <p class="muted">Offline, bounded optimization for inventory, project resources and stop ordering. No real purchases, scheduling or fleet dispatch occur. Optimization runs require explicit operator approval.</p>
+  <p id="fi-opt-status" class="muted small" aria-live="polite">Checking isolated solver installation…</p>
+  <label for="fi-opt-action">Optimization problem</label>
+  <select id="fi-opt-action" style="display:block;margin:8px 0 14px;padding:9px;background:#0d1722;color:#eaf1f8;border:1px solid #40566c;border-radius:7px">
+    <option value="inventory">Optuna — inventory stock tuning</option>
+    <option value="allocation">OR-Tools — budget and labor allocation</option>
+    <option value="route">OR-Tools — vehicle stop-order optimization</option>
+  </select>
+  <label for="fi-opt-problem">Review and edit the optimization problem (JSON)</label>
+  <textarea id="fi-opt-problem" style="min-height:165px" spellcheck="false" aria-label="Explicit solver input JSON"></textarea>
+  <div class="actions">
+    <button type="button" id="fi-opt-run">Review and approve solver run</button>
+    <button type="button" id="fi-opt-refresh" class="secondary">Check optimizer status</button>
+  </div>
+  <pre id="fi-opt-result" aria-live="polite">No optimizer run yet.</pre>
+  <h3>Local AI optimization assistant (Phase 3)</h3>
+  <p class="muted">Your existing llama.cpp AI can suggest a JSON problem or explain solver output. Its text is untrusted advisory data; it cannot run optimization or call REA. You must review any suggested JSON before approving the solver.</p>
+  <label for="fi-opt-request">Describe what to optimize</label>
+  <textarea id="fi-opt-request" style="min-height:85px" maxlength="2400" placeholder="Example: Prioritize inspections and repairs under a budget of 20000 and 120 labor hours."></textarea>
+  <div class="actions">
+    <button type="button" id="fi-opt-ai-draft" class="secondary">Ask local AI to draft JSON</button>
+    <button type="button" id="fi-opt-ai-explain" class="secondary">Explain last solver result</button>
+    <button type="button" id="fi-opt-review-draft" class="secondary" disabled>Review AI draft in editor</button>
+  </div>
+  <pre id="fi-opt-ai-result" aria-live="polite">No AI suggestion yet.</pre>
+  <p class="muted small">AI draft and explanation use the existing loopback llama.cpp endpoint with no tool definitions. Results never auto-apply, and Cognee/REA are not given new execution authority. All numeric inputs must be supplied and verified by the operator.</p>
+</section>
