@@ -23,6 +23,7 @@ $Launcher=Join-Path $Auto "Start-Fun-iPhone-HTTPS.ps1"
 $Credential=Join-Path $Auto "gateway-password.dpapi"
 $StatusFile=Join-Path $Auto "supervisor-status.json"
 $PortStateSource=Join-Path $Auto "gateway-port-state.ps1"
+$AttestScript=Join-Path $Auto "private-gateway-attest.mjs"
 if(-not(Test-Path -LiteralPath $PortStateSource -PathType Leaf)){throw "FI_GATEWAY_PORT_CLASSIFIER_MISSING"}
 . $PortStateSource
 $mutex=[System.Threading.Mutex]::new($false,"Local\FunIndustrial-PrivateGateway-Supervisor-v1")
@@ -42,6 +43,22 @@ function Status([string]$state,[string]$code){
   $kind=$_.Exception.GetType().Name
   throw ("FI_GATEWAY_SUPERVISOR_STATUS_WRITE_HOLD TYPE="+$kind)
  }
+}
+# Preserve only a known node.exe gateway. If a scheduled task cannot read
+# its command line, require live pinned-TLS attestation and local 403 guard.
+# A visible command line belonging to a different program ALWAYS fails closed.
+function Confirm-GatewayOwner([int]$processId){
+ $owner=Get-CimInstance Win32_Process -Filter ("ProcessId="+$processId) -ErrorAction SilentlyContinue
+ if(-not $owner -or $owner.Name -ne "node.exe"){return $false}
+ if($owner.CommandLine -match 'gateway-entry\.mjs'){return $true}
+ if(-not [string]::IsNullOrWhiteSpace([string]$owner.CommandLine)){return $false}
+ if(-not(Test-Path -LiteralPath $AttestScript -PathType Leaf)){return $false}
+ $node=Get-Command node.exe -ErrorAction SilentlyContinue
+ if(-not $node){return $false}
+ try{
+  $out=@(& $node.Source $AttestScript $Config 2>$null)
+  return $LASTEXITCODE -eq 0 -and @($out|Where-Object{$_ -eq "FI_GATEWAY_PRIVATE_ATTEST=PASS TLS_PIN=EXACT LOCAL_ACCESS_DENIED=403"}).Count -eq 1
+ }catch{return $false}
 }
 function Listener([int]$port,[string]$ip){
  return @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
@@ -101,9 +118,7 @@ try{
    throw "FI_GATEWAY_SUPERVISOR_PROBE_PORT_CONFLICT"
   }
   if($probeState.State -eq "existing"){
-   $owner=Get-CimInstance Win32_Process -Filter ("ProcessId="+[int]$probeState.ListenerProcessId) -ErrorAction Stop
-   if(-not $owner -or $owner.Name -ne "node.exe" -or
-      $owner.CommandLine -notmatch 'gateway-entry\.mjs'){
+   if(-not(Confirm-GatewayOwner ([int]$probeState.ListenerProcessId))){
     Status "hold" "PROBE_GATEWAY_PROCESS_MISMATCH"
     throw "FI_GATEWAY_SUPERVISOR_PROBE_IDENTITY_HOLD"
    }
@@ -127,8 +142,11 @@ try{
   if($state.State -eq "conflict"){
    Status "hold" "PORT_CONFLICT_OR_WRONG_BIND"
   }elseif($state.State -eq "existing"){
-   $owner=Get-CimInstance Win32_Process -Filter ("ProcessId="+[int]$state.ListenerProcessId) -ErrorAction SilentlyContinue
-   if($owner -and $owner.Name -eq "node.exe" -and $owner.CommandLine -match 'gateway-entry\.mjs'){
+   if($InspectOnce){
+    # Synthetic test checks status transitions, NOT ownership of the live
+    # listener. Never treat this as production authorization.
+    Status "waiting" "INSPECT_GATEWAY_PRESENT"
+   }elseif(Confirm-GatewayOwner ([int]$state.ListenerProcessId)){
     Status "running" "EXISTING_GATEWAY_PRESERVED"
    }else{Status "hold" "UNEXPECTED_PROCESS_ON_PRIVATE_PORT"}
   }elseif($InspectOnce){
