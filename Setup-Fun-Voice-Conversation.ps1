@@ -5,13 +5,13 @@
 $ErrorActionPreference="Stop"
 $R=Join-Path $env:USERPROFILE "FunIndustrial-REA-MCP-Activation"
 $VoiceLab=Join-Path $env:LOCALAPPDATA "FunIndustrial\VoiceLab"
-$Home=Join-Path $env:LOCALAPPDATA "FunIndustrial\VoiceConversation"
-$Models=Join-Path $Home "models"
-$Venv=Join-Path $Home "venv"
+$ConvHome=Join-Path $env:LOCALAPPDATA "FunIndustrial\VoiceConversation"
+$Models=Join-Path $ConvHome "models"
+$Venv=Join-Path $ConvHome "venv"
 $Py=Join-Path $Venv "Scripts\python.exe"
 $Boot=Join-Path $VoiceLab "venv\Scripts\python.exe"
-$Flag=Join-Path $Home "conversation.enabled"
-$Transcript=Join-Path $Home "transcribe.py"
+$Flag=Join-Path $ConvHome "conversation.enabled"
+$Transcript=Join-Path $ConvHome "transcribe.py"
 $Node=(Get-Command node.exe -ErrorAction Stop).Source
 $B="http://127.0.0.1:8789"
 $S=Join-Path $R "src\server.mjs"
@@ -117,11 +117,11 @@ if($mobile.code -ne "FI_VOICE_MOBILE_UPLOAD_V1" -or $mobile.enabled -ne $true){
 Write-Host "FI_VOICE_CONVERSATION_PREFLIGHT=PASS REA=229 MEMORY=READ_ONLY LLAMA_CPP=READY HTTPS_PID=$oldGateway"
 # The model and packages are installed BEFORE the dashboard is changed.
 $stage="offline_stt_setup"
-if(Test-Path -LiteralPath $Home){
+if(Test-Path -LiteralPath $ConvHome){
  if(Test-Path -LiteralPath $Flag){Fail "CONVERSATION_ALREADY_ENABLED"}
  if(Test-Path -LiteralPath $Transcript){Fail "STT_HOME_ALREADY_HAS_TRANSCRIBER_REFUSE_OVERWRITE"}
 }
-New-Item -ItemType Directory -Path $Home,$Models -Force|Out-Null
+New-Item -ItemType Directory -Path $ConvHome,$Models -Force|Out-Null
 if(-not(Test-Path -LiteralPath $Py -PathType Leaf)){
  & $Boot -m venv $Venv;Check "CREATE_SEPARATE_STT_VENV"
 }
