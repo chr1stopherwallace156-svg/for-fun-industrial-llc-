@@ -23,7 +23,10 @@ def _scalar(x: float, digits: int = 4) -> float:
 
 
 def validate_audio_path(filename: str | Path) -> Path:
-    path = Path(filename).expanduser().resolve(strict=True)
+    original = Path(filename).expanduser()
+    if not original.is_file() or original.is_symlink():
+        raise ValueError("VOICE_AUDIO_NOT_FOUND_OR_SYMLINK_HOLD")
+    path = original.resolve(strict=True)
     if not path.is_file() or path.suffix.lower() not in {".wav", ".flac"}:
         raise ValueError("VOICE_AUDIO_FORMAT_HOLD: use local WAV or FLAC")
     if path.stat().st_size <= 0 or path.stat().st_size > MAX_BYTES:
