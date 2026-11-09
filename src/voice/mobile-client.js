@@ -160,7 +160,7 @@
     body:readyWav
    });
    report("Saved on Windows: "+data.file+". No analysis or model operation was started.");
-   const command='& $vp -m voice_lab analyze "'+data.windowsPath+'"';
+   const command='$vp=Join-Path $env:LOCALAPPDATA \'FunIndustrial\\VoiceLab\\venv\\Scripts\\python.exe\';$src=Join-Path $env:USERPROFILE \'FunIndustrial-VoiceLab-Source\';Push-Location $src;try{& $vp -m voice_lab analyze "'+data.windowsPath+'"}finally{Pop-Location}';
    ui.result.textContent="Voice file: "+data.windowsPath+"\nWindows PowerShell analysis command:\n"+command;
    await reloadList();
   }catch(e){report("Upload failed: "+(e?.message||e))}
