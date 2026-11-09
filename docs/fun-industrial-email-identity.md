@@ -1,13 +1,12 @@
 # Fun Industrial — dedicated AI mailbox integration contract
 
-This is a design/implementation checklist, **not** an enabled email connection.
+Selected Gmail account: **ch1stopherwallace156@gmail.com**. A read-only connector is now implemented at `src/gmail/local-gmail.mjs`, but Google authorization is **not yet completed**, and the mailbox is not connected to the dashboard AI.
 No address, password, API token, SMTP credential, OAuth client secret or mailbox
 content should be committed to GitHub.
 
 ## Desired architecture
 
-- Dedicated business-controlled identity, e.g. `assistant@<domain-you-own>`
-  (illustrative only; not a registered or verified mailbox).
+- Explicitly operator-selected Gmail identity `ch1stopherwallace156@gmail.com`; Google OAuth must verify this exact account before storing any credential.
 - One local provider adapter for an explicitly connected account. Use OAuth 2.0
   with the fewest scopes required, or provider-approved service-account
   delegation if the provider allows it. Do not ask for or store primary account
