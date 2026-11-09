@@ -8,6 +8,7 @@ on:
       - "scripts/patch-iphone-voice-dashboard.mjs"
       - "scripts/check-iphone-voice-live.mjs"
       - "intelligence-checks/iphone-voice-case.mjs"
+      - "intelligence-checks/iphone-safari-pcm-case.mjs"
       - "Activate-Fun-iPhone-Voice.ps1"
       - "Prepare-Fun-iPhone-HTTPS.ps1"
       - "Start-Fun-iPhone-HTTPS.ps1"
@@ -36,7 +37,7 @@ jobs:
           node --check src/voice/private-gateway-entry.mjs
           node --check src/voice/private-gateway-selftest.mjs
       - name: Synthetic WAV format, upload, security and dashboard-preservation tests
-        run: node --test intelligence-checks/iphone-voice-case.mjs
+        run: node --test intelligence-checks/iphone-voice-case.mjs intelligence-checks/iphone-safari-pcm-case.mjs
 
   powershell-parse:
     runs-on: windows-latest
