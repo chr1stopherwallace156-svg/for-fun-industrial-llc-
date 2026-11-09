@@ -10,6 +10,7 @@ $mutex=[Threading.Mutex]::new($false,"Local\FunIndustrial-Dashboard8789-Autostar
 $owns=$false
 # Only this running supervisor may establish an additional trusted child PID.
 $script:spawnedDashboardPid=0
+$script:spawnedDashboardStartUtcTicks=[int64]0
 
 function Write-Status([string]$state,[string]$reason){
  $data=[ordered]@{schema="fun.dashboard.autostart.status.v1";state=$state;reason=$reason;checkedUtc=[DateTime]::UtcNow.ToString("o")}
@@ -51,10 +52,21 @@ function Confirm-Owner([int]$id,$policy){
   # Do not trust any other existing process on 8789; self-launched Node
   # children are separately bound to the PID returned by Start-Process.
   $operatorPin=[int]$policy.verifiedExistingPid
-  $trustedByOperator=$operatorPin -gt 0 -and $id -eq $operatorPin
-  $trustedBySupervisor=$script:spawnedDashboardPid -gt 0 -and $id -eq $script:spawnedDashboardPid
+  $operatorStart=[int64]$policy.verifiedExistingStartUtcTicks
+  $actualStart=[int64]0
+  try{$actualStart=[int64]$proc.StartTime.ToUniversalTime().Ticks}catch{}
+  if($actualStart -eq 0 -and $cim){
+   try{$actualStart=[int64]$cim.CreationDate.ToUniversalTime().Ticks}catch{}
+  }
+  if($actualStart -le 0){return "OWNER_START_TIME_UNAVAILABLE"}
+  $trustedByOperator=$operatorPin -gt 0 -and $id -eq $operatorPin -and
+   $operatorStart -gt 0 -and $actualStart -eq $operatorStart
+  $trustedBySupervisor=$script:spawnedDashboardPid -gt 0 -and
+   $id -eq $script:spawnedDashboardPid -and
+   $script:spawnedDashboardStartUtcTicks -gt 0 -and
+   $actualStart -eq $script:spawnedDashboardStartUtcTicks
   if(-not($trustedByOperator -or $trustedBySupervisor)){
-   return "OWNER_EXECUTABLE_PATH_UNAVAILABLE"
+   return "OWNER_PIN_OR_START_TIME_MISMATCH"
   }
   if(-not(Endpoint-Ready)){return "OWNER_DASHBOARD_ENDPOINTS_UNAVAILABLE"}
   return "VERIFIED_PINNED_PROCESS_AND_ENDPOINTS"
@@ -85,6 +97,7 @@ function Policy-Ready($p){
     [int]$p.computePort -ne 8791 -or
     [int]$p.memoryBudgetMs -lt 12000 -or [int]$p.memoryBudgetMs -gt 180000 -or
     [int]$p.verifiedExistingPid -le 0 -or
+    [int64]$p.verifiedExistingStartUtcTicks -le 0 -or
     @($p.catalogueNames).Count -ne 229 -or
     @($p.allowedTools).Count -gt 229 -or
     $p.voiceHome -ne (Join-Path $env:LOCALAPPDATA "FunIndustrial\VoiceLab") -or
@@ -139,6 +152,7 @@ function Start-Dashboard($p){
    if($port.pid -ne $child.Id){return "UNEXPECTED_DASHBOARD_PROCESS"}
    if(Endpoint-Ready){
     $script:spawnedDashboardPid=[int]$child.Id
+    try{$script:spawnedDashboardStartUtcTicks=[int64]$child.StartTime.ToUniversalTime().Ticks}catch{}
     return "DASHBOARD_AUTOSTART_PASS"
    }
   }
