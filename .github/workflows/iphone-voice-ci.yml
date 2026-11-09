@@ -27,6 +27,7 @@ on:
       - "intelligence-checks/iphone-gateway-autostart-case.mjs"
       - "intelligence-checks/iphone-gateway-port-case.ps1"
       - "src/voice/gateway-port-state.ps1"
+      - "src/voice/private-gateway-attest.mjs"
       - "Diagnose-Fun-iPhone-HTTPS.ps1"
       - "FUN-IPHONE-HTTPS-SETUP.md"
       - "src/gateway.mjs"
@@ -54,6 +55,7 @@ jobs:
           node --check scripts/check-iphone-voice-live.mjs
           node --check src/voice/private-gateway-entry.mjs
           node --check src/voice/private-gateway-selftest.mjs
+          node --check src/voice/private-gateway-attest.mjs
       - name: Check offline Python speech modules compile
         run: |
           python -m py_compile src/voice/transcribe.py src/voice/setup-whisper-model.py
