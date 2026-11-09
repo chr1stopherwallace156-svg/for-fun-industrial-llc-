@@ -11,7 +11,7 @@ $Config=Join-Path $HomeDir "private-gateway.json"
 $Launcher=Join-Path $Auto "Start-Fun-iPhone-HTTPS.ps1"
 $Credential=Join-Path $Auto "gateway-password.dpapi"
 $StatusFile=Join-Path $Auto "supervisor-status.json"
-$mutex=New-Object System.Threading.Mutex($false,"Local\FunIndustrial-PrivateGateway-Supervisor-v1")
+$mutex=[System.Threading.Mutex]::new($false,"Local\FunIndustrial-PrivateGateway-Supervisor-v1")
 $ownsMutex=$false
 function Status([string]$state,[string]$code){
  $log=[ordered]@{schema="fun.voice.gateway.supervisor.status.v1";
