@@ -43,7 +43,8 @@ function Policy-Ready($p){
     $p.host -ne "127.0.0.1" -or [int]$p.port -ne 8789 -or
     [int]$p.computePort -ne 8791 -or
     [int]$p.memoryBudgetMs -lt 12000 -or [int]$p.memoryBudgetMs -gt 180000 -or
-    @($p.allowedTools).Count -ne 229 -or
+    @($p.catalogueNames).Count -ne 229 -or
+    @($p.allowedTools).Count -gt 229 -or
     $p.voiceHome -ne (Join-Path $env:LOCALAPPDATA "FunIndustrial\VoiceLab") -or
     $p.deployedRoot -ne (Join-Path $env:USERPROFILE "FunIndustrial-REA-MCP-Activation")){
   return $false
@@ -64,9 +65,15 @@ function Policy-Ready($p){
     -not $serverText.Contains("FI_VOICE_MOBILE_DASHBOARD_V1") -or
     -not $serverText.Contains("FI_SOURCING_RETIRED_V1")){return $false}
  if(([IO.File]::ReadAllText($marker)).Trim() -ne "FI_VOICE_MOBILE_RECORDING_ENABLED_V1"){return $false}
+ # The full catalogue is inventory only. Preserve only the previously
+ # permission-filtered names; never widen REA execution access at sign-in.
+ $catalogueNames=@($p.catalogueNames|ForEach-Object{[string]$_})
  $names=@($p.allowedTools|ForEach-Object{[string]$_})
- if(@($names|Where-Object{$_ -notmatch '^rea__[A-Za-z0-9_]{1,120}$'}).Count -or
-    @($names|Select-Object -Unique).Count -ne 229){return $false}
+ if(@($catalogueNames|Where-Object{$_ -notmatch '^[-A-Za-z0-9_./:]{1,128}$'}).Count -or
+    @($catalogueNames|Sort-Object -Unique).Count -ne 229 -or
+    @($names|Where-Object{$_ -notmatch '^[-A-Za-z0-9_./:]{1,128}$'}).Count -or
+    @($names|Sort-Object -Unique).Count -ne $names.Count -or
+    @($names|Where-Object{$_ -cnotin $catalogueNames}).Count){return $false}
  return $true
 }
 function Start-Dashboard($p){
