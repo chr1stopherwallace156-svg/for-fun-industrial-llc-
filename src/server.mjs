@@ -6,6 +6,7 @@ import {loadConfig} from "./config.mjs";
 import {createPlatform} from "./platform.mjs";
 import {openAiToolDefinitions,getPlatformTool} from "./platform-tools.mjs";
 import {createAutonomyActivator} from "./autonomy-activation.mjs";
+import {runApprovedLocalDefensiveAudit} from "./security/defensive-audit.mjs";
 const root=path.dirname(fileURLToPath(import.meta.url));
 try{process.loadEnvFile(path.join(root,"../.env"));}catch(error){if(error.code!=="ENOENT")throw error;}
 const config=loadConfig({...process.env,APP_ROOT:path.resolve(root,"..")});
@@ -55,6 +56,15 @@ const server=http.createServer(async(req,res)=>{try{
   try{
    if(body.name.startsWith("rea__"))return json(res,403,{error:"REA execution is disabled in this build; catalogue access is read-only."});
    const tool=getPlatformTool(body.name);if(!tool)return json(res,403,{error:"tool is not in the fixed Fun Industrial tool registry"});
+   // Operator-approved Fun Industrial local defensive inventory only.
+   // This is not routed through compute, REA, shell, or a model tool executor.
+   if(body.name==="fi_security_local_audit"){
+    if(Object.keys(body.arguments).length!==0)return json(res,400,{error:"SECURITY_AUDIT_ACCEPTS_NO_ARGUMENTS"});
+    const report=await runApprovedLocalDefensiveAudit({
+      operatorApproved:true,projectRoot:config.cwd
+    });
+    return json(res,200,{tool:"fi_security_local_audit",result:report});
+   }
    const args={...(body.arguments||{})};let pathName=tool.path||tool.pathTemplate;
    if(tool.pathTemplate){if(typeof args.universe_id!=="string"||!args.universe_id.length)throw new Error("universe_id is required");pathName=tool.pathTemplate.replace("{universe_id}",encodeURIComponent(args.universe_id));if(!["fi_universe_neural_state_set"].includes(tool.name))delete args.universe_id;}
    const method=tool.method||"POST";
