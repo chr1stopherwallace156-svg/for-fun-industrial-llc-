@@ -137,3 +137,12 @@ test("installer preserves pre-existing REA 403 and does not start or permit tool
  assert.doesNotMatch(src,/Invoke-RestMethod "\$Base\/api\/activate" -Method POST/);
  assert.doesNotMatch(src,/REA=229/);
 });
+
+test("installer never writes PowerShell's read-only HOME variable during live page verification",()=>{
+ const source=readFileSync(new URL("../Activate-Fun-Web-In-Chat.ps1",import.meta.url),"utf8");
+ assert.match(source,/\$dashboardPage=Invoke-WebRequest "\$Base\/" -UseBasicParsing/);
+ assert.match(source,/\$dashboardPage\.Content\.Contains\("FI_WEB_CHAT_CONSOLIDATION_UI_V1"\)/);
+ assert.doesNotMatch(source,/\$home\s*=/i);
+ assert.doesNotMatch(source,/\$home\./i);
+ assert.match(source,/FUN_WEB_CHAT_ROLLBACK_FILES=RESTORED/);
+});
