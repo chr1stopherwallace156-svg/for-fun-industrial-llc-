@@ -50,3 +50,31 @@ Ask the local AI: `Propose a local security audit of Fun Industrial`. If it offe
 3. Separately approve any deployment or process restart, preserving llama.cpp and Ollama separation.
 4. Verify actual chat proposal and operator-gated invocation, REA=0 and external targets=0.
 5. Review expected Phase 3 source drift and explicitly pin a new trusted baseline only after source and behavior review.
+
+## Activate the isolated Windows chat preview
+
+This does **not** patch or restart the existing production dashboard, and does not install the original Fscan.
+
+From PowerShell, clone the exact security chat branch into a separate folder:
+
+```powershell
+git clone --depth 1 --single-branch --branch feature/fun-english-security-chat-phase4-20261110 https://github.com/chr1stopherwallace156-svg/for-fun-industrial-llc-.git "$HOME\FunIndustrial-SecurityChat-V1"; if($LASTEXITCODE -ne 0){throw 'SECURITY_CHAT_CLONE_FAILED'}; Set-Location "$HOME\FunIndustrial-SecurityChat-V1"
+```
+
+Start the isolated security chat dashboard (foreground window; Ctrl+C stops only this preview):
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Start-Fun-SecurityChat-Preview.ps1
+```
+
+The launcher checks that the existing compute service on 8791 is listening, that 8794 is free, and that llama.cpp and its model files exist. It runs local Node test suites, starts a *new* dashboard at http://127.0.0.1:8794, disables REA and auto-start, and fixes the scan source to the existing `FunIndustrial-REA-MCP-Activation` folder via `FI_SECURITY_SOURCE_ROOT`.
+
+On the **Windows computer's own browser** visit http://127.0.0.1:8794. In the Local AI conversation panel, click **Approve local security audit**, read the confirmation, and affirm. The result appears in that chat panel. You can also ask Qwen to propose `fi_security_local_audit` and approve its tool proposal. An iPhone's `127.0.0.1` is not the Windows computer.
+
+Do not press the overall platform Activate/Stop buttons in this preview; they are unrelated to the security audit. Do not expose the preview via VPN, LAN, or gateway while authorization and origin controls are still under review.
+
+Only the fixed local scanner, passive HTTP metadata, and source indicators run through the chat bridge. Phase 2 official binary verification and Phase 3 hash-drift monitoring remain their existing separate local commands; they are not invoked automatically by chat.
+
+## Production promotion hold
+
+The current live dashboard may contain additional voice/memory/web patches not reflected in this branch. Do **not** copy this branch's entire `server.mjs`, `public/index.html`, or `platform-tools.mjs` over production. A separate compatible, diff-reviewed migration is required to activate the feature inside the existing running dashboard. Replacing the live source would also change the 204-file baseline and trigger expected drift. Never auto-rebaseline.
