@@ -61,7 +61,7 @@ const server=http.createServer(async(req,res)=>{try{
    if(body.name==="fi_security_local_audit"){
     if(Object.keys(body.arguments).length!==0)return json(res,400,{error:"SECURITY_AUDIT_ACCEPTS_NO_ARGUMENTS"});
     const report=await runApprovedLocalDefensiveAudit({
-      operatorApproved:true,projectRoot:config.cwd
+      operatorApproved:true,projectRoot:process.env.FI_SECURITY_SOURCE_ROOT||config.cwd
     });
     return json(res,200,{tool:"fi_security_local_audit",result:report});
    }
