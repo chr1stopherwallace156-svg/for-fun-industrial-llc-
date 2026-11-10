@@ -109,9 +109,10 @@ try{
  Copy-Item $SrcClient $Client -ErrorAction Stop
  Copy-Item $StageServer $Server -Force -ErrorAction Stop
  Copy-Item $StagePage $Page -Force -ErrorAction Stop
- foreach($pair in @(@($SrcModule,$Module),@($SrcClient,$Client),@($StageServer,$Server),@($StagePage,$Page))){
-  if((Get-FileHash $pair[0]).Hash -ne (Get-FileHash $pair[1]).Hash){Hold "STAGED_HASH_MISMATCH"}
- }
+ if((Get-FileHash $SrcModule).Hash -ne (Get-FileHash $Module).Hash -or
+    (Get-FileHash $SrcClient).Hash -ne (Get-FileHash $Client).Hash -or
+    (Get-FileHash $StageServer).Hash -ne (Get-FileHash $Server).Hash -or
+    (Get-FileHash $StagePage).Hash -ne (Get-FileHash $Page).Hash){Hold "STAGED_HASH_MISMATCH"}
  $stage="restart_only_dashboard_8789"
  Stop-Process -Id ([int]$old.ProcessId) -ErrorAction Stop;$stopped=$true
  for($i=0;$i -lt 40;$i++){if(-not(Snapshot 8789)){break};Start-Sleep -Milliseconds 250}
