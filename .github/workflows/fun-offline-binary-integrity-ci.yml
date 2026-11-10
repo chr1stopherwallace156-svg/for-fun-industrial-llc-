@@ -1,0 +1,34 @@
+name: Fun Industrial Offline Binary Integrity V1
+on:
+  push:
+    paths:
+      - "src/security/verify_llama_release.py"
+      - "src/security/trusted-manifests/llama-b12102-win-cpu-x64.json"
+      - "intelligence-checks/test_offline_binary_integrity.py"
+      - ".github/workflows/fun-offline-binary-integrity-ci.yml"
+  pull_request:
+    paths:
+      - "src/security/verify_llama_release.py"
+      - "src/security/trusted-manifests/llama-b12102-win-cpu-x64.json"
+      - "intelligence-checks/test_offline_binary_integrity.py"
+      - ".github/workflows/fun-offline-binary-integrity-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-binary-integrity-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python syntax verification
+        run: python -m py_compile src/security/verify_llama_release.py intelligence-checks/test_offline_binary_integrity.py
+      - name: Offline synthetic fixture tests
+        run: python -m unittest discover -s intelligence-checks -p test_offline_binary_integrity.py -v

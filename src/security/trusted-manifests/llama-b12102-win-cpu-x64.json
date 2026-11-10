@@ -1,0 +1,18 @@
+{
+  "schema": "fun.binary-integrity-manifest.v1",
+  "release": "b12102",
+  "source_repository": "ggml-org/llama.cpp",
+  "source_commit": "bbb02c93e9b83255b70ac1a755bb02b0a251f9a7",
+  "source_release_url": "https://github.com/ggml-org/llama.cpp/releases/tag/b12102",
+  "archive_name": "llama-b12102-bin-win-cpu-x64.zip",
+  "archive_sha256": "87d8c812e8a68a35de55c2e7caab280bf96199b79395045d7a67de4b1ad802a9",
+  "files": {
+    "llama-server.exe": "9332c4e0c917a0c1fb30e3c3224c1a6b3ea7db1900f3cf30b2dc1d7f8510252e",
+    "llama-server-impl.dll": "41c39c8837e156264f5989cd390c40e521f55c20fb4a1ec4e7c24d955bcc5ac9",
+    "llama.dll": "67fb625c995a246a98f071eff43e9ed9d856c31d3d44d51c664d1d392d4868b4",
+    "llama-common.dll": "6126ee847119fe3395e9df625423f1ac70a4d355e65e65ab850ee73f460ddfdf",
+    "ggml.dll": "93e3ba00d308df2e7d1d2b1c87d94ce9c79e452174807a7cb892f5af4a729bb6",
+    "ggml-base.dll": "dceac56faf1a6f505c601799c3faac060f458ade746b8ab7bb8b48a2f5e8aebe",
+    "ggml-cpu-zen4.dll": "61105ce6dbd251a0132ff79e976eded5b95841fdd6846088bfb09f1329788284"
+  }
+}
