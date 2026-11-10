@@ -1,0 +1,42 @@
+name: Fun Industrial Web Platform Activation CI
+on:
+  push:
+    branches:
+      - feature/fun-iphone-voice-dashboard-20261108
+    paths:
+      - "src/web-activation.mjs"
+      - "scripts/patch-web-platform.mjs"
+      - "intelligence-checks/web-platform-activation-case.mjs"
+      - "Activate-Fun-Web-Platform.ps1"
+      - ".github/workflows/fun-web-platform-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  web-platform:
+    runs-on: windows-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Validate web activator and patcher syntax
+        run: |
+          node --check src/web-activation.mjs
+          node --check scripts/patch-web-platform.mjs
+      - name: Test DDGS adoption and Platform Control integration
+        run: node --test intelligence-checks/web-platform-activation-case.mjs
+      - name: Validate Windows installer
+        shell: pwsh
+        run: |
+          $t=$null
+          $errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'Activate-Fun-Web-Platform.ps1'),[ref]$t,[ref]$errors)|Out-Null
+          if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};throw 'WEB_PLATFORM_PARSE_HOLD'}
+          $body=Get-Content 'Activate-Fun-Web-Platform.ps1' -Raw
+          foreach($mark in @('FUN_WEB_PLATFORM_DEPLOY=PASS','FUN_WEB_PLATFORM_ROLLBACK_FILES=RESTORED','PROTECTED_PORT_CHANGED','WEB_NOT_VISIBLE_IN_PLATFORM_CONTROL')){
+            if(-not $body.Contains($mark)){throw ('WEB_PLATFORM_GUARD_MISSING_'+$mark)}
+          }
+          if($body -match 'Stop-Service|Restart-Service|Set-NetFirewallRule|Register-ScheduledTask'){throw 'WEB_PLATFORM_UNRELATED_MUTATION_HOLD'}
+          Write-Host 'WEB_PLATFORM_WINDOWS_INSTALLER=PASS'
