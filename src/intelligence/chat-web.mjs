@@ -11,8 +11,9 @@ export function webSearchRequested(body){
  return latest?.role==="user"&&typeof latest.content==="string"&&
   latest.content.length>0&&SEARCH_HINT.test(latest.content);
 }
-export async function enrichWebChat(body,{fetchImpl=fetch,timeoutMs=12000}={}){
- if(!webSearchRequested(body))return {applied:false,payload:body,sources:[]};
+export async function enrichWebChat(body,{fetchImpl=fetch,timeoutMs=12000,modelPayload=body}={}){
+ if(!webSearchRequested(body))return {applied:false,payload:modelPayload,sources:[]};
+ if(!modelPayload||!Array.isArray(modelPayload.messages)||modelPayload.messages.at(-1)?.role!=="user")throw Error("WEB_CHAT_MODEL_PAYLOAD_INVALID");
  const latest=body.messages.at(-1);
  const query=clean(latest.content,300);
  if(query.length<3)throw Error("WEB_CHAT_QUERY_INVALID");
@@ -48,10 +49,10 @@ export async function enrichWebChat(body,{fetchImpl=fetch,timeoutMs=12000}={}){
    "[BEGIN UNTRUSTED WEB SEARCH RESULTS]",
    info,
    "[END UNTRUSTED WEB SEARCH RESULTS]",
-   "ORIGINAL USER QUESTION: "+latest.content
+   "CHAT CONTEXT (possibly includes untrusted retrieved memory): "+modelPayload.messages.at(-1).content
   ].join("\n");
   if(quoted.length>12000)throw Error("WEB_CHAT_CONTEXT_TOO_LARGE");
-  // No model-provided tool instructions are forwarded during automatic web lookup.\n  const payload={...body,tools:[],messages:body.messages.slice(0,-1).concat({role:"user",content:quoted})};
+  // No model-provided tool instructions are forwarded during automatic web lookup.\n  const payload={...modelPayload,tools:[],messages:modelPayload.messages.slice(0,-1).concat({role:"user",content:quoted})};
   return {applied:true,payload,sources};
  }catch(e){
   throw Error("WEB_CHAT_SEARCH_UNAVAILABLE:"+String(e.message||"SEARCH_FAILED").slice(0,140));
