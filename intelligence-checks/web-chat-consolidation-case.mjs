@@ -29,7 +29,6 @@ const serverFixture=[
  '/api/optimization/agent/analyze',
  '/api/rea/call',
  '/api/ai/automatic-memory/status',
- '/api/voice/mobile/status',
  '/api/activate',
  '/api/web/status'
 ].join("\n");
