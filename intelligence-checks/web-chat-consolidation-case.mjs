@@ -5,7 +5,7 @@ import {tmpdir} from "node:os";
 import path from "node:path";
 import {spawnSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
-import {webSearchRequested,enrichWebChat,addWebSources} from "../src/intelligence/chat-web.mjs";
+import {webSearchRequested,webQueryFromUser,enrichWebChat,addWebSources} from "../src/intelligence/chat-web.mjs";
 import {patchChatServer,patchChatUi} from "../scripts/patch-chat-web-consolidation.mjs";
 const serverFixture=[
  'import {createWebResearchActivator} from "./web-activation.mjs";',
@@ -57,7 +57,7 @@ test("search query excludes automatic Cognee memory and local model tools stay d
  const request={messages:[{role:"user",content:"Search the web for robotics news"}],tools:[{type:"function",function:{name:"rea__unsafe"}}],max_tokens:512};
  const memory={...request,messages:[{role:"user",content:"PRIVATE COGNEE NOTE [untrusted] Search the web for robotics news"}]};
  const out=await enrichWebChat(request,{fetchImpl:network,modelPayload:memory});
- assert.equal(query,"Search the web for robotics news");
+ assert.equal(query,"robotics news");
  assert.equal(out.applied,true);
  assert.equal(out.sources.length,1);
  assert.equal(out.payload.tools.length,0);
@@ -65,6 +65,36 @@ test("search query excludes automatic Cognee memory and local model tools stay d
  assert.match(out.payload.messages[0].content,/BEGIN UNTRUSTED WEB SEARCH RESULTS/);
  assert.match(addWebSources("Here are the findings",out),/https:\/\/example\.org\/release/);
  assert.doesNotMatch(addWebSources("Here are the findings",out),/javascript:/);
+});
+test("public DDGS query strips conversational instructions but preserves topic qualifiers",()=>{
+ assert.equal(webQueryFromUser("Search the web for industrial robotics"),"industrial robotics");
+ assert.equal(webQueryFromUser("Search the web for latest open-source robotics developments, give me 3 findings with source links"),"latest open-source robotics developments");
+ assert.equal(webQueryFromUser("Look up recent robotics news"),"recent robotics news");
+ assert.equal(webQueryFromUser("Browse the web for current GPU pricing in California"),"current GPU pricing in California");
+});
+test("transient DDGS HTTP 500 is retried once with identical bounded query",async()=>{
+ const attempts=[];const req={messages:[{role:"user",content:"Search the web for industrial robotics"}]};
+ const fetchImpl=async url=>{
+  if(String(url).endsWith("/health"))return response({status:"healthy",version:"1.0.0",service:"DDGS API"});
+  attempts.push(new URL(url).searchParams.get("query"));
+  if(attempts.length===1)return {ok:false,status:500};
+  return response({results:[{title:"Result",href:"https://example.org/release",body:"Description"}]});
+ };
+ const result=await enrichWebChat(req,{fetchImpl});
+ assert.equal(result.applied,true);assert.equal(result.sources.length,1);
+ assert.deepEqual(attempts,["industrial robotics","industrial robotics"]);
+});
+test("DDGS errors fail closed after bounded retry and never retry policy errors",async()=>{
+ const req={messages:[{role:"user",content:"Search the web for industrial robotics"}]};
+ for(const status of [403,500]){
+  let attempts=0;
+  const fetchImpl=async url=>{
+   if(String(url).endsWith("/health"))return response({status:"healthy",version:"1.0.0",service:"DDGS API"});
+   attempts++;return {ok:false,status};
+  };
+  await assert.rejects(()=>enrichWebChat(req,{fetchImpl}),new RegExp("WEB_CHAT_SEARCH_UNAVAILABLE:DDGS_HTTP_"+status));
+  assert.equal(attempts,status===500?2:1);
+ }
 });
 test("search errors fail closed instead of sending unsupported claims to local model",async()=>{
  const input={messages:[{role:"user",content:"Look up recent news"}]};
