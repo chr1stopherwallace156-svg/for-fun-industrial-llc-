@@ -15,13 +15,14 @@ const MAX_SOURCE_BYTES=6*1024*1024;
 const MAX_SINGLE_FILE=128*1024;
 const MAX_DEPTH=9;
 const MIN_AUDIT_TIMEOUT=100;
-const HTTP_PORTS=new Set([8088,8788,8790,8791]);
+const HTTP_PORTS=new Set([8088,8788,8789,8790,8791,8794]);
+const PRIMARY_SECURITY_PORTS=Object.freeze([8088,8443,8788,8789,8790,8791,8794]);
 const RULES=Object.freeze([
-  {id:"DYNAMIC_EVALUATION",re:/\b(?:eval|new\s+Function)\s*\(/i,description:"Dynamic code evaluation requires review"},
-  {id:"SHELL_OR_PROCESS_EXECUTION",re:/\b(?:child_process|spawnSync|execSync|subprocess\.|os\.system\s*\(|Start-Process\b|Invoke-Expression\b)/i,description:"Process or shell execution surface requires authorization review"},
-  {id:"INSECURE_TLS_CONFIG",re:/NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*['"]?0\b|verify\s*=\s*False\b|check_hostname\s*=\s*False\b/i,description:"TLS verification might be disabled"},
-  {id:"DOWNLOAD_AND_EXECUTE",re:/\b(?:curl|wget)\b.{0,160}\|\s*(?:sh|bash|pwsh|powershell)\b/i,description:"Remote download piped into execution needs review"},
-  {id:"ENCODED_POWERSHELL",re:/\b(?:-EncodedCommand|-enc)\b/i,description:"Encoded script execution needs review"}
+  {id:"DYNAMIC_EVALUATION",re:/(?<![.$\w])eval\s*\(|\bnew\s+Function\s*\(/i,description:"Dynamic code evaluation requires review",priority:"high"},
+  {id:"SHELL_OR_PROCESS_EXECUTION",re:/\b(?:subprocess\.(?:Popen|run|call|check_output)\s*\(|os\.system\s*\(|(?:spawn|spawnSync|exec|execSync|execFile|execFileSync)\s*\(|Start-Process\b|Invoke-Expression\b)/i,description:"Executable process launch or shell invocation deserves authorization review",priority:"medium"},
+  {id:"INSECURE_TLS_CONFIG",re:/NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*['"]?0\b|verify\s*=\s*False\b|check_hostname\s*=\s*False\b/i,description:"TLS verification might be disabled",priority:"high"},
+  {id:"DOWNLOAD_AND_EXECUTE",re:/\b(?:curl|wget)\b.{0,160}\|\s*(?:sh|bash|pwsh|powershell)\b/i,description:"Remote download piped into execution needs review",priority:"high"},
+  {id:"ENCODED_POWERSHELL",re:/\b(?:-EncodedCommand|-enc)\b/i,description:"Encoded script execution needs review",priority:"medium"}
 ]);
 
 function boundedString(value,n=120) {
@@ -39,7 +40,7 @@ export async function auditOwnSource(root,{maxFiles=MAX_SOURCE_FILES}={}) {
  const stat=await safeStat(base);
  if(!stat.isDirectory())throw Error("SECURITY_SOURCE_NOT_DIRECTORY");
  if(!Number.isInteger(maxFiles)||maxFiles<1||maxFiles>MAX_SOURCE_FILES)throw Error("SECURITY_SOURCE_FILE_LIMIT_INVALID");
- let bytes=0,files=0;
+ let bytes=0,files=0,totalIndicators=0;
  const findings=[];
  async function walk(folder,depth) {
   if(depth>MAX_DEPTH)throw Error("SECURITY_SOURCE_DEPTH_LIMIT");
@@ -63,9 +64,13 @@ export async function auditOwnSource(root,{maxFiles=MAX_SOURCE_FILES}={}) {
    const lines=data.toString("utf8").split("\n");
    const rel=relative(base,full).replaceAll("\\","/");
    for(let n=0;n<lines.length;n++) {
+    // Skip whole-line comments and innocuous .eval() model methods. This is a
+    // bounded heuristic, not a parser or a vulnerability confirmation.
+    if(/^\s*(?:\/\/|#|\/\*|\*|<!--)/.test(lines[n]))continue;
     for(const rule of RULES) {
-     if(rule.re.test(lines[n])&&findings.length<32) {
-      findings.push({file:rel,line:n+1,rule:rule.id,description:rule.description,severity:"review"});
+     if(rule.re.test(lines[n])) {
+      totalIndicators++;
+      if(findings.length<32)findings.push({file:rel,line:n+1,rule:rule.id,description:rule.description,severity:"review",priority:rule.priority});
      }
     }
    }
@@ -73,8 +78,9 @@ export async function auditOwnSource(root,{maxFiles=MAX_SOURCE_FILES}={}) {
  }
  await walk(base,0);
  return {state:"completed",files_inspected:files,bytes_inspected:bytes,
-   indicators:findings,
-   note:"Heuristic review indicators, not confirmed malware. No files executed.",
+   indicators:findings,indicator_count:totalIndicators,indicator_limit:32,indicators_truncated:totalIndicators>findings.length,
+   risk_summary:{high:findings.filter(x=>x.priority==="high").length,medium:findings.filter(x=>x.priority==="medium").length},
+   note:"Heuristic review indicators, not confirmed malware. Comments and .eval() methods are excluded from the dynamic-evaluation rule. No files executed.",
    scan_scope:"SELECTED_SOURCE_TYPES_EXCLUDES_SECRETS_AND_DEPENDENCIES"};
 }
 export function classifyHttpHeaders({statusCode,headers}={}) {
@@ -94,7 +100,7 @@ export async function probeLoopbackHttp(port,{timeoutMs=800,probeImpl=httpReques
  if(!HTTP_PORTS.has(port))return {port,state:"NOT_A_CONFIGURED_HTTP_PORT"};
  if(!Number.isInteger(timeoutMs)||timeoutMs<MIN_AUDIT_TIMEOUT||timeoutMs>1500)
   throw Error("SECURITY_HTTP_TIMEOUT_INVALID");
- const endpoint=(port===8788?"/api/status":"/health");
+ const endpoint=([8788,8789,8794].includes(port)?"/api/status":"/health");
  return new Promise(resolve=>{
   let done=false,client;
   const finish=(value)=>{
@@ -118,7 +124,7 @@ export async function probeLoopbackHttp(port,{timeoutMs=800,probeImpl=httpReques
  });
 }
 export async function runApprovedLocalDefensiveAudit({
- operatorApproved=false,projectRoot,ports=DEFAULT_PORTS,
+ operatorApproved=false,projectRoot,ports=PRIMARY_SECURITY_PORTS,
  scanImpl=scanApproved,httpImpl=probeLoopbackHttp,sourceImpl=auditOwnSource
 }={}) {
  if(operatorApproved!==true)throw Error("SECURITY_OPERATOR_APPROVAL_REQUIRED");
@@ -139,12 +145,13 @@ export async function runApprovedLocalDefensiveAudit({
  const source=await sourceImpl(projectRoot);
  if(source.state!=="completed"||!Array.isArray(source.indicators))throw Error("SECURITY_SOURCE_RESULT_INVALID");
  return {
-  event:"FUN_ENGLISH_LOCAL_SECURITY_AUDIT_V1",
+  event:"FUN_ENGLISH_LOCAL_SECURITY_AUDIT_V2",
   state:"completed",
   mode:"OFFLINE_DEFENSIVE_LOOPBACK",
   tcp:tcp.results,
   http,
   source,
+  gateway_note:"Port 8443 is checked only on 127.0.0.1. A gateway bound exclusively to a NetBird IP will not be visible through that check. HTTPS gateway access is preserved and not altered.",
   findings_are_untrusted:true,
   false_positive_warning:"Review indicators manually; these checks do not certify malware absence.",
   constraints:{target:"127.0.0.1",ports_checked:ports.length,rea_tools_executed:0,
@@ -159,7 +166,7 @@ if(CLI){
   if(rest.length||!root)throw Error("SECURITY_CLI_ARGUMENTS_INVALID");
   if(action==="preview"){
    console.log(JSON.stringify({event:"FUN_LOCAL_SECURITY_AUDIT_PLAN",state:"preview_only",target:"127.0.0.1",
-    ports:[...DEFAULT_PORTS],source_root:resolve(root),connections_started:0,
+    ports:[...PRIMARY_SECURITY_PORTS],source_root:resolve(root),connections_started:0,
     operator_approval_required:true}));
   }else console.log(JSON.stringify(await runApprovedLocalDefensiveAudit({operatorApproved:true,projectRoot:root})));
  }catch(e){console.error("FUN_LOCAL_SECURITY_AUDIT_HOLD="+boundedString(e.message,180));process.exitCode=1;}
