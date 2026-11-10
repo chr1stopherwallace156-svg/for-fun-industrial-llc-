@@ -1,14 +1,16 @@
 // FI_SOFTWARE_FIRST_COORDINATOR_V1 — persistent, bounded, operator-driven workflow state.
-// No REA, tool invocation, shell, Cognee writes, external browsing, or model lifecycle control.
+// No REA, shell, Cognee writes, external browsing, or model lifecycle control.
+// FI_WORKFLOW_OPTIMIZATION_INTEGRATION_V1 — operator-driven offline solvers, still no external actions.
 import {randomUUID} from "node:crypto";
 import {mkdir,lstat,readFile,writeFile,rename,unlink,open} from "node:fs/promises";
 import {join,resolve,dirname,parse} from "node:path";
 import {homedir} from "node:os";
+import {validateOptimizationStep,runWorkflowOptimization,compactOptimizationEvidence} from "./optimization-step.mjs";
 
 const SCHEMA="fun.workflow.checkpoint.v1";
 const ID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const STEP=/^[a-z][a-z0-9_-]{0,31}$/;
-const TYPES=new Set(["stats","model_summary","review"]);
+const TYPES=new Set(["stats","model_summary","review","optimization"]);
 const defaultRoot=()=>join(process.env.LOCALAPPDATA||join(homedir(),"AppData","Local"),"FunIndustrial","WorkflowRuntime","checkpoints");
 const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
 const object=x=>x!==null&&typeof x==="object"&&!Array.isArray(x);
@@ -28,6 +30,8 @@ function validateSpec(spec){
     throw Error("WORKFLOW_STATS_INPUT_INVALID");
    const keys=Object.keys(s);if(keys.some(k=>!["id","kind","values"].includes(k)))throw Error("WORKFLOW_STATS_FIELDS_DENIED");
    steps.push({id:s.id,kind:s.kind,values:[...s.values]});
+  }else if(s.kind==="optimization"){
+   steps.push(validateOptimizationStep(s));
   }else if(s.kind==="model_summary"){
    if(!ids.has(s.from)||!STEP.test(s.from)||!integer(s.max_tokens??128,32,512))
     throw Error("WORKFLOW_MODEL_REFERENCE_INVALID");
@@ -46,7 +50,7 @@ function sourceContext(record,from){
  const src=record.results[from];
  if(!src||src.status!=="completed")throw Error("WORKFLOW_SOURCE_NOT_COMPLETED");
  // Only a bounded prior result—not full history or tool definitions—enters Qwen.
- const data=JSON.stringify(src.output);
+ const data=JSON.stringify(src.kind==="optimization"?compactOptimizationEvidence(src.output):src.output);
  if(data.length>1700)throw Error("WORKFLOW_MODEL_CONTEXT_LIMIT");
  return ["You are Fun Industrial's local assistant. /no_think",
   "Explain only the supplied measurements or evidence. Give a brief useful answer.",
@@ -114,7 +118,7 @@ async function saveCheckpoint(root,record,{initial=false}={}){
   await rename(temporary,final);
  }finally{await unlink(temporary).catch(()=>{});}
 }
-export function createWorkflowCoordinator({root=defaultRoot(),localModel=defaultLocalModel}={}){
+export function createWorkflowCoordinator({root=defaultRoot(),localModel=defaultLocalModel,optimizationRunner=null}={}){
  if(typeof localModel!=="function")throw Error("WORKFLOW_MODEL_ADAPTER_REQUIRED");
  const folder=resolve(root);
  async function withLock(id,fn){
@@ -171,6 +175,14 @@ export function createWorkflowCoordinator({root=defaultRoot(),localModel=default
    }
    if(step.kind==="stats"){
     r.results[step.id]={status:"completed",kind:step.kind,output:stats(step.values)};
+   }else if(step.kind==="optimization"){
+    // Save an in-flight checkpoint: no silent solver repeats after a crash.
+    r.status="executing";r.updated_at=new Date().toISOString();await saveCheckpoint(folder,r);
+    let output;
+    try{output=await runWorkflowOptimization(step,optimizationRunner);}
+    catch(e){r.status="hold";r.hold_reason=String(e.message||e).slice(0,120);
+     r.updated_at=new Date().toISOString();await saveCheckpoint(folder,r);return r;}
+    r.results[step.id]={status:"completed",kind:step.kind,output};
    }else{
     const remaining=r.output_token_budget-r.used_completion_tokens;
     if(remaining<32)throw Error("WORKFLOW_OUTPUT_TOKEN_BUDGET_EXHAUSTED");
@@ -218,7 +230,7 @@ export function createWorkflowCoordinator({root=defaultRoot(),localModel=default
   return withLock(id,async()=>{
    const r=await readCheckpoint(folder,id);
    if(r.status!=="hold"&&r.status!=="executing")throw Error("WORKFLOW_RETRY_NOT_REQUIRED");
-   if(r.steps[r.cursor]?.kind!=="model_summary"||r.retry_count>=1)throw Error("WORKFLOW_RETRY_DENIED");
+   if(!["model_summary","optimization"].includes(r.steps[r.cursor]?.kind)||r.retry_count>=1)throw Error("WORKFLOW_RETRY_DENIED");
    r.retry_count=(r.retry_count||0)+1;r.status="ready";delete r.hold_reason;
    r.updated_at=new Date().toISOString();await saveCheckpoint(folder,r);return r;
   });
