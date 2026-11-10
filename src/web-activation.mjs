@@ -25,7 +25,7 @@ export function createWebResearchActivator({
  let inFlight=null,ownedChild=null;
  async function check(){
   const health=await readJson(BASE+"/health",fetchImpl);
-  if(!health||health.status!=="ok")throw Error("WEB_HEALTH_IDENTITY_HOLD");
+  if(!health||health.status!=="healthy"||health.service!=="DDGS API"||typeof health.version!=="string")throw Error("WEB_HEALTH_IDENTITY_HOLD");
   const api=await readJson(BASE+"/openapi.json",fetchImpl);
   if(!api?.paths||REQUIRED.some(route=>!Object.hasOwn(api.paths,route)))
    throw Error("WEB_API_IDENTITY_HOLD");
