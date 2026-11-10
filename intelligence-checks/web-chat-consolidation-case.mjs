@@ -62,7 +62,7 @@ test("search query excludes automatic Cognee memory and local model tools stay d
  assert.equal(out.sources.length,1);
  assert.equal(out.payload.tools.length,0);
  assert.match(out.payload.messages[0].content,/PRIVATE COGNEE NOTE/);
- assert.match(out.payload.messages[0].content,/BEGIN UNTRUSTED WEB SEARCH RESULTS/);
+ assert.match(out.payload.messages[0].content,/BEGIN UNTRUSTED WEB EVIDENCE/);
  assert.match(addWebSources("Here are the findings",out),/https:\/\/example\.org\/release/);
  assert.doesNotMatch(addWebSources("Here are the findings",out),/javascript:/);
 });
