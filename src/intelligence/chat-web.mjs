@@ -2,7 +2,7 @@
 // No REA, no action execution, no external search of Cognee memory or other prior turns.
 // The DDGS API is a fixed loopback endpoint; source content is untrusted data.
 const BASE="http://127.0.0.1:4479";
-const SEARCH_HINT=/(?:\bsearch\s+(?:the\s+)?(?:web|internet|online)\b|\blook\s+(?:up|online|on\s+the\s+web)\b|\bbrowse\s+(?:the\s+)?web\b|\bfind\s+(?:on\s+the\s+web|online)\b|\bweb\s+(?:search|research)\b|\blatest\s+(?:news|updates?|information|prices?)\b|\b(?:news|updates?)\s+(?:today|this\s+week)\b)/i;
+const SEARCH_HINT=/(?:\bsearch\s+(?:the\s+)?(?:web|internet|online|for\b)\b|\blook\s+(?:up|online|on\s+the\s+web)\b|\bbrowse\s+(?:the\s+)?web\b|\bfind\s+(?:on\s+the\s+web|online)\b|\bweb\s+(?:search|research)\b|\blatest\s+(?:news|updates?|information|prices?|releases?|versions?)\b|\b(?:news|updates?|weather|prices?)\s+(?:today|this\s+week|right\s+now)\b|\bcurrent\s+(?:weather|stock\s+price|exchange\s+rate|news|price\s+of)\b|\b(?:online|on\s+the\s+internet)\b)/i;
 const CONTROL=/[\u0000-\u001f\u007f]/g;
 const clean=(x,max)=>typeof x==="string"?x.replace(CONTROL," ").trim().slice(0,max):"";
 export function webSearchRequested(body){
@@ -51,7 +51,7 @@ export async function enrichWebChat(body,{fetchImpl=fetch,timeoutMs=12000}={}){
    "ORIGINAL USER QUESTION: "+latest.content
   ].join("\n");
   if(quoted.length>12000)throw Error("WEB_CHAT_CONTEXT_TOO_LARGE");
-  const payload={...body,tools:[],messages:body.messages.slice(0,-1).concat({role:"user",content:quoted})};
+  // No model-provided tool instructions are forwarded during automatic web lookup.\n  const payload={...body,tools:[],messages:body.messages.slice(0,-1).concat({role:"user",content:quoted})};
   return {applied:true,payload,sources};
  }catch(e){
   throw Error("WEB_CHAT_SEARCH_UNAVAILABLE:"+String(e.message||"SEARCH_FAILED").slice(0,140));
