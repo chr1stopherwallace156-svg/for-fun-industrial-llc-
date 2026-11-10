@@ -1,0 +1,44 @@
+name: Fun Industrial Web-in-Chat Consolidation CI
+on:
+  push:
+    branches:
+      - feature/fun-iphone-voice-dashboard-20261108
+    paths:
+      - "src/intelligence/chat-web.mjs"
+      - "src/intelligence/chat-web-client.js"
+      - "scripts/patch-chat-web-consolidation.mjs"
+      - "intelligence-checks/web-chat-consolidation-case.mjs"
+      - "Activate-Fun-Web-In-Chat.ps1"
+      - ".github/workflows/fun-web-chat-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  web-chat:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Verify same-origin chat modules
+        run: |
+          node --check src/intelligence/chat-web.mjs
+          node --check src/intelligence/chat-web-client.js
+          node --check scripts/patch-chat-web-consolidation.mjs
+      - name: Test read-only web-assisted existing chat and UI consolidation
+        run: node --test intelligence-checks/web-chat-consolidation-case.mjs
+      - name: Verify guarded Windows installer
+        shell: pwsh
+        run: |
+          $tok=$null
+          $errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'Activate-Fun-Web-In-Chat.ps1'),[ref]$tok,[ref]$errors)|Out-Null
+          if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};throw 'WEB_CHAT_INSTALL_PARSE_HOLD'}
+          $script=Get-Content 'Activate-Fun-Web-In-Chat.ps1' -Raw
+          foreach($required in @('FUN_WEB_CHAT_DEPLOY=PASS','FUN_WEB_CHAT_ROLLBACK_FILES=RESTORED','PROTECTED_PORT_CHANGED','WEB_ACTIVATE_NOT_HEALTHY','CHAT_CLIENT_NOT_SERVED','STAGED_HASH_MISMATCH')){
+           if(-not $script.Contains($required)){throw ("WEB_CHAT_SAFETY_MARKER_MISSING_"+$required)}
+          }
+          if($script -match 'Stop-Service|Restart-Service|Set-NetFirewallRule|Register-ScheduledTask'){throw 'UNRELATED_SYSTEM_MUTATION_DENIED'}
+          Write-Host 'FUN_WEB_CHAT_INSTALLER=PARSE_PASS ROLLBACK_GUARDED'
