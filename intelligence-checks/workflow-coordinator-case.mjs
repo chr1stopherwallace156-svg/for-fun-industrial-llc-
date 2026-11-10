@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {mkdtempSync,readFileSync,writeFileSync,rmSync,mkdirSync,symlinkSync} from "node:fs";
+import {spawnSync} from "node:child_process";
+import {fileURLToPath} from "node:url";
 import {tmpdir} from "node:os";
 import path from "node:path";
 import {createWorkflowCoordinator} from "../src/workflows/coordinator.mjs";
@@ -124,4 +126,42 @@ test("refuse symlink-backed storage and duplicate operation locks",async()=>{
   writeFileSync(path.join(actual,init.id+".lock"),"simulated competing writer");
   await assert.rejects(()=>trusted.advance(init.id),/WORKFLOW_ALREADY_LOCKED/);
  }finally{rmSync(top,{force:true,recursive:true});}
+});
+
+test("CLI creates, advances, reloads and reviews a saved workflow across processes",()=>{
+ const parent=makeRoot();
+ try{
+  const cli=fileURLToPath(new URL("../src/workflows/cli.mjs",import.meta.url));
+  const specFile=path.join(parent,"spec.json");
+  writeFileSync(specFile,JSON.stringify({goal:"Demo stats",steps:[
+   {id:"s",kind:"stats",values:[4,6]},
+   {id:"review",kind:"review"}]}));
+  const env={...process.env,LOCALAPPDATA:parent};
+  const run=(...args)=>{
+   const res=spawnSync(process.execPath,[cli,...args],{encoding:"utf8",env,timeout:15000});
+   assert.equal(res.status,0,res.stderr);
+   return JSON.parse(res.stdout);
+  };
+  const created=run("create",specFile);
+  assert.equal(created.event,"FUN_WORKFLOW_CLI_RESULT");
+  assert.equal(created.state,"ready");
+  const step=run("step",created.id);
+  assert.equal(step.results.s.output.mean,5);
+  const status=run("status",created.id);
+  assert.equal(status.cursor,1);
+  assert.equal(run("step",created.id).state,"awaiting_review");
+  assert.equal(run("review",created.id,"approve").state,"complete");
+  const error=spawnSync(process.execPath,[cli,"review",created.id,"execute"],{encoding:"utf8",env,timeout:15000});
+  assert.equal(error.status,1);
+  assert.match(error.stderr,/WORKFLOW_REVIEW_DECISION_INVALID/);
+ }finally{rmSync(parent,{force:true,recursive:true});}
+});
+test("Windows installer and pilot never start or stop processes and keep REA permissions unchanged",()=>{
+ const installer=readFileSync(new URL("../Install-Fun-Workflow-Coordinator.ps1",import.meta.url),"utf8");
+ const pilot=readFileSync(new URL("../Run-Fun-Workflow-Pilot.ps1",import.meta.url),"utf8");
+ for(const marker of ["FUN_WORKFLOW_COORDINATOR_INSTALL=PASS","SOURCE_SYNTAX_","PROTECTED_SERVICE_CHANGED_","TARGET_ALREADY_EXISTS_REQUIRES_REVIEW","FUN_WORKFLOW_INSTALL_FAILED="])
+  assert.ok(installer.includes(marker),marker);
+ for(const marker of ["FUN_WORKFLOW_PILOT=PASS","MODEL_CALLS=0","DEMO ONLY"])
+  assert.ok(pilot.includes(marker),marker);
+ assert.doesNotMatch(installer+"\n"+pilot,/Stop-Process|Start-Process|Set-NetFirewallRule|Register-ScheduledTask|rea__|ollama\s+(?:stop|run)|api\/rea\/call/i);
 });
