@@ -1,0 +1,17 @@
+<!-- FI_OPTIMIZATION_AGENT_PANEL_V1: additive local optimization execution with approval boundaries -->
+<section id="fi-opt-agent" class="panel">
+ <h2>Optimization agent — execute calculations and prepare actions</h2>
+ <p class="muted">Describe a goal and supply real, verified values. The agent automatically selects Optuna or OR-Tools and actually runs the local optimization after your confirmation. No purchasing, scheduling, dispatch, REA execution or system changes are automatic.</p>
+ <label for="fi-opt-agent-request">Optimization goal</label>
+ <textarea id="fi-opt-agent-request" maxlength="2400" style="min-height:80px" placeholder="Example: Optimize project allocation under my verified budget and labor capacity."></textarea>
+ <label for="fi-opt-agent-input">Verified inputs (JSON for inventory, allocation or routing)</label>
+ <textarea id="fi-opt-agent-input" style="min-height:155px" spellcheck="false" placeholder='{"budget":20,"labor_capacity":12,"projects":[{"id":"repair","cost":6,"labor":4,"value":15,"max_units":2}]}'></textarea>
+ <div class="actions">
+  <button type="button" id="fi-opt-agent-run">Select optimizer and execute calculation</button>
+  <button type="button" id="fi-opt-agent-save" class="secondary" disabled>Approve local report save</button>
+  <button type="button" id="fi-opt-agent-status-btn" class="secondary">Check agent</button>
+ </div>
+ <p id="fi-opt-agent-status" class="muted small" aria-live="polite">Checking agent readiness…</p>
+ <pre id="fi-opt-agent-result" aria-live="polite">No optimization calculation executed yet.</pre>
+ <p class="muted small">Allowed actions: offline mathematical optimization, followed by an explicitly approved local report export. External business-system actions remain proposed-only and require separately implemented permission-limited integrations. Your existing Phase 3 local AI can help draft the JSON, but missing measurements are never invented.</p>
+</section>
