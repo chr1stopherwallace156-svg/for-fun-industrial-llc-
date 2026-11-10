@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {mkdtempSync,readFileSync,readdirSync,rmSync,writeFileSync} from "node:fs";
 import {spawnSync} from "node:child_process";
+import {fileURLToPath} from "node:url";
 import {tmpdir} from "node:os";
 import path from "node:path";
 import {createOptimizationAgent} from "../src/optimization/agent.mjs";
@@ -119,7 +120,7 @@ test("real CLI staging uses four unique paths and preserves input files",()=>{
   writeFileSync(server,fixture);writeFileSync(ui,sourceUi);
   const script=new URL("../scripts/patch-optimization-agent.mjs",import.meta.url);
   const panel=new URL("../src/optimization/agent-panel.html",import.meta.url);
-  const result=spawnSync(process.execPath,[script.pathname,server,ui,outServer,outUi,panel.pathname],{encoding:"utf8",timeout:10000});
+  const result=spawnSync(process.execPath,[fileURLToPath(script),server,ui,outServer,outUi,fileURLToPath(panel)],{encoding:"utf8",timeout:10000});
   assert.equal(result.status,0,"actual CLI staging failed: "+result.stderr);
   assert.match(result.stdout,/FUN_OPT_AGENT_PATCH=PASS/);
   assert.equal(readFileSync(server,"utf8"),fixture);
@@ -127,7 +128,7 @@ test("real CLI staging uses four unique paths and preserves input files",()=>{
   assert.match(readFileSync(outServer,"utf8"),/FI_OPTIMIZATION_AGENT_V1/);
   assert.match(readFileSync(outUi,"utf8"),/keep original chat/);
   assert.match(readFileSync(outUi,"utf8"),/FI_OPTIMIZATION_AGENT_PANEL_V1/);
-  const rejected=spawnSync(process.execPath,[script.pathname,server,ui,server,outUi,panel.pathname],{encoding:"utf8",timeout:10000});
+  const rejected=spawnSync(process.execPath,[fileURLToPath(script),server,ui,server,outUi,fileURLToPath(panel)],{encoding:"utf8",timeout:10000});
   assert.equal(rejected.status,1);
   assert.match(rejected.stderr,/OPT_AGENT_STAGING_PATHS_INVALID/);
  }finally{rmSync(dir,{recursive:true,force:true});}
