@@ -122,3 +122,18 @@ test("real CLI patching stages separate files and never edits original dashboard
   assert.equal(denied.status,1);
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
+
+test("installer preserves pre-existing REA 403 and does not start or permit tools",()=>{
+ const src=readFileSync(new URL("../Activate-Fun-Web-In-Chat.ps1",import.meta.url),"utf8");
+ assert.match(src,/function ReaHttpCode/);
+ assert.match(src,/\$reaToolsBefore -notin @\(200,403\)/);
+ assert.match(src,/\$reaCatalogBefore -notin @\(200,403\)/);
+ assert.match(src,/REA_HTTP_ACCESS_CHANGED/);
+ assert.match(src,/REA_ALLOWED_TOOLS_CHANGED/);
+ assert.match(src,/REA_CATALOGUE_CHANGED/);
+ assert.match(src,/NO_TOOLS_GRANTED=TRUE/);
+ assert.match(src,/WEB_SERVICE_PROCESS_CHANGED/);
+ assert.doesNotMatch(src,/Invoke-RestMethod "\$Base\/api\/rea\/start" -Method POST/);
+ assert.doesNotMatch(src,/Invoke-RestMethod "\$Base\/api\/activate" -Method POST/);
+ assert.doesNotMatch(src,/REA=229/);
+});
