@@ -44,6 +44,15 @@ export function patchChatServer(input){
   '  }catch(e){return json(res,503,{error:"WEB_CHAT_MODEL_UNAVAILABLE",detail:String(e.message||e).slice(0,150)});}'
  ].join("\n");
  result=once(result,original,replacement);
+ const serverAnchor='const server=http.createServer(async(req,res)=>{try{';
+ result=once(result,serverAnchor,serverAnchor+"\\n"+[
+  ' // FI_WEB_CHAT_CLIENT_ROUTE_V1: CSP-compatible existing dashboard enhancement.',
+  ' if(req.method==="GET"&&req.url==="/api/ai/chat-web-client.js"){',
+  '  if(!localRequest(req,res))return;',
+  '  res.writeHead(200,{"content-type":"text/javascript; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"});',
+  '  return res.end(await readFile(path.join(root,"intelligence","chat-web-client.js")));',
+  ' }'
+ ].join("\\n"));
  const csp=[...result.matchAll(/script-src\s+([^;]+);/g)];
  if(csp.length!==1||!/(?:^|\s)'self'(?:\s|$)/.test(csp[0][1]))
   throw Error("WEB_CHAT_CSP_HOLD");
@@ -60,33 +69,9 @@ export function patchChatUi(source){
  }
  const close=[...source.matchAll(/<\/body\s*>/gi)];
  if(close.length!==1)throw Error("WEB_CHAT_UI_BODY_ANCHOR_HOLD");
- const js=[
-  '<!-- FI_WEB_CHAT_CONSOLIDATION_UI_V1: ordinary chat searches the web, separate search pages hidden. -->',
-  '<script>',
-  '(()=>{',
-  ' "use strict";',
-  ' const TITLES=/^(?:source\\s*(?:and|&)\\s*explore\\s*(?:the\\s*)?web|source\\s*(?:and|&)\\s*explore|explore\\s*(?:the\\s*)?web|web\\s*(?:search|research)\\s*(?:workspace|page|panel)?)$/i;',
-  ' function hideStandaloneSearch(){',
-  '  for(const h of document.querySelectorAll("h1,h2,h3,h4,[role=heading],a,button,[role=tab]")){',
-  '   const name=(h.textContent||"").replace(/\\s+/g," ").trim();',
-  '   if(!TITLES.test(name))continue;',
-  '   if(h.closest("#chat-history,#chat-proposals,#fi-optimization,#fi-opt-agent"))continue;',
-  '   let target;',
-  '   if(h.matches("a,button,[role=tab]"))target=h.closest("li,[role=tab],.nav-item")||h;',
-  '   else target=h.closest("section,article,.panel,[role=tabpanel]")||h;',
-  '   if(target.querySelector?.("#chat-input,#chat-send,#activate,#fi-optimization,#fi-opt-agent"))continue;',
-  '   target.hidden=true;',
-  '   target.style.setProperty("display","none","important");',
-  '  }',
-  ' }',
-  ' if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",hideStandaloneSearch,{once:true});',
-  ' else hideStandaloneSearch();',
-  ' const observer=new MutationObserver(()=>hideStandaloneSearch());',
-  ' observer.observe(document.body,{childList:true,subtree:true});',
-  '})();',
-  '</script>'
- ].join("\n");
- return source.slice(0,close[0].index)+"\n"+js+"\n"+source.slice(close[0].index);
+ const snippet='\\n<!-- FI_WEB_CHAT_CONSOLIDATION_UI_V1: web search in regular chat only -->\\n'+
+  '<script src="/api/ai/chat-web-client.js" defer></script>\\n';
+ return source.slice(0,close[0].index)+snippet+source.slice(close[0].index);
 }
 const invoked=process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url);
 if(invoked){
