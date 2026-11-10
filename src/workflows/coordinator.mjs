@@ -165,11 +165,19 @@ export function createWorkflowCoordinator({root=defaultRoot(),localModel=default
      r.status="hold";r.hold_reason="WORKFLOW_MODEL_OUTPUT_REJECTED";await saveCheckpoint(folder,r);return r;
     }
     const use=usageOf(result);
-    if(use.completion_tokens===null||use.prompt_tokens===null)r.token_usage_complete=false;
-    if(use.completion_tokens!==null)r.used_completion_tokens+=use.completion_tokens;
+    // A budgeted model step must have actual completion accounting. Never
+    // silently proceed through further model steps on unknown consumption.
+    if(use.completion_tokens===null||use.completion_tokens>max_tokens){
+     r.status="hold";r.hold_reason="WORKFLOW_MODEL_USAGE_UNVERIFIED";
+     r.token_usage_complete=false;r.updated_at=new Date().toISOString();
+     await saveCheckpoint(folder,r);return r;
+    }
+    if(use.prompt_tokens===null)r.token_usage_complete=false;
+    r.used_completion_tokens+=use.completion_tokens;
     if(use.prompt_tokens!==null)r.measured_prompt_tokens+=use.prompt_tokens;
     if(use.total_tokens!==null)r.measured_total_tokens+=use.total_tokens;
-    r.results[step.id]={status:"completed",kind:step.kind,output:{answer:result.reply,usage:use,max_tokens}};
+    r.results[step.id]={status:"completed",kind:step.kind,
+     output:{answer:result.reply,usage:use,max_tokens,near_output_limit:use.completion_tokens>=max_tokens-2}};
    }
    r.cursor++;r.status=r.cursor===r.steps.length?"complete":"ready";
    r.updated_at=new Date().toISOString();await saveCheckpoint(folder,r);return r;
