@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {mkdtempSync,readFileSync,writeFileSync,rmSync,mkdirSync,symlinkSync} from "node:fs";
 import {spawnSync} from "node:child_process";
+import {randomUUID} from "node:crypto";
 import {fileURLToPath} from "node:url";
 import {tmpdir} from "node:os";
 import path from "node:path";
@@ -164,4 +165,21 @@ test("Windows installer and pilot never start or stop processes and keep REA per
  for(const marker of ["FUN_WORKFLOW_PILOT=PASS","MODEL_CALLS=0","DEMO ONLY"])
   assert.ok(pilot.includes(marker),marker);
  assert.doesNotMatch(installer+"\n"+pilot,/Stop-Process|Start-Process|Set-NetFirewallRule|Register-ScheduledTask|rea__|ollama\s+(?:stop|run)|api\/rea\/call/i);
+});
+
+test("stale lock recovery requires an explicit operator call and refuses live owners",async()=>{
+ const root=makeRoot();
+ try{
+  const w=createWorkflowCoordinator({root});
+  const a=await w.create({goal:"Synthetic data",steps:[{id:"stats",kind:"stats",values:[2,4]}]});
+  const lock=path.join(root,a.id+".lock");
+  const lockData=pid=>({schema:"fun.workflow.lock.v1",id:a.id,pid,created_at:Date.now(),nonce:randomUUID()});
+  writeFileSync(lock,JSON.stringify(lockData(process.pid)));
+  await assert.rejects(()=>w.recoverLock(a.id),/WORKFLOW_LOCK_OWNER_STILL_RUNNING/);
+  await assert.rejects(()=>w.advance(a.id),/WORKFLOW_ALREADY_LOCKED/);
+  writeFileSync(lock,JSON.stringify(lockData(99999999)));
+  const recovered=await w.recoverLock(a.id);
+  assert.equal(recovered.status,"ready");
+  assert.equal((await w.advance(a.id)).status,"complete");
+ }finally{rmSync(root,{force:true,recursive:true});}
 });
