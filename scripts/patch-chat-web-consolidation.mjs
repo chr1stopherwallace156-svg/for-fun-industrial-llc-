@@ -27,7 +27,7 @@ export function patchChatServer(input){
   '  // '+MARK+': normal chat keeps existing automatic read-only memory.',
   '  const enriched=await fiAutomaticMemory(body,memoryStatus().enabled);',
   '  let web;',
-  '  try{web=await enrichWebChat(enriched.payload);}',
+  '  try{web=await enrichWebChat(body,{modelPayload:enriched.payload});}',
   '  catch(e){return json(res,503,{error:"WEB_CHAT_SEARCH_HOLD",detail:String(e.message||e).slice(0,180)});}',
   '  if(!web.applied)return proxyCompute(req,res,"/ai/chat","POST",enriched.payload);',
   '  if(web.sources.length===0)return json(res,200,{reply:"Web search returned no usable results. I cannot verify a current answer from this search.",tool_calls:[],web:{searched:true,source_count:0}});',
