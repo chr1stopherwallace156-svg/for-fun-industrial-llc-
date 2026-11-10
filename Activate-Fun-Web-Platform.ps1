@@ -76,7 +76,7 @@ if((Get-Item -LiteralPath $ddgsExecutable).Attributes -band [IO.FileAttributes]:
 if($webBefore){
  $ddgs=Req "http://127.0.0.1:4479/health" 8
  $api=Req "http://127.0.0.1:4479/openapi.json" 8
- if($ddgs.status -ne "ok" -or -not $api.paths.'/search/text' -or -not $api.paths.'/extract'){Hold "DDGS_IDENTITY_OR_SCHEMA_HOLD"}
+ if($ddgs.status -ne "healthy" -or $ddgs.service -ne "DDGS API" -or -not $ddgs.version -or -not $api.paths.'/search/text' -or -not $api.paths.'/extract'){Hold "DDGS_IDENTITY_OR_SCHEMA_HOLD"}
  Write-Host 'FUN_WEB_PLATFORM_EXISTING_WEB=RUNNING_WILL_ADOPT'
 }else{
  Write-Host 'FUN_WEB_PLATFORM_EXISTING_WEB=OFFLINE_WILL_START_ON_ACTIVATE'
