@@ -36,7 +36,7 @@ export function webChatTokenMetrics(result,context){
  const finite=v=>Number.isInteger(v)&&v>=0?v:null;
  const usage=result?.usage||{},limit=context.payload.max_tokens??512;
  const generated=finite(usage.completion_tokens);
- return {prompt_tokens:finite(usage.prompt_tokens),completion_tokens:generated,
+ return {prompt_tokens:finite(usage.prompt_tokens),cached_prompt_tokens:finite(usage.prompt_tokens_details?.cached_tokens),total_tokens:finite(usage.total_tokens),completion_tokens:generated,
   output_limit_tokens:limit,near_output_limit:generated!==null&&generated>=limit-2,
   evidence_chars:context.evidence.chars,evidence_budget_chars:context.evidence.budget_chars,
   original_evidence_chars:context.evidence.original_chars,
