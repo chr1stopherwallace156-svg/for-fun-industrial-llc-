@@ -116,7 +116,7 @@ test("refuse symlink-backed storage and duplicate operation locks",async()=>{
  const top=makeRoot();
  try{
   const actual=path.join(top,"real"),alias=path.join(top,"link");
-  mkdirSync(actual);symlinkSync(actual,alias,"dir");
+  mkdirSync(actual);symlinkSync(actual,alias,process.platform==="win32"?"junction":"dir");
   const wf=createWorkflowCoordinator({root:alias,localModel:async()=>({})});
   await assert.rejects(()=>wf.create({goal:"Data",steps:[{id:"s",kind:"stats",values:[1]}]}),/WORKFLOW_STORAGE_PATH_UNSAFE/);
   const trusted=createWorkflowCoordinator({root:actual});
