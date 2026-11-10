@@ -10,6 +10,9 @@ on:
       - "intelligence-checks/web-chat-consolidation-case.mjs"
       - "Activate-Fun-Web-In-Chat.ps1"
       - "Repair-Fun-Web-Chat-DDGS-Query.ps1"
+      - "Deploy-Fun-Web-Chat-Token-Budget.ps1"
+      - "scripts/patch-chat-web-budget-v2.mjs"
+      - "intelligence-checks/web-chat-token-budget-case.mjs"
       - ".github/workflows/fun-web-chat-ci.yml"
   workflow_dispatch:
 permissions:
@@ -28,8 +31,11 @@ jobs:
           node --check src/intelligence/chat-web.mjs
           node --check src/intelligence/chat-web-client.js
           node --check scripts/patch-chat-web-consolidation.mjs
+          node --check scripts/patch-chat-web-budget-v2.mjs
       - name: Test read-only web-assisted existing chat and UI consolidation
         run: node --test intelligence-checks/web-chat-consolidation-case.mjs
+      - name: Test software-evidence compacting and measured token usage
+        run: node --test intelligence-checks/web-chat-token-budget-case.mjs
       - name: Verify guarded Windows installer
         shell: pwsh
         run: |
@@ -55,4 +61,15 @@ jobs:
            if(-not $repair.Contains($required)){throw ("WEB_CHAT_QUERY_REPAIR_GUARD_MISSING_"+$required)}
           }
           Write-Host 'FUN_WEB_CHAT_QUERY_REPAIR=PARSE_PASS GUARDED_DASHBOARD_ONLY_RESTART=TRUE'
+          $budgetPath=Join-Path $PWD 'Deploy-Fun-Web-Chat-Token-Budget.ps1'
+          $budgetTokens=$null
+          $budgetErrors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile($budgetPath,[ref]$budgetTokens,[ref]$budgetErrors)|Out-Null
+          if($budgetErrors.Count){$budgetErrors|ForEach-Object{Write-Error $_.Message};throw 'WEB_TOKEN_BUDGET_INSTALL_PARSE_HOLD'}
+          $budget=Get-Content $budgetPath -Raw
+          foreach($required in @('FUN_WEB_TOKEN_BUDGET_DEPLOY=PASS','FUN_WEB_TOKEN_BUDGET_ROLLBACK_FILES=RESTORED','STAGED_HASH_MISMATCH','PROTECTED_SERVICE_PID_CHANGED')){
+           if(-not $budget.Contains($required)){throw ('WEB_TOKEN_BUDGET_GUARD_MISSING_'+$required)}
+          }
+          if($budget -match 'Stop-Service|Restart-Service|Set-NetFirewallRule|Register-ScheduledTask'){throw 'WEB_TOKEN_BUDGET_UNRELATED_SYSTEM_MUTATION_DENIED'}
+          Write-Host 'FUN_WEB_TOKEN_BUDGET_INSTALL=PARSE_PASS ROLLBACK_GUARDED'
           Write-Host 'FUN_WEB_CHAT_INSTALLER=PARSE_PASS ROLLBACK_GUARDED REA_POLICY_PRESERVED'
