@@ -90,3 +90,14 @@ test("actual CLI staging writes output without modifying the original",()=>{
   assert.equal(denied.status,1);assert.match(denied.stderr,/WEB_STAGE_PATHS_INVALID/);
  }finally{rmSync(dir,{recursive:true,force:true});}
 });
+
+test("offline port 4479 is recoverable by installed Platform Control Activate, not a preflight blocker",()=>{
+ const installer=readFileSync(new URL("../Activate-Fun-Web-Platform.ps1",import.meta.url),"utf8");
+ assert.match(installer,/foreach\(\$port in @\(8088,8791,8443\)\)/);
+ assert.match(installer,/\$webBefore=Snapshot 4479/);
+ assert.match(installer,/FUN_WEB_PLATFORM_EXISTING_WEB=OFFLINE_WILL_START_ON_ACTIVATE/);
+ assert.match(installer,/Invoke-RestMethod "\$Base\/api\/activate" -Method POST/);
+ assert.match(installer,/FUN_WEB_PLATFORM_ACTIVATE_BUTTON=PASS/);
+ assert.match(installer,/WEB_PORT_4479_NOT_STARTED/);
+ assert.doesNotMatch(installer,/PROTECTED_SERVICE_OFFLINE_4479/);
+});
