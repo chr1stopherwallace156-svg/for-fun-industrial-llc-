@@ -147,3 +147,17 @@ test("compact optimization evidence excludes full allocation and remains bounded
  assert.ok(JSON.stringify(compact).length<1500);
  assert.equal(JSON.stringify(compact).includes('"q29"'),false);
 });
+
+test("Windows upgrade and pilot preserve checkpoints, explicit review and protected services",()=>{
+ const upgrade=readFileSync(new URL("../Upgrade-Fun-Workflow-Optimization.ps1",import.meta.url),"utf8");
+ const pilot=readFileSync(new URL("../Run-Fun-Workflow-Optimization-Pilot.ps1",import.meta.url),"utf8");
+ for(const marker of ["FUN_WORKFLOW_OPTIMIZATION_UPGRADE=PASS","LIVE_COORDINATOR_V1_BASELINE_MISMATCH",
+  "LIVE_CLI_BASELINE_MISMATCH","PROTECTED_SERVICE_CHANGED_","FUN_WORKFLOW_OPTIMIZATION_DEPLOY_HOLD",
+  "coordinator.before.mjs","FUN_WORKFLOW_OPTIMIZATION_ROLLBACK=ATTEMPTED"])
+  assert.ok(upgrade.includes(marker),marker);
+ for(const marker of ["FUN_WORKFLOW_OPTIMIZATION_PILOT=PASS","MODEL_CALLS=0",
+  "COMPLETION_TOKENS=0","OPERATOR_REVIEW=NOT_GRANTED","DEMO ONLY"])
+  assert.ok(pilot.includes(marker),marker);
+ assert.doesNotMatch(upgrade+"\n"+pilot,/Stop-Process|Start-Process|Restart-Service|Set-NetFirewallRule|Register-ScheduledTask|api\/rea\/call|ollama\s+(?:stop|run)/i);
+ assert.doesNotMatch(upgrade,/WorkflowRuntime[\\/]checkpoints[\\/]/);
+});
