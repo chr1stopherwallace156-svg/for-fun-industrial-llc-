@@ -94,7 +94,7 @@ test("standalone search section is hidden rather than breaking its existing even
  assert.match(patched,/src="\/api\/ai\/chat-web-client\.js"/);
  const client=readFileSync(new URL("../src/intelligence/chat-web-client.js",import.meta.url),"utf8");
  assert.match(client,/#chat-input,#chat-send,#activate/);
- assert.match(patched,/MutationObserver/);
+ assert.match(client,/MutationObserver/);
  assert.throws(()=>patchChatUi(patched),/ALREADY_PATCHED/);
 });
 test("real CLI patching stages separate files and never edits original dashboard",()=>{
