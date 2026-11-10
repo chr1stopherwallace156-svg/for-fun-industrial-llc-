@@ -104,7 +104,7 @@ test("failed solver causes durable HOLD and operator-only retry, preserving prio
   const wf=createWorkflowCoordinator({root:folder,optimizationRunner:{
    status:()=>({state:"ready"}),run:async()=>{
     calls++;if(calls===1)throw Error("OPTIMIZATION_SOLVER_HOLD");return result("inventory");
-   }});
+   }}});
   const a=await wf.create({goal:"Try optimization",steps:[
    {id:"solve",kind:"optimization",action:"inventory",problem:inventory}],output_token_budget:96});
   const b=await wf.advance(a.id);
