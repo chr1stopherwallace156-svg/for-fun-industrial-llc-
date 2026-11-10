@@ -1,0 +1,51 @@
+name: Fun Industrial Phase 2.2 Safe AI-Assisted Optimization
+on:
+  push:
+    branches:
+      - feature/fun-workflow-phase22-20261110
+    paths:
+      - "src/workflows/**"
+      - "intelligence-checks/workflow-phase22-case.mjs"
+      - "intelligence-checks/workflow-optimization-case.mjs"
+      - "Install-Fun-Workflow-Phase22.ps1"
+      - "Run-Fun-Workflow-Phase22-Pilot.ps1"
+      - "docs/FUN-WORKFLOW-PHASE22-V1.md"
+      - ".github/workflows/fun-workflow-phase22-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qualify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Syntax-check Phase 2.2 modules
+        run: |
+          node --check src/workflows/phase22.mjs
+          node --check src/workflows/phase22-cli.mjs
+          node --check src/workflows/coordinator.mjs
+          node --check src/workflows/optimization-step.mjs
+      - name: Exercise pure Phase 2.2 and regression tests
+        run: node --test intelligence-checks/workflow-phase22-case.mjs intelligence-checks/workflow-optimization-case.mjs intelligence-checks/workflow-coordinator-case.mjs
+      - name: Parse guarded Windows installer and pilot
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach($file in @('Install-Fun-Workflow-Phase22.ps1','Run-Fun-Workflow-Phase22-Pilot.ps1')){
+            $tokens=$null
+            $errors=$null
+            [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $file),[ref]$tokens,[ref]$errors)|Out-Null
+            if($errors.Count){
+              foreach($item in $errors){Write-Error $item.Message}
+              throw ('FUN_PHASE22_SCRIPT_PARSE_HOLD_'+$file)
+            }
+          }
+          Write-Host 'FUN_PHASE22_SCRIPTS=PARSE_PASS LIVE_SERVICES=NOT_TOUCHED'
