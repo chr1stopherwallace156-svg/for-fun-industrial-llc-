@@ -13,7 +13,7 @@ const routes=["/health","/search/text","/search/images","/search/news","/search/
 const response=data=>({ok:true,status:200,json:async()=>data});
 const network=state=>async url=>{
  if(!state.alive)throw Error("offline");
- if(url.endsWith("/health"))return response({status:"ok"});
+ if(url.endsWith("/health"))return response({status:"healthy",version:"1.0.0",service:"DDGS API"});
  if(url.endsWith("/openapi.json"))return response({paths:Object.fromEntries(routes.map(r=>[r,{}]))});
  throw Error("unknown url");
 };
@@ -59,7 +59,7 @@ test("fixed DDGS executable launched once and only controller-owned process stop
  assert.equal((await a.stop()).state,"stopping");
 });
 test("port 4479 identity mismatch fails closed",async()=>{
- const wrong=async u=>u.endsWith("/health")?response({status:"fake"}):response({paths:{"/health":{}}});
+ const wrong=async u=>u.endsWith("/health")?response({status:"healthy",version:"1.0.0",service:"Unrelated service"}):response({paths:{"/health":{}}});
  let spawned=false;
  const a=createWebResearchActivator({fetchImpl:wrong,exists:()=>true,osName:"win32",spawnProcess:()=>{spawned=true}});
  assert.equal((await a.activate()).action,"identity_hold");assert.equal(spawned,false);
@@ -100,4 +100,19 @@ test("offline port 4479 is recoverable by installed Platform Control Activate, n
  assert.match(installer,/FUN_WEB_PLATFORM_ACTIVATE_BUTTON=PASS/);
  assert.match(installer,/WEB_PORT_4479_NOT_STARTED/);
  assert.doesNotMatch(installer,/PROTECTED_SERVICE_OFFLINE_4479/);
+});
+
+test("DDGS health contract is healthy + DDGS API, not ok",async()=>{
+ const source=readFileSync(new URL("../src/web-activation.mjs",import.meta.url),"utf8");
+ const diagnostic=readFileSync(new URL("../scripts/diagnose-ddgs-platform-spawn.mjs",import.meta.url),"utf8");
+ const installer=readFileSync(new URL("../Activate-Fun-Web-Platform.ps1",import.meta.url),"utf8");
+ assert.match(source,/health\.status!=="healthy"/);
+ assert.match(source,/health\.service!=="DDGS API"/);
+ assert.match(diagnostic,/body\?\.status!=="healthy"/);
+ assert.match(installer,/\$ddgs\.status -ne "healthy"/);
+ assert.match(installer,/\$ddgs\.service -ne "DDGS API"/);
+ const invalid=async url=>url.endsWith("/health")?response({status:"ok",version:"1.0.0",service:"DDGS API"}):response({paths:Object.fromEntries(routes.map(r=>[r,{}]))});
+ const a=createWebResearchActivator({fetchImpl:invalid,exists:()=>true,osName:"win32"});
+ assert.equal((await a.status()).state,"stopped");
+ assert.equal((await a.activate()).action,"identity_hold");
 });
