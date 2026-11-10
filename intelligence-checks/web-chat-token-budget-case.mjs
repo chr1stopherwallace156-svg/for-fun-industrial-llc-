@@ -43,6 +43,8 @@ test("real model token metrics report exact fields only when supplied by llama.c
  const context={payload:{max_tokens:512},evidence:{chars:780,original_chars:1380,budget_chars:1100}};
  const metrics=webChatTokenMetrics({usage:{prompt_tokens:812,completion_tokens:511,total_tokens:1323}},context);
  assert.equal(metrics.prompt_tokens,812);
+ assert.equal(metrics.total_tokens,1323);
+ assert.equal(metrics.cached_prompt_tokens,null);
  assert.equal(metrics.completion_tokens,511);
  assert.equal(metrics.output_limit_tokens,512);
  assert.equal(metrics.near_output_limit,true);
