@@ -56,8 +56,8 @@ $Previous=Join-Path $Backup 'coordinator.before.mjs'
 Copy-Item -LiteralPath $Installed -Destination $Previous -ErrorAction Stop
 $backedUp=$true
 try{
- Copy-Item -LiteralPath $SourceAdapter -Destination $Added -ErrorAction Stop
  $created=$true
+ Copy-Item -LiteralPath $SourceAdapter -Destination $Added -ErrorAction Stop
  Copy-Item -LiteralPath $SourceCoordinator -Destination $Installed -Force -ErrorAction Stop
  if((Get-FileHash $SourceCoordinator).Hash -ne (Get-FileHash $Installed).Hash -or
     (Get-FileHash $SourceAdapter).Hash -ne (Get-FileHash $Added).Hash){Hold 'LIVE_SOURCE_HASH_MISMATCH'}
