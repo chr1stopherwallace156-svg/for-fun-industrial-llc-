@@ -18,7 +18,8 @@ try{
  else if(command==="step"&&args.length===1)result=await coordinator.advance(args[0]);
  else if(command==="review"&&args.length===2)result=await coordinator.review(args[0],args[1]);
  else if(command==="retry"&&args.length===1)result=await coordinator.retry(args[0]);
- else throw Error("WORKFLOW_COMMAND_INVALID: create SPEC_JSON | status ID | step ID | review ID approve/reject | retry ID");
+ else if(command==="recover-lock"&&args.length===1)result=await coordinator.recoverLock(args[0]);
+ else throw Error("WORKFLOW_COMMAND_INVALID: create SPEC_JSON | status ID | step ID | review ID approve/reject | retry ID | recover-lock ID");
  console.log(JSON.stringify({event:"FUN_WORKFLOW_CLI_RESULT",state:result.status,id:result.id,cursor:result.cursor,
   steps:result.steps.length,used_completion_tokens:result.used_completion_tokens,
   measured_prompt_tokens:result.measured_prompt_tokens,
