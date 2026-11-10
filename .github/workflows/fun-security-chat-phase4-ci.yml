@@ -1,0 +1,38 @@
+name: Fun Industrial English Security Chat Phase 4
+on:
+  push:
+    paths:
+      - "src/security/defensive-audit.mjs"
+      - "src/server.mjs"
+      - "src/platform-tools.mjs"
+      - "intelligence-checks/security-chat-phase4-case.mjs"
+      - ".github/workflows/fun-security-chat-phase4-ci.yml"
+  pull_request:
+    paths:
+      - "src/security/defensive-audit.mjs"
+      - "src/server.mjs"
+      - "src/platform-tools.mjs"
+      - "intelligence-checks/security-chat-phase4-case.mjs"
+      - ".github/workflows/fun-security-chat-phase4-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  security-chat-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax verification
+        run: node --check src/security/defensive-audit.mjs
+      - name: Security chat and TCP regression
+        run: node --test intelligence-checks/security-chat-phase4-case.mjs intelligence-checks/local-security-scan-case.mjs src/platform-tools.test.mjs
+      - name: Ensure preview is non-executing
+        run: node src/security/defensive-audit.mjs preview .
