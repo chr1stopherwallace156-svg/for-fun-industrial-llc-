@@ -3,6 +3,8 @@ on:
   push:
     paths:
       - "src/security/defensive-audit.mjs"
+      - "public/index.html"
+      - "Start-Fun-SecurityChat-Preview.ps1"
       - "src/server.mjs"
       - "src/platform-tools.mjs"
       - "intelligence-checks/security-chat-phase4-case.mjs"
@@ -10,6 +12,8 @@ on:
   pull_request:
     paths:
       - "src/security/defensive-audit.mjs"
+      - "public/index.html"
+      - "Start-Fun-SecurityChat-Preview.ps1"
       - "src/server.mjs"
       - "src/platform-tools.mjs"
       - "intelligence-checks/security-chat-phase4-case.mjs"
@@ -31,7 +35,7 @@ jobs:
         with:
           node-version: '22'
       - name: Syntax verification
-        run: node --check src/security/defensive-audit.mjs
+        run: node --check src/security/defensive-audit.mjs && node --check src/server.mjs && node --check src/platform-tools.mjs
       - name: Security chat and TCP regression
         run: node --test intelligence-checks/security-chat-phase4-case.mjs intelligence-checks/local-security-scan-case.mjs src/platform-tools.test.mjs
       - name: Ensure preview is non-executing
