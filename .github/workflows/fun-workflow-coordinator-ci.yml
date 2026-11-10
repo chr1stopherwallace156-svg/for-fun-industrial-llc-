@@ -5,6 +5,9 @@ on:
       - feature/fun-iphone-voice-dashboard-20261108
     paths:
       - "src/workflows/**"
+      - "intelligence-checks/workflow-optimization-case.mjs"
+      - "Upgrade-Fun-Workflow-Optimization.ps1"
+      - "Run-Fun-Workflow-Optimization-Pilot.ps1"
       - "intelligence-checks/workflow-coordinator-case.mjs"
       - "Install-Fun-Workflow-Coordinator.ps1"
       - "Run-Fun-Workflow-Pilot.ps1"
@@ -29,13 +32,16 @@ jobs:
         run: |
           node --check src/workflows/coordinator.mjs
           node --check src/workflows/cli.mjs
+          node --check src/workflows/optimization-step.mjs
       - name: Exercise persistent software-first tasks and permission limits
         run: node --test intelligence-checks/workflow-coordinator-case.mjs
+      - name: Exercise offline optimization step integration and permissions
+        run: node --test intelligence-checks/workflow-optimization-case.mjs
       - name: Parse guarded Windows installation and synthetic pilot
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          foreach($file in @('Install-Fun-Workflow-Coordinator.ps1','Run-Fun-Workflow-Pilot.ps1')){
+          foreach($file in @('Install-Fun-Workflow-Coordinator.ps1','Run-Fun-Workflow-Pilot.ps1','Upgrade-Fun-Workflow-Optimization.ps1','Run-Fun-Workflow-Optimization-Pilot.ps1')){
             $tok=$null
             $err=$null
             [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $file),[ref]$tok,[ref]$err)|Out-Null
