@@ -9,6 +9,11 @@ import {webSearchRequested,enrichWebChat,addWebSources} from "../src/intelligenc
 import {patchChatServer,patchChatUi} from "../scripts/patch-chat-web-consolidation.mjs";
 const serverFixture=[
  'import {createWebResearchActivator} from "./web-activation.mjs";',
+ 'import {mobileVoiceHandler} from "./voice/mobile-upload.mjs";',
+ 'if(String(req.url||"").startsWith("/api/voice/mobile/")){',
+ ' if(!localRequest(req,res))return;',
+ ' if(await mobileVoiceHandler(req,res))return;',
+ ' }',
  'const FI_WEB_PLATFORM_ACTIVATION_V1=true;',
  'const FI_OPTIMIZATION_AGENT_V1=true;',
  'const FI_AUTO_COGNEE_CHAT_V1=true;',
@@ -81,6 +86,9 @@ test("patched existing chat preserves memory decorator, other routes and tool bo
  assert.match(patched,/if\(!web\.applied\)return proxyCompute/);
  assert.match(patched,/tool_calls:\[\]/);
  assert.match(patched,/FI_WEB_CHAT_CLIENT_ROUTE_V1/);
+ assert.match(patched,/mobileVoiceHandler/);
+ assert.ok(!serverFixture.includes("/api/voice/mobile/status"));
+ assert.throws(()=>patchChatServer(serverFixture.replace('if(await mobileVoiceHandler(req,res))return;','if(false)return;')), /WEB_CHAT_VOICE_DISPATCH_MISSING/);
  assert.match(patched,/return json\(res,503,\{error:"WEB_CHAT_SEARCH_HOLD"/);
  assert.match(patched,/script-src \'self\'/);
  for(const p of ["/api/rea/call","/api/activate","/api/web/status","/api/optimization/agent/analyze"])assert.ok(patched.includes(p));
