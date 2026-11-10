@@ -155,9 +155,9 @@ try{
  if(-not(WaitDashboard $newNode $true)){Hold "DASHBOARD_RESTART_NOT_READY"}
  $phase="web_chat_ui_verification"
  $js=Invoke-WebRequest "$Base/api/ai/chat-web-client.js" -UseBasicParsing -TimeoutSec 12 -ErrorAction Stop
- $home=Invoke-WebRequest "$Base/" -UseBasicParsing -TimeoutSec 12 -ErrorAction Stop
+ $dashboardPage=Invoke-WebRequest "$Base/" -UseBasicParsing -TimeoutSec 12 -ErrorAction Stop
  if($js.StatusCode -ne 200 -or -not $js.Content.Contains("FI_WEB_CHAT_UI_V1") -or
-    -not $home.Content.Contains("FI_WEB_CHAT_CONSOLIDATION_UI_V1")){Hold "CHAT_CLIENT_NOT_SERVED"}
+    -not $dashboardPage.Content.Contains("FI_WEB_CHAT_CONSOLIDATION_UI_V1")){Hold "CHAT_CLIENT_NOT_SERVED"}
  Write-Host "FUN_WEB_CHAT_UI=PASS EXISTING_CHAT_PRESERVED=TRUE WEB_PAGE_HIDDEN=TRUE"
  $phase="observational_rea_policy_verification"
  # This is a chat interface deployment, not a platform activation.
