@@ -45,14 +45,14 @@ export function patchChatServer(input){
  ].join("\n");
  result=once(result,original,replacement);
  const serverAnchor='const server=http.createServer(async(req,res)=>{try{';
- result=once(result,serverAnchor,serverAnchor+"\\n"+[
+ result=once(result,serverAnchor,serverAnchor+"\n"+[
   ' // FI_WEB_CHAT_CLIENT_ROUTE_V1: CSP-compatible existing dashboard enhancement.',
   ' if(req.method==="GET"&&req.url==="/api/ai/chat-web-client.js"){',
   '  if(!localRequest(req,res))return;',
   '  res.writeHead(200,{"content-type":"text/javascript; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"});',
   '  return res.end(await readFile(path.join(root,"intelligence","chat-web-client.js")));',
   ' }'
- ].join("\\n"));
+ ].join("\n"));
  const csp=[...result.matchAll(/script-src\s+([^;]+);/g)];
  if(csp.length!==1||!/(?:^|\s)'self'(?:\s|$)/.test(csp[0][1]))
   throw Error("WEB_CHAT_CSP_HOLD");
@@ -69,8 +69,8 @@ export function patchChatUi(source){
  }
  const close=[...source.matchAll(/<\/body\s*>/gi)];
  if(close.length!==1)throw Error("WEB_CHAT_UI_BODY_ANCHOR_HOLD");
- const snippet='\\n<!-- FI_WEB_CHAT_CONSOLIDATION_UI_V1: web search in regular chat only -->\\n'+
-  '<script src="/api/ai/chat-web-client.js" defer></script>\\n';
+ const snippet='\n<!-- FI_WEB_CHAT_CONSOLIDATION_UI_V1: web search in regular chat only -->\n'+
+  '<script src="/api/ai/chat-web-client.js" defer></script>\n';
  return source.slice(0,close[0].index)+snippet+source.slice(close[0].index);
 }
 const invoked=process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url);
