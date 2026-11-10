@@ -9,6 +9,7 @@ on:
       - "scripts/patch-chat-web-consolidation.mjs"
       - "intelligence-checks/web-chat-consolidation-case.mjs"
       - "Activate-Fun-Web-In-Chat.ps1"
+      - "Repair-Fun-Web-Chat-DDGS-Query.ps1"
       - ".github/workflows/fun-web-chat-ci.yml"
   workflow_dispatch:
 permissions:
@@ -44,4 +45,14 @@ jobs:
           foreach($bad in @('Invoke-RestMethod "$Base/api/rea/start" -Method POST','Invoke-RestMethod "$Base/api/activate" -Method POST')){
             if($script.Contains($bad)){throw ('WEB_CHAT_UNRELATED_ACTIVATION_DENIED_'+$bad)}
           }
+          $repairPath=Join-Path $PWD 'Repair-Fun-Web-Chat-DDGS-Query.ps1'
+          $repairTokens=$null
+          $repairErrors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile($repairPath,[ref]$repairTokens,[ref]$repairErrors)|Out-Null
+          if($repairErrors.Count){$repairErrors|ForEach-Object{Write-Error $_.Message};throw 'WEB_CHAT_QUERY_REPAIR_PARSE_HOLD'}
+          $repair=Get-Content $repairPath -Raw
+          foreach($required in @('FUN_WEB_CHAT_QUERY_REPAIR=PASS','FUN_WEB_CHAT_QUERY_ROLLBACK_MODULE=RESTORED','PROTECTED_SERVICE_PID_CHANGED','UNRECOGNIZED_LIVE_MODULE')){
+           if(-not $repair.Contains($required)){throw ("WEB_CHAT_QUERY_REPAIR_GUARD_MISSING_"+$required)}
+          }
+          Write-Host 'FUN_WEB_CHAT_QUERY_REPAIR=PARSE_PASS GUARDED_DASHBOARD_ONLY_RESTART=TRUE'
           Write-Host 'FUN_WEB_CHAT_INSTALLER=PARSE_PASS ROLLBACK_GUARDED REA_POLICY_PRESERVED'
