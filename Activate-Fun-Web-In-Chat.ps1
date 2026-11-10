@@ -25,6 +25,17 @@ function Snapshot([int]$port){
 function Req([string]$url,[int]$timeout=15){
  Invoke-RestMethod -Uri $url -TimeoutSec $timeout -ErrorAction Stop
 }
+# Observational permission probe: 403 is an intentional REA policy outcome,
+# never a reason to grant tools, connect VPN, or start REA.
+function ReaHttpCode([string]$url){
+ try{
+  $response=Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 15 -ErrorAction Stop
+  return [int]$response.StatusCode
+ }catch{
+  if($_.Exception.Response){return [int]$_.Exception.Response.StatusCode}
+  Hold "REA_ACCESS_PROBE_UNAVAILABLE"
+ }
+}
 function DashboardPid(){
  $list=@(Get-NetTCPConnection -LocalPort 8789 -State Listen -ErrorAction SilentlyContinue|Where-Object{$_.LocalAddress -eq "127.0.0.1"})
  if($list.Count -ne 1){Hold "DASHBOARD_LISTENER_IDENTITY"}
@@ -92,13 +103,24 @@ $MemoryBudget=[int]$memory.recallBudgetMs
 $voice=Req "$Base/api/voice/mobile/status" 15
 $ai=Req "$Base/api/ai/status" 15
 $optimizer=Req "$Base/api/optimization/agent/status" 15
-$reaBefore=@((Req "$Base/api/rea/tools" 45).tools)
+$reaToolsBefore=ReaHttpCode "$Base/api/rea/tools"
+$reaCatalogBefore=ReaHttpCode "$Base/api/rea/catalog"
+if($reaToolsBefore -notin @(200,403) -or $reaCatalogBefore -notin @(200,403)){
+ Hold "REA_UNEXPECTED_ACCESS_STATUS"
+}
+# The 229-item MCP catalogue is inventory, NOT a 229-tool execution allowlist.
+# The permission-filtered /api/rea/tools may correctly return 403 or an empty list.
+$reaAllowedBefore=@()
+$reaCatalogueNamesBefore=@()
+if($reaToolsBefore -eq 200){$reaAllowedBefore=@((Req "$Base/api/rea/tools" 15).tools|ForEach-Object{$_.name}|Sort-Object)}
+if($reaCatalogBefore -eq 200){$reaCatalogueNamesBefore=@((Req "$Base/api/rea/catalog" 15).tools|ForEach-Object{$_.name}|Sort-Object)}
 if($memory.mode -ne "automatic_contextual_read_only" -or $memory.enabledByDefault -ne $true -or
    $memory.memoryAvailable -ne $true -or $MemoryBudget -lt 12000 -or $MemoryBudget -gt 180000 -or
    $voice.code -ne "FI_VOICE_MOBILE_UPLOAD_V1" -or $ai.state -ne "ready" -or
-   $ai.ownership -ne "external" -or $optimizer.state -ne "ready" -or $reaBefore.Count -ne 229){
+   $ai.ownership -ne "external" -or $optimizer.state -ne "ready"){
  Hold "PRESERVED_SERVICES_NOT_READY"
 }
+Write-Host "FUN_WEB_CHAT_REA_PREFLIGHT=OBSERVED TOOLS_HTTP=$reaToolsBefore CATALOG_HTTP=$reaCatalogBefore NO_ACCESS_CHANGE=TRUE"
 & $Node --check $Module;Check "MODULE_SYNTAX"
 & $Node --check $UiModule;Check "CLIENT_SYNTAX"
 & $Node --check $Patcher;Check "PATCHER_SYNTAX"
@@ -114,7 +136,7 @@ Copy-Item $Page $UiBefore -ErrorAction Stop
 & $Node --check $Staged;Check "STAGED_SERVER_SYNTAX"
 if(-not([IO.File]::ReadAllText($Staged)).Contains("FI_WEB_CHAT_CONSOLIDATION_V1") -or
    -not([IO.File]::ReadAllText($StagedUi)).Contains("FI_WEB_CHAT_CONSOLIDATION_UI_V1")){Hold "STAGED_MARKER_MISSING"}
-Write-Host "FUN_WEB_CHAT_PREFLIGHT=PASS BACKUP=$Backup DASHBOARD_PID=$originalPid REA=229"
+Write-Host "FUN_WEB_CHAT_PREFLIGHT=PASS BACKUP=$Backup DASHBOARD_PID=$originalPid REA_POLICY=OBSERVATIONAL"
 try{
  $phase="copy_staged_chat_sources";$changed=$true
  Copy-Item $Module $Target -ErrorAction Stop
@@ -137,32 +159,23 @@ try{
  if($js.StatusCode -ne 200 -or -not $js.Content.Contains("FI_WEB_CHAT_UI_V1") -or
     -not $home.Content.Contains("FI_WEB_CHAT_CONSOLIDATION_UI_V1")){Hold "CHAT_CLIENT_NOT_SERVED"}
  Write-Host "FUN_WEB_CHAT_UI=PASS EXISTING_CHAT_PRESERVED=TRUE WEB_PAGE_HIDDEN=TRUE"
- $phase="exercise_existing_platform_activate"
- $activation=Invoke-RestMethod "$Base/api/activate" -Method POST -ContentType "application/json" -Body "{}" -TimeoutSec 120 -ErrorAction Stop
- if($activation.web.state -ne "running"){Hold ("WEB_ACTIVATE_DID_NOT_RECOVER_"+$activation.web.action)}
- $activatedWeb=Req "$Base/api/web/status" 15
- if($activatedWeb.state -ne "running" -or -not(Snapshot 4479)){Hold "WEB_ACTIVATE_NOT_HEALTHY"}
- Write-Host ("FUN_WEB_CHAT_ACTIVATE_BUTTON=PASS WEB_ACTION="+$activation.web.action)
- $phase="read_only_rea_reinitialization"
- $reaStarted=$false
- for($i=1;$i -le 3;$i++){
-  try{
-   $response=Invoke-RestMethod "$Base/api/rea/start" -Method POST -ContentType "application/json" -Body "{}" -TimeoutSec 120 -ErrorAction Stop
-   if($response.state -eq "ready"){$reaStarted=$true;break}
-  }catch{Write-Warning "FUN_WEB_CHAT_REA_REINIT_RETRY=$i"}
-  if($i -lt 3){Start-Sleep -Seconds 3}
+ $phase="observational_rea_policy_verification"
+ # This is a chat interface deployment, not a platform activation.
+ # Do not POST /api/activate or /api/rea/start during installation.
+ $reaToolsAfter=ReaHttpCode "$Base/api/rea/tools"
+ $reaCatalogAfter=ReaHttpCode "$Base/api/rea/catalog"
+ if($reaToolsAfter -ne $reaToolsBefore -or $reaCatalogAfter -ne $reaCatalogBefore){
+  Hold "REA_HTTP_ACCESS_CHANGED"
  }
- if(-not $reaStarted){Hold "REA_REINITIALIZATION_HOLD"}
- $reaAfter=@();$catalogReady=$false
- for($i=1;$i -le 5;$i++){
-  try{
-   $reaAfter=@((Req "$Base/api/rea/tools" 45).tools)
-   if($reaAfter.Count -eq 229){$catalogReady=$true;break}
-  }catch{Write-Warning "FUN_WEB_CHAT_REA_CATALOG_RETRY=$i"}
-  if($i -lt 5){Start-Sleep -Seconds 3}
+ if($reaToolsBefore -eq 200){
+  $allowedAfter=@((Req "$Base/api/rea/tools" 15).tools|ForEach-Object{$_.name}|Sort-Object)
+  if(@(Compare-Object $reaAllowedBefore $allowedAfter).Count){Hold "REA_ALLOWED_TOOLS_CHANGED"}
  }
- if(-not $catalogReady -or
-    (Compare-Object @($reaBefore|ForEach-Object{$_.name}|Sort-Object) @($reaAfter|ForEach-Object{$_.name}|Sort-Object)).Count){Hold "REA_CATALOGUE_CHANGED"}
+ if($reaCatalogBefore -eq 200){
+  $catalogueAfter=@((Req "$Base/api/rea/catalog" 15).tools|ForEach-Object{$_.name}|Sort-Object)
+  if(@(Compare-Object $reaCatalogueNamesBefore $catalogueAfter).Count){Hold "REA_CATALOGUE_CHANGED"}
+ }
+ Write-Host "FUN_WEB_CHAT_REA_POLICY=PASS TOOLS_HTTP=$reaToolsAfter CATALOG_HTTP=$reaCatalogAfter NO_TOOLS_GRANTED=TRUE"
  $phase="platform_control_smoke"
  $status=Req "$Base/api/status" 15
  $web=Req "$Base/api/web/status" 15
@@ -170,18 +183,18 @@ try{
  $v=Req "$Base/api/voice/mobile/status" 15
  $a=Req "$Base/api/ai/status" 15
  $opt=Req "$Base/api/optimization/agent/status" 15
- if($web.state -ne "running" -or @($status.services|Where-Object{$_.id -eq "web" -and $_.state -eq "running"}).Count -ne 1){Hold "WEB_NOT_VISIBLE_IN_PLATFORM_CONTROL"}
+ if(@($status.services|Where-Object{$_.id -eq "web"}).Count -ne 1 -or
+    $web.state -notin @("running","stopped")){Hold "WEB_NOT_VISIBLE_IN_PLATFORM_CONTROL"}
  if($mem.mode -ne $memory.mode -or $mem.enabledByDefault -ne $true -or [int]$mem.recallBudgetMs -ne $MemoryBudget){Hold "MEMORY_REGRESSION"}
  if($v.code -ne $voice.code -or $v.enabled -ne $voice.enabled -or
     $a.state -ne "ready" -or $a.ownership -ne "external" -or $opt.state -ne "ready"){Hold "SERVICE_REGRESSION"}
  foreach($port in @(8088,8791,8443)){
   if((Snapshot $port) -ne $protected[$port]){Hold ("PROTECTED_PORT_CHANGED_"+$port)}
  }
- if($webBefore -and (Snapshot 4479) -ne $webBefore){Hold "PREEXISTING_WEB_PROCESS_CHANGED"}
- if(-not $webBefore -and -not(Snapshot 4479)){Hold "WEB_PORT_4479_NOT_STARTED"}
+ if((Snapshot 4479) -ne $webBefore){Hold "WEB_SERVICE_PROCESS_CHANGED"}
  Write-Host "FUN_WEB_CHAT_CONSOLIDATION=PASS CHAT_LOOKUP=INTEGRATED SEPARATE_WEB_SECTION=HIDDEN"
- Write-Host ("FUN_WEB_CHAT_DDGS=PASS PORT=4479 ACTION="+$activation.web.action)
- Write-Host "FUN_WEB_CHAT_DEPLOY=PASS DASHBOARD=8789 WEB=4479 REA=229 AI=EXTERNAL MEMORY=READ_ONLY VOICE=PRESERVED OPTIMIZATION=PRESERVED"
+ Write-Host "FUN_WEB_CHAT_WEB_SERVICE=UNCHANGED STATE=$($web.state) PORT=4479"
+ Write-Host "FUN_WEB_CHAT_DEPLOY=PASS DASHBOARD=8789 WEB_STATE=$($web.state) REA_HTTP=$reaToolsAfter AI=EXTERNAL MEMORY=READ_ONLY VOICE=PRESERVED OPTIMIZATION=PRESERVED"
  Write-Host "FUN_WEB_CHAT_BACKUP=$Backup"
 }catch{
  $why=$_.Exception.Message
@@ -201,7 +214,7 @@ try{
     $restored=StartDashboard (Join-Path $Backup "rollback.stdout.log") (Join-Path $Backup "rollback.stderr.log")
     if(WaitDashboard $restored $false){
      Write-Warning "FUN_WEB_CHAT_PREVIOUS_DASHBOARD=RESTORED PID=$($restored.Id)"
-     try{Invoke-RestMethod "$Base/api/rea/start" -Method POST -ContentType "application/json" -Body "{}" -TimeoutSec 120 -ErrorAction Stop|Out-Null}catch{Write-Warning "FUN_WEB_CHAT_ROLLBACK_REA_HOLD"}
+     Write-Warning "FUN_WEB_CHAT_ROLLBACK_REA=UNTOUCHED"
     }else{Write-Warning "FUN_WEB_CHAT_ROLLBACK_DASHBOARD_UNCONFIRMED"}
    }else{Write-Warning "FUN_WEB_CHAT_ROLLBACK_PORT_OCCUPIED"}
   }catch{Write-Warning "FUN_WEB_CHAT_ROLLBACK_START_FAILED"}
