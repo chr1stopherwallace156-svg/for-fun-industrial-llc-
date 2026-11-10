@@ -95,7 +95,7 @@ if($webBefore){
  if($ddgs.status -ne "healthy" -or $ddgs.service -ne "DDGS API" -or -not $ddgs.version -or -not $api.paths.'/search/text' -or -not $api.paths.'/extract'){Hold "DDGS_IDENTITY_OR_SCHEMA_HOLD"}
  Write-Host 'FUN_WEB_CHAT_EXISTING_WEB=RUNNING_WILL_ADOPT'
 }else{
- Write-Host 'FUN_WEB_CHAT_EXISTING_WEB=OFFLINE_WILL_START_ON_ACTIVATE'
+ Write-Host 'FUN_WEB_CHAT_EXISTING_WEB=OFFLINE_WILL_REMAIN_STOPPED_UNTIL_ACTIVATE'
 }
 $originalPid=DashboardPid
 $memory=Req "$Base/api/ai/automatic-memory/status" 15
@@ -169,11 +169,11 @@ try{
  }
  if($reaToolsBefore -eq 200){
   $allowedAfter=@((Req "$Base/api/rea/tools" 15).tools|ForEach-Object{$_.name}|Sort-Object)
-  if(@(Compare-Object $reaAllowedBefore $allowedAfter).Count){Hold "REA_ALLOWED_TOOLS_CHANGED"}
+  if((@($reaAllowedBefore) -join "`n") -cne (@($allowedAfter) -join "`n")){Hold "REA_ALLOWED_TOOLS_CHANGED"}
  }
  if($reaCatalogBefore -eq 200){
   $catalogueAfter=@((Req "$Base/api/rea/catalog" 15).tools|ForEach-Object{$_.name}|Sort-Object)
-  if(@(Compare-Object $reaCatalogueNamesBefore $catalogueAfter).Count){Hold "REA_CATALOGUE_CHANGED"}
+  if((@($reaCatalogueNamesBefore) -join "`n") -cne (@($catalogueAfter) -join "`n")){Hold "REA_CATALOGUE_CHANGED"}
  }
  Write-Host "FUN_WEB_CHAT_REA_POLICY=PASS TOOLS_HTTP=$reaToolsAfter CATALOG_HTTP=$reaCatalogAfter NO_TOOLS_GRANTED=TRUE"
  $phase="platform_control_smoke"
