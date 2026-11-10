@@ -1,0 +1,34 @@
+name: Fun Industrial Integrity Monitoring Phase 3
+on:
+  push:
+    paths:
+      - "src/security/integrity_monitor.py"
+      - "intelligence-checks/test_integrity_monitor_v1.py"
+      - ".github/workflows/fun-integrity-monitor-phase3-ci.yml"
+  pull_request:
+    paths:
+      - "src/security/integrity_monitor.py"
+      - "intelligence-checks/test_integrity_monitor_v1.py"
+      - ".github/workflows/fun-integrity-monitor-phase3-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-integrity-monitor-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify syntax
+        run: python -m py_compile src/security/integrity_monitor.py intelligence-checks/test_integrity_monitor_v1.py
+      - name: Run offline integrity-monitor qualification
+        run: python -m unittest discover -s intelligence-checks -p test_integrity_monitor_v1.py -v
+      - name: Verify CLI entry point
+        run: python src/security/integrity_monitor.py --help
