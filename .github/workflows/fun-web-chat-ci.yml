@@ -37,8 +37,11 @@ jobs:
           [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'Activate-Fun-Web-In-Chat.ps1'),[ref]$tok,[ref]$errors)|Out-Null
           if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};throw 'WEB_CHAT_INSTALL_PARSE_HOLD'}
           $script=Get-Content 'Activate-Fun-Web-In-Chat.ps1' -Raw
-          foreach($required in @('FUN_WEB_CHAT_DEPLOY=PASS','FUN_WEB_CHAT_ROLLBACK_FILES=RESTORED','PROTECTED_PORT_CHANGED','WEB_ACTIVATE_NOT_HEALTHY','CHAT_CLIENT_NOT_SERVED','STAGED_HASH_MISMATCH')){
+          foreach($required in @('FUN_WEB_CHAT_DEPLOY=PASS','FUN_WEB_CHAT_ROLLBACK_FILES=RESTORED','PROTECTED_PORT_CHANGED','REA_HTTP_ACCESS_CHANGED','REA_ALLOWED_TOOLS_CHANGED','WEB_SERVICE_PROCESS_CHANGED','CHAT_CLIENT_NOT_SERVED','STAGED_HASH_MISMATCH')){
            if(-not $script.Contains($required)){throw ("WEB_CHAT_SAFETY_MARKER_MISSING_"+$required)}
           }
           if($script -match 'Stop-Service|Restart-Service|Set-NetFirewallRule|Register-ScheduledTask'){throw 'UNRELATED_SYSTEM_MUTATION_DENIED'}
-          Write-Host 'FUN_WEB_CHAT_INSTALLER=PARSE_PASS ROLLBACK_GUARDED'
+          foreach($bad in @('Invoke-RestMethod "$Base/api/rea/start" -Method POST','Invoke-RestMethod "$Base/api/activate" -Method POST')){
+            if($script.Contains($bad)){throw ('WEB_CHAT_UNRELATED_ACTIVATION_DENIED_'+$bad)}
+          }
+          Write-Host 'FUN_WEB_CHAT_INSTALLER=PARSE_PASS ROLLBACK_GUARDED REA_POLICY_PRESERVED'
