@@ -63,16 +63,17 @@ async function run(id,hash){
  const proposal=await getProposal(id);
  if(!/^[a-f0-9]{64}$/.test(hash||"")||hash!==proposal.sha256)
   throw Error("PHASE22_OPERATOR_HASH_MISMATCH");
- const claimFile=join(root,id+".claim");
- // Non-replayable approval claim. A crashed process needs manual inspection; never auto-repeat.
- const claim=await open(claimFile,"wx",0o600);
- try{await claim.writeFile(JSON.stringify({id,sha256:hash,operator_run_requested:true,
-  started_at:new Date().toISOString()}),"utf8");await claim.sync();}finally{await claim.close();}
- // Limit Phase 2.2 to a single run at a time across CLI processes.
+ // Acquire the per-runtime solver lock before consuming the single-use run claim.
+ // A concurrent caller must not accidentally burn its proposal approval.
  const lockFile=join(root,"solver-phase22.lock");
  const lock=await open(lockFile,"wx",0o600);
  try{
   await lock.writeFile(JSON.stringify({id,pid:process.pid}),"utf8");await lock.sync();
+  const claimFile=join(root,id+".claim");
+  // Non-replayable approval claim. A crashed process needs manual inspection; never auto-repeat.
+  const claim=await open(claimFile,"wx",0o600);
+  try{await claim.writeFile(JSON.stringify({id,sha256:hash,operator_run_requested:true,
+   started_at:new Date().toISOString()}),"utf8");await claim.sync();}finally{await claim.close();}
   const coordinator=createWorkflowCoordinator();
   const created=await coordinator.create(phase22WorkflowSpec(proposal));
   await writeFile(claimFile,JSON.stringify({id,sha256:hash,operator_run_requested:true,
