@@ -11,11 +11,19 @@ export function webSearchRequested(body){
  return latest?.role==="user"&&typeof latest.content==="string"&&
   latest.content.length>0&&SEARCH_HINT.test(latest.content);
 }
+// Keep the user's full instruction for Qwen, but send only search terms to DDGS.
+export function webQueryFromUser(text){
+ let q=clean(text,500);
+ q=q.replace(/^(?:(?:please|kindly)\s+)?(?:(?:could|can|would)\s+you\s+)?/i,"");
+ q=q.replace(/^(?:search\s+(?:(?:the\s+)?(?:web|internet|online)\s+)?for\s+|look\s+up\s+|browse\s+(?:the\s+)?web\s+for\s+|web\s+search\s+for\s+)/i,"");
+ q=q.replace(/\s*(?:[,;]\s*|\s+)(?:and\s+)?(?:please\s+)?(?:give\s+(?:me\s+)?|provide\s+|include\s+|show\s+(?:me\s+)?|list\s+)(?:\d+\s+)?(?:results?|findings?|sources?|links?|citations?|a\s+summary|summaries)\b.*$/i,"");
+ return clean(q.replace(/[?!.,;:]+\s*$/,""),300);
+}
 export async function enrichWebChat(body,{fetchImpl=fetch,timeoutMs=12000,modelPayload=body}={}){
  if(!webSearchRequested(body))return {applied:false,payload:modelPayload,sources:[]};
  if(!modelPayload||!Array.isArray(modelPayload.messages)||modelPayload.messages.at(-1)?.role!=="user")throw Error("WEB_CHAT_MODEL_PAYLOAD_INVALID");
  const latest=body.messages.at(-1);
- const query=clean(latest.content,300);
+ const query=webQueryFromUser(latest.content);
  if(query.length<3)throw Error("WEB_CHAT_QUERY_INVALID");
  try{
   const health=await fetchImpl(BASE+"/health",{signal:AbortSignal.timeout(2500),redirect:"error"});
@@ -27,7 +35,13 @@ export async function enrichWebChat(body,{fetchImpl=fetch,timeoutMs=12000,modelP
   url.searchParams.set("query",query);
   url.searchParams.set("max_results","3");
   url.searchParams.set("safesearch","moderate");
-  const result=await fetchImpl(url.toString(),{signal:AbortSignal.timeout(timeoutMs),redirect:"error"});
+  // One bounded retry for transient DDGS upstream failures; never silently
+  // substitute model knowledge for a failed public search.
+  let result;
+  for(let attempt=0;attempt<2;attempt++){
+   result=await fetchImpl(url.toString(),{signal:AbortSignal.timeout(timeoutMs),redirect:"error"});
+   if(result.ok||![500,502,503,504].includes(result.status))break;
+  }
   if(!result.ok)throw Error("DDGS_HTTP_"+result.status);
   const json=await result.json();
   if(!Array.isArray(json?.results))throw Error("DDGS_RESULTS_INVALID");
