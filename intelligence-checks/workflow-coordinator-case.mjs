@@ -16,7 +16,7 @@ test("deterministic steps and crash-safe checkpoints can resume in a new instanc
   const model=async ({message,max_tokens})=>{
    modelCalls++;
    assert.match(message,/BEGIN UNTRUSTED STEP DATA/);
-   assert.match(message,/\\"mean\\":/);
+   assert.match(message,/"mean":/);
    assert.equal(max_tokens,64);
    return {reply:"The values average 6.67 and total 20.",tool_calls:[],
     usage:{prompt_tokens:89,completion_tokens:17,total_tokens:106,prompt_tokens_details:{cached_tokens:21}}};
