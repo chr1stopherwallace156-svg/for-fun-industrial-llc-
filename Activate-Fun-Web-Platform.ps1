@@ -45,7 +45,7 @@ function WaitDashboard([System.Diagnostics.Process]$process,[bool]$requireWeb){
    if($agent.state -ne "ready" -or $memory.mode -ne "automatic_contextual_read_only"){continue}
    if($requireWeb){
     $web=Req "$Base/api/web/status" 4
-    if($web.state -ne "running"){continue}
+    if($web.state -notin @("running","stopped")){continue}
    }
    if((DashboardPid) -eq $process.Id){return $true}
   }catch{}
@@ -65,13 +65,22 @@ foreach($marker in @("FI_OPTIMIZATION_AGENT_V1","FI_OPTIMIZATION_PHASE23_V1","FI
  if(-not $original.Contains($marker)){Hold ("BASELINE_MARKER_MISSING_"+$marker)}
 }
 $protected=@{}
-foreach($port in @(4479,8088,8791,8443)){
+foreach($port in @(8088,8791,8443)){
  $protected[$port]=Snapshot $port
  if(-not $protected[$port]){Hold ("PROTECTED_SERVICE_OFFLINE_"+$port)}
 }
-$ddgs=Req "http://127.0.0.1:4479/health" 8
-$api=Req "http://127.0.0.1:4479/openapi.json" 8
-if($ddgs.status -ne "ok" -or -not $api.paths.'/search/text' -or -not $api.paths.'/extract'){Hold "DDGS_IDENTITY_OR_SCHEMA_HOLD"}
+$webBefore=Snapshot 4479
+$ddgsExecutable=Join-Path $env:USERPROFILE 'FunIndustrial-WebResearch\.venv-search\Scripts\ddgs.exe'
+if(-not(Test-Path -LiteralPath $ddgsExecutable -PathType Leaf)){Hold "DDGS_VENV_EXECUTABLE_MISSING"}
+if((Get-Item -LiteralPath $ddgsExecutable).Attributes -band [IO.FileAttributes]::ReparsePoint){Hold "DDGS_SYMLINK_EXECUTABLE_DENIED"}
+if($webBefore){
+ $ddgs=Req "http://127.0.0.1:4479/health" 8
+ $api=Req "http://127.0.0.1:4479/openapi.json" 8
+ if($ddgs.status -ne "ok" -or -not $api.paths.'/search/text' -or -not $api.paths.'/extract'){Hold "DDGS_IDENTITY_OR_SCHEMA_HOLD"}
+ Write-Host 'FUN_WEB_PLATFORM_EXISTING_WEB=RUNNING_WILL_ADOPT'
+}else{
+ Write-Host 'FUN_WEB_PLATFORM_EXISTING_WEB=OFFLINE_WILL_START_ON_ACTIVATE'
+}
 $originalPid=DashboardPid
 $memory=Req "$Base/api/ai/automatic-memory/status" 15
 $MemoryBudget=[int]$memory.recallBudgetMs
@@ -95,7 +104,7 @@ Copy-Item $Server $Before -ErrorAction Stop
 & $Node $Patcher $Server $Staged;Check "STAGING"
 & $Node --check $Staged;Check "STAGED_SERVER_SYNTAX"
 if(-not([IO.File]::ReadAllText($Staged)).Contains("FI_WEB_PLATFORM_ACTIVATION_V1")){Hold "STAGED_MARKER_MISSING"}
-Write-Host "FUN_WEB_PLATFORM_PREFLIGHT=PASS BACKUP=$Backup DASHBOARD_PID=$originalPid WEB=4479 REA=229"
+Write-Host "FUN_WEB_PLATFORM_PREFLIGHT=PASS BACKUP=$Backup DASHBOARD_PID=$originalPid WEB_STARTABLE=TRUE REA=229"
 try{
  $phase="copy_additive_source";$changed=$true
  Copy-Item $Module $Target -ErrorAction Stop
@@ -108,6 +117,12 @@ try{
  if(Snapshot 8789){Hold "DASHBOARD_PORT_NOT_RELEASED"}
  $newNode=StartDashboard (Join-Path $Backup "new.stdout.log") (Join-Path $Backup "new.stderr.log")
  if(-not(WaitDashboard $newNode $true)){Hold "DASHBOARD_RESTART_NOT_READY"}
+ $phase="exercise_existing_platform_activate"
+ $activation=Invoke-RestMethod "$Base/api/activate" -Method POST -ContentType "application/json" -Body "{}" -TimeoutSec 120 -ErrorAction Stop
+ if($activation.web.state -ne "running"){Hold ("WEB_ACTIVATE_DID_NOT_RECOVER_"+$activation.web.action)}
+ $activatedWeb=Req "$Base/api/web/status" 15
+ if($activatedWeb.state -ne "running" -or -not(Snapshot 4479)){Hold "WEB_ACTIVATE_NOT_HEALTHY"}
+ Write-Host ("FUN_WEB_PLATFORM_ACTIVATE_BUTTON=PASS WEB_ACTION="+$activation.web.action)
  $phase="read_only_rea_reinitialization"
  $reaStarted=$false
  for($i=1;$i -le 3;$i++){
@@ -139,11 +154,13 @@ try{
  if($mem.mode -ne $memory.mode -or $mem.enabledByDefault -ne $true -or [int]$mem.recallBudgetMs -ne $MemoryBudget){Hold "MEMORY_REGRESSION"}
  if($v.code -ne $voice.code -or $v.enabled -ne $voice.enabled -or
     $a.state -ne "ready" -or $a.ownership -ne "external" -or $opt.state -ne "ready"){Hold "SERVICE_REGRESSION"}
- foreach($port in @(4479,8088,8791,8443)){
+ foreach($port in @(8088,8791,8443)){
   if((Snapshot $port) -ne $protected[$port]){Hold ("PROTECTED_PORT_CHANGED_"+$port)}
  }
+ if($webBefore -and (Snapshot 4479) -ne $webBefore){Hold "PREEXISTING_WEB_PROCESS_CHANGED"}
+ if(-not $webBefore -and -not(Snapshot 4479)){Hold "WEB_PORT_4479_NOT_STARTED"}
  Write-Host "FUN_WEB_PLATFORM_INTEGRATION=PASS ACTIVATE_SERVICE=WEB_INCLUDED SERVICE_HEALTH=VISIBLE"
- Write-Host "FUN_WEB_PLATFORM_EXISTING_DDGS=PRESERVED PORT=4479"
+ Write-Host ("FUN_WEB_PLATFORM_DDGS=PASS PORT=4479 ACTION="+$activation.web.action)
  Write-Host "FUN_WEB_PLATFORM_DEPLOY=PASS DASHBOARD=8789 WEB=4479 REA=229 AI=EXTERNAL MEMORY=READ_ONLY VOICE=PRESERVED OPTIMIZATION=PRESERVED"
  Write-Host "FUN_WEB_PLATFORM_BACKUP=$Backup"
 }catch{
