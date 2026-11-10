@@ -1,0 +1,44 @@
+name: Fun Industrial Persistent Software-First Workflow CI
+on:
+  push:
+    branches:
+      - feature/fun-iphone-voice-dashboard-20261108
+    paths:
+      - "src/workflows/**"
+      - "intelligence-checks/workflow-coordinator-case.mjs"
+      - "Install-Fun-Workflow-Coordinator.ps1"
+      - "Run-Fun-Workflow-Pilot.ps1"
+      - ".github/workflows/fun-workflow-coordinator-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  workflow:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Syntax
+        run: |
+          node --check src/workflows/coordinator.mjs
+          node --check src/workflows/cli.mjs
+      - name: Exercise persistent software-first tasks and permission limits
+        run: node --test intelligence-checks/workflow-coordinator-case.mjs
+      - name: Parse guarded Windows installation and synthetic pilot
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach($file in @('Install-Fun-Workflow-Coordinator.ps1','Run-Fun-Workflow-Pilot.ps1')){
+            $tok=$null
+            $err=$null
+            [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $file),[ref]$tok,[ref]$err)|Out-Null
+            if($err.Count){$err|ForEach-Object{Write-Error $_.Message};throw ('WORKFLOW_SCRIPT_PARSE_HOLD_'+$file)}
+          }
+          Write-Host 'FUN_WORKFLOW_SCRIPTS=PARSE_PASS NO_SERVICE_RESTART=TRUE'
