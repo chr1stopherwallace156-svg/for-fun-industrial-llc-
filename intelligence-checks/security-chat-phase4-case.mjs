@@ -117,6 +117,13 @@ test("server-side handler rejects model arguments and never routes security thro
  const server=await readFile(file,"utf8");
  assert.match(server,/if\(body\.name==="fi_security_local_audit"\)/);
  assert.match(server,/Object\.keys\(body\.arguments\)\.length!==0/);
- assert.match(server,/operatorApproved:true,projectRoot:config\.cwd/);
+ assert.match(server,/operatorApproved:true,projectRoot:process\.env\.FI_SECURITY_SOURCE_ROOT\|\|config\.cwd/);
  assert.match(server,/if\(body\.name\.startsWith\("rea__"\)\)/);
+});
+
+test("existing dashboard chat includes an explicit approval confirmation before local security execution",async()=>{
+ const html=await readFile(fileURLToPath(new URL("../public/index.html",import.meta.url)),"utf8");
+ assert.match(html,/id="security-scan"/);
+ assert.match(html,/confirm\("Authorize a loopback-only TCP\/HTTP inspection/);
+ assert.match(html,/api\("\/api\/ai\/tool-call",\{name:"fi_security_local_audit",arguments:\{\}\}\)/);
 });
