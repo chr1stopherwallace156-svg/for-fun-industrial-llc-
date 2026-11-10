@@ -63,7 +63,7 @@ export function phase22Proposal(request,response,{id=randomUUID(),timestamp=new 
 }
 export function verifyPhase22Proposal(record){
  ensure(only(record,["schema","id","goal","candidates","selected_index","reason",
-  "model_usage","created_at","sha256"])&&Object.keys(record).length===10,"PROPOSAL_FIELDS");
+  "model_usage","created_at","sha256"])&&Object.keys(record).length===9,"PROPOSAL_FIELDS");
  ensure(record.schema==="fun.workflow.phase22.proposal.v1","PROPOSAL_SCHEMA");
  ensure(typeof record.sha256==="string"&&/^[0-9a-f]{64}$/.test(record.sha256),"PROPOSAL_HASH_FIELD");
  const {sha256,...unsigned}=record;
@@ -79,7 +79,7 @@ export function verifyPhase22Proposal(record){
 }
 export function phase22WorkflowSpec(verified){
  ensure(isObject(verified)&&isObject(verified.selected),"VERIFICATION_REQUIRED");
- return {goal:"Decision support only: "+verified.goal,
+ return {goal:verified.goal,
   output_token_budget:128,
   steps:[{id:"solve",kind:"optimization",action:verified.selected.action,problem:verified.selected.problem},
    {id:"review",kind:"review"}]};
