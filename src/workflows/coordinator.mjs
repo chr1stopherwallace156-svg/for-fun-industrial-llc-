@@ -124,8 +124,28 @@ export function createWorkflowCoordinator({root=defaultRoot(),localModel=default
   let handle;
   try{handle=await open(lock,"wx",0o600);}
   catch(e){if(e.code==="EEXIST")throw Error("WORKFLOW_ALREADY_LOCKED");throw e;}
-  try{return await fn();}
-  finally{await handle.close();await unlink(lock);}
+  try{
+   await handle.writeFile(JSON.stringify({schema:"fun.workflow.lock.v1",id,pid:process.pid,created_at:Date.now(),nonce:randomUUID()}));
+   await handle.sync();
+   return await fn();
+  }finally{await handle.close();await unlink(lock);}
+ }
+ async function recoverLock(id){
+  await ensureRoot(folder);
+  if(!ID.test(id||""))throw Error("WORKFLOW_ID_INVALID");
+  const lock=join(folder,id+".lock");
+  const info=await lstat(lock);
+  if(!info.isFile()||info.isSymbolicLink()||info.size<20||info.size>1024)throw Error("WORKFLOW_LOCK_UNSAFE");
+  const data=JSON.parse(await readFile(lock,"utf8"));
+  if(data.schema!=="fun.workflow.lock.v1"||data.id!==id||!integer(data.pid,1,2147483647)||
+     !integer(data.created_at,1,Number.MAX_SAFE_INTEGER)||!ID.test(data.nonce))
+   throw Error("WORKFLOW_LOCK_INVALID");
+  // Never unlock a running workflow. An old PID that has been reused results
+  // in a safe hold rather than guessing which process owns it.
+  try{process.kill(data.pid,0);throw Error("WORKFLOW_LOCK_OWNER_STILL_RUNNING");}
+  catch(e){if(e.message==="WORKFLOW_LOCK_OWNER_STILL_RUNNING"||e.code!=="ESRCH")throw e;}
+  await unlink(lock);
+  return readCheckpoint(folder,id);
  }
  async function create(spec){
   const valid=validateSpec(spec);const storage=await ensureRoot(folder);
@@ -203,5 +223,5 @@ export function createWorkflowCoordinator({root=defaultRoot(),localModel=default
    r.updated_at=new Date().toISOString();await saveCheckpoint(folder,r);return r;
   });
  }
- return {create,get,advance,review,retry};
+ return {create,get,advance,review,retry,recoverLock};
 }
