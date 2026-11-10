@@ -108,7 +108,7 @@ test("separate CLI must require explicit proposal ID and SHA to run",()=>{
  const cli=readFileSync(new URL("../src/workflows/phase22-cli.mjs",import.meta.url),"utf8");
  for(const s of ["run\"&&args.length===2","PHASE22_OPERATOR_HASH_MISMATCH",
   'open(claimFile,"wx"','solver-phase22.lock',"getProposal(id)",
-  "review\"","executed_tools:0","solver_runs:0"])
+  "operator_review:","executed_tools:0","solver_runs:0"])
   assert.ok(cli.includes(s),s);
  assert.doesNotMatch(cli,/Start-Process|Stop-Process|Restart-Service|api\/rea\/call|ollama\s+stop/i);
 });
