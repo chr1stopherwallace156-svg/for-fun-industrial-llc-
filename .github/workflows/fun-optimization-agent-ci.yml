@@ -1,0 +1,55 @@
+name: Fun Industrial Phase 4 Optimization Agent CI
+on:
+  push:
+    branches:
+      - feature/fun-iphone-voice-dashboard-20261108
+    paths:
+      - "src/optimization/agent.mjs"
+      - "src/optimization/agent-client.js"
+      - "src/optimization/agent-panel.html"
+      - "scripts/patch-optimization-agent.mjs"
+      - "intelligence-checks/optimization-agent-v1-case.mjs"
+      - "Activate-Fun-Optimization-Agent.ps1"
+      - ".github/workflows/fun-optimization-agent-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-agent:
+    runs-on: windows-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Verify agent sources are valid JavaScript
+        shell: pwsh
+        run: |
+          node --check src/optimization/agent.mjs
+          node --check src/optimization/agent-client.js
+          node --check scripts/patch-optimization-agent.mjs
+          if($LASTEXITCODE -ne 0){throw 'AGENT_SYNTAX_HOLD'}
+      - name: Validate execution boundaries and single-use approval
+        run: node --test intelligence-checks/optimization-agent-v1-case.mjs
+      - name: Parse restricted Windows installer
+        shell: pwsh
+        run: |
+          $tokens=$null
+          $problems=$null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'Activate-Fun-Optimization-Agent.ps1'),
+            [ref]$tokens,[ref]$problems
+          ) | Out-Null
+          if($problems.Count){$problems|ForEach-Object{Write-Error $_.Message};throw 'AGENT_INSTALLER_PARSE_HOLD'}
+          $script=Get-Content 'Activate-Fun-Optimization-Agent.ps1' -Raw
+          foreach($m in @('FUN_OPT_AGENT_DEPLOY=PASS','FUN_OPT_AGENT_ROLLBACK_FILES=RESTORED',
+           'REA_CATALOGUE_CHANGED','PROTECTED_PORT_CHANGED','EXTERNAL_LLAMA_NOT_READY','MEMORY_REGRESSION')){
+           if(-not $script.Contains($m)){throw "AGENT_INSTALLER_SAFETY_MARKER_HOLD=$m"}
+          }
+          if($script -match 'Stop-Service|Restart-Service|Set-NetFirewallRule|Register-ScheduledTask|/api/shutdown'){
+           throw 'AGENT_INSTALLER_UNRELATED_MUTATION_HOLD'
+          }
+          Write-Host 'FUN_OPT_AGENT_INSTALLER=PARSE_PASS PROTECTED_SERVICES=REQUIRED'
