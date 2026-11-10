@@ -56,9 +56,21 @@ export function patchChatServer(input){
  const csp=[...result.matchAll(/script-src\s+([^;]+);/g)];
  if(csp.length!==1||!/(?:^|\s)'self'(?:\s|$)/.test(csp[0][1]))
   throw Error("WEB_CHAT_CSP_HOLD");
+ // Mobile voice status is dispatched through a shared prefix handler, not
+ // a literal /api/voice/mobile/status route inside server.mjs.
+ // Require the same import + dispatch wiring in input and staged output.
+ for(const voiceAnchor of [
+  'import {mobileVoiceHandler} from "./voice/mobile-upload.mjs";',
+  'if(String(req.url||"").startsWith("/api/voice/mobile/")){',
+  'if(await mobileVoiceHandler(req,res))return;'
+ ]){
+  if(!input.includes(voiceAnchor)||!result.includes(voiceAnchor))
+   throw Error("WEB_CHAT_VOICE_DISPATCH_MISSING_"+voiceAnchor.slice(0,55));
+ }
  for(const route of ["/api/optimization/agent/analyze","/api/rea/call",
-  "/api/ai/automatic-memory/status","/api/voice/mobile/status","/api/activate","/api/web/status"]){
-  if(!result.includes(route))throw Error("WEB_CHAT_PROTECTED_ROUTE_MISSING_"+route);
+  "/api/ai/automatic-memory/status","/api/activate","/api/web/status"]){
+  if(!input.includes(route)||!result.includes(route))
+   throw Error("WEB_CHAT_PROTECTED_ROUTE_MISSING_"+route);
  }
  return result;
 }
