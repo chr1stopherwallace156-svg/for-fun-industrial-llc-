@@ -52,7 +52,8 @@ export async function enrichWebChat(body,{fetchImpl=fetch,timeoutMs=12000,modelP
    "CHAT CONTEXT (possibly includes untrusted retrieved memory): "+modelPayload.messages.at(-1).content
   ].join("\n");
   if(quoted.length>12000)throw Error("WEB_CHAT_CONTEXT_TOO_LARGE");
-  // No model-provided tool instructions are forwarded during automatic web lookup.\n  const payload={...modelPayload,tools:[],messages:modelPayload.messages.slice(0,-1).concat({role:"user",content:quoted})};
+  // No model-provided tool instructions are forwarded during automatic web lookup.
+  const payload={...modelPayload,tools:[],messages:modelPayload.messages.slice(0,-1).concat({role:"user",content:quoted})};
   return {applied:true,payload,sources};
  }catch(e){
   throw Error("WEB_CHAT_SEARCH_UNAVAILABLE:"+String(e.message||"SEARCH_FAILED").slice(0,140));
