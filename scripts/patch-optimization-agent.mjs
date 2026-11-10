@@ -74,7 +74,7 @@ if(invoked){
  try{
   const [server,ui,outServer,outUi,panel]=process.argv.slice(2);
   if(!server||!ui||!outServer||!outUi||!panel||
-     new Set([server,ui,outServer,outUi].map(resolve)).size!==4)
+     new Set([server,ui,outServer,outUi].map(p=>resolve(p))).size!==4)
    throw Error("OPT_AGENT_STAGING_PATHS_INVALID");
   writeFileSync(outServer,patchOptimizationAgentServer(readFileSync(server,"utf8")),"utf8");
   writeFileSync(outUi,patchOptimizationAgentUi(readFileSync(ui,"utf8"),readFileSync(panel,"utf8")),"utf8");
