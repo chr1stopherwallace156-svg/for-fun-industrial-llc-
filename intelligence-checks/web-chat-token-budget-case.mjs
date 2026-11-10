@@ -45,13 +45,13 @@ test("real model token metrics report exact fields only when supplied by llama.c
  assert.equal(metrics.prompt_tokens,812);
  assert.equal(metrics.completion_tokens,511);
  assert.equal(metrics.output_limit_tokens,512);
- assert.equal(metrics.output_limit_reached,true);
+ assert.equal(metrics.near_output_limit,true);
  assert.equal(metrics.evidence_chars,780);
  assert.equal(metrics.original_evidence_chars,1380);
  const notMeasured=webChatTokenMetrics({usage:{}},context);
  assert.equal(notMeasured.prompt_tokens,null);
  assert.equal(notMeasured.completion_tokens,null);
- assert.equal(notMeasured.output_limit_reached,false);
+ assert.equal(notMeasured.near_output_limit,false);
 });
 test("reject oversized evidence and keep fixed source maximum",()=>{
  assert.throws(()=>compactWebEvidence(Array.from({length:4},()=>({url:"https://example.com",title:"A",snippet:"B"}))),/WEB_EVIDENCE_SOURCES_INVALID/);
