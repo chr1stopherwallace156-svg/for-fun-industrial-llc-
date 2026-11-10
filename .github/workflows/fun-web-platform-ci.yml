@@ -8,6 +8,7 @@ on:
       - "scripts/patch-web-platform.mjs"
       - "intelligence-checks/web-platform-activation-case.mjs"
       - "Activate-Fun-Web-Platform.ps1"
+      - "scripts/diagnose-ddgs-platform-spawn.mjs"
       - ".github/workflows/fun-web-platform-ci.yml"
   workflow_dispatch:
 permissions:
@@ -25,6 +26,7 @@ jobs:
         run: |
           node --check src/web-activation.mjs
           node --check scripts/patch-web-platform.mjs
+          node --check scripts/diagnose-ddgs-platform-spawn.mjs
       - name: Test DDGS adoption and Platform Control integration
         run: node --test intelligence-checks/web-platform-activation-case.mjs
       - name: Validate Windows installer
