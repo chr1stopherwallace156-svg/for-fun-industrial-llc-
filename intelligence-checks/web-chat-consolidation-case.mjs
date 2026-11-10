@@ -176,3 +176,17 @@ test("installer never writes PowerShell's read-only HOME variable during live pa
  assert.doesNotMatch(source,/\$home\./i);
  assert.match(source,/FUN_WEB_CHAT_ROLLBACK_FILES=RESTORED/);
 });
+
+test("targeted DDGS repair changes only web chat module and preserves other live processes",()=>{
+ const source=readFileSync(new URL("../Repair-Fun-Web-Chat-DDGS-Query.ps1",import.meta.url),"utf8");
+ assert.match(source,/FI_WEB_CHAT_DDGS_QUERY_REPAIR_V1/);
+ assert.match(source,/UNRECOGNIZED_LIVE_MODULE/);
+ assert.match(source,/Stop-Process -Id \$originalPid/);
+ assert.match(source,/FUN_WEB_CHAT_QUERY_ROLLBACK_MODULE=RESTORED/);
+ assert.match(source,/PROTECTED_SERVICE_PID_CHANGED/);
+ assert.match(source,/MODULE_HASH_MISMATCH/);
+ assert.match(source,/DDGS_QUERY=CONCISE HTTP_5XX_RETRY=BOUNDED/);
+ assert.doesNotMatch(source,/Invoke-RestMethod "\$Base\/api\/activate" -Method POST/);
+ assert.doesNotMatch(source,/Invoke-RestMethod "\$Base\/api\/rea\/start" -Method POST/);
+ assert.doesNotMatch(source,/Stop-Service|Restart-Service|Set-NetFirewallRule/);
+});
