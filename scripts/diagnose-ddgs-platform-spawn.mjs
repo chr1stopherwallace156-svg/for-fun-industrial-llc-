@@ -13,7 +13,7 @@ async function check(){
  const h=await fetch(BASE+"/health",{signal:AbortSignal.timeout(2200),redirect:"error"});
  if(!h.ok)throw Error("HEALTH_HTTP_"+h.status);
  const body=await h.json();
- if(body?.status!=="ok")throw Error("HEALTH_STATUS_INVALID");
+ if(body?.status!=="healthy"||body.service!=="DDGS API"||typeof body.version!=="string")throw Error("HEALTH_STATUS_INVALID");
  const r=await fetch(BASE+"/openapi.json",{signal:AbortSignal.timeout(2200),redirect:"error"});
  if(!r.ok)throw Error("SCHEMA_HTTP_"+r.status);
  const api=await r.json();
