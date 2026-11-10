@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {EventEmitter} from "node:events";
+import {Script} from "node:vm";
 import {mkdtemp,mkdir,writeFile,rm,readFile,symlink} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
@@ -126,4 +127,16 @@ test("existing dashboard chat includes an explicit approval confirmation before 
  assert.match(html,/id="security-scan"/);
  assert.match(html,/confirm\("Authorize a loopback-only TCP\/HTTP inspection/);
  assert.match(html,/api\("\/api\/ai\/tool-call",\{name:"fi_security_local_audit",arguments:\{\}\}\)/);
+});
+
+test("browser inline chat script compiles and preview does not install to live runtime",async()=>{
+ const html=await readFile(fileURLToPath(new URL("../public/index.html",import.meta.url)),"utf8");
+ const body=html.match(/<script>([\s\S]*?)<\/script>/);
+ assert.ok(body,"inline browser JavaScript required");
+ assert.doesNotThrow(()=>new Script(body[1],{filename:"security-chat-inline.js"}));
+ const launcher=await readFile(fileURLToPath(new URL("../Start-Fun-SecurityChat-Preview.ps1",import.meta.url)),"utf8");
+ assert.match(launcher,/\$env:PORT='8794'/);
+ assert.match(launcher,/\$env:REA_ENABLED='false'/);
+ assert.match(launcher,/\$env:AI_AUTOSTART='false'/);
+ assert.doesNotMatch(launcher,/Stop-Process|Terminate-Process|Remove-Item|Invoke-WebRequest/);
 });
