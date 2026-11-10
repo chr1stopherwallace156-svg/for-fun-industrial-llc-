@@ -1,0 +1,34 @@
+name: Fun Industrial Local Security Inventory V1
+on:
+  push:
+    paths:
+      - "src/security/local-scan.mjs"
+      - "intelligence-checks/local-security-scan-case.mjs"
+      - ".github/workflows/fun-local-security-scan-ci.yml"
+  pull_request:
+    paths:
+      - "src/security/local-scan.mjs"
+      - "intelligence-checks/local-security-scan-case.mjs"
+      - ".github/workflows/fun-local-security-scan-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  local-security-scan:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate module syntax
+        run: node --check src/security/local-scan.mjs
+      - name: Run isolated loopback-only tests
+        run: node --test intelligence-checks/local-security-scan-case.mjs
+      - name: Verify default preview has no network probes
+        run: node src/security/local-scan.mjs --target 127.0.0.1 --ports 8788,8790
