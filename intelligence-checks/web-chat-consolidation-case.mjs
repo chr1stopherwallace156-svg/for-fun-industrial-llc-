@@ -15,6 +15,7 @@ const serverFixture=[
  'const FI_VOICE_MOBILE_DASHBOARD_V1=true;',
  'const FI_SOURCING_RETIRED_V1=true;',
  'const csp="script-src \'self\' \'nonce-xyz\'; frame-ancestors \'none\';";',
+ 'const server=http.createServer(async(req,res)=>{try{',
  ' if(req.method==="POST"&&req.url==="/api/ai/chat"){',
  '  const body=await readBody(req,1000000);',
  '  const enriched=await fiAutomaticMemory(body,memoryStatus().enabled);',
@@ -79,6 +80,7 @@ test("patched existing chat preserves memory decorator, other routes and tool bo
  assert.match(patched,/const enriched=await fiAutomaticMemory\(body,memoryStatus\(\)\.enabled\)/);
  assert.match(patched,/if\(!web\.applied\)return proxyCompute/);
  assert.match(patched,/tool_calls:\[\]/);
+ assert.match(patched,/FI_WEB_CHAT_CLIENT_ROUTE_V1/);
  assert.match(patched,/return json\(res,503,\{error:"WEB_CHAT_SEARCH_HOLD"/);
  assert.match(patched,/script-src \'self\'/);
  for(const p of ["/api/rea/call","/api/activate","/api/web/status","/api/optimization/agent/analyze"])assert.ok(patched.includes(p));
@@ -89,7 +91,9 @@ test("standalone search section is hidden rather than breaking its existing even
  const patched=patchChatUi(pageFixture);
  assert.match(patched,/FI_WEB_CHAT_CONSOLIDATION_UI_V1/);
  assert.match(patched,/Source and Explore the Web/);
- assert.match(patched,/#chat-input,#chat-send,#activate/);
+ assert.match(patched,/src="\/api\/ai\/chat-web-client\.js"/);
+ const client=readFileSync(new URL("../src/intelligence/chat-web-client.js",import.meta.url),"utf8");
+ assert.match(client,/#chat-input,#chat-send,#activate/);
  assert.match(patched,/MutationObserver/);
  assert.throws(()=>patchChatUi(patched),/ALREADY_PATCHED/);
 });
