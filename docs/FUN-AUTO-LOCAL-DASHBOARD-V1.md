@@ -30,3 +30,14 @@ On a HOLD after source mutation, the script attempts best-effort rollback: stop 
 Offline Windows and Linux tests cover auto-local execution, no tool calls, server source composition with cognition and capability patches, real base HTML UI compatibility, JavaScript syntax, source preservation, reentrancy and no REA execution. Passing CI and staging is not evidence that a live deployment occurred or that the 4B model will always choose the right function.
 
 **Next operator sequence:** first stage-only from a new checkout, review PASS and backup path; then separately apply with -Apply, inspect live endpoints; then test using an initial graph-only task in the UI. Do not merge blindly into active release or overwrite the live dashboard without these checks.
+## Compatibility repair after November 11 Windows stage HOLD
+
+The operator ran stage-only against an evolved live 8789 dashboard. The original 25 offline tests passed, but the UI patch stopped with `FUN_AUTO_DASH_UI_STAGE=HOLD AUTO_DASH_UI_EXISTING_CHAT_MISSING_id="chat-history"` and `FUN_AUTO_DASH_HOLD=UI_STAGING_FAILED`. **The dashboard was not modified and no processes restarted.** This was a wrong assumption in our patch, not a failure of the Cognitive Kernel or llama.cpp.
+
+The revised UI adapter (V2) no longer depends on `chat-history`, `chat-input`, `chat-send` or any original chat IDs. It inserts an independent `fi-auto-local-panel` section immediately before the single closing `</body>`. Its JavaScript lives in `src/experimental/auto-local-client.js`, served from the same-origin `GET /api/ai/auto-local/client.js` route; there are no added inline scripts or dependencies on existing chat variables. The server checks same-origin/loopback through `localRequest`. All old document text and script bodies remain identical. Reject missing or ambiguous body/ID collisions rather than force replacements.
+
+The guarded deployer now stages and (only with operator `-Apply`) copies the new client module along with the existing two experimental modules. The previous preflight, backup/rollback, verified-owner restarts, no-REA execution rule, and prevention of volatile Cognitive Kernel data loss remain in force.
+
+Targeted qualification after the change: 26/26 Windows + Ubuntu PASS; Windows PowerShell parse PASS. This includes a mocked evolved page that has no legacy chat elements and confirms its existing text remains. This is not a confirmation of a live deployment on the operator's Windows host.
+
+The next action is to `git pull --ff-only` the existing `FunIndustrial-AutoDashboard-V1` checkout and run the deployer **without** `-Apply`. Only consider guarded activation if the actual Windows stage emits `FUN_AUTO_DASH_STAGE=PASS` and `FUN_AUTO_DASH_LIVE_DEPLOY=NOT_PERFORMED`. After activation, visit the root dashboard `http://127.0.0.1:8789/`, where the new standalone panel will appear. The normal chat remains unaffected.
