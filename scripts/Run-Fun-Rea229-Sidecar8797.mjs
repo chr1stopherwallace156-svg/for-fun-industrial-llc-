@@ -148,8 +148,10 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
   console.log('FUN_REA229=INACTIVE. Explicit --serve required. Existing Fun Industrial processes unchanged.');
  }else{
   try{
+   let active=null;
+   try{
    const expectedNames=await parentSnapshot();
-   const active=await activateRea229({expectedNames});
+   active=await activateRea229({expectedNames});
    const confirm=await parentSnapshot();
    if(JSON.stringify(expectedNames.slice().sort())!==JSON.stringify(confirm.slice().sort()))
     throw Error('REA229_PARENT_CATALOGUE_CHANGED_AFTER_INDEPENDENT_START');
@@ -161,9 +163,14 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
    };
    process.on('SIGINT',()=>{end().catch(()=>process.exit(1))});
    process.on('SIGTERM',()=>{end().catch(()=>process.exit(1))});
-  }catch(error){
-   console.error('FUN_REA229_HOLD='+String(error?.message||error));
-   process.exitCode=1;
+   }catch(error){
+    if(active){
+     await new Promise(resolve=>active.server.close(resolve));
+     await active.adapter.stop();
+    }
+    console.error('FUN_REA229_HOLD='+String(error?.message||error));
+    process.exitCode=1;
+   }
   }
  }
 }
