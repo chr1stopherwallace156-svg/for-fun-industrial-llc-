@@ -31,7 +31,7 @@ function serverFixture(){
  "import http from 'node:http';import path from 'node:path';import {fileURLToPath} from 'node:url';",
  "const root=path.dirname(fileURLToPath(import.meta.url));",
  "/* FI_COGNITIVE_LIVE_PATCH_V1 FI_CAPABILITY_INDEX_LIVE_V1 FI_AUTO_COGNEE_CHAT_V1 FI_VOICE_MOBILE_DASHBOARD_V1",
- "/api/cognition/catalogue/status /api/ai/tool-call /api/rea/call /api/ai/automatic-memory/status /api/cognition/health",
+ "/api/cognition/catalogue/status /api/cognition/status /api/cognition/catalogue/search /api/ai/tool-call /api/rea/call /api/ai/automatic-memory/status /api/cognition/health",
  "const enriched=await fiAutomaticMemory(body,memoryStatus().enabled); */",
  "const server=http.createServer(async(req,res)=>{try{",
  "  if(req.url==='/api/ai/chat')return;",
@@ -112,7 +112,7 @@ test('UI patch adds a distinct button and leaves ordinary chat and tool proposal
  assert.match(updated,/id="chat-proposals"/);
  assert.match(updated,/document\.getElementById\("chat-send"\)\.onclick=sendChat/);
  assert.match(updated,/node\.textContent=/);
- const script=updated.match(/<script>([\s\S]*?)<\/script>\s*<\/body>/g)?.at(-1)?.replace(/^<script>/,'').replace(/<\/script>\s*<\/body>$/,'');
+ const script=[...updated.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)?.[1];
  assert.ok(script);
  assert.doesNotThrow(()=>new Script(script));
  assert.throws(()=>patchAutoLocalDashboardUi(updated),/ALREADY_INSTALLED/);
