@@ -62,11 +62,12 @@ test('purpose-locked Qwen can select binary_session status with read-only parame
  assert.equal(result.state,'real_mcp_tool_executed');
  assert.equal(result.actions.length,1);
  assert.equal(result.actions[0].tool,'binary_session');
- assert.deepEqual(result.actions[0].arguments,{});
+ assert.deepEqual(result.actions[0].arguments,{detail:'summary',refresh_candidates:false});
+ assert.deepEqual(f.stats().exactPayload.arguments,{detail:'summary',refresh_candidates:false});
  assert.equal(f.stats().exactPayload.name,'binary_session');
  assert.equal(f.stats().modelBody.tools.length,1);
  assert.equal(f.stats().modelBody.tools[0].function.name,'rea_tool_007');
- assert.equal(f.stats().modelBody.tools[0].function.parameters.properties.detail.enum[0],'summary');
+ assert.deepEqual(f.stats().modelBody.tools[0].function.parameters,{type:'object',properties:{},additionalProperties:false});
  assert.ok(logs.includes('READ_ONLY_CANDIDATES=binary_session'));
 });
 test('binary_session must be in actual 229-tool catalogue; no guessed substitutes',async()=>{
@@ -78,7 +79,7 @@ test('binary_session must be in actual 229-tool catalogue; no guessed substitute
  await assert.rejects(runDirectReaPilot({prompt:'Inspect the REA MCP binary session status and provider availability.',requestFn:custom}),/REQUIRED_READ_ONLY_TOOL_NOT_INSTALLED/);
  assert.equal(f.stats().toolCount,0);assert.equal(f.stats().modelCount,0);
 });
-test('Qwen is not allowed to refresh provider candidates or request huge complete binary session',async()=>{
+test('Qwen cannot authorize a provider refresh or complete binary session; client forces safe defaults',async()=>{
  const f=fixture();
  const request='Inspect the REA MCP binary session status and available provider capabilities.';
  const choose=async(url,body)=>{
@@ -89,7 +90,24 @@ test('Qwen is not allowed to refresh provider candidates or request huge complet
   }
   return f.requestFn(url,body);
  };
- await assert.rejects(runDirectReaPilot({prompt:request,requestFn:choose}),/SESSION_SUMMARY_ONLY/);
+ const logs=[];
+ const result=await runDirectReaPilot({prompt:request,requestFn:choose,log:x=>logs.push(x)});
+ assert.equal(result.state,'real_mcp_tool_executed');
+ assert.equal(f.stats().toolCount,1);
+ assert.deepEqual(f.stats().exactPayload.arguments,{detail:'summary',refresh_candidates:false});
+ assert.ok(logs.includes('QWEN_ARGS_NORMALIZED_TO_FIXED_READ_ONLY_SUMMARY=TRUE'));
+});
+test('Qwen cannot introduce unknown status tool argument fields',async()=>{
+ const f=fixture();
+ const request='Inspect the REA MCP binary session status and available provider capabilities.';
+ const tampered=async(url,body)=>{
+  if(url===LLAMA&&body?.tools)
+   return {choices:[{finish_reason:'tool_calls',message:{tool_calls:[{
+    function:{name:body.tools[0].function.name,arguments:JSON.stringify({detail:'summary',unexpected:'danger'})}
+   }]}}]};
+  return f.requestFn(url,body);
+ };
+ await assert.rejects(runDirectReaPilot({prompt:request,requestFn:tampered}),/SESSION_UNKNOWN_ARGUMENTS/);
  assert.equal(f.stats().toolCount,0);
 });
 test('JavaScript source inspection request stops instead of offering Android and Ghidra tools',async()=>{
