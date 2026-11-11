@@ -1,3 +1,4 @@
+import {spawnSync} from 'node:child_process';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createCapabilityIndex} from '../src/cognition/capability-index.mjs';
@@ -134,4 +135,11 @@ test('patch refuses pre-cognition source and no direct REA execution',()=>{
  assert.doesNotMatch(routes,/platform\.start\(/);
  assert.doesNotMatch(routes,/platform\.callReaTool\(/);
  assert.doesNotMatch(routes,/\/api\/rea\/call.*POST/);
+});
+
+test('generated staged source must parse as a complete Node ESM module, not just match text markers',()=>{
+ 
+ const staged=patchCapabilityLive(fixture());
+ const result=spawnSync(process.execPath,['--check','--input-type=module'],{input:staged,encoding:'utf8'});
+ assert.equal(result.status,0,'generated module syntax invalid: '+result.stderr);
 });
