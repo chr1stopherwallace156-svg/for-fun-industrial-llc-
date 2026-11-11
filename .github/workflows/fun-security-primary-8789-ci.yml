@@ -8,6 +8,8 @@ on:
       - 'Deploy-Fun-Security-Primary-8789.ps1'
       - 'Reconcile-Fun-Dashboard8789-Policy.ps1'
       - 'Diagnose-Fun-Dashboard8789-Supervisor.ps1'
+      - 'Diagnose-Fun-Dashboard8789-TaskContext.ps1'
+      - 'intelligence-checks/dashboard-task-context-case.mjs'
       - 'intelligence-checks/dashboard-policy-reconciliation-case.mjs'
       - 'intelligence-checks/dashboard-policy-hash-case.ps1'
       - 'intelligence-checks/dashboard-supervisor-diagnostic-case.mjs'
@@ -23,6 +25,8 @@ on:
       - 'Deploy-Fun-Security-Primary-8789.ps1'
       - 'Reconcile-Fun-Dashboard8789-Policy.ps1'
       - 'Diagnose-Fun-Dashboard8789-Supervisor.ps1'
+      - 'Diagnose-Fun-Dashboard8789-TaskContext.ps1'
+      - 'intelligence-checks/dashboard-task-context-case.mjs'
       - 'intelligence-checks/dashboard-policy-reconciliation-case.mjs'
       - 'intelligence-checks/dashboard-policy-hash-case.ps1'
       - 'intelligence-checks/dashboard-supervisor-diagnostic-case.mjs'
@@ -49,7 +53,7 @@ jobs:
       - name: Syntax validation
         run: node --check src/security/defensive-audit.mjs && node --check src/security/security-chat-client.js && node --check scripts/patch-security-primary-8789.mjs
       - name: Synthetic patch safety and scanning tests
-        run: node --test intelligence-checks/dashboard-supervisor-diagnostic-case.mjs intelligence-checks/dashboard-policy-reconciliation-case.mjs intelligence-checks/security-primary-8789-case.mjs intelligence-checks/security-chat-phase4-case.mjs intelligence-checks/local-security-scan-case.mjs
+        run: node --test intelligence-checks/dashboard-task-context-case.mjs intelligence-checks/dashboard-supervisor-diagnostic-case.mjs intelligence-checks/dashboard-policy-reconciliation-case.mjs intelligence-checks/security-primary-8789-case.mjs intelligence-checks/security-chat-phase4-case.mjs intelligence-checks/local-security-scan-case.mjs
       - name: Default CLI is non-connecting preview
         run: node src/security/defensive-audit.mjs preview .
       - name: Parse Windows deployment script without executing it
@@ -65,6 +69,9 @@ jobs:
           $tok3=$null; $err3=$null; [Management.Automation.Language.Parser]::ParseFile((Resolve-Path './Diagnose-Fun-Dashboard8789-Supervisor.ps1').Path,[ref]$tok3,[ref]$err3) | Out-Null
           if($err3.Count){$err3 | Format-List | Out-String | Write-Host; throw 'SUPERVISOR_DIAGNOSTIC_PARSE_HOLD'}
           Write-Host 'FUN_SECURITY_SUPERVISOR_DIAGNOSTIC_PARSE=PASS'
+          $tok4=$null; $err4=$null; [Management.Automation.Language.Parser]::ParseFile((Resolve-Path './Diagnose-Fun-Dashboard8789-TaskContext.ps1').Path,[ref]$tok4,[ref]$err4) | Out-Null
+          if($err4.Count){$err4 | Format-List | Out-String | Write-Host; throw 'TASK_CONTEXT_DIAGNOSTIC_PARSE_HOLD'}
+          Write-Host 'FUN_SECURITY_TASK_CONTEXT_DIAGNOSTIC_PARSE=PASS'
       - name: Execute isolated policy digest known-answer regression (no host changes)
         if: runner.os == 'Windows'
         shell: pwsh
