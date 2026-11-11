@@ -23,6 +23,7 @@ function fixture(){
   if(url===PARENT+'/api/ai/tools')return {local_tool_count:19,rea_tool_count:229};
   if(url===LOCAL+'/api/ai/auto-local/status')return {sidecar:true,state:'ready'};
   if(url===REA+'/api/rea229/call')return {tool:body.name,result:{isError:false,structuredContent:{scope:'rea-runtime',values:[]}}};
+  if(url===REA+'/api/rea229/run')return {state:'round_limit_reached',actions:[{tool:'inspect_artifact',round:1,summary:'Read-only sample'}],reply:'REA produced one tool result'};
   if(url===LOCAL+'/api/ai/auto-local/run')return {state:'completed_with_actions',actions:[{tool:'fi_graph_analyze',round:1,result:{nodes:3}}],reply:'Graph observed'};
   if(url===LLAMA)return {choices:[{finish_reason:'stop',message:{content:'Qwen grounded response'}}],usage:{completion_tokens:19}};
   throw Error('UNEXPECTED_REQUEST_'+url);
@@ -35,6 +36,7 @@ test('classification separates public website, REA, local action and unsupported
  assert.equal(routeUnifiedTask('Inspect the REA MCP analysis settings').tool,'inspect_analysis_settings');
  assert.equal(routeUnifiedTask('Check REA MCP provider status').tool,'binary_session');
  assert.equal(routeUnifiedTask('Run a graph analysis using local compute').kind,'local_action_review');
+ assert.equal(routeUnifiedTask('Use REA to inspect a Rust executable').kind,'rea_action_review');
  assert.equal(routeUnifiedTask('Inspect my local game files').kind,'needs_user_file');
  assert.equal(routeUnifiedTask('Inspect this website').kind,'needs_website_url');
  assert.equal(routeUnifiedTask('Can Call of Duty Warzone be ported to an iPhone?').kind,'general_assistance');
@@ -68,6 +70,41 @@ test('separate local execution requires explicit operatorConfirmed true',async()
  assert.equal(out.state,'local_action_executed');
  assert.equal(out.actions[0].tool,'fi_graph_analyze');
  assert.deepEqual(f.calls.map(x=>x.url),[LOCAL+'/api/ai/auto-local/status',LOCAL+'/api/ai/auto-local/run']);
+});
+test('REA task waits for separate operator click; ordinary chat never executes',async()=>{
+ const f=fixture();
+ const out=await f.app.chat({prompt:'Use REA to inspect the Rust executable'});
+ assert.equal(out.state,'awaiting_operator_click');
+ assert.equal(out.route,'rea_action_review');
+ assert.equal(out.actions.length,0);
+ assert.equal(f.calls.length,0);
+});
+test('REA action requires separate explicit click and delegates one round to existing 8797 executor',async()=>{
+ const f=fixture();
+ const prompt='Use REA to inspect the Rust executable';
+ await assert.rejects(f.app.executeRea({prompt}),/REA_OPERATOR_CONFIRMATION_REQUIRED/);
+ assert.equal(f.calls.length,0);
+ const out=await f.app.executeRea({prompt,operatorConfirmed:true});
+ assert.equal(out.route,'rea_tools');
+ assert.equal(out.state,'rea_actions_executed');
+ assert.equal(out.actions[0].tool,'inspect_artifact');
+ const run=f.calls.find(x=>x.url===REA+'/api/rea229/run');
+ assert.deepEqual(run.body,{prompt,rounds:1});
+ assert.equal(f.calls.some(x=>x.url===LOCAL+'/api/ai/auto-local/run'),false);
+});
+test('REA approval cannot be reused to execute a general user question',async()=>{
+ const f=fixture();
+ await assert.rejects(f.app.executeRea({prompt:'Who made this game?',operatorConfirmed:true}),/REA_TASK_NOT_MATCHED/);
+ assert.equal(f.calls.length,0);
+});
+test('REA runner can decline to call without fabricating executed actions',async()=>{
+ const f=fixture();
+ const ask=async(url,body)=>url===REA+'/api/rea229/run'?
+  {state:'model_no_tool_call',actions:[],reply:'No tool selected'}:f.request(url,body);
+ const app=createUnifiedTaskChat({request:ask,fetchWeb:f.fetchWeb});
+ const result=await app.executeRea({prompt:'Use REA to inspect this executable',operatorConfirmed:true});
+ assert.equal(result.state,'rea_model_no_actions');
+ assert.deepEqual(result.actions,[]);
 });
 test('unrelated prompt never triggers local action even if operatorConfirmed true',async()=>{
  const f=fixture();
@@ -214,6 +251,20 @@ test('local execution HTTP requires separate operatorConfirmed true and task mat
    prompt:'Run local graph analyze',operatorConfirmed:true},headers);
   assert.equal(ok.status,200,ok.body);
   assert.equal(JSON.parse(ok.body).state,'local_action_executed');
+ }finally{await new Promise(r=>server.close(r))}
+});
+test('REA execution HTTP requires independent explicit consent and cannot execute from a GET',async()=>{
+ const f=fixture(),server=await start(f.app);
+ const headers={origin:'http://127.0.0.1:8798','x-fi-unified':'operator-click'};
+ const prompt='Use REA to inspect a Rust executable';
+ try{
+  const denied=await req(server,'POST','/api/unified/rea/execute',{prompt,operatorConfirmed:false},headers);
+  assert.equal(denied.status,422);
+  assert.equal(f.calls.length,0);
+  const good=await req(server,'POST','/api/unified/rea/execute',{prompt,operatorConfirmed:true},headers);
+  assert.equal(good.status,200,good.body);
+  assert.equal(JSON.parse(good.body).actions.length,1);
+  assert.deepEqual(f.calls.map(x=>x.url),[REA+'/api/rea229/status',REA+'/api/rea229/run']);
  }finally{await new Promise(r=>server.close(r))}
 });
 test('UI source compiles and CLI stays inert unless explicitly --serve',async()=>{
