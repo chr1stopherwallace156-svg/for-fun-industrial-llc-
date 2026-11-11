@@ -16,7 +16,7 @@ function dedupe(list,source,seen,limit){
  if(!Array.isArray(list)||list.length>limit)throw Error('CAPABILITY_CATALOGUE_SIZE_INVALID_'+source);
  const out=[];
  for(const item of list){
-  const name=source==='rea'?'rea__'+item?.name:item?.function?.name;
+  const name=source==='rea'?(typeof item?.name==='string'?'rea__'+item.name:null):item?.function?.name;
   const description=source==='rea'?item?.description:item?.function?.description;
   const record=normalize(name,description,source);
   if(!record)continue;
@@ -61,7 +61,7 @@ export function createCapabilityIndex({localDefinitions,reaCatalogue}={}){
   return Object.freeze({version:'fi-capability-index-v1',localCount:local().records.length,
    reaCatalogued:cachedRea.length,reaState:state,reaError:lastError,
    reaRefreshes:loads,modelExecutionEnabled:false,automaticReaInitialization:false,
-   automaticToolCalls:false,executionGrants:0,availableSourceCount:2});
+   automaticToolCalls:false,executionGrants:0,availableSourceCount:1+(state==='available_catalogue_only'?1:0)});
  }
  function search({query,limit=6,budgetChars=1200}={}){
   if(typeof query!=='string'||query.length<2||query.length>1000||!/\S/.test(query))
