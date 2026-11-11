@@ -19,6 +19,6 @@ test("backup hashes, original runtime settings, and protected port ownership are
  for(const item of ["server.original.mjs","index.original.html","tools.original.mjs","server.staged.mjs","index.staged.html","tools.staged.mjs","policy.retired.json","memoryBudgetMs","REA_ALLOWED_TOOLS=(@($pol.allowedTools)-join ',')","PROTECTED_PORT_CHANGED_","RESTORE_STDERR_LOG="])assert.ok(body.includes(item),item);
 });
 test("reads failed runtime log and reports health without needing policy approvals",()=>{
- for(const item of ["FAILED_DEPLOYMENT_STDERR_PATH=","FAILED_STARTUP_ERROR_HINT=","${label}_VOICE_ENABLED=","${label}_MEMORY_MODE=","FUN_PHASE5_RECOVERY=PASS"])assert.ok(body.includes(item),item);
+ for(const item of ["FAILED_DEPLOYMENT_STDERR_PATH=","FAILED_STARTUP_ERROR_HINT=","$($label)_VOICE_ENABLED=","$($label)_MEMORY_MODE=","FUN_PHASE5_RECOVERY=PASS"])assert.ok(body.includes(item),item);
  assert.doesNotMatch(body,/Reconcile-Fun-Dashboard8789-Policy/);
 });
