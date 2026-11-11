@@ -1,0 +1,34 @@
+name: Fun autonomous local tool experiment qualification
+on:
+  push:
+    branches:
+      - feature/fun-auto-tool-experiment-v1-20261111
+  pull_request:
+    paths:
+      - 'src/experimental/auto-local-tools.mjs'
+      - 'scripts/Run-Fun-Auto-Local-Experiment.mjs'
+      - 'intelligence-checks/auto-local-tools-case.mjs'
+      - '.github/workflows/fun-auto-local-experiment-ci.yml'
+permissions:
+  contents: read
+jobs:
+  local-experiment:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax verification
+        run: |
+          node --check src/experimental/auto-local-tools.mjs
+          node --check scripts/Run-Fun-Auto-Local-Experiment.mjs
+          node --check intelligence-checks/auto-local-tools-case.mjs
+      - name: Offline autonomous local execution tests
+        run: node --test intelligence-checks/auto-local-tools-case.mjs
+      - name: CLI is inert without operator --run
+        run: node scripts/Run-Fun-Auto-Local-Experiment.mjs
