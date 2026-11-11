@@ -95,3 +95,66 @@ test('no unauthenticated production REA or arbitrary server action in source',as
  assert.doesNotMatch(s,/\/api\/rea\/call|\/api\/activate|\/api\/stop|child_process|spawn\(/);
  assert.match(s,/127\.0\.0\.1:8789/);
 });
+
+
+function modelClient({dashboard,raw}){
+ const seen=[];
+ const client=async(path,options)=>{
+  seen.push({path,options});
+  if(path==='/api/ai/status')return {state:'ready'};
+  if(path==='/api/cognition/health')return {version:'fi-cognitive-live-bridge-v1',reaExecutionGrants:0};
+  if(path==='/api/cognition/catalogue/status')return {version:'fi-capability-index-v1',executionGrants:0,localCount:defs.length};
+  if(path==='/api/ai/tools')return {local_tool_count:defs.length,tools:defs};
+  if(path==='/api/ai/chat')return dashboard(path,options);
+  if(path==='/__raw_llama_chat__')return raw(path,options);
+  if(path==='/api/ai/tool-call')return {tool:options.body.name,result:{connected:true,edges:2}};
+  throw Error('unexpected '+path);
+ };
+ return {client,seen};
+}
+test('a fallback placeholder invokes existing raw llama once and executes its valid structured call',async()=>{
+ let first=0,rawCount=0;
+ const {client,seen}=modelClient({
+  dashboard:async()=>{first++;return {reply:'The model proposed a tool call. Review it before execution.',tool_calls:[]}},
+  raw:async(_p,{body})=>{
+   rawCount++;
+   assert.equal(body.tool_choice,'auto');
+   assert.equal(body.tools.length,6);
+   assert.match(body.messages[0].content,/without another approval prompt/);
+   return {choices:[{message:{content:null,tool_calls:[call('fi_graph_analyze',{nodes:['a','b','c'],edges:[['a','b'],['a','c']]})]}}]};
+  }
+ });
+ const result=await runHttpExperiment({prompt:'Analyze a graph with nodes a,b,c and two edges',rounds:1,client});
+ assert.equal(result.actions.length,1);
+ assert.equal(result.actions[0].tool,'fi_graph_analyze');
+ assert.equal(first,1);
+ assert.equal(rawCount,1);
+ assert.equal(seen.filter(x=>x.path==='/api/ai/tool-call').length,1);
+});
+test('ambiguous unstructured model output at both layers fails closed with no tool execution',async()=>{
+ const {client,seen}=modelClient({
+  dashboard:async()=>({reply:'The model proposed a tool call. Review it before execution.',tool_calls:[]}),
+  raw:async()=>({choices:[{message:{content:null,tool_calls:[]}}]})
+ });
+ await assert.rejects(runHttpExperiment({prompt:'Analyze this graph',client}),/AUTO_LOCAL_NO_STRUCTURED_TOOL_CALL_FROM_RAW_LLAMA/);
+ assert.equal(seen.filter(x=>x.path==='/api/ai/tool-call').length,0);
+ assert.equal(seen.filter(x=>x.path==='/__raw_llama_chat__').length,1);
+});
+test('a valid structured dashboard call is executed exactly once without another model request',async()=>{
+ const {client,seen}=modelClient({
+  dashboard:async()=>({tool_calls:[call('fi_graph_analyze',{nodes:['a','b'],edges:[['a','b']]})]}),
+  raw:async()=>{throw Error('raw fallback should not be reached')}
+ });
+ const result=await runHttpExperiment({prompt:'Analyze a graph',rounds:1,client});
+ assert.equal(result.actions.length,1);
+ assert.equal(seen.filter(x=>x.path==='/__raw_llama_chat__').length,0);
+ assert.equal(seen.filter(x=>x.path==='/api/ai/tool-call').length,1);
+});
+test('raw llama proposed unregistered REA or shell tool remains blocked at local schema gate',async()=>{
+ const {client,seen}=modelClient({
+  dashboard:async()=>({reply:'The model proposed a tool call. Review it before execution.',tool_calls:[]}),
+  raw:async()=>({choices:[{message:{tool_calls:[call('rea__shell_execute',{})]}}]})
+ });
+ await assert.rejects(runHttpExperiment({prompt:'Analyze a graph',client}),/TOOL_NOT_IN_ACTIVE_LOCAL_REGISTRY/);
+ assert.equal(seen.filter(x=>x.path==='/api/ai/tool-call').length,0);
+});
