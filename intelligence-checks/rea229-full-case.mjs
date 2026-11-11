@@ -206,3 +206,21 @@ test('entrypoint is inert without --serve and launcher does not terminate unrela
  assert.match(powershell,/-WorkingDirectory \$Primary/);
  assert.match(powershell,/taskkill\.exe \/PID \$Child\.Id \/T \/F/);
 });
+
+test('actual MCP isError status is a failed tool execution, never an automatic retry',async()=>{
+ const {adapter}=testAdapter();
+ let callCount=0;
+ adapter.callTool=async name=>{
+  callCount++;return {tool:name,result:{isError:true,content:[{type:'text',text:'Synthetic failure'}]}};
+ };
+ const runner=createFullReaRunner({adapter,infer:async payload=>({
+  choices:[{message:{tool_calls:[{function:{name:payload.tools[0].function.name,arguments:'{}'}}]}}]
+ })});
+ await runner.initialize({expectedNames:catalogue.map(x=>x.name)});
+ await assert.rejects(runner.run({prompt:'Inspect Rust binary',rounds:3}),/MCP_TOOL_RETURNED_ERROR/);
+ assert.equal(callCount,1);
+ assert.equal(runner.status().executedCalls,1);
+ assert.equal(runner.status().failedSessions,1);
+ await assert.rejects(runner.callExact({name:'rea_inspect_rust_binary',arguments:{}}),/MCP_TOOL_RETURNED_ERROR/);
+ assert.equal(callCount,2);
+});
