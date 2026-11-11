@@ -17,16 +17,14 @@ const matchPrompt={
  status:p=>/\b(?:rea|mcp)\b/i.test(p)&&
   /\b(?:binary.session|session.status|providers?|capabilit(?:y|ies)|availab(?:le|ility))\b/i.test(p)&&
   /\b(?:status|inspect|inspectable|check|report|show|list|available|availability)\b/i.test(p)&&
-  !/\.(?:js|mjs|cjs|ts|tsx|jsx)\b/i.test(p),
- guidance:p=>/\b(?:rea|mcp)\b/i.test(p)&&/\b(?:installed|built.?in|internal|tool)\b/i.test(p)&&
-  /\bguidance\b/i.test(p)&&!/\.(?:js|mjs|cjs|ts|tsx|jsx)\b/i.test(p)
+  !/\.(?:js|mjs|cjs|ts|tsx|jsx)\b/i.test(p)
 };
 export function chooseReaDiagnosticTools(catalogue,prompt){
  if(!Array.isArray(catalogue)||catalogue.length!==229)rejectCode('CATALOGUE_NOT_229');
  if(typeof prompt!=='string'||prompt.length<10||prompt.length>1800)rejectCode('INVALID_PROMPT');
- const category=matchPrompt.settings(prompt)?'settings':matchPrompt.status(prompt)?'status':matchPrompt.guidance(prompt)?'guidance':null;
+ const category=matchPrompt.settings(prompt)?'settings':matchPrompt.status(prompt)?'status':null;
  if(!category)rejectCode('NO_VERIFIED_COMPATIBLE_READ_ONLY_REA_TOOL_FOR_TASK');
- const names=category==='settings'?['inspect_analysis_settings']:category==='status'?['binary_session']:['search_guidance'];
+ const names=category==='settings'?['inspect_analysis_settings']:['binary_session'];
  const selected=names.map(name=>catalogue.find(t=>t?.name===name));
  if(selected.some(t=>!t))rejectCode('REQUIRED_READ_ONLY_TOOL_NOT_INSTALLED');
  for(const tool of selected){
@@ -91,6 +89,11 @@ export async function runDirectReaPilot({prompt,requestFn=request,log=()=>{}}={}
   try{args=JSON.parse(args)}catch{rejectCode('MODEL_ARGS_INVALID_JSON')}
  }
  if(!plain(args)||JSON.stringify(args).length>20000)rejectCode('MODEL_ARGS_INVALID');
+ if(selected.name==='binary_session'&&
+    (Object.keys(args).some(key=>!['detail','refresh_candidates'].includes(key))||
+     (args.detail!==undefined&&args.detail!=='summary')||
+     (args.refresh_candidates!==undefined&&args.refresh_candidates!==false)))
+   rejectCode('SESSION_SUMMARY_ONLY');
  log('QWEN_SELECTED_REAL_REA_TOOL='+selected.name);
  // Validate that the selected operation remains the one exact allowed purpose.
  if(!ranked.some(t=>t.name===selected.name))rejectCode('TOOL_PURPOSE_CHANGED');
