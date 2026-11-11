@@ -18,10 +18,18 @@ export function patchAutoLocalDashboardServer(source){
  '/api/ai/automatic-memory/status','/api/cognition/health']){
   if(!source.includes(required))throw Error('AUTO_DASH_BASELINE_MISSING_'+required);
  }
+ if(!source.includes('import {readFile}') || !source.includes('const root=path.dirname('))throw Error('AUTO_DASH_FILE_SERVE_BASELINE_UNEXPECTED');
  let out=replaceOnce(source,ROOT,IMPORT+'\n// '+MARK+'\n'+ROOT);
  const injection=[
   'const fiAutoLocalDashboard=createAutoLocalDashboard();',
   SERVER,
+  ' // '+MARK+': independently served CSP-compatible script; same-origin only.',
+  ' if(req.method==="GET"&&req.url==="/api/ai/auto-local/client.js"){',
+  '  if(!localRequest(req,res))return;',
+  '  const script=await readFile(path.join(root,"experimental","auto-local-client.js"));',
+  '  res.writeHead(200,{"content-type":"text/javascript; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"});',
+  '  return res.end(script);',
+  ' }',
   ' // '+MARK+': only explicit operator-click starts an automatic local session.',
   ' if(req.method==="GET"&&req.url==="/api/ai/auto-local/status"){',
   '  if(!localRequest(req,res))return;',
