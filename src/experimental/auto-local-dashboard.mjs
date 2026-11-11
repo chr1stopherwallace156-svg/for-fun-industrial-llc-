@@ -44,7 +44,13 @@ export function createAutoLocalDashboard({client=fixedRequest}={}){
     throw Error('AUTO_DASH_COGNITION_IDENTITY_HOLD');
    if(index.version!=='fi-capability-index-v1'||index.executionGrants!==0)
     throw Error('AUTO_DASH_INDEX_IDENTITY_HOLD');
-   const tools=selectCurrentLocalTools(toolsResponse.tools);
+   // The fixed 19 local tools coexist with 229 allowlisted REA definitions.
+   // Selecting all 248 would exceed the local-only runner's size boundary and
+   // falsely imply REA may execute. Filter by the existing fixed local prefix.
+   if(!Array.isArray(toolsResponse.tools)||toolsResponse.tools.length>320)
+    throw Error('AUTO_DASH_COMBINED_CATALOGUE_INVALID');
+   const onlyLocal=toolsResponse.tools.filter(item=>typeof item?.function?.name==='string'&&item.function.name.startsWith('fi_'));
+   const tools=selectCurrentLocalTools(onlyLocal);
    if(tools.length!==toolsResponse.local_tool_count||tools.length!==index.localCount)
     throw Error('AUTO_DASH_LOCAL_TOOL_COUNT_HOLD');
    const result=await runAutoLocalExperiment({
