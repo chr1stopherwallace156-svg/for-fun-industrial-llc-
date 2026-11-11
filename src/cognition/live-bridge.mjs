@@ -50,14 +50,28 @@ export function createLiveCognitionBridge({kernel = new CognitiveKernel(), capab
       capabilities: capabilities()};
   }
   async function liveStatus() {
+    // The primary cognitive status endpoint MUST NOT stall while unrelated
+    // platform health adapters (NetBird/REA/compute) are slow.
     const snapshot = status();
     if (serviceStatus) {
+      let timeout;
       try {
-        const state = await serviceStatus();
-        snapshot.services = Array.isArray(state?.services) ? state.services.map(x => ({
-          id: String(x.id || '').slice(0,48), state: String(x.state || 'unknown').slice(0,40)
-        })).slice(0,30) : [];
+        const raced = await Promise.race([
+          Promise.resolve().then(()=>serviceStatus()).then(
+            state=>({state}),()=>({failed:true})),
+          new Promise(resolve=>{timeout=setTimeout(()=>resolve({timeout:true}),1500);})
+        ]);
+        if (raced.timeout) snapshot.serviceHealth = 'timed_out_unverified';
+        else if(raced.failed) snapshot.serviceHealth = 'not_verified';
+        else {
+          snapshot.services = Array.isArray(raced.state?.services)
+            ? raced.state.services.map(x=>({
+              id:String(x.id||'').slice(0,48),
+              state:String(x.state||'unknown').slice(0,40)
+            })).slice(0,30) : [];
+        }
       } catch { snapshot.serviceHealth = 'not_verified'; }
+      finally {clearTimeout(timeout);}
     }
     return snapshot;
   }
