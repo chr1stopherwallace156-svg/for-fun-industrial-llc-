@@ -76,7 +76,7 @@ function VerifyExistingServices(){
   if($statusCode -eq 403){$reaDenied=$true}else{Hold ('REA_STOPPED_UNEXPECTED_HTTP_'+$statusCode)}
  }
  if(-not $reaDenied){Hold 'REA_DENIAL_NOT_CONFIRMED'}
- if([int]$definitions.rea_tool_count -ne 0 -or -not [string]::IsNullOrWhiteSpace([string]($definitions.tools|Where-Object {$_.function.name -like 'rea__*'}|Select-Object -First 1))){Hold 'REA_TOOL_VISIBILITY_UNEXPECTED'}
+ if([int]$definitions.rea_tool_count -ne 0 -or @($definitions.tools|Where-Object {$_.function.name -like 'rea__*'}).Count -ne 0){Hold 'REA_TOOL_VISIBILITY_UNEXPECTED'}
  # No REA tools or execution privileges are carried into the new dashboard.
  return @{Names=$names;Allowed=@();ReaState='stopped';MemoryBudget=[int]$memory.recallBudgetMs}
 }
