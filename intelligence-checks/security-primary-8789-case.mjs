@@ -39,7 +39,7 @@ const TOOLS=[
  'export function openAiToolDefinitions(reaTools=[]){return platformTools}',
  'export function getPlatformTool(name){return platformTools.find(t=>t.name===name)||null}',
 ].join("\n");
-const UI='<html><body><!-- FI_VOICE_MOBILE_PANEL_V1 FI_OPTIMIZATION_PHASE23_PANEL_V1 --><div id="chat-input"></div><p>existing chat retained</p></body></html>';
+const UI='<html><body><!-- FI_VOICE_MOBILE_PANEL_V1 FI_OPTIMIZATION_PHASE23_PANEL_V1 --><section id="fi-voice-mobile" class="panel"></section><script src="/api/voice/mobile/client.js" defer></script><p>existing chat retained</p></body></html>';
 
 test("surgical server patch preserves installed voice, memory and REA and inserts approval-only tool",()=>{
  const out=patchPrimaryServer(SERVER);
@@ -61,6 +61,14 @@ test("tool registry has zero user/model arguments and no REA policy change",()=>
  assert.match(s,/additionalProperties:false/);
  assert.doesNotMatch(s,/allowedTools=|REA_ALLOWED_TOOLS=/);
  assert.throws(()=>patchPrimaryTools(s),/SECURITY_TOOLS_ALREADY_PATCHED/);
+});
+test("UI patch accepts deployed voice/AI operator dashboard without old chat-input IDs",()=>{
+ const operatorHtml='<html><body><!-- FI_VOICE_MOBILE_PANEL_V1 FI_OPTIMIZATION_PHASE23_PANEL_V1 --><section id="fi-voice-mobile"></section><script src="/api/voice/mobile/client.js" defer></script><div id="fi-unified">Live operator</div></body></html>';
+ const staged=patchPrimaryUi(operatorHtml);
+ assert.match(staged,/Live operator/);
+ assert.match(staged,/\/api\/security\/client.js/);
+ assert.ok(!staged.includes('id="chat-input"'));
+ assert.throws(()=>patchPrimaryUi(operatorHtml.replace('src="/api/voice/mobile/client.js"','src="/api/voice/obsolete.js"')),/SECURITY_PRIMARY_VOICE_ANCHOR_NOT_VERIFIED/);
 });
 test("UI inserts one external script while preserving existing chat",()=>{
  const s=patchPrimaryUi(UI);
@@ -121,7 +129,9 @@ test("fixed primary audit inspects 8789 and 8443 but does not HTTP-probe NetBird
 });
 test("primary security browser client mounts inside existing local chat and asks approval",async()=>{
  const client=await readFile(fileURLToPath(new URL("../src/security/security-chat-client.js",import.meta.url)),"utf8");
- assert.match(client,/getElementById\("chat-input"\)/);
+ assert.match(client,/for\(const id of \["chat-input","chat-send","chat-history","fi-voice-conversation"\]\)/);
+ assert.match(client,/getElementById\("fi-voice-mobile"\)/);
+ assert.match(client,/fi-security-primary-results/);
  assert.match(client,/window\.confirm/);
  assert.match(client,/x-fi-security-approval/);
  assert.match(client,/textContent=message/);
