@@ -44,7 +44,7 @@ function StartDashboard([string]$stdout,[string]$stderr){
  $env:FUN_VOICE_HOME=Join-Path $env:LOCALAPPDATA 'FunIndustrial\VoiceLab'
  return Start-Process -FilePath $Node -ArgumentList @('src/server.mjs') -WorkingDirectory $Live -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
 }
-function WaitDashboard([System.Diagnostics.Process]$process){
+function WaitDashboard([System.Diagnostics.Process]$process,[bool]$requireChat=$true){
  for($i=0;$i -lt 70;$i++){
   Start-Sleep -Milliseconds 500
   $process.Refresh()
@@ -52,12 +52,13 @@ function WaitDashboard([System.Diagnostics.Process]$process){
   try{
    if((DashboardPid) -ne $process.Id){continue}
    $ai=Request '/api/ai/status' 4
-   $chat=Request '/api/ai/chat-optimization/status' 4
+   $chatState='ready'
+   if($requireChat){$chat=Request '/api/ai/chat-optimization/status' 4;$chatState=$chat.state}
    $memory=Request '/api/ai/automatic-memory/status' 4
    $voice=Request '/api/voice/mobile/status' 4
    $web=Request '/api/web/status' 4
    $agent=Request '/api/optimization/agent/status' 4
-   if($ai.state -eq 'ready' -and $chat.state -eq 'ready' -and
+   if($ai.state -eq 'ready' -and $chatState -eq 'ready' -and
       $memory.mode -eq 'automatic_contextual_read_only' -and
       $voice.code -eq 'FI_VOICE_MOBILE_UPLOAD_V1' -and
       $web.state -eq 'running' -and $agent.state -eq 'ready'){return $true}
@@ -205,7 +206,7 @@ try{
    for($i=0;$i -lt 40;$i++){if(-not(Snap 8789)){break};Start-Sleep -Milliseconds 200}
    if(-not(Snap 8789)){
     $restored=StartDashboard (Join-Path $Backup 'rollback.stdout.log') (Join-Path $Backup 'rollback.stderr.log')
-    if(WaitDashboard $restored){Write-Warning 'FUN_CHAT_OPTIMIZATION_ROLLBACK_DASHBOARD=RESTORED'}
+    if(WaitDashboard $restored $false){Write-Warning 'FUN_CHAT_OPTIMIZATION_ROLLBACK_DASHBOARD=RESTORED'}
     else{Write-Warning 'FUN_CHAT_OPTIMIZATION_ROLLBACK_DASHBOARD=UNCONFIRMED'}
    }else{Write-Warning 'FUN_CHAT_OPTIMIZATION_ROLLBACK_PORT_OCCUPIED'}
   }catch{Write-Warning 'FUN_CHAT_OPTIMIZATION_ROLLBACK_START_FAILED'}
