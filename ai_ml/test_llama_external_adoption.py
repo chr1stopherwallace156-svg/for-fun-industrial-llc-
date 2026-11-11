@@ -67,6 +67,16 @@ class ExternalAdoptionTests(unittest.TestCase):
             self.assertFalse(status["managed"])
             self.assertIsNone(runtime.process)
 
+    def test_direct_request_for_other_model_refuses_existing_server(self):
+        runtime = LlamaCppRuntime()
+        other = Path(self.tmp.name, "different.gguf")
+        other.write_bytes(b"placeholder")
+        with patch.dict("os.environ", self.env), patch("urllib.request.urlopen", self.urlopen), patch(
+            "subprocess.Popen", side_effect=AssertionError("must not spawn")):
+            with self.assertRaisesRegex(RuntimeError, "another llama.cpp server"):
+                runtime.start(str(self.binary), str(other), port=8088)
+            self.assertIsNone(runtime.process)
+
     def test_wrong_model_identity_is_rejected_and_chat_denied(self):
         runtime = LlamaCppRuntime()
         def mismatch(req, timeout=None):
