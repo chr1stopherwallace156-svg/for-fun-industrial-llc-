@@ -47,7 +47,7 @@ test("staging patch preserves existing chat source and protected paths",()=>{
  const modern='<html><body data-app="fun"><div>FI_WEB_CHAT_CONSOLIDATION_UI_V1</div><div>FI_VOICE_MOBILE_PANEL_V1</div><section><h2>Local Qwen Workspace</h2><textarea id="qwenPrompt"></textarea><button id="qwenSubmit">Ask</button></section></body></html>';
  const modernPatched=patchChatOptimizationUi(modern);
  assert.match(modernPatched,/FI_CHAT_OPTIMIZATION_UI_V1/);
- assert.match(modernPatched,/api\\/ai\\/chat-optimization\\/client\\.js/);
+ assert.ok(modernPatched.includes('src="/api/ai/chat-optimization/client.js"'));
  assert.ok(modernPatched.includes('id="qwenPrompt"'));
  assert.ok(modernPatched.includes('id="qwenSubmit"'));
  assert.ok(modernPatched.indexOf('id="qwenPrompt"') < modernPatched.indexOf('FI_CHAT_OPTIMIZATION_UI_V1'));
@@ -151,9 +151,9 @@ test("client recognizes explicit optimization prompt but never grants autonomous
  assert.match(c,/addEventListener\("keydown"/);
  assert.match(c,/stopImmediatePropagation/);
  assert.match(c,/FI_CHAT_OPTIMIZATION_COMPAT_V2/);
- assert.match(c,/findChat\\(\\)/);
+ assert.ok(c.includes("findChat()"));
  assert.match(c,/fi-chat-opt-standalone/);
- assert.match(c,/matches\\.length===1/);
+ assert.ok(c.includes("matches.length===1"));
  assert.match(c,/Prepare optimization/);
  assert.match(c,/x-fi-optimization-approval/);
  assert.match(c,/window.confirm/);
