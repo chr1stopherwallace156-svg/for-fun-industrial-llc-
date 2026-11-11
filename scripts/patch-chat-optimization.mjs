@@ -45,12 +45,16 @@ export function patchChatOptimizationServer(original){
 }
 export function patchChatOptimizationUi(original){
  if(original.includes("FI_CHAT_OPTIMIZATION_UI_V1"))throw Error("CHAT_OPT_UI_ALREADY_PATCHED");
+ // The operator dashboard evolves independently of GitHub's original chat markup.
+ // Preserve the entire existing UI. The injected client will discover one unique
+ // chat surface or provide an explicit local-only optimizer entry without hijacking chat.
  for(const marker of ["FI_WEB_CHAT_CONSOLIDATION_UI_V1",
-  'id="chat-input"','id="chat-send"','id="chat-proposals"']){
+  "FI_VOICE_MOBILE_PANEL_V1"]){
   if(!original.includes(marker))throw Error("CHAT_OPT_UI_BASELINE_MISSING_"+marker);
  }
+ const openings=[...original.matchAll(/<body(?:\\s[^>]*)?>/gi)];
  const matches=[...original.matchAll(/<\/body\s*>/gi)];
- if(matches.length!==1)throw Error("CHAT_OPT_BODY_ANCHOR_HOLD");
+ if(openings.length!==1||matches.length!==1)throw Error("CHAT_OPT_BODY_ANCHOR_HOLD");
  const p=matches[0].index;
  return original.slice(0,p)+'\n<!-- FI_CHAT_OPTIMIZATION_UI_V1: chat prompt enhancement, approval-gated -->\n'+
   '<script src="/api/ai/chat-optimization/client.js" defer></script>\n'+original.slice(p);
