@@ -38,10 +38,19 @@ test("staging patch preserves existing chat source and protected paths",()=>{
  assert.match(output,/chat-optimization\/client\.js/);
  assert.throws(()=>patchChatOptimizationServer(output),/ALREADY_PATCHED/);
  assert.throws(()=>patchChatOptimizationServer(fixtureServer.replace("FI_AUTO_COGNEE_CHAT_V1","MISSING")),/PROTECTED_MARKER/);
- const input='<html><body><div>FI_WEB_CHAT_CONSOLIDATION_UI_V1</div><textarea id="chat-input"></textarea><button id="chat-send">Send</button><div id="chat-proposals"></div></body></html>';
+ const input='<html><body><div>FI_WEB_CHAT_CONSOLIDATION_UI_V1</div><div>FI_VOICE_MOBILE_PANEL_V1</div><textarea id="chat-input"></textarea><button id="chat-send">Send</button><div id="chat-proposals"></div></body></html>';
  const ui=patchChatOptimizationUi(input);
  assert.match(ui,/FI_CHAT_OPTIMIZATION_UI_V1/);
  assert.ok(ui.includes('id="chat-input"'));
+ // The deployed dashboard has evolved beyond these historic chat IDs.
+ // Staging must not require them or strip any existing chat controls.
+ const modern='<html><body data-app="fun"><div>FI_WEB_CHAT_CONSOLIDATION_UI_V1</div><div>FI_VOICE_MOBILE_PANEL_V1</div><section><h2>Local Qwen Workspace</h2><textarea id="qwenPrompt"></textarea><button id="qwenSubmit">Ask</button></section></body></html>';
+ const modernPatched=patchChatOptimizationUi(modern);
+ assert.match(modernPatched,/FI_CHAT_OPTIMIZATION_UI_V1/);
+ assert.match(modernPatched,/api\\/ai\\/chat-optimization\\/client\\.js/);
+ assert.ok(modernPatched.includes('id="qwenPrompt"'));
+ assert.ok(modernPatched.includes('id="qwenSubmit"'));
+ assert.ok(modernPatched.indexOf('id="qwenPrompt"') < modernPatched.indexOf('FI_CHAT_OPTIMIZATION_UI_V1'));
  assert.throws(()=>patchChatOptimizationUi(ui),/ALREADY_PATCHED/);
  assert.throws(()=>patchChatOptimizationUi("<html><body></body></html>"),/UI_BASELINE_MISSING/);
 });
@@ -141,6 +150,11 @@ test("client recognizes explicit optimization prompt but never grants autonomous
  assert.match(c,/addEventListener\("click"/);
  assert.match(c,/addEventListener\("keydown"/);
  assert.match(c,/stopImmediatePropagation/);
+ assert.match(c,/FI_CHAT_OPTIMIZATION_COMPAT_V2/);
+ assert.match(c,/findChat\\(\\)/);
+ assert.match(c,/fi-chat-opt-standalone/);
+ assert.match(c,/matches\\.length===1/);
+ assert.match(c,/Prepare optimization/);
  assert.match(c,/x-fi-optimization-approval/);
  assert.match(c,/window.confirm/);
  assert.match(c,/verified numeric candidate problems/i);
