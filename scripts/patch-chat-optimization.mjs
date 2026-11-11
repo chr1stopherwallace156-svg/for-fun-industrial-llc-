@@ -52,7 +52,7 @@ export function patchChatOptimizationUi(original){
   "FI_VOICE_MOBILE_PANEL_V1"]){
   if(!original.includes(marker))throw Error("CHAT_OPT_UI_BASELINE_MISSING_"+marker);
  }
- const openings=[...original.matchAll(/<body(?:\\s[^>]*)?>/gi)];
+ const openings=[...original.matchAll(/<body(?:\s[^>]*)?>/gi)];
  const matches=[...original.matchAll(/<\/body\s*>/gi)];
  if(openings.length!==1||matches.length!==1)throw Error("CHAT_OPT_BODY_ANCHOR_HOLD");
  const p=matches[0].index;
