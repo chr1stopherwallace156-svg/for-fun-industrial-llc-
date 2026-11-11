@@ -215,11 +215,18 @@ try{
  }
  if($Changed){
   try{
-   if((Hash $Server) -eq $StagedServerHash -and (Hash $Ui) -eq $StagedUiHash){
+   # Restore each file independently if it still has either the original
+   # bytes or the exact bytes installed by this run. A partial copy failure
+   # must not strand the live server with mixed original/staged files.
+   $serverCurrent=Hash $Server
+   $uiCurrent=Hash $Ui
+   if($serverCurrent -eq $StagedServerHash){
     Copy-Item -LiteralPath (Join-Path $Work 'server.original.mjs') -Destination $Server -Force -ErrorAction Stop
+   }elseif($serverCurrent -ne $OldServerHash){Write-Warning 'SERVER_EXTERNALLY_CHANGED_NO_OVERWRITE'}
+   if($uiCurrent -eq $StagedUiHash){
     Copy-Item -LiteralPath (Join-Path $Work 'index.original.html') -Destination $Ui -Force -ErrorAction Stop
-    if((Hash $Server) -ne $OldServerHash -or (Hash $Ui) -ne $OldUiHash){Write-Warning 'BACKUP_HASH_RESTORE_MISMATCH'}
-   }else{Write-Warning 'LIVE_SOURCE_EXTERNALLY_CHANGED_NO_AUTOMATIC_OVERWRITE'}
+   }elseif($uiCurrent -ne $OldUiHash){Write-Warning 'UI_EXTERNALLY_CHANGED_NO_OVERWRITE'}
+   if((Hash $Server) -ne $OldServerHash -or (Hash $Ui) -ne $OldUiHash){Write-Warning 'BACKUP_HASH_RESTORE_MISMATCH'}
    foreach($m in $Modules){
     if(-not $ModuleWasPresent[$m]){
      $dest=Join-Path $Dir $m
