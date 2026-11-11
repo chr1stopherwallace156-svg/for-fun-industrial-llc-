@@ -17,7 +17,7 @@ function findChat(){
  for(const section of document.querySelectorAll("section,article,.panel,[role=region]")){
   const headings=[...section.querySelectorAll("h1,h2,h3,h4")].filter(h=>{
    const label=(h.textContent||"").trim().toLowerCase();
-   return /\\b(chat|conversation)\\b/.test(label)&&/\\b(ai|qwen|local|assistant|fun industrial)\\b/.test(label);
+   return /\b(chat|conversation)\b/.test(label)&&/\b(ai|qwen|local|assistant|fun industrial)\b/.test(label);
   });
   if(headings.length!==1)continue;
   const fields=[...section.querySelectorAll("textarea")].filter(e=>!e.disabled&&!e.readOnly&&!e.closest("#fi-chat-opt-panel"));
