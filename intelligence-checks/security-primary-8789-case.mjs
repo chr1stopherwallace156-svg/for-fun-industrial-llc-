@@ -62,6 +62,17 @@ test("tool registry has zero user/model arguments and no REA policy change",()=>
  assert.doesNotMatch(s,/allowedTools=|REA_ALLOWED_TOOLS=/);
  assert.throws(()=>patchPrimaryTools(s),/SECURITY_TOOLS_ALREADY_PATCHED/);
 });
+test("reuse existing bounded English local audit tool rather than duplicate registry name",()=>{
+ const existing='const platformTools=[{name:"fi_security_local_audit",description:"Operator-approved local defensive audit.",parameters:object({},[]),path:"/api/security/local-audit",localSecurity:true}];\n'+
+ 'export function openAiToolDefinitions(reaTools=[]){return platformTools};\n'+
+ 'export function getPlatformTool(name){return platformTools.find(x=>x.name===name)||null;}';
+ const staged=patchPrimaryTools(existing);
+ assert.equal((staged.match(/name:"fi_security_local_audit"/g)||[]).length,1);
+ assert.doesNotMatch(staged,/platformTools\.push/);
+ assert.match(staged,/FI_SECURITY_PRIMARY_8789_V1/);
+ const dangerous=existing.replace('parameters:object({},[])','parameters:object({command:{type:"string"}},["command"])');
+ assert.throws(()=>patchPrimaryTools(dangerous),/SECURITY_EXISTING_TOOL_NOT_BOUNDED/);
+});
 test("UI patch accepts deployed voice/AI operator dashboard without old chat-input IDs",()=>{
  const operatorHtml='<html><body><!-- FI_VOICE_MOBILE_PANEL_V1 FI_OPTIMIZATION_PHASE23_PANEL_V1 --><section id="fi-voice-mobile"></section><script src="/api/voice/mobile/client.js" defer></script><div id="fi-unified">Live operator</div></body></html>';
  const staged=patchPrimaryUi(operatorHtml);
