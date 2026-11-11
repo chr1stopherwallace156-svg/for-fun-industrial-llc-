@@ -14,7 +14,7 @@ const HTML='<!doctype html><html lang="en"><head><meta charset="utf-8"><meta nam
 '</style></head><body><main><header><h1>Fun Industrial · Unified Task Chat</h1><p>One chat for public websites, game/app feasibility, REA session inspection, Qwen explanations and reviewed local compute actions.</p><div id="service-status" role="status" class="status">Checking existing services…</div></header>'+
 '<section class="panel"><h2>Conversation</h2><div id="history" aria-live="polite"><article class="assistant">Describe a website, app, game, engineering question, or local task. I’ll identify what can be checked and clearly report what actually ran.</article></div></section>'+
 '<section class="panel"><label for="task">Your request</label><textarea id="task" maxlength="2200" placeholder="Analyze https://example.org and summarize its static page text, or ask if Warzone can run on iPhone, or inspect REA MCP session status"></textarea><div class="actions"><button type="button" id="send">Send to Qwen</button></div>'+
-'<div id="action-review"><p><strong>Local action requires a separate explicit decision.</strong> This may modify local computation or other registered local tool state. Review the request before authorizing.</p><label><input type="checkbox" id="local-consent">I authorize this one local-tools session for the request above</label><button type="button" id="local-execute" disabled>Execute reviewed local tools</button></div></section>'+
+'<div id="action-review"><p><strong>Tool execution requires a separate explicit decision.</strong> This may modify local computation or other registered local tool state. Review the request before authorizing.</p><label><input type="checkbox" id="local-consent">I authorize this one local-tools session for the request above</label><button type="button" id="local-execute" disabled>Execute reviewed tools</button></div></section>'+
 '<section class="panel"><h2>Execution evidence</h2><div id="event-log"></div><p class="muted">Read-only tasks may run after you send. Local tools require a separate review. No background operation, automatic downloads, arbitrary shell, or DRM/anti-cheat bypass.</p></section><script src="/api/unified/client.js" defer></script></main></body></html>';
 function send(res,status,value,type='application/json; charset=utf-8'){
  const data=typeof value==='string'?value:JSON.stringify(value);
@@ -30,7 +30,7 @@ async function body(req){
  return b;
 }
 export function createUnifiedChatServer({app=createUnifiedTaskChat(),readClient=()=>readFile(CLIENT,'utf8')}={}){
- if(typeof app?.status!=='function'||typeof app?.chat!=='function'||typeof app?.executeLocal!=='function')
+ if(typeof app?.status!=='function'||typeof app?.chat!=='function'||typeof app?.executeLocal!=='function'||typeof app?.executeRea!=='function')
   throw Error('UNIFIED_APP_REQUIRED');
  return http.createServer(async(req,res)=>{
   try{
@@ -41,7 +41,7 @@ export function createUnifiedChatServer({app=createUnifiedTaskChat(),readClient=
    if(req.method==='GET'&&u.pathname==='/'&&!u.search)return send(res,200,HTML,'text/html; charset=utf-8');
    if(req.method==='GET'&&u.pathname==='/api/unified/client.js'&&!u.search)return send(res,200,await readClient(),'text/javascript; charset=utf-8');
    if(req.method==='GET'&&u.pathname==='/api/unified/status'&&!u.search)return send(res,200,await app.status());
-   if(req.method==='POST'&&['/api/unified/chat','/api/unified/local/execute'].includes(u.pathname)&&!u.search){
+   if(req.method==='POST'&&['/api/unified/chat','/api/unified/local/execute','/api/unified/rea/execute'].includes(u.pathname)&&!u.search){
     if(req.headers.origin!==ORIGIN||req.headers['x-fi-unified']!=='operator-click')
      return send(res,403,{error:'UNIFIED_CLICK_ORIGIN_REQUIRED'});
     const data=await body(req);
@@ -49,8 +49,8 @@ export function createUnifiedChatServer({app=createUnifiedTaskChat(),readClient=
      if(Object.keys(data).some(k=>k!=='prompt'))throw Error('CHAT_FIELDS_NOT_ALLOWED');
      return send(res,200,await app.chat(data));
     }
-    if(Object.keys(data).some(k=>!['prompt','operatorConfirmed'].includes(k)))throw Error('LOCAL_EXECUTE_FIELDS_NOT_ALLOWED');
-    return send(res,200,await app.executeLocal(data));
+    if(Object.keys(data).some(k=>!['prompt','operatorConfirmed'].includes(k)))throw Error('ACTION_EXECUTE_FIELDS_NOT_ALLOWED');
+    return send(res,200,u.pathname==='/api/unified/rea/execute'?await app.executeRea(data):await app.executeLocal(data));
    }
    return send(res,404,{error:'UNIFIED_ROUTE_NOT_FOUND'});
   }catch(error){
