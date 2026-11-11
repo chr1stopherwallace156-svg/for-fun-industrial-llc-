@@ -6,10 +6,10 @@ const LLAMA='http://127.0.0.1:8088/v1/chat/completions';
 const prompt='Inspect the current REA MCP analysis settings using a real read-only session tool. Report the returned settings without modifying them.';
 function fixture(overrides={}){
  const all=Array.from({length:229},(_,i)=>{
-  const name=i===7?'inspect_analysis_settings':i===8?'search_guidance':i===9?'read_adb_setting':i===10?'read_bytes':'rea_generic_fixture_'+String(i).padStart(3,'0');
+  const name=i===6?'binary_session':i===7?'inspect_analysis_settings':i===8?'search_guidance':i===9?'read_adb_setting':i===10?'read_bytes':'rea_generic_fixture_'+String(i).padStart(3,'0');
   return {name,alias:'rea_tool_'+String(i+1).padStart(3,'0'),
-   description:i===7?'Read-only inspect active REA analysis settings':i===8?'Search installed REA guidance':i===9?'Read Android ADB settings':i===10?'Read Ghidra analysis memory':'Generic fixture',
-   inputSchema:{type:'object',properties:{},additionalProperties:false}};
+   description:i===6?'Read-only session status and provider capability availability':i===7?'Read-only inspect active REA analysis settings':i===8?'Search installed REA guidance':i===9?'Read Android ADB settings':i===10?'Read Ghidra analysis memory':'Generic fixture',
+   inputSchema:i===6?{type:'object',properties:{detail:{type:'string',enum:['summary','complete']},refresh_candidates:{type:'boolean'}},additionalProperties:false}:{type:'object',properties:{},additionalProperties:false}};
  });
  let modelCount=0,toolCount=0,summaryCount=0,modelBody=null,exactPayload=null;
  const requestFn=async(url,body)=>{
@@ -54,6 +54,29 @@ test('purpose-locked Qwen emits one real REA analysis-settings call with no ADB 
  assert.ok(logs.some(x=>x==='READ_ONLY_CANDIDATES=inspect_analysis_settings'));
  assert.ok(logs.some(x=>x.startsWith('MODEL_METADATA=')));
  assert.ok(logs.some(x=>x.startsWith('QWEN_SELECTED_REAL_REA_TOOL=')));
+});
+test('purpose-locked Qwen can select binary_session status with read-only parameters',async()=>{
+ const f=fixture(),logs=[];
+ const request='Inspect the REA MCP binary session status and available provider capabilities. Use a real read-only session status capability and summarize the returned availability.';
+ const result=await runDirectReaPilot({prompt:request,requestFn:f.requestFn,log:x=>logs.push(x)});
+ assert.equal(result.state,'real_mcp_tool_executed');
+ assert.equal(result.actions.length,1);
+ assert.equal(result.actions[0].tool,'binary_session');
+ assert.deepEqual(result.actions[0].arguments,{});
+ assert.equal(f.stats().exactPayload.name,'binary_session');
+ assert.equal(f.stats().modelBody.tools.length,1);
+ assert.equal(f.stats().modelBody.tools[0].function.name,'rea_tool_007');
+ assert.equal(f.stats().modelBody.tools[0].function.parameters.properties.detail.enum[0],'summary');
+ assert.ok(logs.includes('READ_ONLY_CANDIDATES=binary_session'));
+});
+test('binary_session must be in actual 229-tool catalogue; no guessed substitutes',async()=>{
+ const f=fixture();
+ const custom=async(url,body)=>{
+  if(url===BASE+'/api/rea229/tools?limit=229')return {tools:f.all.map(t=>t.name==='binary_session'?{...t,name:'read_adb_setting_copy'}:t)};
+  return f.requestFn(url,body);
+ };
+ await assert.rejects(runDirectReaPilot({prompt:'Inspect the REA MCP binary session status and provider availability.',requestFn:custom}),/REQUIRED_READ_ONLY_TOOL_NOT_INSTALLED/);
+ assert.equal(f.stats().toolCount,0);assert.equal(f.stats().modelCount,0);
 });
 test('JavaScript source inspection request stops instead of offering Android and Ghidra tools',async()=>{
  const f=fixture();
