@@ -42,6 +42,20 @@ export function extractText(html){
   m=>({'&nbsp;':' ','&amp;':'&','&lt;':'<','&gt;':'>','&quot;':'"','&apos;':"'",'&#39;':"'"}[m.toLowerCase()]||' '))
   .replace(/[\u0000-\u001f\u007f]+/g,' ').replace(/\s+/g,' ').trim().slice(0,7000);
 }
+// Node may ask a custom lookup callback for an address list (options.all=true)
+// when auto-select-family is enabled. Returning a single address for that call
+// causes ERR_INVALID_IP_ADDRESS on recent Node versions. Both forms must pin
+// only the already validated public IPv4 address, never re-resolve the hostname.
+export function createPinnedPublicLookup(target){
+ if(!isPublicIPv4(target))throw Error('WEB_PINNED_ADDRESS_NOT_PUBLIC');
+ return (_hostname,options,callback)=>{
+  const cb=typeof options==='function'?options:callback;
+  if(typeof cb!=='function')throw Error('WEB_LOOKUP_CALLBACK_MISSING');
+  if(options&&typeof options==='object'&&options.all===true)
+   return cb(null,[{address:target,family:4}]);
+  return cb(null,target,4);
+ };
+}
 export async function fetchPublicWebText(raw,{lookup=dnsLookup,request=https.request}={}){
  const uri=validatePublicHttps(raw);
  const resolved=await lookup(uri.hostname,{family:4,all:true});
@@ -53,7 +67,7 @@ export async function fetchPublicWebText(raw,{lookup=dnsLookup,request=https.req
   const fail=msg=>{if(settled)return;settled=true;reject(Error(msg))};
   const req=request(uri,{
    method:'GET',timeout:12000,
-   lookup:(_hostname,_opts,cb)=>cb(null,target,4),
+   family:4,lookup:createPinnedPublicLookup(target),
    headers:{'accept':'text/html,text/plain;q=0.9','accept-encoding':'identity',
     'user-agent':'FunIndustrial-ReadOnlyResearch/1.0'}
   },res=>{
