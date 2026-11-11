@@ -10,7 +10,7 @@ $Candidate=Join-Path $Repo 'ai_ml\llama_runtime.py'
 $Recovery=Join-Path $Repo 'Recover-Fun-Compute.ps1'
 $EnvFile=Join-Path $Live '.env'
 $Backup=Join-Path $env:LOCALAPPDATA ('FunIndustrial\ExternalLlamaAdoption\'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,8))
-$Changed=$false;$ComputeStopped=$false
+$Changed=$false;$ComputeStopped=$false;$script:NewComputePid=0
 function Hold([string]$reason){throw ('FUN_EXTERNAL_LLAMA_ADOPTION_HOLD='+$reason)}
 function File([string]$p){
  if(-not(Test-Path -LiteralPath $p -PathType Leaf)){Hold ('FILE_MISSING_'+$p)}
@@ -100,6 +100,8 @@ try{
  for($i=0;$i -lt 40;$i++){if(-not(Port 8791)){break};Start-Sleep -Milliseconds 250}
  if(Port 8791){Hold 'OLD_COMPUTE_PORT_NOT_RELEASED'}
  Recover
+ $script:NewComputePid=PidOf 8791 'uvicorn\s+compute_service\.app:app'
+ if($script:NewComputePid -eq $computePid){Hold 'OLD_COMPUTE_PID_REUSED_UNEXPECTEDLY'}
  $modelStatus=GetJson 'http://127.0.0.1:8791/ai/runtime/llama-cpp' 12
  if($modelStatus.state -ne 'ready' -or $modelStatus.ownership -ne 'external_unmanaged' -or $modelStatus.managed -ne $false){Hold 'MODEL_ADOPTION_NOT_VERIFIED'}
  if((PidOf 8088 '(llama-server|llama\.exe)') -ne $llamaPid){Hold 'LLAMA_PROCESS_CHANGED_POSTFLIGHT'}
@@ -116,6 +118,13 @@ try{
  }
  if($ComputeStopped){
   try{
+   # Only stop the new process if it was started and identified by THIS run.
+   if($script:NewComputePid -gt 0 -and (Port 8791)){
+    if((PidOf 8791 'uvicorn\s+compute_service\.app:app') -eq $script:NewComputePid){
+     Stop-Process -Id $script:NewComputePid -ErrorAction Stop
+     for($j=0;$j -lt 40;$j++){if(-not(Port 8791)){break};Start-Sleep -Milliseconds 250}
+    }
+   }
    if(-not(Port 8791)){Recover;Write-Warning 'OLD_COMPUTE_RECOVERED_CHECK_AI_HEALTH'}
    else{Write-Warning 'COMPUTE_PORT_OCCUPIED_AFTER_FAILURE_REVIEW_REQUIRED'}
   }catch{Write-Warning 'COMPUTE_RECOVERY_FAILED_MANUAL_REVIEW_REQUIRED'}
