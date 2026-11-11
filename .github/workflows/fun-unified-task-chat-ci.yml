@@ -7,6 +7,8 @@ on:
     paths:
       - 'src/experimental/unified-task-chat.mjs'
       - 'src/experimental/unified-public-web.mjs'
+      - 'src/experimental/unified-fact-guard.mjs'
+      - 'scripts/Diagnose-Fun-Unified-Web8798.mjs'
       - 'src/experimental/unified-task-client.js'
       - 'scripts/Run-Fun-Unified-Chat8798.mjs'
       - 'Start-Fun-Unified-Chat8798.ps1'
@@ -31,6 +33,8 @@ jobs:
         run: |
           node --check src/experimental/unified-task-chat.mjs
           node --check src/experimental/unified-public-web.mjs
+          node --check src/experimental/unified-fact-guard.mjs
+          node --check scripts/Diagnose-Fun-Unified-Web8798.mjs
           node --check src/experimental/unified-task-client.js
           node --check scripts/Run-Fun-Unified-Chat8798.mjs
           node --check intelligence-checks/unified-task-chat-case.mjs
