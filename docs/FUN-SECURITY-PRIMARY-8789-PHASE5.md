@@ -105,3 +105,15 @@ Operator:
 2. Run Reconcile-Fun-Dashboard8789-Policy.ps1 **without -Approve** again.
 3. Confirm FUN_DASHBOARD_POLICY_REVIEW=PASS; POLICY_REVIEW_INPUT_UTF8_BYTES should be a positive realistic value; POLICY_REVIEW_DIGEST must **not** be e3b0c442...b855.
 4. Do not execute -Approve until reviewing changed source, verifying that the digest is genuine, and agreeing to update the stored policy.
+
+## November 10 — supervisor refused the reconciled policy (read-only diagnosis)
+
+The operator-authorized policy review was valid, but the supervisor did not report EXISTING_DASHBOARD_PRESERVED within the 28-second qualification window; the reconciliation script attempted rollback from the backed-up policy file.
+
+Do **not** run reconciliation -Approve again, change the scheduled task, or run deployment -Apply. The new Diagnose-Fun-Dashboard8789-Supervisor.ps1 script inspects the installed and repository supervisor file fingerprints, verifies the local Node 8789 owner, records original policy and supervisor status, and invokes **only** the canonical read-only functions Policy-Ready, Endpoint-Ready and Confirm-Owner with a proposed in-memory candidate policy. There are no changes to policy, status.json, services, task, protected ports or REA permissions. If the installed supervisor source does not match the reviewed canonical version, it stops rather than executing unfamiliar instructions.
+
+After pulling the same feature branch, run:
+~~~powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$HOME\FunIndustrial-SecurityPrimary-V1\Diagnose-Fun-Dashboard8789-Supervisor.ps1"
+~~~
+Report all SUPERVISOR_*, SIMULATED_* and FUN_DASHBOARD_SUPERVISOR_DIAGNOSTIC values. A read-only diagnostic PASS means the report completed, **not** that the supervisor currently accepts the policy. The repair must address the exact observed failed check. Any later policy change needs a fresh explicit review, independent backup and acceptance.
