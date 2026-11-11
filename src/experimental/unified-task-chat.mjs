@@ -50,7 +50,7 @@ export function routeUnifiedTask(prompt){
  return {kind:'general_assistance',execution:'no_tools'};
 }
 export async function fixedJson(url,body=null,{timeout=180000}={}){
- if(![PARENT+'/api/ai/tools',REA+'/api/rea229/status',REA+'/api/rea229/tools?limit=229',
+ if(![PARENT+'/api/ai/tools',PARENT+'/api/ai/status',REA+'/api/rea229/status',REA+'/api/rea229/tools?limit=229',
   LOCAL+'/api/ai/auto-local/status',REA+'/api/rea229/call',
   REA+'/api/rea229/run',LOCAL+'/api/ai/auto-local/run',
   LLAMA].includes(url))fail('OUTBOUND_ENDPOINT_NOT_ALLOWED');
@@ -105,17 +105,20 @@ export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWeb
   return {tool,arguments:{},realMcp:true,result:action.result};
  }
  async function status(){
-  const [rea,local,registry]=await Promise.allSettled([
+  const [rea,local,registry,ai]=await Promise.allSettled([
    request(REA+'/api/rea229/status'),
    request(LOCAL+'/api/ai/auto-local/status'),
-   request(PARENT+'/api/ai/tools')
+   request(PARENT+'/api/ai/tools'),
+   request(PARENT+'/api/ai/status')
   ]);
   const r=rea.status==='fulfilled'?rea.value:null;
   const l=local.status==='fulfilled'?local.value:null;
   const t=registry.status==='fulfilled'?registry.value:null;
-  return {version:'fi-unified-task-chat-8798-v1',state:'ready',
+  const a=ai.status==='fulfilled'?ai.value:null;
+  return {version:'fi-unified-task-chat-8798-v1',state:a?.state==='ready'&&r?.liveMcpHealth==='ready'&&l?.sidecar===true?'ready':'degraded',
    service:'independent_loopback',operatorStarted:true,background:false,
    autoReadOnly:true,localExecutionRequiresExplicitClick:true,
+   ai:{ready:a?.state==='ready',engine:'external_llama_cpp',port:8088},
    rea:{ready:r?.liveMcpHealth==='ready'&&r?.realReaToolCount===229,
     count:r?.realReaToolCount??0},
    local:{ready:l?.sidecar===true,count:t?.local_tool_count??0},
