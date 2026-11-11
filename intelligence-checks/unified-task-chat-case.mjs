@@ -9,7 +9,7 @@ import {fileURLToPath} from 'node:url';
 import {createUnifiedTaskChat,routeUnifiedTask} from '../src/experimental/unified-task-chat.mjs';
 import {correctMillisecondSeconds} from '../src/experimental/unified-fact-guard.mjs';
 import {diagnoseWebUrl} from '../scripts/Diagnose-Fun-Unified-Web8798.mjs';
-import {validatePublicHttps,isPublicIPv4,extractText,fetchPublicWebText} from '../src/experimental/unified-public-web.mjs';
+import {validatePublicHttps,isPublicIPv4,createPinnedPublicLookup,extractText,fetchPublicWebText} from '../src/experimental/unified-public-web.mjs';
 import {createUnifiedChatServer,PORT,HOST} from '../scripts/Run-Fun-Unified-Chat8798.mjs';
 const REA='http://127.0.0.1:8797',LOCAL='http://127.0.0.1:8796';
 const LLAMA='http://127.0.0.1:8088/v1/chat/completions';
@@ -261,6 +261,56 @@ test('public IPv4 checker refuses reserved, private, multicast and documentation
   assert.equal(isPublicIPv4(ip),false,ip);
  assert.equal(isPublicIPv4('8.8.8.8'),true);
  assert.equal(validatePublicHttps('https://example.com/page').hostname,'example.com');
+});
+test('pinned public lookup returns Node all=true address records and legacy single-address callback',()=>{
+ const pinned=createPinnedPublicLookup('93.184.215.14');
+ let all;
+ pinned('example.org',{family:0,all:true},(err,addresses)=>{
+  assert.equal(err,null);all=addresses;
+ });
+ assert.deepEqual(all,[{address:'93.184.215.14',family:4}]);
+ let single;
+ pinned('example.org',{family:4,all:false},(err,address,family)=>{
+  assert.equal(err,null);single={address,family};
+ });
+ assert.deepEqual(single,{address:'93.184.215.14',family:4});
+ let shorthand;
+ pinned('example.org',(err,address,family)=>{
+  assert.equal(err,null);shorthand={address,family};
+ });
+ assert.deepEqual(shorthand,{address:'93.184.215.14',family:4});
+ for(const ip of ['127.0.0.1','10.0.0.1','169.254.169.254','203.0.113.1'])
+  assert.throws(()=>createPinnedPublicLookup(ip),/WEB_PINNED_ADDRESS_NOT_PUBLIC/);
+});
+test('pinned HTTPS request honors Node lookup options.all=true without invalid IP shape',async()=>{
+ let allRequested=false;
+ const request=(_url,options,onResponse)=>{
+  assert.equal(options.family,4);
+  options.lookup('example.org',{all:true,verbatim:true},(err,addresses)=>{
+   assert.equal(err,null);
+   assert.ok(Array.isArray(addresses),'Node all=true requires array of address-family records');
+   assert.deepEqual(addresses,[{address:'93.184.215.14',family:4}]);
+   allRequested=true;
+  });
+  const req=new EventEmitter();
+  req.destroy=()=>{};
+  req.end=()=>{
+   const response=new EventEmitter();
+   response.statusCode=200;
+   response.headers={'content-type':'text/html'};
+   response.resume=()=>{};
+   onResponse(response);
+   response.emit('data',Buffer.from('<title>Example Domain</title><h1>Example Domain</h1>'));
+   response.emit('end');
+  };
+  return req;
+ };
+ const result=await fetchPublicWebText('https://example.org/',{
+  lookup:async()=>[{address:'93.184.215.14'}],request});
+ assert.equal(allRequested,true);
+ assert.match(result.text,/Example Domain/);
+ assert.equal(result.noScriptsExecuted,true);
+ assert.equal(result.redirectsFollowed,0);
 });
 test('public web function rejects DNS results containing private addresses before network request',async()=>{
  let outbound=0;
