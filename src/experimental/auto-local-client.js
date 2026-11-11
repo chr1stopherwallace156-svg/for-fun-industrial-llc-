@@ -23,7 +23,7 @@ button.addEventListener('click',async()=>{
  try{
   const response=await fetch('/api/ai/auto-local/run',{
    method:'POST',credentials:'same-origin',
-   headers:{'content-type':'application/json'},
+   headers:{'content-type':'application/json','x-fi-auto-local':'operator-click'},
    body:JSON.stringify({prompt:task,rounds:2})
   });
   const data=await response.json();
