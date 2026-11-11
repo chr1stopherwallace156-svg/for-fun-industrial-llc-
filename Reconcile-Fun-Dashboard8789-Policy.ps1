@@ -216,18 +216,54 @@ try{
     @($staged.allowedTools).Count -ne $originalAllowed.Count -or
     @($staged.catalogueNames).Count -ne 229){Hold 'NEW_POLICY_STAGING_INVALID'}
  if((HashFile $PolicyFile) -ne $originalPolicyHash){Hold 'ORIGINAL_POLICY_CHANGED_BEFORE_REPLACE'}
+ # A non-atomic policy write can be mistaken for an invalid candidate by
+ # the 20-second scheduled watcher. Confirm a clean old status snapshot first.
+ $initialStatus=Get-Content -LiteralPath $StatusFile -Raw -ErrorAction Stop|ConvertFrom-Json
+ $initialStatusTime=[DateTime]::Parse([string]$initialStatus.checkedUtc).ToUniversalTime()
+ if(([DateTime]::UtcNow-$initialStatusTime).TotalSeconds -gt 50){
+  Hold 'AUTOSTART_SUPERVISOR_STATUS_STALE_BEFORE_UPDATE'
+ }
+ $candidateHash=HashFile $candidate
  $prepared=$true
  Move-Item -LiteralPath $candidate -Destination $PolicyFile -Force -ErrorAction Stop
+ if((HashFile $PolicyFile) -ne $candidateHash){Hold 'WRITTEN_POLICY_BYTES_DIFFER_FROM_VERIFIED_CANDIDATE'}
+ $installedPolicy=Get-Content -LiteralPath $PolicyFile -Raw -ErrorAction Stop|ConvertFrom-Json
+ if($installedPolicy.schema -ne 'fun.dashboard.autostart.v1' -or
+    [int]$installedPolicy.verifiedExistingPid -ne [int]$owner.Pid -or
+    [int64]$installedPolicy.verifiedExistingStartUtcTicks -ne [int64]$owner.StartTicks -or
+    [string]$installedPolicy.serverSha256 -cne $serverHash.ToUpperInvariant() -or
+    [string]$installedPolicy.htmlSha256 -cne $htmlHash.ToUpperInvariant() -or
+    @($installedPolicy.catalogueNames).Count -ne 229 -or
+    (@($installedPolicy.allowedTools|ForEach-Object{[string]$_}|Sort-Object) -join ',') -cne
+    (@($originalAllowed|Sort-Object) -join ',')){
+  Hold 'PERSISTED_POLICY_ROUNDTRIP_INVALID'
+ }
  if((HashFile $Server) -ne $serverHash -or (HashFile $Html) -ne $htmlHash){Hold 'LIVE_SOURCE_CHANGED_DURING_RECONCILIATION'}
- # Supervisor uses a 20-second monitor cadence. Do not stop/restart the task.
+ # A live scheduled monitor polls every 20s. Observe several *fresh* ticks
+ # after the candidate is on disk; never classify the old HOLD as a new one.
  $accepted=$false
- for($i=0;$i -lt 28;$i++){
+ $freshTicks=0;$lastTick=$initialStatusTime;$lastReport='NONE';$samples=@()
+ Write-Host "WATCHDOG_BEFORE_POLICY_UPDATE=$($initialStatus.state):$($initialStatus.reason)"
+ for($i=0;$i -lt 83;$i++){
+  Start-Sleep -Seconds 1
   $state=$null
   try{$state=Get-Content -LiteralPath $StatusFile -Raw -ErrorAction Stop|ConvertFrom-Json}catch{}
-  if($state -and $state.state -eq 'running' -and $state.reason -eq 'EXISTING_DASHBOARD_PRESERVED'){$accepted=$true;break}
-  Start-Sleep -Seconds 1
+  if(-not $state -or -not $state.checkedUtc){continue}
+  $stamp=$null
+  try{$stamp=[DateTime]::Parse([string]$state.checkedUtc).ToUniversalTime()}catch{continue}
+  if($stamp -le $lastTick){continue}
+  $lastTick=$stamp;$freshTicks++
+  $lastReport=([string]$state.state+':'+[string]$state.reason)
+  $samples+=($stamp.ToString('o')+' '+$lastReport)
+  Write-Host "WATCHDOG_FRESH_REPORT_$($freshTicks)=$lastReport"
+  if($state.state -eq 'running' -and $state.reason -eq 'EXISTING_DASHBOARD_PRESERVED'){
+   $accepted=$true;break
+  }
  }
- if(-not $accepted){Hold 'SUPERVISOR_DID_NOT_ACCEPT_RECONCILED_POLICY'}
+ if(-not $accepted){
+  if($freshTicks -eq 0){Hold 'SUPERVISOR_NOT_POLLING_AFTER_POLICY_WRITE'}
+  Hold ("SUPERVISOR_REJECTED_POLICY_FRESH_TICKS_"+$freshTicks+"_LAST_"+$lastReport)
+ }
  Write-Host 'FUN_DASHBOARD_POLICY_RECONCILE=PASS'
  Write-Host "SUPERVISOR=RUNNING CURRENT_DASHBOARD_PID=$($owner.Pid)"
  Write-Host "POLICY_BACKUP=$backup"
@@ -236,8 +272,12 @@ try{
 }catch{
  $errorMessage=$_.Exception.Message
  if($prepared){
-  try{Copy-Item -LiteralPath (Join-Path $backup 'policy.original.json') -Destination $PolicyFile -Force -ErrorAction Stop}
-  catch{Write-Warning "FUN_DASHBOARD_POLICY_RESTORE_NEEDS_MANUAL_REVIEW=$backup"}
+  try{
+   $backupFile=Join-Path $backup 'policy.original.json'
+   Copy-Item -LiteralPath $backupFile -Destination $PolicyFile -Force -ErrorAction Stop
+   if((HashFile $PolicyFile) -ne (HashFile $backupFile)){Hold 'ROLLBACK_FILE_HASH_MISMATCH'}
+   Write-Host 'AUTOSTART_POLICY_ROLLBACK=VERIFIED'
+  }catch{Write-Warning "FUN_DASHBOARD_POLICY_RESTORE_NEEDS_MANUAL_REVIEW=$backup ERROR=$($_.Exception.Message)"}
  }
  throw ("FUN_DASHBOARD_POLICY_RECONCILE_HOLD="+$errorMessage+" BACKUP="+$backup)
 }
