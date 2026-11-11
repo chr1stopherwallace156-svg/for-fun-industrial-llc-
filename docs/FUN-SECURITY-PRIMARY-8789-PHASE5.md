@@ -117,3 +117,15 @@ After pulling the same feature branch, run:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$HOME\FunIndustrial-SecurityPrimary-V1\Diagnose-Fun-Dashboard8789-Supervisor.ps1"
 ~~~
 Report all SUPERVISOR_*, SIMULATED_* and FUN_DASHBOARD_SUPERVISOR_DIAGNOSTIC values. A read-only diagnostic PASS means the report completed, **not** that the supervisor currently accepts the policy. The repair must address the exact observed failed check. Any later policy change needs a fresh explicit review, independent backup and acceptance.
+
+## November 10 — watchdog reconciliation evidence hardening after task-context check
+
+A read-only task-context inspection confirmed: current operator, scheduled task principal and one running PowerShell watchdog owner all match the policy SID; the scheduled watchdog polls at ~20-second intervals; prior policy rollback matches its backup. This excludes a stopped task and owner mismatch but does not establish why the previous candidate was rejected.
+
+The subsequent revised Reconcile-Fun-Dashboard8789-Policy.ps1 **still defaults to read-only review**. When given a fresh, independently approved digest, it now checks the last watchdog timestamp is fresh; verifies the exact proposed policy bytes on disk after replacement; re-reads policy data and permissions; and records each genuinely new watchdog status tick for up to about 83 seconds. It needs a *fresh* running:EXISTING_DASHBOARD_PRESERVED report, not a stale file or a guessed timeout. If rejected, it reports the observed status reason and confirms rollback by comparing to the saved original policy hash. It never stops or restarts the watchdog, dashboard, gateway, llama.cpp or compute.
+
+Do not reuse a digest from before changing sources or process states without rerunning the **read-only** review. Do not run -Apply until the reconciled policy is accepted. Read-only review:
+
+~~~powershell
+git -C "$HOME\FunIndustrial-SecurityPrimary-V1" pull --ff-only origin feature/fun-security-primary-8789-phase5-20261110; if($LASTEXITCODE -ne 0){throw 'FUN_POLICY_SOURCE_PULL_HOLD'}; powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$HOME\FunIndustrial-SecurityPrimary-V1\Reconcile-Fun-Dashboard8789-Policy.ps1"
+~~~
