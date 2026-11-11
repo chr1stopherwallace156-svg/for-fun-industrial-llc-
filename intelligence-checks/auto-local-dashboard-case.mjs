@@ -5,6 +5,8 @@ import {Script} from 'node:vm';
 import {createAutoLocalDashboard} from '../src/experimental/auto-local-dashboard.mjs';
 import {patchAutoLocalDashboardServer} from '../scripts/patch-auto-local-dashboard-server.mjs';
 import {patchAutoLocalDashboardUi} from '../scripts/patch-auto-local-dashboard-ui.mjs';
+import {patchCognitiveLiveServer} from '../scripts/patch-cognitive-live.mjs';
+import {patchCapabilityLive} from '../scripts/patch-capability-live.mjs';
 const tools=['fi_graph_analyze','fi_tensor_contract','fi_compute_train','fi_universe_list',
  'fi_hopfield_store','fi_hopfield_recall','fi_universe_add_bridge'].map(name=>({
  type:'function',function:{name,description:name.replace(/_/g,' '),parameters:{type:'object',properties:{}}}
@@ -126,4 +128,62 @@ test('new bridge has no direct REA calls, shell, platform mutation or independen
  const source=await readFile(new URL('../src/experimental/auto-local-dashboard.mjs',import.meta.url),'utf8');
  assert.doesNotMatch(source,/\/api\/rea\/call|\/api\/activate|\/api\/stop|child_process|spawn\(|setInterval/);
  assert.match(source,/localhost|127\.0\.0\.1/);
+});
+
+test('all three additive server patches compose into one syntactically valid module',()=>{
+ const base=[
+  "import http from 'node:http';import path from 'node:path';import {fileURLToPath} from 'node:url';",
+  "// FI_AUTO_COGNEE_CHAT_V1 FI_SOURCING_RETIRED_V1 FI_VOICE_MOBILE_DASHBOARD_V1",
+  "const root=path.dirname(fileURLToPath(import.meta.url));",
+  "const server=http.createServer(async(req,res)=>{try{",
+  " if(req.method==='POST'&&req.url==='/api/rea/call')return;",
+  " if(req.method==='POST'&&req.url==='/api/ai/tool-call')return;",
+  " if(req.method==='GET'&&req.url==='/api/ai/automatic-memory/status')return;",
+  " if(req.method==='POST'&&req.url==='/api/ai/chat'){",
+  "  const body=await readBody(req,1000000);",
+  "  const enriched=await fiAutomaticMemory(body,memoryStatus().enabled);",
+  '  return proxyCompute(req,res,"/ai/chat","POST",enriched.payload);',
+  " }",
+  "}catch(e){res.end();}});"
+ ].join('\n');
+ const final=patchAutoLocalDashboardServer(patchCapabilityLive(patchCognitiveLiveServer(base)));
+ const result=spawnSync(process.execPath,['--check','--input-type=module'],{input:final,encoding:'utf8'});
+ assert.equal(result.status,0,'three-patch generated server syntax: '+result.stderr);
+ assert.equal((final.match(/fiAutomaticMemory\(body,memoryStatus\(\)\.enabled\)/g)||[]).length,1);
+ assert.match(final,/fiAutoLocalDashboard\.run\(body\)/);
+ assert.match(final,/decorateCapabilityChat/);
+});
+test('patches real repository UI while retaining original chat functionality',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const before=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
+ const after=patchAutoLocalDashboardUi(before);
+ assert.equal(after.split('id="chat-send"').length,2);
+ assert.equal(after.split('id="chat-auto-run"').length,2);
+ assert.match(after,/Proposed platform \/ REA actions/);
+ assert.match(after,/el\("chat-send"\)\.onclick=sendChat/);
+ const js=[...after.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)?.[1];
+ assert.ok(js);
+ assert.doesNotThrow(()=>new Script(js));
+});
+test('Windows auto-dashboard deployment protects old cognition and independent processes',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const script=await readFile(new URL('../Deploy-Fun-Auto-Local-Dashboard8789.ps1',import.meta.url),'utf8');
+ assert.match(script,/param\(\[switch\]\$Apply\)/);
+ assert.match(script,/FUN_AUTO_DASH_LIVE_DEPLOY=NOT_PERFORMED/);
+ assert.match(script,/COGNITIVE_VOLATILE_DATA_WOULD_BE_LOST/);
+ assert.match(script,/EmptyCognition \$pre\.Cognitive/);
+ assert.match(script,/EmptyCognition \(Json '\/api\/cognition\/status' 12\)/);
+ assert.match(script,/CheckRea/);
+ assert.match(script,/\$env:REA_ALLOWED_TOOLS=''/);
+ assert.match(script,/8088,8791,8443,4479,8794/);
+ assert.match(script,/server\.original\.mjs/);
+ assert.match(script,/index\.original\.html/);
+ assert.match(script,/\$serverCurrent=Hash \$Server/);
+ assert.match(script,/\$uiCurrent=Hash \$Ui/);
+ assert.match(script,/FUN_AUTO_DASH_LIVE_DEPLOY=PASS/);
+ assert.match(script,/FUN_AUTO_DASH_ROLLBACK_STARTED_PID/);
+ const stops=[...script.matchAll(/Stop-Process -Id ([^\r\n]+)/g)].map(m=>m[1]);
+ assert.equal(stops.length,2);
+ assert.ok(stops.every(s=>s.includes('$OldPid')||s.includes('$NewProcess.Id')));
+ assert.doesNotMatch(script,/\/ai\/runtime\/llama-cpp\/stop|\/api\/stop|\/api\/activate/);
 });
