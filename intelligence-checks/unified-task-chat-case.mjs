@@ -7,6 +7,8 @@ import {readFile} from 'node:fs/promises';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {createUnifiedTaskChat,routeUnifiedTask} from '../src/experimental/unified-task-chat.mjs';
+import {correctMillisecondSeconds} from '../src/experimental/unified-fact-guard.mjs';
+import {diagnoseWebUrl} from '../scripts/Diagnose-Fun-Unified-Web8798.mjs';
 import {validatePublicHttps,isPublicIPv4,extractText,fetchPublicWebText} from '../src/experimental/unified-public-web.mjs';
 import {createUnifiedChatServer,PORT,HOST} from '../scripts/Run-Fun-Unified-Chat8798.mjs';
 const REA='http://127.0.0.1:8797',LOCAL='http://127.0.0.1:8796';
@@ -33,6 +35,59 @@ function fixture(){
  const fetchWeb=async url=>{pages.push(url);return {url,text:'PUBLIC SAMPLE WEB DATA',bytes:38}};
  return {calls,pages,request,fetchWeb,app:createUnifiedTaskChat({request,fetchWeb})};
 }
+test('deterministic unit guard fixes 300000ms (0.3s) but preserves true 30000ms (30s)',()=>{
+ const r=correctMillisecondSeconds('javascript.analysis_timeout_ms: 300000 milliseconds (0.3 seconds); wasm.timeout: 30000 ms (30 seconds).');
+ assert.equal(r.correctionCount,1);
+ assert.match(r.text,/300000 milliseconds \(300 seconds\)/);
+ assert.match(r.text,/30000 ms \(30 seconds\)/);
+ assert.deepEqual(r.fixes[0],{milliseconds:300000,modelSeconds:0.3,correctSeconds:300});
+});
+test('unit guard is no-op for other numerical observations or unsupported values',()=>{
+ const text='node.parent_heap 4395630592 bytes; max depth 1000; 512 MiB (0.5 GiB)';
+ const r=correctMillisecondSeconds(text);
+ assert.equal(r.text,text);
+ assert.equal(r.correctionCount,0);
+});
+test('live Qwen REA summary is corrected deterministically without modifying raw MCP observations',async()=>{
+ const f=fixture();
+ const raw='300000 milliseconds (0.3 seconds); 30000 ms (30 seconds)';
+ const request=async(url,body)=>url===LLAMA?
+   {choices:[{finish_reason:'stop',message:{content:raw}}],usage:{completion_tokens:26}}:f.request(url,body);
+ const app=createUnifiedTaskChat({request,fetchWeb:f.fetchWeb});
+ const response=await app.chat({prompt:'Inspect the REA MCP analysis settings'});
+ assert.equal(response.unitCorrections,1);
+ assert.match(response.reply,/300000 milliseconds \(300 seconds\)/);
+ assert.match(response.reply,/30000 ms \(30 seconds\)/);
+ assert.equal(response.actions[0].executed,true);
+ assert.match(response.actions[0].resultPreview,/rea-runtime/);
+});
+test('web diagnostic prints error cause and does not claim success',async()=>{
+ const lines=[];
+ const output=await diagnoseWebUrl('https://example.org/',{
+  resolve:async()=>[{address:'93.184.215.14'}],
+  fetchWeb:async()=>{throw Error('WEB_REQUEST_ERROR_ECONNRESET')},
+  write:x=>lines.push(x)});
+ assert.equal(output.status,'hold');
+ assert.ok(lines.includes('WEB_DIAG_RESULT=HOLD'));
+ assert.ok(lines.includes('WEB_DIAG_CAUSE=WEB_REQUEST_ERROR_ECONNRESET'));
+ assert.ok(lines.includes('WEB_DIAG_DNS_A_COUNT=1'));
+});
+test('web diagnostic captures bounded public page text and does not execute scripts',async()=>{
+ const lines=[];
+ const output=await diagnoseWebUrl('https://example.org/',{
+  resolve:async()=>[{address:'93.184.215.14'}],
+  fetchWeb:async()=>({url:'https://example.org/',bytes:110,text:'Example Domain'}),
+  write:x=>lines.push(x)});
+ assert.equal(output.status,'pass');
+ assert.ok(lines.includes('WEB_DIAG_RESULT=PASS'));
+ assert.ok(lines.includes('WEB_DIAG_TEXT_EXCERPT=Example Domain'));
+});
+test('web diagnostic CLI remains inert without operator argument',async()=>{
+ const file=fileURLToPath(new URL('../scripts/Diagnose-Fun-Unified-Web8798.mjs',import.meta.url));
+ const p=spawnSync(process.execPath,[file],{encoding:'utf8',timeout:12000});
+ assert.equal(p.status,0,p.stderr);
+ assert.match(p.stdout,/WEB_DIAG=INACTIVE/);
+});
 test('classification separates public website, REA, local action and unsupported local files',()=>{
  assert.equal(routeUnifiedTask('Analyze https://example.org/ home page').kind,'public_website');
  assert.equal(routeUnifiedTask('Inspect the REA MCP analysis settings').tool,'inspect_analysis_settings');
