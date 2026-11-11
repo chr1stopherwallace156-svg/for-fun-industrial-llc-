@@ -47,3 +47,15 @@ The initial 8 kernel tests plus 7 bridge/patch tests passed locally. This does n
 ## Compatibility repair 2026-11-10
 
 A real installed dashboard diagnostic returned `COGNITION_PROTECTED_BASELINE_MISSING:FI_SECURITY_PRIMARY_8789_V1` with all required chat and memory anchors present. The patcher now accepts the earlier pre-security-primary baseline without weakening an installed security phase. Use `node scripts/diagnose-cognitive-live.mjs <live-server-path>` before and after staging to inspect `patchStatus` without printing source code. The live model/compute endpoint on port 8791 must still be healthy before `-Apply`.
+
+## Readiness probe repair 2026-11-11
+
+The first guarded Apply passed 16/16 stage tests but reported NEW_DASHBOARD_NOT_READY. The applied and rollback stdout both showed the server listening on 127.0.0.1:8789 without logged startup errors. The source rollback succeeded; neither the newly applied dashboard nor its full API health was independently confirmed.
+
+The earlier readiness loop called GET /api/cognition/status and GET /api/ai/status with 4-second timeouts. Both requests could wait for platform.status() and the full REA/NetBird health chain. The updated bridge now provides **GET /api/cognition/health**, a synchronous local-only in-process identity check which does not call platform.status(), Cognee, REA, or any external service.
+
+The launch gate now requires (1) the same verified 8789 Node PID, (2) the correct bounded cognition health identity, (3) reaExecutionGrants = 0, and (4) direct compute 8791 /ai/runtime/llama-cpp state = ready. The full after-restart VerifyExistingServices gate still separately checks AI status, memory, voice, fixed local registry, and REA allowlist. Fail-closed rollback remains active.
+
+GET /api/cognition/status also caps its separate platform-health summary at 1.5 seconds, reporting timed_out_unverified rather than hanging indefinitely. **This is a targeted possible-false-negative repair, not proof that the first failure was caused by slow REA health.**
+
+Before another Apply, confirm the prior rollback successfully restored the ordinary chat and that port 8789 is owned by the expected Node process. Always run the stage-only script first. Do not bypass owner/authority/compute checks, and do not stop Ollama or external llama.cpp.
