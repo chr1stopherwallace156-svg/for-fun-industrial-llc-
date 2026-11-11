@@ -150,3 +150,35 @@ test('Windows startup gate checks fast cognition health and independent compute 
  assert.match(script,/\$After=VerifyExistingServices/);
  assert.match(script,/FUN_COGNITION_LIVE_DEPLOY=PASS/);
 });
+
+test('deployment tolerates stopped REA only when catalogue stays HTTP 403 and no REA tools are exposed',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const {fileURLToPath}=await import('node:url');
+ const source=await readFile(fileURLToPath(new URL('../Deploy-Fun-Cognition-Live8789.ps1',import.meta.url)),'utf8');
+ assert.match(source,/\$reaService\[0\]\.state -ne 'stopped'/);
+ assert.match(source,/REA_NOT_STOPPED_REQUIRES_SEPARATE_OPERATOR_REVIEW/);
+ assert.match(source,/GetJson '\/api\/rea\/tools' 12/);
+ assert.match(source,/\$statusCode -eq 403/);
+ assert.match(source,/REA_TOOLS_UNEXPECTEDLY_ACCESSIBLE/);
+ assert.match(source,/REA_STOPPED_UNEXPECTED_HTTP_/);
+ assert.match(source,/\$definitions\.rea_tool_count -ne 0/);
+ assert.match(source,/REA_TOOL_VISIBILITY_UNEXPECTED/);
+ assert.match(source,/\$env:REA_ALLOWED_TOOLS=''/);
+ assert.doesNotMatch(source,/\$env:REA_ALLOWED_TOOLS=\(\$script:PreRea -join ','\)/);
+ assert.match(source,/REA_STATE_OR_ALLOWLIST_CHANGED/);
+ assert.match(source,/FUN_COGNITION_REA_BASELINE=STOPPED_AND_DENIED_PRESERVED/);
+ assert.match(source,/FUN_COGNITION_LIVE_DEPLOY=PASS/);
+});
+test('cognitive deploy remains fail-closed if llama or compute is unavailable and never activates REA',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const {fileURLToPath}=await import('node:url');
+ const source=await readFile(fileURLToPath(new URL('../Deploy-Fun-Cognition-Live8789.ps1',import.meta.url)),'utf8');
+ assert.match(source,/LIVE_MODEL_COMPUTE_UNAVAILABLE_FIX_FIRST/);
+ assert.match(source,/LIVE_COMPUTE_OR_LLAMA_PORT_MISSING/);
+ assert.match(source,/GetJson '\/api\/ai\/status'/);
+ assert.match(source,/GetJson '\/api\/ai\/automatic-memory\/status'/);
+ assert.match(source,/GetJson '\/api\/voice\/mobile\/status'/);
+ assert.doesNotMatch(source,/Invoke-RestMethod.*-Method Post.*api\/activate/);
+ assert.doesNotMatch(source,/Invoke-RestMethod.*-Method Post.*rea/);
+ assert.doesNotMatch(source,/REA_ENABLED='true'/);
+});
