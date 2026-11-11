@@ -4,7 +4,7 @@
 
 This extends the completed Phase 2.2 offline Qwen selection + Optuna/OR-Tools workflow into **the existing Fun Industrial dashboard chat** at 127.0.0.1:8789. It does not create another listener, daemon, recurring schedule, or tool execution authority.
 
-An explicit chat command like `Optimize inventory for these demand samples` is recognized before the existing Send handler. Instead of passing the request to unrestricted model tools, the same chat area displays a bounded review panel. Other chat requests still use the existing chat path, with automatic read-only memory, web research, voice, and REA catalogue behavior unchanged.
+An explicit chat command like `Optimize inventory for these demand samples` is recognized before the existing Send handler **only when a uniquely identifiable chat control is found**. If the installed operator dashboard does not use the historical chat IDs and its actual controls cannot be identified unambiguously, the injected client adds a dedicated **Optimization in Fun Industrial** section on that same dashboard, with an explicit **Prepare optimization** button. In this compatibility fallback, optimization is *not* triggered by sending text into the unidentified regular chat. Existing chat, automatic read-only memory, web research, voice, and REA catalogue behavior remain unchanged.
 
 The panel requires the operator to enter **1–3 concrete validated candidate JSON objects** using the existing inventory/allocation/route schemas. It never silently assumes demand, stock costs, budgets, labor, or distances. The previous Phase 2.2 prompt lets local Qwen select one index only, without executing any solver. The selected problem and goal are saved with SHA-256 integrity, proposal ID, model reason, and measured token usage.
 
@@ -35,7 +35,7 @@ Open `http://127.0.0.1:8789` and enter:
 
 `Optimize inventory using my verified demand numbers`
 
-The chat displays a review panel. For a **synthetic test only**, paste this complete candidate array:
+The chat either displays an inline review panel (recognized chat controls) or a separate **Optimization in Fun Industrial** panel farther down the page (unrecognized dashboard markup). For the latter, enter your optimization goal there and choose **Prepare optimization**. For a **synthetic test only**, paste this complete candidate array:
 
 ```json
 [{"action":"inventory","problem":{"demand_samples":[3,4,3,6,7,4,5,8,5,4],"min_stock":0,"max_stock":12,"holding_cost":1,"shortage_cost":3,"trials":48}}]
@@ -59,3 +59,7 @@ Treat two upstream open source patterns as architecture references, **not implic
 4. `OpenHands/software-agent-sdk`: optional agent orchestration architecture, but do **not** adopt its heavy execution stack as a default for local CPU-constrained Fun Industrial.
 
 Recommended next stage: build a deterministic, read-only repository-indexing and architecture-report pipeline that records file paths, imports, dependency edges, changed source ranges, test coverage links, and uncertainty. Feed only small evidence summaries to Qwen, then gate patches behind tests and human approval. This adds complexity comprehension without requiring a larger local model or granting agent write authority.
+
+## Dashboard compatibility repair — 2026-11-10
+
+The first live Windows installation stopped before any service restart with `CHAT_OPT_UI_BASELINE_MISSING_id="chat-input"`, after all 27 focused tests passed. The real dashboard is a customized version; earlier voice patchers already warned not to assume that legacy input ID. The compatibility patch removes those brittle selectors from **staging-time validation**, verifies a unique body element plus protected web and voice markers, and safely attaches only if chat controls are uniquely identifiable at runtime. Otherwise it renders a separate opt-in optimizer input on the same dashboard. Focused CI confirms both original and customized markup. No existing chat controls or messages are replaced.
