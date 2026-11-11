@@ -125,7 +125,7 @@ test('PowerShell bootstrap explicitly protects 229 ready REA, parent ports and s
  const {readFile}=await import('node:fs/promises');
  const text=await readFile(new URL('../Start-Fun-Auto-Sidecar8796.ps1',import.meta.url),'utf8');
  for(const pattern of [/rea_tool_count -ne 229/,/local_tool_count -ne 19/,
- /'REA_229_SESSION_NOT_READY_PRESERVE_HOST'/,/PortOwners 8789/,/PARENT_8789=PRESERVED/,
+ /'REA_229_SESSION_NOT_READY_PRESERVE_HOST'/,/foreach\(\$port in @\(8789,8088,8791,8794,4479\)\)/,/PARENT_8789=PRESERVED/,
  /Start-Process -FilePath \$Node/,/SIDECAR_PORT_8796_ALREADY_OWNED_NO_RESTART/]){
   assert.match(text,pattern);
  }
