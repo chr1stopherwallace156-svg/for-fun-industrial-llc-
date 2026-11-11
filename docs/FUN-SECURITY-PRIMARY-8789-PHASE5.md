@@ -93,3 +93,15 @@ The first read-only reconciliation report returned LIVE_CHAT_OR_VOICE_UI_MISSING
 The reviewed policy script now checks the stable FI_VOICE_MOBILE_PANEL_V1 marker, its same-origin mobile voice client script, one closing body element, actual live chat API route definitions, a responsive AI tool catalogue, and the rest of the original supervisor/health/process identity requirements. The primary security UI patcher likewise checks for the actual installed voice panel rather than demanding old sample chat-input or chat-send elements. The security client tries to mount within a recognizable chat panel and otherwise uses the already-installed voice panel as a visible fallback, always showing its own audited result region.
 
 After updating this same GitHub branch, rerun the **read-only** reconciliation command. Never skip to -Approve or Phase 5 -Apply merely because the old selector check has been repaired. The next HOLD, if any, must be investigated on its own merits.
+
+## Critical policy review digest fix — November 10
+
+A Windows operator review returned POLICY_REVIEW_DIGEST=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855. This is the SHA-256 hash of EMPTY INPUT, not a valid review digest. The source used a PowerShell function parameter named $input, which collides with PowerShell's automatic pipeline variable. That old output is **invalid for any -Approve invocation**. No policy change was made by the review-only run.
+
+This repair renames the function parameter, rejects empty or unreasonably small serialized review JSON, verifies SHA-256('abc') against the known answer, and refuses the empty-string digest. Windows CI runs the isolated pure function to check the known answer, varying input and empty-string rejection without executing reconciliation or changing host state.
+
+Operator:
+1. Pull the same Phase 5 branch with git pull --ff-only.
+2. Run Reconcile-Fun-Dashboard8789-Policy.ps1 **without -Approve** again.
+3. Confirm FUN_DASHBOARD_POLICY_REVIEW=PASS; POLICY_REVIEW_INPUT_UTF8_BYTES should be a positive realistic value; POLICY_REVIEW_DIGEST must **not** be e3b0c442...b855.
+4. Do not execute -Approve until reviewing changed source, verifying that the digest is genuine, and agreeing to update the stored policy.
