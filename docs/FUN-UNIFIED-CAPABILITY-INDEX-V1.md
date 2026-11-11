@@ -27,3 +27,16 @@ Capability catalogue presence does not mean availability, authorization or execu
 
 ## Validation
 Windows and Ubuntu CI run deterministic local tests for 229 synthetic REA catalogue entries, wrong/duplicate metadata, unavailable REA, injection as untrusted reference, bounded ranking and unchanged chat tools. No real REA MCP, network or model operations are executed in CI.
+## Guarded live installation (new, separate from staging)
+
+`Deploy-Fun-Capability-Index8789.ps1` now exists. It defaults to stage-only and requires the explicit `-Apply` switch for live activation. It validates the installed cognitive release marker and verified 8789 Node owner, patch syntax, module syntax, 12 isolated tests, exact staged source bytes, no conflicting module installs, current AI/voice/default-on Cognee, local-first configuration, REA stopped plus HTTP 403, and zero REA execution grants. It hashes the original server and backs it up before any live writes.
+
+A special safety stop is important: cognitive knowledge lives in process memory. A dashboard restart erases its current in-memory claims, checks, predictions and event history. The script therefore rejects `-Apply` if the Cognitive Kernel snapshot reports ANY claims, predictions, or events. Do not bypass that gate to force deployment.
+
+If preflight passes and cognitive state is empty, the script installs the staged server and two capability modules, restarts ONLY the verified Node dashboard on localhost:8789, and verifies the health and ownership of 8789, 8088, 8791, plus any other protected listeners, status consistency of Cognee, voice, model, REA stopped and local tools, and one live graph capability query. On an error, it tries to stop only its own newly started 8789 process, restore the exact original server from the run's backup, remove only its own new modules, and restart the previous dashboard. This rollback is a best-effort action and its service health must be checked independently if it reports HOLD.
+
+Neither the staging nor the live deployment initializes REA, starts or stops llama.cpp, changes Elektron Ollama, grants tool execution, or modifies any persistent REA allowlist. REA remains stopped and catalogue entries remain unavailable until separately initialized by the operator.
+
+Offline GitHub Actions on Windows and Ubuntu: 12/12 target tests PASS; PowerShell parser checks PASS for both stage and live deploy scripts. **This does not mean the live upgrade has run on the user's PC.** Only an operator-command `FUN_CAPABILITY_LIVE_DEPLOY=PASS` followed by independent live endpoint checks can confirm installation.
+
+The broader repository Node suite still has two unrelated sourcing/selection tests failing in some CI runs; this change does not claim to repair them.
