@@ -10,7 +10,7 @@ $Root='http://127.0.0.1:8789'
 $Patcher=Join-Path $Repo 'scripts\patch-auto-local-dashboard-server.mjs'
 $UiPatcher=Join-Path $Repo 'scripts\patch-auto-local-dashboard-ui.mjs'
 $Dir=Join-Path $Live 'src\experimental'
-$Modules=@('auto-local-dashboard.mjs','auto-local-tools.mjs')
+$Modules=@('auto-local-dashboard.mjs','auto-local-tools.mjs','auto-local-client.js')
 $ProtectedPorts=@(8088,8791,8443,4479,8794)
 $Work=Join-Path $env:LOCALAPPDATA ('FunIndustrial\AutoDashboard8789\'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,8))
 $OldPid=0;$NodeExe='';$NewProcess=$null;$Changed=$false;$Restarted=$false
@@ -114,6 +114,7 @@ foreach($d in @($Repo,$Live,(Join-Path $Live 'src'),(Join-Path $Live 'public')))
 foreach($p in @($Server,$Ui,$Patcher,$UiPatcher,
  (Join-Path $Repo 'src\experimental\auto-local-dashboard.mjs'),
  (Join-Path $Repo 'src\experimental\auto-local-tools.mjs'),
+ (Join-Path $Repo 'src\experimental\auto-local-client.js'),
  (Join-Path $Repo 'intelligence-checks\auto-local-dashboard-case.mjs'),
  (Join-Path $Repo 'intelligence-checks\auto-local-tools-case.mjs'))){File $p}
 $Original=[IO.File]::ReadAllText($Server)
@@ -127,7 +128,8 @@ $OldPid=[int]$found.Pid;$NodeExe=[string]$found.Exe
 $OldServerHash=Hash $Server;$OldUiHash=Hash $Ui
 foreach($mod in @($Patcher,$UiPatcher,
  (Join-Path $Repo 'src\experimental\auto-local-dashboard.mjs'),
- (Join-Path $Repo 'src\experimental\auto-local-tools.mjs'))){
+ (Join-Path $Repo 'src\experimental\auto-local-tools.mjs'),
+ (Join-Path $Repo 'src\experimental\auto-local-client.js'))){
  & $NodeExe --check $mod
  if($LASTEXITCODE -ne 0){Hold ('MODULE_SYNTAX_FAILED_'+$mod)}
 }
@@ -147,6 +149,7 @@ if($LASTEXITCODE -ne 0){Hold 'SERVER_STAGING_FAILED'}
 if($LASTEXITCODE -ne 0){Hold 'UI_STAGING_FAILED'}
 & $NodeExe --check $StagedServer
 if($LASTEXITCODE -ne 0){Hold 'STAGED_SERVER_SYNTAX_FAILED'}
+if(-not ([IO.File]::ReadAllText($StagedUi)).Contains('FI_AUTO_LOCAL_DASHBOARD_UI_V2')){Hold 'STANDALONE_UI_MARKER_NOT_FOUND'}
 $StagedServerHash=Hash $StagedServer;$StagedUiHash=Hash $StagedUi
 if((Hash $Server) -ne $OldServerHash -or (Hash $Ui) -ne $OldUiHash){Hold 'LIVE_FILES_CHANGED_DURING_STAGING'}
 if(Test-Path -LiteralPath $Dir){DirCheck $Dir}
@@ -159,6 +162,7 @@ foreach($m in $Modules){
   if((Hash $dest) -ne (Hash $src)){Hold ('CONFLICTING_EXISTING_MODULE_'+$m)}
  }
 }
+Write-Host 'FUN_AUTO_DASH_UI_VARIANT=STANDALONE_PANEL_CSP_COMPATIBLE'
 Write-Host 'FUN_AUTO_DASH_STAGE=PASS SERVER_AND_UI_ORIGINALS_UNCHANGED=TRUE'
 Write-Host ('FUN_AUTO_DASH_BACKUP='+$Work)
 if(-not $Apply){Write-Host 'FUN_AUTO_DASH_LIVE_DEPLOY=NOT_PERFORMED';exit 0}
