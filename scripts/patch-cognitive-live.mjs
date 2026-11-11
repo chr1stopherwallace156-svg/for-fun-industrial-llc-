@@ -1,5 +1,6 @@
 // FI_COGNITIVE_LIVE_PATCH_V1 — patch ONLY staged copies of deployed Fun Industrial.
-// Requires already qualified consolidated chat and security-primary baseline.
+// Requires the established local chat/memory/voice baseline. Security-primary is
+// preserved if installed, but cognition does not depend on that separate phase.
 import {readFileSync,writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -13,7 +14,10 @@ function once(s,anchor,replacement) {
 }
 export function patchCognitiveLiveServer(source) {
   if(typeof source !== 'string' || source.includes(MARK)) throw Error('COGNITION_ALREADY_INSTALLED_OR_INVALID');
-  for(const marker of ['FI_AUTO_COGNEE_CHAT_V1','FI_SECURITY_PRIMARY_8789_V1',
+  const hasSecurityPrimary=source.includes('FI_SECURITY_PRIMARY_8789_V1');
+  if(hasSecurityPrimary && !source.includes('/api/security/status'))
+    throw Error('COGNITION_SECURITY_PRIMARY_INCONSISTENT');
+  for(const marker of ['FI_AUTO_COGNEE_CHAT_V1',
     'FI_SOURCING_RETIRED_V1','FI_VOICE_MOBILE_DASHBOARD_V1',
     '/api/rea/call','/api/ai/tool-call','/api/ai/chat','/api/ai/automatic-memory/status']) {
     if(!source.includes(marker)) throw Error('COGNITION_PROTECTED_BASELINE_MISSING:'+marker);
@@ -54,11 +58,16 @@ export function patchCognitiveLiveServer(source) {
   const priorCalls=(source.match(/fiAutomaticMemory\(body,memoryStatus\(\)\.enabled\)/g)||[]).length;
   const nextCalls=(out.match(/fiAutomaticMemory\(body,memoryStatus\(\)\.enabled\)/g)||[]).length;
   if(priorCalls !== 1 || nextCalls !== 1) throw Error('COGNITION_CHAT_DECORATION_COUNT_INVALID');
-  for(const marker of ['FI_AUTO_COGNEE_CHAT_V1','FI_SECURITY_PRIMARY_8789_V1',
+  for(const marker of ['FI_AUTO_COGNEE_CHAT_V1',
     'FI_VOICE_MOBILE_DASHBOARD_V1','/api/rea/call','/api/ai/tool-call',
-    '/api/security/status','/api/ai/automatic-memory/status']) {
+    '/api/ai/automatic-memory/status']) {
     if(!out.includes(marker)) throw Error('COGNITION_PROTECTED_ROUTE_LOST:'+marker);
   }
+  if(hasSecurityPrimary && (!out.includes('FI_SECURITY_PRIMARY_8789_V1') ||
+      !out.includes('/api/security/status')))
+    throw Error('COGNITION_SECURITY_PRIMARY_ROUTE_LOST');
+  if(!hasSecurityPrimary && out.includes('FI_SECURITY_PRIMARY_8789_V1'))
+    throw Error('COGNITION_UNEXPECTED_SECURITY_INSERTION');
   return out;
 }
 const invoked=process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url);
