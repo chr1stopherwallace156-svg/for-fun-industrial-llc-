@@ -69,14 +69,28 @@ function Launch8789([string]$name){
  return Start-Process -FilePath $script:NodeExe -ArgumentList 'src/server.mjs' -WorkingDirectory $Live -PassThru -RedirectStandardOutput ($name+'.stdout.log') -RedirectStandardError ($name+'.stderr.log')
 }
 function WaitFor8789([int]$id){
+ # Only local-process cognition health is used in this time-sensitive poll.
+ # The /api/cognition/status and /api/ai/status routes can synchronously wait
+ # on unrelated REA/NetBird health probes. Full readiness is separately
+ # verified by VerifyExistingServices after this launch gate.
+ $script:LastReadinessReason='NO_RESPONSE'
  for($i=0;$i -lt 60;$i++){
   Start-Sleep -Milliseconds 500
   try{
-   if((Owner8789).Pid -ne $id){continue}
-   $c=GetJson '/api/cognition/status' 4
-   $a=GetJson '/api/ai/status' 4
-   if($c.version -eq 'fi-cognitive-live-bridge-v1' -and $a.state -eq 'ready'){return $true}
-  }catch{}
+   if((Owner8789).Pid -ne $id){$script:LastReadinessReason='DASHBOARD_PID_MISMATCH';continue}
+   $c=GetJson '/api/cognition/health' 4
+   if($c.version -ne 'fi-cognitive-live-bridge-v1' -or $c.liveChatDecorator -ne $true -or
+      $c.reaExecutionGrants -ne 0){
+    $script:LastReadinessReason='COGNITION_IDENTITY_OR_AUTHORITY_HOLD'
+    continue
+   }
+   $compute=Invoke-RestMethod -Uri 'http://127.0.0.1:8791/ai/runtime/llama-cpp' -TimeoutSec 6
+   if($compute.state -ne 'ready'){$script:LastReadinessReason='COMPUTE_AI_NOT_READY';continue}
+   $script:LastReadinessReason='READY'
+   return $true
+  }catch{
+   $script:LastReadinessReason=('HTTP_OR_PROCESS_HOLD_'+$_.Exception.GetType().Name)
+  }
  }
  return $false
 }
@@ -134,7 +148,7 @@ try {
  for($i=0;$i -lt 30;$i++){if(-not (PortSnapshot 8789)){break};Start-Sleep -Milliseconds 250}
  if(PortSnapshot 8789){Hold 'OLD_DASHBOARD_STILL_LISTENING'}
  $NewProcess=Launch8789 (Join-Path $Work 'applied')
- if(-not (WaitFor8789 ([int]$NewProcess.Id))){Hold 'NEW_DASHBOARD_NOT_READY'}
+ if(-not (WaitFor8789 ([int]$NewProcess.Id))){Hold ('NEW_DASHBOARD_NOT_READY_'+$script:LastReadinessReason)}
  $After=VerifyExistingServices
  if($script:SecurityInstalled -ne $Original.Contains('FI_SECURITY_PRIMARY_8789_V1')){Hold 'SECURITY_BASELINE_CHANGED'}
  if(($After.Names -join '|') -cne ($PreTools -join '|')){Hold 'TOOL_REGISTRY_CHANGED'}
