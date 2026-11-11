@@ -85,8 +85,12 @@ export function patchPrimaryUi(source){
  for(const label of ["FI_VOICE_MOBILE_PANEL_V1","FI_OPTIMIZATION_PHASE23_PANEL_V1"]){
   if(!source.includes(label))throw Error("SECURITY_UI_PROTECTED_MARKER_MISSING_"+label);
  }
- if(!source.includes('id="chat-input"')&&!source.includes('id="chat-send"')){
-  throw Error("SECURITY_LIVE_CHAT_PANEL_NOT_FOUND");
+ // The deployed operator dashboard is not the older GitHub example.
+ // Validate its protected voice panel and same-origin script rather than
+ // requiring the optional sample chat-input/chat-send element IDs.
+ if(!source.includes('id="fi-voice-mobile"')||
+    !source.includes('src="/api/voice/mobile/client.js"')){
+  throw Error("SECURITY_PRIMARY_VOICE_ANCHOR_NOT_VERIFIED");
  }
  const closing=[...source.matchAll(/<\/body\s*>/gi)];
  if(closing.length!==1)throw Error("SECURITY_UI_BODY_ANCHOR_HOLD");
