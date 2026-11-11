@@ -2,10 +2,61 @@
    Intercepts only clear optimization commands; ordinary chat is untouched. Never auto-runs. */
 (()=>{
 "use strict";
-const input=document.getElementById("chat-input");
-const send=document.getElementById("chat-send");
-const host=document.getElementById("chat-proposals");
-if(!input||!send||!host)return;
+// FI_CHAT_OPTIMIZATION_COMPAT_V2 — the live operator dashboard may not use
+// the historic chat-input/chat-send IDs. Detect a unique chat surface or fail
+// safely into a standalone *explicit* optimizer entry inside this dashboard.
+function findChat(){
+ const knownInput=document.getElementById("chat-input");
+ const knownSend=document.getElementById("chat-send");
+ if(knownInput&&knownSend){
+  return {input:knownInput,send:knownSend,
+   container:knownInput.closest("section,article,.panel")||knownInput.parentElement,
+   host:document.getElementById("chat-proposals")};
+ }
+ const matches=[];
+ for(const section of document.querySelectorAll("section,article,.panel,[role=region]")){
+  const headings=[...section.querySelectorAll("h1,h2,h3,h4")].filter(h=>{
+   const label=(h.textContent||"").trim().toLowerCase();
+   return /\\b(chat|conversation)\\b/.test(label)&&/\\b(ai|qwen|local|assistant|fun industrial)\\b/.test(label);
+  });
+  if(headings.length!==1)continue;
+  const fields=[...section.querySelectorAll("textarea")].filter(e=>!e.disabled&&!e.readOnly&&!e.closest("#fi-chat-opt-panel"));
+  const buttons=[...section.querySelectorAll("button")].filter(e=>
+   /^send(?: message)?$/i.test((e.textContent||"").trim())&&!e.disabled);
+  if(fields.length===1&&buttons.length===1)
+   matches.push({input:fields[0],send:buttons[0],container:section,host:null});
+ }
+ return matches.length===1?matches[0]:null;
+}
+let controls=findChat();
+let input,send,host;
+if(controls){
+ input=controls.input;send=controls.send;
+ host=controls.host;
+ if(!host){
+  host=document.createElement("div");host.id="fi-chat-opt-host";
+  controls.container.appendChild(host);
+ }
+}else{
+ // Preserve unknown/custom chat completely; use an explicit same-dashboard
+ // optimization input instead of guessing selectors or intercepting another form.
+ const container=document.createElement("section");
+ container.id="fi-chat-opt-standalone";container.className="panel";
+ container.appendChild(Object.assign(document.createElement("h2"),{textContent:"Optimization in Fun Industrial"}));
+ container.appendChild(Object.assign(document.createElement("p"),{
+  textContent:"The existing chat controls were not uniquely identifiable. This separate entry uses the same local Qwen and operator-approved solvers without changing ordinary chat."
+ }));
+ input=document.createElement("textarea");input.id="fi-chat-opt-request";
+ input.placeholder="Describe an optimization goal (at least 8 characters)";
+ input.maxLength=500;
+ container.appendChild(input);
+ send=document.createElement("button");send.type="button";
+ send.id="fi-chat-opt-start";send.textContent="Prepare optimization";
+ container.appendChild(send);
+ host=document.createElement("div");host.id="fi-chat-opt-host";
+ container.appendChild(host);
+ document.body.appendChild(container);
+}
 const BASE="/api/ai/chat-optimization/";
 let busy=false,proposal=null,workflowId=null;
 const intent=s=>/^(?:please\s+)?(?:(?:can|could|would)\s+you\s+|i\s+want\s+(?:to\s+|you\s+to\s+)|help\s+me\s+(?:to\s+)?)?(?:optimi[sz]e\b|run\s+(?:an?\s+)?optimi[sz]ation\b|find\s+(?:the\s+)?optimal\b)/i.test(s.trim());
@@ -42,7 +93,7 @@ function show(goal){
  const panel=node("section");panel.className="panel";panel.id="fi-chat-opt-panel";
  panel.style.marginTop="10px";
  panel.appendChild(node("h3","Optimization proposal (local, approval required)"));
- panel.appendChild(node("p","Your chat request was recognized as an optimization request. Provide verified numeric candidate problems. Qwen will select one; it cannot invent values or execute it without a separate approval."));
+ panel.appendChild(node("p","This optimization request is separate from an ordinary chat reply. Provide verified numeric candidate problems. Qwen will select one; it cannot invent values or execute it without a separate approval."));
  const label=node("label","Goal from chat");label.htmlFor="fi-chat-opt-goal";panel.appendChild(label);
  const goalText=node("textarea");goalText.id="fi-chat-opt-goal";goalText.maxLength=500;goalText.value=goal.slice(0,500);panel.appendChild(goalText);
  const cLabel=node("label","Verified candidate JSON array (1-3 candidates)");cLabel.htmlFor="fi-chat-opt-candidates";panel.appendChild(cLabel);
@@ -118,15 +169,30 @@ function show(goal){
  host.replaceChildren(panel);
  input.value="";
 }
-send.addEventListener("click",e=>{
- const text=input.value.trim();
- if(text&&intent(text)){
-  e.preventDefault();e.stopImmediatePropagation();show(text);
- }
-},true);
-input.addEventListener("keydown",e=>{
- if(e.key==="Enter"&&!e.shiftKey&&intent(input.value)){
-  e.preventDefault();e.stopImmediatePropagation();show(input.value.trim());
- }
-},true);
+function prepareFromInput(force,e){
+ const text=(input.value||"").trim();
+ if(!text||text.length<8)return;
+ if(!force&&!intent(text))return;
+ e.preventDefault();e.stopImmediatePropagation();
+ show(text);
+}
+if(controls){
+ // Keep the normal Send/Enter behavior for all non-optimization prompts.
+ send.addEventListener("click",e=>prepareFromInput(false,e),true);
+ input.addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&!e.shiftKey)prepareFromInput(false,e);
+ },true);
+ // An explicit entry also works when the user phrases an optimization request
+ // naturally instead of starting with the word "optimize".
+ const launch=document.createElement("button");
+ launch.type="button";launch.className="secondary";
+ launch.id="fi-chat-opt-launch";launch.textContent="Optimize";
+ launch.addEventListener("click",e=>prepareFromInput(true,e));
+ (send.parentElement||controls.container).appendChild(launch);
+}else{
+ send.addEventListener("click",e=>prepareFromInput(true,e));
+ input.addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&!e.shiftKey)prepareFromInput(true,e);
+ });
+}
 })();
