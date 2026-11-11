@@ -7,6 +7,13 @@ const task=el('task'),send=el('send'),history=el('history'),
       log=el('event-log');
 if(!task||!send||!history||!status||!review||!approve||!execute||!log)return;
 let busy=false,pending=null,pendingKind=null;
+const conversation=[];
+function appendContext(role,content){
+ const limited=String(content||'').slice(0,1050);
+ if(!limited.trim())return;
+ conversation.push({role,content:limited});
+ if(conversation.length>8)conversation.splice(0,conversation.length-8);
+}
 function message(role,text){
  const node=document.createElement('article');
  node.className=role;node.textContent=String(text).slice(0,13000);
@@ -46,8 +53,9 @@ send.addEventListener('click',async()=>{
  resetReview();toggle(true);
  message('you',prompt);status.textContent='Routing task…';
  try{
-  const result=await api('/api/unified/chat',{prompt});
+  const result=await api('/api/unified/chat',{prompt,context:conversation.slice()});
   message('assistant',result.reply||'(No model response. Inspect the evidence log.)');
+  appendContext('user',prompt);appendContext('assistant',result.reply);
   event('ROUTE='+String(result.route)+' STATE='+String(result.state));
   showActions(result);
   if(['local_action_review','rea_action_review'].includes(result.route)){
@@ -74,7 +82,8 @@ execute.addEventListener('click',async()=>{
  event('Operator explicitly authorized one '+kind+' tools session');
  try{
   const data=await api(kind==='rea'?'/api/unified/rea/execute':'/api/unified/local/execute',{prompt,operatorConfirmed:true});
-  message('assistant',data.reply||('Local tool session completed: '+String(data.state)));
+  message('assistant',data.reply||('Tool session completed: '+String(data.state)));
+  appendContext('assistant',data.reply||('Tool session completed: '+String(data.state)));
   showActions(data);
   status.textContent='READY · '+String(data.state);
  }catch(error){message('error','LOCAL EXECUTION HOLD: '+String(error.message||error));status.textContent='LOCAL HOLD'}
