@@ -11,6 +11,7 @@ on:
       - 'intelligence-checks/dashboard-policy-reconciliation-case.mjs'
       - 'intelligence-checks/dashboard-policy-hash-case.ps1'
       - 'intelligence-checks/dashboard-supervisor-diagnostic-case.mjs'
+      - 'intelligence-checks/dashboard-supervisor-ast-case.ps1'
       - 'intelligence-checks/security-primary-8789-case.mjs'
       - 'intelligence-checks/security-chat-phase4-case.mjs'
       - '.github/workflows/fun-security-primary-8789-ci.yml'
@@ -25,6 +26,7 @@ on:
       - 'intelligence-checks/dashboard-policy-reconciliation-case.mjs'
       - 'intelligence-checks/dashboard-policy-hash-case.ps1'
       - 'intelligence-checks/dashboard-supervisor-diagnostic-case.mjs'
+      - 'intelligence-checks/dashboard-supervisor-ast-case.ps1'
       - 'intelligence-checks/security-primary-8789-case.mjs'
       - 'intelligence-checks/security-chat-phase4-case.mjs'
       - '.github/workflows/fun-security-primary-8789-ci.yml'
@@ -67,3 +69,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./intelligence-checks/dashboard-policy-hash-case.ps1
+      - name: Execute isolated supervisor AST classifier tests (comments vs executable mutations)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./intelligence-checks/dashboard-supervisor-ast-case.ps1
