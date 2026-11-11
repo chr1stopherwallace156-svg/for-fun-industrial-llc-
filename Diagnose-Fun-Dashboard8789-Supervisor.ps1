@@ -32,16 +32,40 @@ if($sourceHash -cne $liveHash){
 $parserTokens=$null;$parserErrors=$null
 $ast=[Management.Automation.Language.Parser]::ParseFile($CanonicalWatcher,[ref]$parserTokens,[ref]$parserErrors)
 if($parserErrors.Count){Hold 'CANONICAL_WATCHER_PARSE_ERRORS'}
+# Inspect actual executable command AST nodes, never raw source text.
+# Commented references to Start-Process in Confirm-Owner are NOT executable.
+function Assert-ReadOnlyFunctionAst($functionAst,[string]$name){
+ $allowed=@('Get-CimInstance','Get-Process','Invoke-RestMethod','Get-FileHash',
+  'Test-Path','Join-Path','ForEach-Object','Sort-Object','Where-Object','Endpoint-Ready')
+ $calls=@($functionAst.FindAll({param($n)
+   $n -is [Management.Automation.Language.CommandAst]
+ },$true))
+ foreach($call in $calls){
+  $command=$call.GetCommandName()
+  if([string]::IsNullOrWhiteSpace($command) -or $command -notin $allowed){
+   Hold ('UNEXPECTED_EXECUTABLE_COMMAND_IN_FUNCTION_'+$name)
+  }
+ }
+ # Never allow a write/process action hidden as a .NET member invocation.
+ $forbiddenMethods=@('WriteAllText','WriteAllBytes','AppendAllText',
+  'Delete','Move','Replace','SetAttributes','Start','Kill','Stop','Terminate')
+ $members=@($functionAst.FindAll({param($n)
+   $n -is [Management.Automation.Language.InvokeMemberExpressionAst]
+ },$true))
+ foreach($member in $members){
+  $method=[string]$member.Member.Extent.Text
+  $method=$method.Trim([char[]]@([char]39,[char]34))
+  if($method -in $forbiddenMethods){Hold ('UNEXPECTED_EXECUTABLE_METHOD_IN_FUNCTION_'+$name)}
+ }
+}
 # Define ONLY the three selected read-only functions, never execute the
 # watchdog's main loop, mutex, task registration or status-file writer.
 $names=@('Policy-Ready','Confirm-Owner','Endpoint-Ready')
 foreach($name in $names){
  $defs=@($ast.FindAll({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name},$true))
  if($defs.Count -ne 1){Hold ('CANONICAL_READ_ONLY_FUNCTION_MISSING_'+$name)}
+ Assert-ReadOnlyFunctionAst $defs[0] $name
  $code=$defs[0].Extent.Text
- if($code -match '(?i)\b(?:Stop-Process|Start-Process|Set-Content|Add-Content|Out-File|Remove-Item|Copy-Item|Move-Item|Set-ScheduledTask|Start-ScheduledTask|Register-ScheduledTask|Write-Status)\b'){
-  Hold ('UNEXPECTED_SIDE_EFFECT_IN_FUNCTION_'+$name)
- }
  . ([scriptblock]::Create($code))
 }
 $listener=@(Get-NetTCPConnection -LocalPort 8789 -State Listen -ErrorAction SilentlyContinue)
