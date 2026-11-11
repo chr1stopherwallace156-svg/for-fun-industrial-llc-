@@ -1,0 +1,58 @@
+name: Fun local auto tools dashboard qualification
+on:
+  push:
+    branches:
+      - feature/fun-dashboard-auto-local-chat-v1-20261111
+  pull_request:
+    paths:
+      - 'src/experimental/auto-local-dashboard.mjs'
+      - 'src/experimental/auto-local-client.js'
+      - 'scripts/Run-Fun-Auto-Sidecar8796.mjs'
+      - 'Start-Fun-Auto-Sidecar8796.ps1'
+      - 'intelligence-checks/auto-sidecar-case.mjs'
+      - 'scripts/patch-auto-local-dashboard-*.mjs'
+      - 'intelligence-checks/auto-local-dashboard-case.mjs'
+      - 'Deploy-Fun-Auto-Local-Dashboard8789.ps1'
+      - '.github/workflows/fun-auto-local-dashboard-ci.yml'
+permissions:
+  contents: read
+jobs:
+  auto-dashboard:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax
+        run: |
+          node --check src/experimental/auto-local-dashboard.mjs
+          node --check src/experimental/auto-local-client.js
+          node --check scripts/Run-Fun-Auto-Sidecar8796.mjs
+          node --check intelligence-checks/auto-sidecar-case.mjs
+          node --check scripts/patch-auto-local-dashboard-server.mjs
+          node --check scripts/patch-auto-local-dashboard-ui.mjs
+          node --check intelligence-checks/auto-local-dashboard-case.mjs
+      - name: Offline dashboard integration tests
+        run: node --test intelligence-checks/auto-sidecar-case.mjs intelligence-checks/auto-local-dashboard-case.mjs intelligence-checks/auto-local-tools-case.mjs
+      - name: Windows guarded deployer parse check
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $f='./Deploy-Fun-Auto-Local-Dashboard8789.ps1'
+          if (-not (Test-Path -LiteralPath $f -PathType Leaf)) { throw 'DEPLOYER_MISSING' }
+          $tokens=$null
+          $errors=$null
+          [Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f).Path,[ref]$tokens,[ref]$errors) | Out-Null
+          if ($errors.Count) { $errors | Format-List | Out-String | Write-Host; throw 'AUTO_DASH_DEPLOYER_PARSE_HOLD' }
+          Write-Host 'FUN_AUTO_DASH_DEPLOYER_PARSE=PASS'
+          $t=$null
+          $e=$null
+          [Management.Automation.Language.Parser]::ParseFile((Resolve-Path './Start-Fun-Auto-Sidecar8796.ps1').Path,[ref]$t,[ref]$e) | Out-Null
+          if($e.Count){$e | Format-List | Out-String | Write-Host; throw 'AUTO_SIDECAR_BOOTSTRAP_PARSE_HOLD'}
+          Write-Host 'FUN_AUTO_SIDECAR_BOOTSTRAP_PARSE=PASS'
