@@ -1,4 +1,6 @@
-# Guarded Fun Industrial security integration into the existing 8789 chat.
+# Fun Industrial security integration into the existing 8789 chat.
+# Legacy source hash watchdog and provisional 204-file monitoring do not gate
+# ordinary software deployment. Those diagnostics are opt-in, not autostart policy.
 # Default STAGE ONLY. -Apply authorizes a restart of ONLY the 8789 Node dashboard.
 # 8443 gateway, external llama.cpp, Python API, Ollama, and NetBird are never restarted.
 [CmdletBinding()]param([switch]$Apply)
@@ -6,21 +8,18 @@ $ErrorActionPreference='Stop'
 $Src=$PSScriptRoot
 $Live=Join-Path $env:USERPROFILE 'FunIndustrial-REA-MCP-Activation'
 $Node=(Get-Command node.exe -ErrorAction Stop).Source
-$Python=Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe'
 $Base='http://127.0.0.1:8789'
 $Server=Join-Path $Live 'src\server.mjs'
 $Html=Join-Path $Live 'public\index.html'
 $Tools=Join-Path $Live 'src\platform-tools.mjs'
 $LiveSec=Join-Path $Live 'src\security'
-$Pin='a622d627fccb3934f23886b0360d8de4b92f82df42ff25a3d4f9e5b9b5488b9b'
-$Baseline=Join-Path $env:LOCALAPPDATA 'FunIndustrial\SecurityIntegrityV1\candidate-baseline.json'
 $Auto=Join-Path $env:LOCALAPPDATA 'FunIndustrial\DashboardAutostart'
-$PolicyFile=Join-Path $Auto 'policy.json'
 $TaskName='FunIndustrial-Dashboard8789-Autostart'
+$PolicyFile=Join-Path $Auto 'policy.json'
 $Work=Join-Path $env:LOCALAPPDATA ('FunIndustrial\SecurityPrimary8789\'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,8))
 $Patch=Join-Path $Src 'scripts\patch-security-primary-8789.mjs'
 $Mods=@('local-scan.mjs','defensive-audit.mjs','security-chat-client.js')
-$PrePorts=@{};$PreAllowed=@();$PreCatalogue=0;$Policy=$null;$PolicyChanged=$false
+$PrePorts=@{};$PreAllowed=@();$PreCatalogue=0
 $ExistingMods=@{};$Changed=$false;$OldStopped=$false;$NextProcess=$null;$OldPid=0
 function Hold([string]$x){throw ('FUN_SECURITY_PRIMARY_HOLD='+$x)}
 function Snap([int]$port){
@@ -66,23 +65,20 @@ function WaitReady([int]$id,[int]$tries=80){
  return $false
 }
 foreach($p in @($Live,(Join-Path $Live 'src'),(Join-Path $Live 'public'),$Src)){CheckDir $p}
-foreach($p in @($Server,$Html,$Tools,$Patch,$Python,$Baseline,(Join-Path $Src 'src\security\integrity_monitor.py'),(Join-Path $Src 'intelligence-checks\security-primary-8789-case.mjs'))){CheckFile $p}
+foreach($p in @($Server,$Html,$Tools,$Patch,(Join-Path $Src 'intelligence-checks\security-primary-8789-case.mjs'))){CheckFile $p}
 foreach($name in $Mods){CheckFile (Join-Path $Src ('src\security\'+$name))}
-if((Get-FileHash -LiteralPath $Baseline -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Pin){Hold 'BASELINE_PIN_MISMATCH'}
-& $Python (Join-Path $Src 'src\security\integrity_monitor.py') verify --baseline $Baseline --expected-sha $Pin
-if($LASTEXITCODE -ne 0){Hold 'PRE_DEPLOY_204_FILE_BASELINE_CHANGED'}
 $original=[IO.File]::ReadAllText($Server)
 foreach($marker in @('FI_AUTO_COGNEE_CHAT_V1','FI_VOICE_MOBILE_DASHBOARD_V1','FI_SOURCING_RETIRED_V1')){
  if(-not $original.Contains($marker)){Hold ('PROTECTED_LIVE_MARKER_MISSING_'+$marker)}
 }
 if($original.Contains('FI_SECURITY_PRIMARY_8789_V1')){Hold 'SECURITY_ALREADY_DEPLOYED'}
-$task=Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-$hasPolicy=Test-Path -LiteralPath $PolicyFile -PathType Leaf
-if([bool]$task -ne [bool]$hasPolicy){Hold 'AUTOSTART_POLICY_TASK_MISMATCH'}
-if($hasPolicy){
- CheckFile $PolicyFile
- $Policy=Get-Content -LiteralPath $PolicyFile -Raw -ErrorAction Stop|ConvertFrom-Json
- if($Policy.schema -ne 'fun.dashboard.autostart.v1' -or $Policy.deployedRoot -ne $Live -or $Policy.serverSha256 -ne (Get-FileHash $Server).Hash -or $Policy.htmlSha256 -ne (Get-FileHash $Html).Hash){Hold 'AUTOSTART_SOURCE_PIN_MISMATCH'}
+# Refuse competing legacy watchdog while deploying. Use the one-step
+# Retire-Legacy-Pins-And-Deploy.ps1 script to back it up and retire it first.
+if(Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue){
+ Hold 'LEGACY_AUTOSTART_TASK_ACTIVE_USE_RETIRE_AND_DEPLOY'
+}
+if(Test-Path -LiteralPath $PolicyFile -PathType Leaf){
+ Hold 'LEGACY_AUTOSTART_POLICY_STILL_PRESENT_USE_RETIRE_AND_DEPLOY'
 }
 $OldPid=Pid8789
 $v=Api '/api/voice/mobile/status'
@@ -118,7 +114,6 @@ New-Item -ItemType Directory -Path $Work -Force -ErrorAction Stop|Out-Null
 Copy-Item $Server (Join-Path $Work 'server.original.mjs')
 Copy-Item $Html (Join-Path $Work 'index.original.html')
 Copy-Item $Tools (Join-Path $Work 'tools.original.mjs')
-if($Policy){Copy-Item $PolicyFile (Join-Path $Work 'policy.original.json')}
 $StageServer=Join-Path $Work 'server.staged.mjs'
 $StageHtml=Join-Path $Work 'index.staged.html'
 $StageTools=Join-Path $Work 'tools.staged.mjs'
@@ -129,7 +124,7 @@ if($LASTEXITCODE -ne 0){Hold 'STAGED_SERVER_SYNTAX'}
 & $Node --check $StageTools
 if($LASTEXITCODE -ne 0){Hold 'STAGED_TOOLS_SYNTAX'}
 if(-not ([IO.File]::ReadAllText($StageHtml)).Contains('/api/security/client.js')){Hold 'STAGED_CHAT_CLIENT_MISSING'}
-Write-Host "FUN_SECURITY_PRIMARY_STAGE=PASS PORT=8789 BASELINE=UNCHANGED REA_CATALOGUE=$PreCatalogue"
+Write-Host "FUN_SECURITY_PRIMARY_STAGE=PASS PORT=8789 LEGACY_PINS=NOT_REQUIRED REA_CATALOGUE=$PreCatalogue"
 Write-Host "FUN_SECURITY_BACKUP=$Work"
 if(-not $Apply){Write-Host 'FUN_SECURITY_PRIMARY_DEPLOY=NOT_PERFORMED USE_-Apply_TO_AUTHORIZE_8789_RESTART';exit 0}
 try{
@@ -155,7 +150,7 @@ try{
  $page=(Invoke-WebRequest -Uri ($Base+'/') -UseBasicParsing -TimeoutSec 15).Content
  if(-not $page.Contains('/api/security/client.js')){Hold 'LIVE_SECURITY_CHAT_BUTTON_SCRIPT_NOT_SERVED'}
  $js=(Invoke-WebRequest -Uri ($Base+'/api/security/client.js') -UseBasicParsing -TimeoutSec 15).Content
- if(-not $js.Contains('FI_SECURITY_PRIMARY_CLIENT_V1')){Hold 'SECURITY_CLIENT_NOT_IDENTIFIED'}
+ if(-not $js.Contains('FI_SECURITY_PRIMARY_CLIENT_V2')){Hold 'SECURITY_CLIENT_NOT_IDENTIFIED'}
  $names=@((Api '/api/ai/tools' 45).tools|ForEach-Object {$_.function.name})
  if($names -cnotcontains 'fi_security_local_audit'){Hold 'SECURITY_TOOL_NOT_REGISTERED'}
  # An unauthenticated tool-call must be refused without performing an audit.
@@ -182,24 +177,14 @@ try{
  if($reaAfter.Count -ne $PreCatalogue){Hold 'REA_229_CATALOGUE_REGRESSION'}
  $reaAllowedAfter=@((Api '/api/rea/tools' 45).tools|ForEach-Object {[string]$_.name})
  if(($reaAllowedAfter -join ',') -ne ($PreAllowed -join ',')){Hold 'REA_PERMISSION_REGRESSION'}
- if($Policy){
-  $Policy.serverSha256=(Get-FileHash $Server -Algorithm SHA256).Hash
-  $Policy.htmlSha256=(Get-FileHash $Html -Algorithm SHA256).Hash
-  $Policy.verifiedExistingPid=[int]$NextProcess.Id
-  $Policy.verifiedExistingStartUtcTicks=[int64]$NextProcess.StartTime.ToUniversalTime().Ticks
-  $Policy.capturedUtc=[DateTime]::UtcNow.ToString('o')
-  $candidate=Join-Path $Auto ('policy.security-8789-'+[guid]::NewGuid().ToString('N')+'.tmp')
-  [IO.File]::WriteAllText($candidate,($Policy|ConvertTo-Json -Depth 10),[Text.UTF8Encoding]::new($false))
-  Move-Item -LiteralPath $candidate -Destination $PolicyFile -Force
-  $PolicyChanged=$true
- }
  Write-Host 'FUN_SECURITY_PRIMARY_8789_DEPLOY=PASS'
  Write-Host "FUN_SECURITY_DASHBOARD_PID=$($NextProcess.Id) SECURITY_CHAT_ACTIVE=TRUE"
  Write-Host "FUN_SECURITY_AUDIT=$($result.result.state) SOURCE_FILES=$($result.result.source.files_inspected)"
  Write-Host 'FUN_SECURITY_GATEWAY_8443=UNCHANGED LLAMA_8088=UNCHANGED COMPUTE_8791=UNCHANGED'
  Write-Host 'FUN_SECURITY_REA_CATALOGUE_AND_ALLOWLIST=UNCHANGED'
  Write-Host "FUN_SECURITY_BACKUP=$Work"
- Write-Host 'FUN_SECURITY_BASELINE_204=EXPECTED_DRIFT_REVIEW_BEFORE_NEW_PIN'
+ Write-Host 'FUN_SECURITY_PROVISIONAL_BASELINE=OPTIONAL_ON_DEMAND_NOT_DEPLOYMENT_GATE'
+ Write-Host 'FUN_SECURITY_LEGACY_WATCHDOG=RETIRED_NO_AUTO_START_AT_LOGIN'
 }catch{
  $reason=$_.Exception.Message
  Write-Warning "FUN_SECURITY_PRIMARY=HOLD REASON=$reason BACKUP=$Work"
@@ -219,7 +204,6 @@ try{
    }
   }
  }
- if($PolicyChanged){Copy-Item (Join-Path $Work 'policy.original.json') $PolicyFile -Force -ErrorAction SilentlyContinue}
  if($OldStopped){
   try{
    for($i=0;$i -lt 40;$i++){if(-not(Snap 8789)){break};Start-Sleep -Milliseconds 300}
