@@ -14,7 +14,7 @@ $CognitionDir=Join-Path $Live 'src\cognition'
 $Work=Join-Path $env:LOCALAPPDATA ('FunIndustrial\CognitionLive8789\'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,8))
 $OriginalPid=0;$NodeExe=$null;$Restarted=$false;$Changed=$false;$NewProcess=$null
 $ProtectedPorts=@(8088,8791,8443,4479,8794)
-$PortBefore=@{};$ModuleExisted=@{};$PreTools=@();$PreRea=@();$MemoryBudget=90000
+$PortBefore=@{};$ModuleExisted=@{};$PreTools=@();$PreRea=@();$MemoryBudget=90000;$script:SecurityInstalled=$false
 function Hold([string]$reason){throw ('FUN_COGNITION_LIVE_HOLD='+$reason)}
 function CheckFile([string]$p){
  if(-not (Test-Path -LiteralPath $p -PathType Leaf)){Hold ('FILE_NOT_FOUND_'+$p)}
@@ -42,14 +42,19 @@ function GetJson([string]$path,[int]$timeout=12){
  return Invoke-RestMethod -Uri ($Base+$path) -TimeoutSec $timeout -ErrorAction Stop
 }
 function VerifyExistingServices(){
- $security=GetJson '/api/security/status'
+ # Security-primary is optional ONLY when its deployment marker is absent.
+ # If installed, it must be healthy before and after the dashboard restart.
+ if($script:SecurityInstalled){
+  $security=GetJson '/api/security/status'
+  if($security.state -ne 'ready'){Hold 'INSTALLED_SECURITY_UNHEALTHY'}
+ }
  $memory=GetJson '/api/ai/automatic-memory/status'
  $voice=GetJson '/api/voice/mobile/status'
  $ai=GetJson '/api/ai/status'
  $definitions=GetJson '/api/ai/tools' 40
  $rea=GetJson '/api/rea/tools' 40
  $compute=Invoke-RestMethod -Uri 'http://127.0.0.1:8791/ai/runtime/llama-cpp' -TimeoutSec 8
- if($security.state -ne 'ready' -or $memory.enabledByDefault -ne $true -or $voice.enabled -ne $true){Hold 'PROTECTED_SERVICES_UNHEALTHY'}
+ if($memory.enabledByDefault -ne $true -or $voice.enabled -ne $true){Hold 'PROTECTED_SERVICES_UNHEALTHY'}
  if($ai.state -ne 'ready' -or $compute.state -ne 'ready'){Hold 'LIVE_MODEL_COMPUTE_UNAVAILABLE_FIX_FIRST'}
  $names=@($definitions.tools | ForEach-Object {$_.function.name})
  if($names.Count -lt 4 -or @($names|Sort-Object -Unique).Count -ne $names.Count){Hold 'TOOL_REGISTRY_UNEXPECTED'}
@@ -78,6 +83,7 @@ function WaitFor8789([int]$id){
 foreach($d in @($Src,$Live,(Join-Path $Live 'src'),(Join-Path $Src 'src\cognition'))){CheckDir $d}
 foreach($f in @($Server,$Patcher,(Join-Path $Src 'src\cognition\kernel.mjs'),(Join-Path $Src 'src\cognition\live-bridge.mjs'),(Join-Path $Src 'intelligence-checks\cognitive-live-bridge-case.mjs'),(Join-Path $Src 'intelligence-checks\cognitive-kernel-case.mjs'))){CheckFile $f}
 $Original=[IO.File]::ReadAllText($Server)
+$script:SecurityInstalled=$Original.Contains('FI_SECURITY_PRIMARY_8789_V1')
 if($Original.Contains('FI_COGNITIVE_LIVE_PATCH_V1')){Hold 'ALREADY_INSTALLED'}
 $Owner=Owner8789
 $OriginalPid=[int]$Owner.Pid;$NodeExe=$Owner.Exe
@@ -103,6 +109,7 @@ foreach($name in $Modules){
  }
 }
 Write-Host 'FUN_COGNITION_LIVE_STAGE=PASS NEW_ROUTES=7 CHAT_DECORATOR=VERIFIED LIVE_CHANGED=FALSE'
+if($script:SecurityInstalled){Write-Host 'FUN_COGNITION_SECURITY_PRIMARY=INSTALLED_PRESERVED'}else{Write-Host 'FUN_COGNITION_SECURITY_PRIMARY=NOT_INSTALLED_UNCHANGED'}
 Write-Host ('FUN_COGNITION_BACKUP='+$Work)
 if(-not $Apply){Write-Host 'FUN_COGNITION_LIVE_DEPLOY=NOT_PERFORMED RUN_WITH_-Apply_AFTER_SERVICE_HEALTH_READY';exit 0}
 try {
@@ -129,6 +136,7 @@ try {
  $NewProcess=Launch8789 (Join-Path $Work 'applied')
  if(-not (WaitFor8789 ([int]$NewProcess.Id))){Hold 'NEW_DASHBOARD_NOT_READY'}
  $After=VerifyExistingServices
+ if($script:SecurityInstalled -ne $Original.Contains('FI_SECURITY_PRIMARY_8789_V1')){Hold 'SECURITY_BASELINE_CHANGED'}
  if(($After.Names -join '|') -cne ($PreTools -join '|')){Hold 'TOOL_REGISTRY_CHANGED'}
  if(($After.Allowed -join '|') -cne ($PreRea -join '|')){Hold 'REA_ALLOWED_TOOLS_CHANGED'}
  foreach($port in $ProtectedPorts){if((PortSnapshot $port) -cne $PortBefore[$port]){Hold ('PROTECTED_PORT_OWNER_CHANGED_'+$port)}}
