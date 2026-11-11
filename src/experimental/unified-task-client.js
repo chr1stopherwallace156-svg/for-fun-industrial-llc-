@@ -6,7 +6,7 @@ const task=el('task'),send=el('send'),history=el('history'),
       approve=el('local-consent'),execute=el('local-execute'),
       log=el('event-log');
 if(!task||!send||!history||!status||!review||!approve||!execute||!log)return;
-let busy=false,pending=null;
+let busy=false,pending=null,pendingKind=null;
 function message(role,text){
  const node=document.createElement('article');
  node.className=role;node.textContent=String(text).slice(0,13000);
@@ -19,7 +19,7 @@ function event(text){
 }
 function toggle(state){busy=state;send.disabled=state;execute.disabled=state||!pending||!approve.checked}
 function resetReview(){
- pending=null;approve.checked=false;review.classList.remove('open');toggle(busy);
+ pending=null;pendingKind=null;approve.checked=false;review.classList.remove('open');toggle(busy);
 }
 async function api(url,body){
  const response=await fetch(url,{method:body?'POST':'GET',credentials:'same-origin',
@@ -50,8 +50,15 @@ send.addEventListener('click',async()=>{
   message('assistant',result.reply||'(No model response. Inspect the evidence log.)');
   event('ROUTE='+String(result.route)+' STATE='+String(result.state));
   showActions(result);
-  if(result.route==='local_action_review'){
-   pending=prompt;review.classList.add('open');execute.disabled=true;
+  if(['local_action_review','rea_action_review'].includes(result.route)){
+   pending=prompt;
+   pendingKind=result.route==='rea_action_review'?'rea':'local';
+   const kindText=pendingKind==='rea'?
+    'REA may change files, devices or processes. One REA execution round may call more than one tool.':
+    'Registered local compute tools may change in-memory state.';
+   event('REVIEW REQUIRED: '+kindText);
+   execute.textContent=pendingKind==='rea'?'Execute REA tools (approved)':'Execute local tools (approved)';
+   review.classList.add('open');execute.disabled=true;
   }
   status.textContent='READY · '+String(result.state)+' · '+String(result.execution);
   task.value='';
@@ -61,12 +68,12 @@ send.addEventListener('click',async()=>{
 approve.addEventListener('change',()=>{execute.disabled=busy||!pending||!approve.checked});
 execute.addEventListener('click',async()=>{
  if(busy||!pending||!approve.checked)return;
- const prompt=pending;
- // One click equals one user-authorized local compute session. Never silent.
- resetReview();toggle(true);status.textContent='Running explicitly authorized local tools…';
- event('Operator explicitly authorized one local tools session');
+ const prompt=pending,kind=pendingKind;
+ // One click equals one authorized finite tool session, never silent.
+ resetReview();toggle(true);status.textContent='Running explicitly authorized '+kind+' tools…';
+ event('Operator explicitly authorized one '+kind+' tools session');
  try{
-  const data=await api('/api/unified/local/execute',{prompt,operatorConfirmed:true});
+  const data=await api(kind==='rea'?'/api/unified/rea/execute':'/api/unified/local/execute',{prompt,operatorConfirmed:true});
   message('assistant',data.reply||('Local tool session completed: '+String(data.state)));
   showActions(data);
   status.textContent='READY · '+String(data.state);
