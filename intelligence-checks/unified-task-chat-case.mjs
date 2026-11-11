@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import http from 'node:http';
+import {EventEmitter} from 'node:events';
 import {Script} from 'node:vm';
 import {readFile} from 'node:fs/promises';
 import {spawnSync} from 'node:child_process';
@@ -213,6 +214,48 @@ test('public web function rejects DNS results containing private addresses befor
   request:()=>{outbound++;throw Error('should not connect')}
  }),/WEB_DNS_NOT_PUBLIC/);
  assert.equal(outbound,0);
+});
+function mockHttpsResponse({status=200,type='text/html',chunks=['<h1>Public title</h1>']}={}){
+ let attempts=0,destroyed=0;
+ const request=(_url,_options,onResponse)=>{
+  attempts++;
+  const req=new EventEmitter();
+  req.destroy=()=>{destroyed++};
+  req.end=()=>{
+   const res=new EventEmitter();
+   res.statusCode=status;res.headers={'content-type':type};res.resume=()=>{};
+   onResponse(res);
+   for(const c of chunks)res.emit('data',Buffer.isBuffer(c)?c:Buffer.from(c));
+   res.emit('end');
+  };
+  return req;
+ };
+ return {request,stats:()=>({attempts,destroyed})};
+}
+test('public web fetch pins public DNS, returns bounded static text with scripts removed',async()=>{
+ const fake=mockHttpsResponse({chunks:['<h2>Readable facts</h2><script>doDanger()</script>']});
+ const r=await fetchPublicWebText('https://example.org/',{
+  lookup:async()=>[{address:'93.184.215.14'}],request:fake.request});
+ assert.equal(r.sourceTrust,'untrusted');
+ assert.equal(r.redirectsFollowed,0);
+ assert.match(r.text,/Readable facts/);
+ assert.doesNotMatch(r.text,/doDanger/);
+ assert.equal(fake.stats().attempts,1);
+});
+test('HTTP redirect is never followed, even if endpoint points to a public domain',async()=>{
+ const fake=mockHttpsResponse({status:302});
+ await assert.rejects(fetchPublicWebText('https://example.org/',{
+  lookup:async()=>[{address:'93.184.215.14'}],request:fake.request}),/WEB_HTTP_302/);
+ assert.equal(fake.stats().attempts,1);
+});
+test('binary web downloads are refused and oversized responses terminate',async()=>{
+ const f1=mockHttpsResponse({type:'application/octet-stream',chunks:['binary']});
+ await assert.rejects(fetchPublicWebText('https://example.org/bin',{
+  lookup:async()=>[{address:'93.184.215.14'}],request:f1.request}),/WEB_CONTENT_TYPE_UNSUPPORTED/);
+ const f2=mockHttpsResponse({chunks:[Buffer.alloc(131073,97)]});
+ await assert.rejects(fetchPublicWebText('https://example.org/huge',{
+  lookup:async()=>[{address:'93.184.215.14'}],request:f2.request}),/WEB_TEXT_SIZE_LIMIT/);
+ assert.equal(f2.stats().destroyed,1);
 });
 test('static webpage parser does not retain scripts, forms, or iframe text',()=>{
  const out=extractText('<h1>Title &amp; text</h1><script>execute()</script><form>password</form><p>Public</p>');
