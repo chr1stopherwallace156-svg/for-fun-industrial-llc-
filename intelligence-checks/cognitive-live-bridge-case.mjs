@@ -61,7 +61,7 @@ test('malformed cognition input rejected; calls cannot route to REA or platform 
  assert.throws(()=>b.executeDataOperation('/api/cognition/propose',null),/BODY_INVALID/);
  assert.throws(()=>b.executeDataOperation('/api/cognition/propose',{source:'x',subject:'a',predicate:'b',object:'c',junk:'x'.repeat(6000)}),/BODY_INVALID/);
 });
-function patchedFixture(){return `
+function patchedFixture({security=true}={}){const fixture=`
 // FI_AUTO_COGNEE_CHAT_V1 FI_SECURITY_PRIMARY_8789_V1 FI_SOURCING_RETIRED_V1 FI_VOICE_MOBILE_DASHBOARD_V1
 import http from 'node:http';import path from 'node:path';import {fileURLToPath} from 'node:url';
 const root=path.dirname(fileURLToPath(import.meta.url));
@@ -78,6 +78,8 @@ const server=http.createServer(async(req,res)=>{try{
 }catch(e){}}
 );
 `;
+ return security ? fixture : fixture.replace('FI_SECURITY_PRIMARY_8789_V1','no-security')
+    .replace(" if(req.method==='GET'&&req.url==='/api/security/status')return;",'');
 }
 test('patch preserves existing chat pipeline, protected routes and adds new routing only',()=>{
  const before=patchedFixture();const after=patchCognitiveLiveServer(before);
@@ -91,8 +93,18 @@ test('patch preserves existing chat pipeline, protected routes and adds new rout
  assert.equal((after.match(/fiAutomaticMemory\(body,memoryStatus\(\)\.enabled\)/g)||[]).length,1);
  assert.throws(()=>patchCognitiveLiveServer(after),/ALREADY_INSTALLED/);
 });
-test('patch holds if security not installed or original memory route has been changed',()=>{
+test('patch works on pre-security-primary deployed chat and does not introduce a security route',()=>{
+ const before=patchedFixture({security:false});
+ const after=patchCognitiveLiveServer(before);
+ assert.match(after,/FI_COGNITIVE_CHAT_CONTEXT_V1/);
+ assert.doesNotMatch(after,/FI_SECURITY_PRIMARY_8789_V1/);
+ assert.doesNotMatch(after,/api\/security\/status/);
+ assert.match(after,/api\/rea\/call/);
+ assert.match(after,/api\/ai\/automatic-memory\/status/);
+ assert.equal((after.match(/fiAutomaticMemory\(body,memoryStatus\(\)\.enabled\)/g)||[]).length,1);
+});
+test('patch detects inconsistent installed security and altered memory route',()=>{
  const x=patchedFixture();
- assert.throws(()=>patchCognitiveLiveServer(x.replace('FI_SECURITY_PRIMARY_8789_V1','no-security')),/BASELINE_MISSING/);
+ assert.throws(()=>patchCognitiveLiveServer(x.replace(" if(req.method==='GET'&&req.url==='/api/security/status')return;",'')),/SECURITY_PRIMARY_INCONSISTENT/);
  assert.throws(()=>patchCognitiveLiveServer(x.replace('const enriched=await fiAutomaticMemory','const sample=await fiAutomaticMemory')),/EXISTING_CHAT_PIPELINE_UNKNOWN/);
 });
