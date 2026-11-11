@@ -9,7 +9,7 @@ const exact=(x,fields)=>x!==null&&typeof x==="object"&&!Array.isArray(x)&&
 export function createChatOptimizationHandler({service=createChatOptimization()}={}){
  return async function handler(req,res,{json,readBody}){
   const route=String(req.url||"").split("?")[0];
-  if(!endpoints.has(route))return false;
+  if(!endpoints.has(route))return json(res,404,{error:"CHAT_OPT_ROUTE_NOT_FOUND"});
   const reply=(code,obj)=>json(res,code,obj);
   if(route==="/api/ai/chat-optimization/status"&&req.method==="GET")
    return reply(200,{state:"ready",engine:"phase22-existing",automatic_execution:false,
