@@ -49,3 +49,10 @@ test("phase 5 still validates existing voice memory REA and loopback, without pr
  assert.ok(deploy.includes(x),x);
  assert.doesNotMatch(deploy,/NODE_TLS_REJECT_UNAUTHORIZED|REA_ALLOWED_TOOLS=\*|REA_ALLOWED_TOOLS='ALL'/);
 });
+
+test("live 8789 dashboard restarts only with same verified Node executable path",()=>{
+ assert.match(deploy,/\$originalNodePath=\[string\]\$existingNodeProcess\.ExecutablePath/);
+ assert.match(deploy,/\$Node=\$originalNodePath/);
+ assert.match(deploy,/RUNNING_8789_NODE_EXE_PATH_NOT_VERIFIABLE/);
+ assert.match(deploy,/CheckFile \$originalNodePath/);
+});
