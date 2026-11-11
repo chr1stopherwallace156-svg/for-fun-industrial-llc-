@@ -60,7 +60,7 @@ if(invoked){
  try{
   const [server,html,outServer,outHtml]=process.argv.slice(2);
   if([server,html,outServer,outHtml].some(x=>!x)||
-   new Set([server,html,outServer,outHtml].map(resolve)).size!==4)
+   new Set([server,html,outServer,outHtml].map(x=>resolve(x))).size!==4)
    throw Error("CHAT_OPT_PATCH_UNIQUE_PATHS_REQUIRED");
   writeFileSync(outServer,patchChatOptimizationServer(readFileSync(server,"utf8")),"utf8");
   writeFileSync(outHtml,patchChatOptimizationUi(readFileSync(html,"utf8")),"utf8");
