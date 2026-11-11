@@ -87,12 +87,13 @@ class LlamaCppRuntime:
         deadline=time.monotonic()+90
         while time.monotonic()<deadline:
             if self.process.poll() is not None:raise RuntimeError("llama-server exited during startup; inspect .runtime/logs/llama-server.log")
-            if self._health():return {"state":"ready","pid":self.process.pid,"host":"127.0.0.1","port":port,"model_path":self.model_path,"device":"cpu","threads":threads,"context":context}
+            if self._health():return {"state":"ready","pid":self.process.pid,"host":"127.0.0.1","port":port,"model_path":self.model_path,"device":"cpu","threads":threads,"context":context,"ownership":"managed","managed":True}
             time.sleep(.5)
         self.stop(); raise TimeoutError("llama-server did not become ready within 90 seconds")
     def chat(self,messages,max_tokens=512,temperature=0.7,tools=None):
+        if self.process is None and not self._adopt_configured_external():
+            raise RuntimeError("matching external llama.cpp model is not verified")
         if not self._health():raise RuntimeError("local model is not ready")
-        if self.process is None and not self._adopt_configured_external():raise RuntimeError("matching external llama.cpp model is not verified")
         if not isinstance(messages,list) or not 1<=len(messages)<=24:raise ValueError("messages must contain 1 to 24 turns")
         clean=[]
         for message in messages:
@@ -119,7 +120,7 @@ class LlamaCppRuntime:
                         "device":"cpu","ownership":"external_unmanaged","managed":False}
             return {"state":"stopped" if configured else "not-configured"}
         code=self.process.poll();ready=code is None and self._health()
-        return {"state":"ready" if ready else "exited" if code is not None else "loading","pid":self.process.pid,"exit_code":code,"model_path":self.model_path,"endpoint":self.endpoint,"device":"cpu"}
+        return {"state":"ready" if ready else "exited" if code is not None else "loading","pid":self.process.pid,"exit_code":code,"model_path":self.model_path,"endpoint":self.endpoint,"device":"cpu","ownership":"managed","managed":True}
     def stop(self):
         if self.process is None:return {"state":"not-running"}
         if self.process.poll() is not None:
