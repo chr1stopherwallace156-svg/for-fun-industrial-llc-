@@ -1,3 +1,5 @@
+import {fileURLToPath} from 'node:url';
+import {createReaAdapter} from '../src/adapters/rea.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -174,4 +176,33 @@ test('client and launcher preserve existing 8789, 8796, 8088, 8791 processes',as
  }
  assert.match(ps,/REAL_REA_MCP_TOOLS=229 ADDRESSABLE=229 EXECUTION_ENABLED=TRUE/);
  assert.doesNotMatch(ps,/Stop-Process -Id \$OldPid|\/api\/activate|\/api\/stop/);
+});
+
+test('real stdio MCP child handshakes with 229 entries and executes a genuine tools/call',async()=>{
+ const fixture=fileURLToPath(new URL('./fixtures/rea229-mcp-fixture.cjs',import.meta.url));
+ const adapter=createReaAdapter({enabled:true,command:process.execPath,args:[fixture]});
+ try{
+  const runner=createFullReaRunner({adapter,infer:async()=>({choices:[{message:{content:'no tools needed'}}]})});
+  const expected=Array.from({length:229},(_,i)=>'rea_fixture_'+String(i).padStart(3,'0'));
+  const status=await runner.initialize({expectedNames:expected});
+  assert.equal(status.realReaToolCount,229);
+  assert.equal((await adapter.health()).state,'ready');
+  const item=await runner.callExact({name:'rea_fixture_228',arguments:{message:'hello 229'}});
+  assert.equal(item.tool,'rea_fixture_228');
+  assert.match(item.result.content[0].text,/SIMULATED rea_fixture_228/);
+  assert.equal(runner.status().executedCalls,1);
+ }finally{
+  await adapter.stop();
+  assert.equal((await adapter.health()).state,'stopped');
+ }
+});
+test('entrypoint is inert without --serve and launcher does not terminate unrelated parents',async()=>{
+ const {spawnSync}=await import('node:child_process');
+ const launcher=fileURLToPath(new URL('../scripts/Run-Fun-Rea229-Sidecar8797.mjs',import.meta.url));
+ const result=spawnSync(process.execPath,[launcher],{encoding:'utf8',timeout:12000});
+ assert.equal(result.status,0,result.stderr);
+ assert.match(result.stdout,/FUN_REA229=INACTIVE/);
+ const powershell=await readFile(new URL('../Start-Fun-Rea229-Sidecar8797.ps1',import.meta.url),'utf8');
+ assert.match(powershell,/-WorkingDirectory \$Primary/);
+ assert.match(powershell,/taskkill\.exe \/PID \$Child\.Id \/T \/F/);
 });
