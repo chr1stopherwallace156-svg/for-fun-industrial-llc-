@@ -78,6 +78,20 @@ test('binary_session must be in actual 229-tool catalogue; no guessed substitute
  await assert.rejects(runDirectReaPilot({prompt:'Inspect the REA MCP binary session status and provider availability.',requestFn:custom}),/REQUIRED_READ_ONLY_TOOL_NOT_INSTALLED/);
  assert.equal(f.stats().toolCount,0);assert.equal(f.stats().modelCount,0);
 });
+test('Qwen is not allowed to refresh provider candidates or request huge complete binary session',async()=>{
+ const f=fixture();
+ const request='Inspect the REA MCP binary session status and available provider capabilities.';
+ const choose=async(url,body)=>{
+  if(url===LLAMA&&body?.tools){
+   return {choices:[{finish_reason:'tool_calls',message:{tool_calls:[{
+    function:{name:body.tools[0].function.name,arguments:JSON.stringify({detail:'complete',refresh_candidates:true})}
+   }]}}]};
+  }
+  return f.requestFn(url,body);
+ };
+ await assert.rejects(runDirectReaPilot({prompt:request,requestFn:choose}),/SESSION_SUMMARY_ONLY/);
+ assert.equal(f.stats().toolCount,0);
+});
 test('JavaScript source inspection request stops instead of offering Android and Ghidra tools',async()=>{
  const f=fixture();
  const request='Read-only inspect this JavaScript source file: C:\\test\\rea-full-229.mjs using REA tools. Do not modify it.';
@@ -85,10 +99,14 @@ test('JavaScript source inspection request stops instead of offering Android and
  assert.equal(f.stats().modelCount,0);
  assert.equal(f.stats().toolCount,0);
 });
-test('guidance profile selects only installed REA search_guidance',async()=>{
+test('guidance is not guessed from upstream docs when 229 live tools lack the function',async()=>{
  const f=fixture();
- const selected=chooseReaDiagnosticTools(f.all,'Search the built-in REA MCP guidance on analysis workflows');
- assert.deepEqual(selected.map(x=>x.name),['search_guidance']);
+ await assert.rejects(
+  runDirectReaPilot({prompt:'Search the built-in REA MCP guidance on analysis workflows',requestFn:f.requestFn}),
+  /NO_VERIFIED_COMPATIBLE_READ_ONLY_REA_TOOL_FOR_TASK/
+ );
+ assert.equal(f.stats().modelCount,0);
+ assert.equal(f.stats().toolCount,0);
 });
 test('catalogue missing matching inspection function fails closed without model call',async()=>{
  const f=fixture();
