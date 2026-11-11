@@ -22,6 +22,28 @@ export function selectCurrentLocalTools(definitions){
  if(!picked.length)fail('NO_LOCAL_TOOLS');
  return picked;
 }
+const STOP_WORDS=new Set(['please','about','some','them','there','their','the','for','with','that','this','what','from','your','into','have','does','were','could','would','should','using','want','need','capabilities','tools','tool','then','after']);
+function tokens(value){
+ return [...new Set((String(value||'').toLowerCase().match(/[a-z][a-z0-9]{2,}/g)||[]).filter(x=>!STOP_WORDS.has(x)))].slice(0,50);
+}
+export function selectRelevantLocalTools(all,query,limit=6){
+ if(!Array.isArray(all)||!Number.isInteger(limit)||limit<1||limit>32)fail('SELECT_INVALID');
+ const ts=tokens(query);
+ const scores=all.map((item,i)=>{
+  const fn=item.function;
+  const name=fn.name.toLowerCase().replaceAll('_',' ');
+  const description=String(fn.description||'').toLowerCase();
+  let score=0;
+  for(const t of ts){
+   if(name.includes(t))score+=6;
+   else if(description.includes(t))score+=1;
+  }
+  return {item,i,score};
+ });
+ scores.sort((a,b)=>b.score-a.score||a.i-b.i);
+ return scores.slice(0,limit).map(x=>x.item);
+}
+
 function normalizeCalls(response, allowed){
  const calls = response?.tool_calls;
  if(calls == null)return [];
@@ -46,12 +68,13 @@ export async function runAutoLocalExperiment({
  if(!Number.isInteger(maxRounds)||maxRounds<1||maxRounds>8)fail('ROUNDS_INVALID');
  if(!Number.isInteger(maxTokens)||maxTokens<32||maxTokens>1024)fail('TOKENS_INVALID');
  const tools=selectCurrentLocalTools(definitions);
- const allowed=new Set(tools.map(x=>x.function.name));
  const transcript=[{role:'user',content:prompt}];
  const actions=[];
  let latestReply='';
  for(let round=1;round<=maxRounds;round++){
-  const answer=await chat({messages:transcript,tools,max_tokens:maxTokens,temperature:0.25});
+  const activeTools=selectRelevantLocalTools(tools,prompt+' '+latestReply,6);
+  const allowed=new Set(activeTools.map(x=>x.function.name));
+  const answer=await chat({messages:transcript,tools:activeTools,max_tokens:maxTokens,temperature:0.25});
   if(!plainObject(answer))fail('MODEL_RESPONSE_INVALID');
   latestReply=safeText(answer.reply);
   const calls=normalizeCalls(answer,allowed);
