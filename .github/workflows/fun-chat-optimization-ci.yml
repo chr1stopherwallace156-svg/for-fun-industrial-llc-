@@ -1,0 +1,47 @@
+name: Fun Industrial Chat Optimizer Integration Qualification
+on:
+  push:
+    branches:
+      - feature/fun-phase221-chat-optimizer-20261110
+    paths:
+      - "src/workflows/**"
+      - "scripts/patch-chat-optimization.mjs"
+      - "intelligence-checks/chat-optimization-case.mjs"
+      - "intelligence-checks/workflow-phase22-case.mjs"
+      - "Install-Fun-Chat-Optimization.ps1"
+      - "docs/FUN-CHAT-OPTIMIZATION-V1.md"
+      - ".github/workflows/fun-chat-optimization-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qualify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Syntax check
+        run: |
+          node --check src/workflows/chat-optimization.mjs
+          node --check src/workflows/chat-optimization-http.mjs
+          node --check src/workflows/chat-optimization-client.js
+          node --check scripts/patch-chat-optimization.mjs
+      - name: Run focused offline regression tests
+        run: node --test intelligence-checks/chat-optimization-case.mjs intelligence-checks/workflow-phase22-case.mjs intelligence-checks/workflow-optimization-case.mjs intelligence-checks/workflow-coordinator-case.mjs
+      - name: Parse guarded Windows deployment
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $path=Join-Path $PWD 'Install-Fun-Chat-Optimization.ps1'
+          $tokens=$null
+          $errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)|Out-Null
+          if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};throw 'CHAT_OPT_DEPLOY_POWERSHELL_PARSE_HOLD'}
+          Write-Host 'FUN_CHAT_OPT_DEPLOY_SCRIPT=PARSE_PASS'
