@@ -93,7 +93,20 @@ $htmlText=[IO.File]::ReadAllText($Html)
 foreach($marker in @('FI_AUTO_COGNEE_CHAT_V1','FI_VOICE_MOBILE_DASHBOARD_V1','FI_SOURCING_RETIRED_V1')){
  if(-not $serverText.Contains($marker)){Hold ('SERVER_FEATURE_MISSING_'+$marker)}
 }
-if(-not $htmlText.Contains('FI_VOICE_MOBILE_PANEL_V1') -or -not $htmlText.Contains('id="chat-input"')){Hold 'LIVE_CHAT_OR_VOICE_UI_MISSING'}
+# The real installed dashboard is not the old GitHub sample. Its actual
+# voice patcher deliberately did not depend on the sample's chat-input ID.
+# Verify a distinctive live voice panel + its same-origin client script instead.
+# Existing chat API identity and tool access are independently qualified below.
+if(-not $htmlText.Contains('FI_VOICE_MOBILE_PANEL_V1') -or
+   -not $htmlText.Contains('src="/api/voice/mobile/client.js"')){
+ Hold 'LIVE_VOICE_PANEL_OR_CLIENT_SCRIPT_MISSING'
+}
+if(@([regex]::Matches($htmlText,'</body\s*>','IgnoreCase')).Count -ne 1){
+ Hold 'LIVE_DASHBOARD_HTML_STRUCTURE_INVALID'
+}
+foreach($route in @('/api/ai/chat','/api/ai/tool-call','/api/ai/tools')){
+ if(-not $serverText.Contains($route)){Hold ('LIVE_CHAT_ROUTE_MISSING_'+$route)}
+}
 $node=(Get-Command node.exe -ErrorAction Stop).Source
 & $node --check $Server
 if($LASTEXITCODE -ne 0){Hold 'LIVE_SERVER_SYNTAX_INVALID'}
@@ -106,6 +119,8 @@ try{
 $v=Api '/api/voice/mobile/status'
 $m=Api '/api/ai/automatic-memory/status'
 $a=Api '/api/ai/status'
+$chatTools=Api '/api/ai/tools' 25
+if($null -eq $chatTools -or $null -eq $chatTools.tools -or @($chatTools.tools).Count -eq 0){Hold 'LIVE_CHAT_TOOL_CATALOGUE_UNAVAILABLE'}
 $catalog=Api '/api/rea/catalog' 45
 $allow=Api '/api/rea/tools' 45
 $names=@($catalog.tools|ForEach-Object {[string]$_.name})
