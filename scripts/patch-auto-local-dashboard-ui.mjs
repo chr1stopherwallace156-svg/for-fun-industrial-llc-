@@ -1,33 +1,42 @@
-// FI_AUTO_LOCAL_DASHBOARD_UI_PATCH_V1 — separate button, original chat unchanged.
+// FI_AUTO_LOCAL_DASHBOARD_UI_PATCH_V2 — standalone panel for evolved dashboards.
+// Does not require, rename, replace, or inspect any existing chat element IDs.
 import {readFileSync,writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-const MARK='FI_AUTO_LOCAL_DASHBOARD_UI_V1';
-const SEND='<button id="chat-send">Send message</button>';
-const END='</body></html>';
-const SCRIPT="\n<script>\n// FI_AUTO_LOCAL_DASHBOARD_UI_V1 — independent operator-started action.\n(()=>{'use strict';\nconst byId=id=>document.getElementById(id);\nconst button=byId('chat-auto-run'),state=byId('chat-auto-state'),prompt=byId('chat-input');\nif(!button||!state||!prompt)return;\nlet running=false;\nfunction message(text){\n const node=document.createElement('div');\n node.style.cssText='padding:10px 12px;margin:8px 0;border-radius:9px;background:#203849;white-space:pre-wrap;overflow-wrap:anywhere';\n node.textContent='Fun Industrial auto tools: '+String(text).slice(0,12000);\n const history=byId('chat-history');if(history){history.appendChild(node);history.scrollTop=history.scrollHeight;}\n}\nbutton.onclick=async()=>{\n if(running)return;\n const value=prompt.value.trim();\n if(value.length<3||value.length>2000){state.textContent='Enter a task of 3–2000 characters';return;}\n running=true;button.disabled=true;state.textContent='Running local AI tools (no per-tool prompts)…';\n message('Operator-started task: '+value);\n try{\n  const res=await fetch('/api/ai/auto-local/run',{\n   method:'POST',headers:{'content-type':'application/json'},\n   body:JSON.stringify({prompt:value,rounds:2})\n  });\n  const data=await res.json();\n  if(!res.ok)throw Error(String(data.error||('HTTP '+res.status)));\n  const actions=Array.isArray(data.actions)?data.actions:[];\n  for(const action of actions){\n   message('Executed '+String(action.tool)+' (round '+String(action.round)+')\\n'+\n    JSON.stringify(action.result).slice(0,3500));\n  }\n  if(data.reply)message('AI: '+String(data.reply));\n  state.textContent=String(data.state)+' · executed '+actions.length+\n   ' · registered '+String(data.registeredLocal)+' local tools · REA unchanged';\n  prompt.value='';\n }catch(error){\n  const issue=String(error.message||error).slice(0,280);\n  message('HOLD — '+issue);state.textContent='HOLD: '+issue;\n }finally{running=false;button.disabled=false;}\n};\n})();\n</script>\n";
-function one(s,anchor,replacement){
- if(s.split(anchor).length!==2)throw Error('AUTO_DASH_UI_ANCHOR_NOT_UNIQUE_'+anchor.slice(0,70));
- return s.replace(anchor,()=>replacement);
-}
+const MARK='FI_AUTO_LOCAL_DASHBOARD_UI_V2';
+const PANEL=\`
+<!-- FI_AUTO_LOCAL_DASHBOARD_UI_V2: separately triggered local execution panel -->
+<section id="fi-auto-local-panel" aria-label="Fun Industrial automatic local tools" style="padding:16px;margin:16px 0;border:1px solid #40566c;border-radius:12px;background:#172331;color:#eaf1f8">
+  <h2>Fun Industrial · Automatic Local Tools</h2>
+  <p>Run one local AI task without per-tool confirmation. Only currently registered Fun Industrial local tools are eligible; REA is unchanged.</p>
+  <label for="fi-auto-task">Task for Qwen</label>
+  <textarea id="fi-auto-task" maxlength="2000" rows="4" placeholder="Describe a task for local AI..." style="display:block;width:100%;box-sizing:border-box;min-height:90px;padding:10px;background:#0d1722;color:#eaf1f8;border:1px solid #40566c"></textarea>
+  <button type="button" id="fi-auto-run">Run AI tools automatically</button>
+  <span id="fi-auto-state" role="status" aria-live="polite">Manual start · up to two rounds · no REA execution</span>
+  <div id="fi-auto-output" aria-live="polite" style="max-height:460px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:12px"></div>
+</section>
+<script src="/api/ai/auto-local/client.js" defer></script>
+\`;
 export function patchAutoLocalDashboardUi(source){
- if(typeof source!=='string'||source.includes(MARK))throw Error('AUTO_DASH_UI_ALREADY_INSTALLED_OR_INVALID');
- for(const anchor of ['id="chat-history"','id="chat-input"',SEND,'id="chat-proposals"']){
-  if(!source.includes(anchor))throw Error('AUTO_DASH_UI_EXISTING_CHAT_MISSING_'+anchor);
+ if(typeof source!=='string'||source.includes(MARK)||source.includes('id="fi-auto-local-panel"'))
+  throw Error('AUTO_DASH_UI_ALREADY_INSTALLED_OR_INVALID');
+ if(!/<body\b/i.test(source))throw Error('AUTO_DASH_UI_NO_BODY');
+ const matches=[...source.matchAll(/<\/body\s*>/gi)];
+ if(matches.length!==1)throw Error('AUTO_DASH_UI_BODY_CLOSING_NOT_UNIQUE');
+ for(const id of ['fi-auto-task','fi-auto-run','fi-auto-state','fi-auto-output']){
+  if(source.includes('id="'+id+'"'))throw Error('AUTO_DASH_UI_ID_COLLISION_'+id);
  }
- let out=one(source,SEND,SEND+'<button type="button" class="secondary" id="chat-auto-run">Run AI tools automatically</button>'+
-  '<span class="muted small" id="chat-auto-state" aria-live="polite">Run manually · no per-tool approval · local tools only</span>');
- out=one(out,END,SCRIPT+END);
- for(const marker of ['id="chat-send"','id="chat-clear"','id="chat-proposals"','id="ai-stop"','id="security-scan"']){
-  if(!out.includes(marker))throw Error('AUTO_DASH_UI_PROTECTED_CONTROL_LOST_'+marker);
- }
- return out;
+ // Leave all original HTML, inline scripts and event handlers unchanged.
+ const index=matches[0].index;
+ const result=source.slice(0,index)+PANEL+'\n'+source.slice(index);
+ if(!result.includes(source.slice(0,index)))throw Error('AUTO_DASH_UI_PREFIX_CHANGED');
+ return result;
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  try{
   const [input,output]=process.argv.slice(2);
   if(!input||!output||resolve(input)===resolve(output))throw Error('AUTO_DASH_UI_PATHS_INVALID');
   writeFileSync(output,patchAutoLocalDashboardUi(readFileSync(input,'utf8')),'utf8');
-  console.log('FUN_AUTO_DASH_UI_STAGE=PASS ORIGINAL_UNCHANGED=TRUE');
+  console.log('FUN_AUTO_DASH_UI_STAGE=PASS STANDALONE_COMPATIBLE=TRUE ORIGINAL_UNCHANGED=TRUE');
  }catch(e){console.error('FUN_AUTO_DASH_UI_STAGE=HOLD '+String(e.message||e));process.exitCode=1;}
 }
