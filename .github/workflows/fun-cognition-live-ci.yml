@@ -1,0 +1,49 @@
+name: Fun Industrial Cognitive Live Compatibility
+
+on:
+  push:
+    branches:
+      - feature/fun-cognition-live8789-v1-20261110
+  pull_request:
+    paths:
+      - 'src/cognition/**'
+      - 'scripts/patch-cognitive-live.mjs'
+      - 'scripts/diagnose-cognitive-live.mjs'
+      - 'intelligence-checks/cognitive-*.mjs'
+      - 'Deploy-Fun-Cognition-Live8789.ps1'
+      - '.github/workflows/fun-cognition-live-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  cognitive-qualification:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Static syntax checks
+        run: |
+          node --check src/cognition/kernel.mjs
+          node --check src/cognition/live-bridge.mjs
+          node --check scripts/patch-cognitive-live.mjs
+          node --check scripts/diagnose-cognitive-live.mjs
+          node --check intelligence-checks/cognitive-live-bridge-case.mjs
+      - name: Isolated cognition and integration qualification
+        run: node --test intelligence-checks/cognitive-kernel-case.mjs intelligence-checks/cognitive-live-bridge-case.mjs
+      - name: Parse Windows deployment without executing
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens=$null
+          $errors=$null
+          [Management.Automation.Language.Parser]::ParseFile((Resolve-Path './Deploy-Fun-Cognition-Live8789.ps1').Path,[ref]$tokens,[ref]$errors) | Out-Null
+          if($errors.Count){$errors | Format-List | Out-String | Write-Host; throw 'COGNITION_DEPLOYMENT_POWERSHELL_PARSE_HOLD'}
+          Write-Host 'FUN_COGNITION_DEPLOYMENT_POWERSHELL_PARSE=PASS'
