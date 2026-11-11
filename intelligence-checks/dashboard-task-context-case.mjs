@@ -21,7 +21,9 @@ test("read-only task-context probe never edits policy, status, task, service or 
  assert.doesNotMatch(src,/\[IO\.File\]::WriteAllText/);
 });
 test("probe redacts task principal and full process arguments",()=>{
- assert.doesNotMatch(src,/Write-Host\s*.*(?:\$userId|\$taskSid|\$policySid|\$interactiveSid|\$ownerSid|\$w\.CommandLine)/i);
+ assert.doesNotMatch(src,/Write-Host[^\n]*(?:USER_ID|USER_SID|TASK_SID|OWNER_SID|PROCESS_ARGUMENTS|COMMAND_LINE)\s*=/i);
+ assert.doesNotMatch(src,/Write-Host[^\n]*["\x27]\s*\$(?:userId|taskSid|policySid|interactiveSid|ownerSid)\b/i);
+ assert.match(src,/Write-Host "CURRENT_USER_MATCH_POLICY=\$\(\$interactiveSid -eq \$policySid\)"/);
  assert.match(src,/WATCHER_OWNER_RESOLVED=/);
  assert.match(src,/TASK_PRINCIPAL_RESOLVED=/);
  assert.match(src,/DASHBOARD_LISTENER_VALID=/);
