@@ -6,6 +6,8 @@ on:
       - 'src/security/security-chat-client.js'
       - 'scripts/patch-security-primary-8789.mjs'
       - 'Deploy-Fun-Security-Primary-8789.ps1'
+      - 'Retire-Legacy-Pins-And-Deploy.ps1'
+      - 'intelligence-checks/security-legacy-retirement-case.mjs'
       - 'Reconcile-Fun-Dashboard8789-Policy.ps1'
       - 'Diagnose-Fun-Dashboard8789-Supervisor.ps1'
       - 'Diagnose-Fun-Dashboard8789-TaskContext.ps1'
@@ -23,6 +25,8 @@ on:
       - 'src/security/security-chat-client.js'
       - 'scripts/patch-security-primary-8789.mjs'
       - 'Deploy-Fun-Security-Primary-8789.ps1'
+      - 'Retire-Legacy-Pins-And-Deploy.ps1'
+      - 'intelligence-checks/security-legacy-retirement-case.mjs'
       - 'Reconcile-Fun-Dashboard8789-Policy.ps1'
       - 'Diagnose-Fun-Dashboard8789-Supervisor.ps1'
       - 'Diagnose-Fun-Dashboard8789-TaskContext.ps1'
@@ -53,7 +57,7 @@ jobs:
       - name: Syntax validation
         run: node --check src/security/defensive-audit.mjs && node --check src/security/security-chat-client.js && node --check scripts/patch-security-primary-8789.mjs
       - name: Synthetic patch safety and scanning tests
-        run: node --test intelligence-checks/dashboard-task-context-case.mjs intelligence-checks/dashboard-supervisor-diagnostic-case.mjs intelligence-checks/dashboard-policy-reconciliation-case.mjs intelligence-checks/security-primary-8789-case.mjs intelligence-checks/security-chat-phase4-case.mjs intelligence-checks/local-security-scan-case.mjs
+        run: node --test intelligence-checks/security-legacy-retirement-case.mjs intelligence-checks/dashboard-task-context-case.mjs intelligence-checks/dashboard-supervisor-diagnostic-case.mjs intelligence-checks/dashboard-policy-reconciliation-case.mjs intelligence-checks/security-primary-8789-case.mjs intelligence-checks/security-chat-phase4-case.mjs intelligence-checks/local-security-scan-case.mjs
       - name: Default CLI is non-connecting preview
         run: node src/security/defensive-audit.mjs preview .
       - name: Parse Windows deployment script without executing it
@@ -63,6 +67,9 @@ jobs:
           $tok=$null; $err=$null; [Management.Automation.Language.Parser]::ParseFile((Resolve-Path './Deploy-Fun-Security-Primary-8789.ps1').Path,[ref]$tok,[ref]$err) | Out-Null
           if($err.Count){$err | Format-List | Out-String | Write-Host; throw 'DEPLOYMENT_POWERSHELL_SYNTAX_HOLD'}
           Write-Host 'FUN_SECURITY_DEPLOYMENT_POWERSHELL_PARSE=PASS'
+          $tw=$null; $ew=$null; [Management.Automation.Language.Parser]::ParseFile((Resolve-Path './Retire-Legacy-Pins-And-Deploy.ps1').Path,[ref]$tw,[ref]$ew) | Out-Null
+          if($ew.Count){$ew | Format-List | Out-String | Write-Host; throw 'ONE_RUN_RETIRE_AND_DEPLOY_PARSE_HOLD'}
+          Write-Host 'FUN_SECURITY_ONE_RUN_RETIRE_DEPLOY_PARSE=PASS'
           $tok2=$null; $err2=$null; [Management.Automation.Language.Parser]::ParseFile((Resolve-Path './Reconcile-Fun-Dashboard8789-Policy.ps1').Path,[ref]$tok2,[ref]$err2) | Out-Null
           if($err2.Count){$err2 | Format-List | Out-String | Write-Host; throw 'RECONCILIATION_POWERSHELL_SYNTAX_HOLD'}
           Write-Host 'FUN_SECURITY_RECONCILIATION_POWERSHELL_PARSE=PASS'
