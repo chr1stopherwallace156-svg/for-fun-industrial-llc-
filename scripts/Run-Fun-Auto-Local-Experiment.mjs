@@ -6,12 +6,21 @@ import {runAutoLocalExperiment,selectCurrentLocalTools} from '../src/experimenta
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const BASE='http://127.0.0.1:8789';
+const COMPUTE_CHAT='http://127.0.0.1:8791/ai/chat';
+const PROPOSAL_FALLBACK='The model proposed a tool call. Review it before execution.';
+function unforwardedProposal(reply){
+ return reply && typeof reply==='object' && reply.reply===PROPOSAL_FALLBACK &&
+  (!Array.isArray(reply.tool_calls)||reply.tool_calls.length===0);
+}
 function arg(flag,defaultValue){
  const i=process.argv.indexOf(flag);
  return i<0?defaultValue:process.argv[i+1];
 }
 async function request(path,{method='GET',body=null,timeout=10000}={}){
- const response=await fetch(BASE+path,{method,
+ // The only permitted cross-service route is the existing loopback compute chat.
+ // No arbitrary URLs, REA routes or executable shell endpoints are accepted.
+ const endpoint=path==='/__compute_chat__'?COMPUTE_CHAT:BASE+path;
+ const response=await fetch(endpoint,{method,
   headers:body===null?{}:{'content-type':'application/json'},
   body:body===null?undefined:JSON.stringify(body),signal:AbortSignal.timeout(timeout)});
  const data=await response.json().catch(()=>({}));
@@ -36,7 +45,17 @@ export async function runHttpExperiment({prompt,rounds=3,maxTokens=384,client=re
  // No REA catalogue or REA function names are submitted to the local model.
  return runAutoLocalExperiment({
   prompt,definitions:local,maxRounds:rounds,maxTokens,
-  chat:body=>client('/api/ai/chat',{method:'POST',body,timeout:180000}),
+  chat:async body=>{
+   const dashboard=await client('/api/ai/chat',{method:'POST',body,timeout:180000});
+   if(!unforwardedProposal(dashboard))return dashboard;
+   // A known llama.cpp fallback arrived without an executable tool_calls array.
+   // Make exactly one non-executing model request to the existing compute service.
+   // This DOES NOT run a tool; the existing runner independently validates any
+   // structured call against the actual local tool schemas before dispatch.
+   const raw=await client('/__compute_chat__',{method:'POST',body,timeout:180000});
+   if(unforwardedProposal(raw))throw Error('AUTO_LOCAL_UNSTRUCTURED_MODEL_PROPOSAL_AT_BOTH_CHAT_LAYERS');
+   return raw;
+  },
   execute:body=>client('/api/ai/tool-call',{method:'POST',body,timeout:180000}),
   onAction
  });
