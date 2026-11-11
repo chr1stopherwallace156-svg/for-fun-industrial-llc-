@@ -128,6 +128,7 @@ export function createFullReaRunner({adapter,infer}={}){
    const res=await adapter.callTool(name,args);
    if(res?.tool!==name)err('MCP_TOOL_RESULT_IDENTITY_MISMATCH');
    callsExecuted++;
+   if(res.result?.isError===true)err('MCP_TOOL_RETURNED_ERROR');
    return {tool:name,result:res.result,realReaToolCount:229};
   }finally{busy=false}
  }
@@ -162,6 +163,7 @@ export function createFullReaRunner({adapter,infer}={}){
      const res=await adapter.callTool(call.name,call.arguments);
      if(res?.tool!==call.name)err('MCP_TOOL_RESULT_IDENTITY_MISMATCH');
      callsExecuted++;
+     if(res.result?.isError===true)err('MCP_TOOL_RETURNED_ERROR');
      const summary=maxChars(JSON.stringify(res.result),3200);
      actions.push({round,tool:call.name,summary});
      results.push({tool:call.name,result:summary});
