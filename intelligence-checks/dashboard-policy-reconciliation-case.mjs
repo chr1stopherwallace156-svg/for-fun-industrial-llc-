@@ -22,6 +22,14 @@ test("reconciler verifies running node identity and source timestamps",()=>{
   "SERVER_MODIFIED_UTC=", "HTML_MODIFIED_UTC="
  ])assert.ok(src.includes(marker),marker);
 });
+test("reconciler recognizes real operator dashboard without old sample chat-input ID",()=>{
+ assert.match(src,/LIVE_VOICE_PANEL_OR_CLIENT_SCRIPT_MISSING/);
+ assert.match(src,/LIVE_DASHBOARD_HTML_STRUCTURE_INVALID/);
+ assert.match(src,/LIVE_CHAT_ROUTE_MISSING_/);
+ assert.match(src,/LIVE_CHAT_TOOL_CATALOGUE_UNAVAILABLE/);
+ assert.ok(src.includes('src="/api/voice/mobile/client.js"'));
+ assert.doesNotMatch(src,/htmlText\.Contains\('id="chat-input"'\)/);
+});
 test("reconciler requires existing supervisor task and preserves 229 REA names",()=>{
  for(const marker of [
   "EXISTING_AUTOSTART_TASK_NOT_RUNNING","AUTOSTART_TASK_ACTION_CHANGED",
