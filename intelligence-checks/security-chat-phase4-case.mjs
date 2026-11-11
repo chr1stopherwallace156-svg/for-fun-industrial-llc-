@@ -44,7 +44,7 @@ test("authorized orchestration is pinned to local host with zero REA/exploit act
   sourceImpl:async root=>{calls.push({step:"source",root});return {state:"completed",indicators:[],files_inspected:2}}
  });
  assert.deepEqual(calls,[
-  {step:"tcp",target:"127.0.0.1",ports:[8788,8790,8088,8791],authorized:true,timeoutMs:500},
+  {step:"tcp",target:"127.0.0.1",ports:[8088,8443,8788,8789,8790,8791,8794],authorized:true,timeoutMs:500},
   {step:"http",port:8088},
   {step:"source",root:"fixture"}
  ]);
