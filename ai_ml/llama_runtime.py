@@ -12,6 +12,52 @@ class LlamaCppRuntime:
             with urllib.request.urlopen(self.endpoint+"/health",timeout=timeout) as response:
                 return response.status==200
         except (OSError,urllib.error.URLError):return False
+    # FI_EXTERNAL_LLAMA_ADOPTION_V1 — read-only matching-model discovery on Fun's
+    # reserved loopback 8088. Does not start, terminate or own another process.
+    def _adopt_configured_external(self):
+        if self.process is not None:
+            return False
+        binary = os.environ.get("LLAMA_CPP_SERVER", "").strip()
+        model = os.environ.get("LLAMA_CPP_MODEL", "").strip()
+        if not binary or not model or not Path(binary).is_file() or not Path(model).is_file():
+            return False
+        try:
+            port = int(os.environ.get("LLAMA_CPP_PORT", "8088"))
+        except ValueError:
+            return False
+        if port != 8088:
+            return False
+        base = "http://127.0.0.1:8088"
+        try:
+            with urllib.request.urlopen(base + "/health", timeout=1.5) as response:
+                if response.status != 200:
+                    return False
+                body = json.loads(response.read(4096))
+                if not isinstance(body, dict) or body.get("status") not in ("ok", "ready"):
+                    return False
+            with urllib.request.urlopen(base + "/v1/models", timeout=2.0) as response:
+                if response.status != 200:
+                    return False
+                data = json.loads(response.read(32768))
+            entries = data.get("data") if isinstance(data, dict) else None
+            if not isinstance(entries, list) or not entries or len(entries) > 16:
+                return False
+            expected = Path(model).name.casefold()
+            expected_stem = Path(model).stem.casefold()
+            def model_matches(entry):
+                if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
+                    return False
+                name = entry["id"].replace("\\", "/").rsplit("/", 1)[-1].casefold()
+                stem = name[:-5] if name.endswith(".gguf") else name
+                return name == expected or stem == expected_stem
+            if not any(model_matches(entry) for entry in entries):
+                return False
+        except (OSError, ValueError, TypeError, KeyError, urllib.error.URLError):
+            return False
+        self.endpoint = base
+        self.model_path = str(Path(model))
+        return True
+
     def start_configured(self):
         executable=os.environ.get("LLAMA_CPP_SERVER","").strip()
         model=os.environ.get("LLAMA_CPP_MODEL","").strip()
@@ -28,7 +74,18 @@ class LlamaCppRuntime:
         if not isinstance(threads,int) or not 1<=threads<=16:raise ValueError("threads must be between 1 and 16")
         if not isinstance(context,int) or not 512<=context<=8192:raise ValueError("context must be between 512 and 8192")
         self.endpoint=f"http://127.0.0.1:{port}"
-        if self._health():raise RuntimeError("another llama.cpp server already owns the configured port")
+        if self._health():
+            # A direct start request cannot silently adopt a *different*
+            # model from the one it explicitly requested.
+            configured_binary = os.environ.get("LLAMA_CPP_SERVER", "").strip()
+            configured_model = os.environ.get("LLAMA_CPP_MODEL", "").strip()
+            if (port == 8088 and configured_binary and configured_model and
+                binary == Path(configured_binary).expanduser().resolve() and
+                model == Path(configured_model).expanduser().resolve() and
+                self._adopt_configured_external()):
+                return {"state":"ready","endpoint":self.endpoint,"model_path":self.model_path,
+                        "device":"cpu","ownership":"external_unmanaged","managed":False}
+            raise RuntimeError("another llama.cpp server already owns the configured port")
         log_dir=Path(os.environ.get("FUN_INDUSTRIAL_RUNTIME",Path.cwd()/".runtime"))/"logs"; log_dir.mkdir(parents=True,exist_ok=True)
         self.log_handle=(log_dir/"llama-server.log").open("a",encoding="utf-8")
         args=([str(binary),"serve","--model",str(model),"--host","127.0.0.1","--port",str(port),"--threads",str(threads),"--ctx-size",str(context),"--n-gpu-layers","0","--jinja"] if binary.stem.lower()=="llama" else [str(binary),"--model",str(model),"--host","127.0.0.1","--port",str(port),"--threads",str(threads),"--ctx-size",str(context),"--n-gpu-layers","0","--jinja"])
@@ -37,10 +94,12 @@ class LlamaCppRuntime:
         deadline=time.monotonic()+90
         while time.monotonic()<deadline:
             if self.process.poll() is not None:raise RuntimeError("llama-server exited during startup; inspect .runtime/logs/llama-server.log")
-            if self._health():return {"state":"ready","pid":self.process.pid,"host":"127.0.0.1","port":port,"model_path":self.model_path,"device":"cpu","threads":threads,"context":context}
+            if self._health():return {"state":"ready","pid":self.process.pid,"host":"127.0.0.1","port":port,"model_path":self.model_path,"device":"cpu","threads":threads,"context":context,"ownership":"managed","managed":True}
             time.sleep(.5)
         self.stop(); raise TimeoutError("llama-server did not become ready within 90 seconds")
     def chat(self,messages,max_tokens=512,temperature=0.7,tools=None):
+        if self.process is None and not self._adopt_configured_external():
+            raise RuntimeError("matching external llama.cpp model is not verified")
         if not self._health():raise RuntimeError("local model is not ready")
         if not isinstance(messages,list) or not 1<=len(messages)<=24:raise ValueError("messages must contain 1 to 24 turns")
         clean=[]
@@ -61,9 +120,14 @@ class LlamaCppRuntime:
             return {"reply":message.get("content") or "The model proposed a tool call. Review it before execution.","tool_calls":message.get("tool_calls",[]),"model":data.get("model","local-model"),"usage":data.get("usage",{})}
         except (KeyError,IndexError,TypeError) as exc:raise RuntimeError("llama.cpp returned an unexpected chat response") from exc
     def status(self):
-        if self.process is None:return {"state":"not-configured" if not os.environ.get("LLAMA_CPP_SERVER") or not os.environ.get("LLAMA_CPP_MODEL") else "stopped"}
+        if self.process is None:
+            configured = bool(os.environ.get("LLAMA_CPP_SERVER") and os.environ.get("LLAMA_CPP_MODEL"))
+            if self._adopt_configured_external():
+                return {"state":"ready","endpoint":self.endpoint,"model_path":self.model_path,
+                        "device":"cpu","ownership":"external_unmanaged","managed":False}
+            return {"state":"stopped" if configured else "not-configured"}
         code=self.process.poll();ready=code is None and self._health()
-        return {"state":"ready" if ready else "exited" if code is not None else "loading","pid":self.process.pid,"exit_code":code,"model_path":self.model_path,"endpoint":self.endpoint,"device":"cpu"}
+        return {"state":"ready" if ready else "exited" if code is not None else "loading","pid":self.process.pid,"exit_code":code,"model_path":self.model_path,"endpoint":self.endpoint,"device":"cpu","ownership":"managed","managed":True}
     def stop(self):
         if self.process is None:return {"state":"not-running"}
         if self.process.poll() is not None:

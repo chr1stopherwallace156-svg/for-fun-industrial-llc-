@@ -1,0 +1,39 @@
+name: Fun external llama adoption qualification
+on:
+  push:
+    branches:
+      - repair/fun-external-llama-adoption-20261111
+  pull_request:
+    paths:
+      - 'ai_ml/llama_runtime.py'
+      - 'ai_ml/test_llama_external_adoption.py'
+      - 'Stage-Fun-External-Llama-Adoption.ps1'
+      - '.github/workflows/fun-external-llama-adoption-ci.yml'
+permissions:
+  contents: read
+jobs:
+  offline-adoption:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pure offline adoption and ownership tests
+        run: python -m unittest ai_ml.test_llama_external_adoption -v
+      - name: Python syntax validation
+        run: python -m py_compile ai_ml/llama_runtime.py
+      - name: Windows installer syntax only
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tok=$null
+          $err=$null
+          [Management.Automation.Language.Parser]::ParseFile((Resolve-Path './Stage-Fun-External-Llama-Adoption.ps1').Path,[ref]$tok,[ref]$err) | Out-Null
+          if($err.Count){$err | Format-List | Out-String | Write-Host; throw 'EXTERNAL_ADOPTION_INSTALLER_SYNTAX_HOLD'}
+          Write-Host 'FUN_EXTERNAL_LLAMA_ADOPTION_POWERSHELL_PARSE=PASS'
