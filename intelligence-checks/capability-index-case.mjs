@@ -143,3 +143,26 @@ test('generated staged source must parse as a complete Node ESM module, not just
  const result=spawnSync(process.execPath,['--check','--input-type=module'],{input:staged,encoding:'utf8'});
  assert.equal(result.status,0,'generated module syntax invalid: '+result.stderr);
 });
+
+test('guarded Windows activation preserves REA policy, model owners and cognition volatile state',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const {fileURLToPath}=await import('node:url');
+ const script=await readFile(fileURLToPath(new URL('../Deploy-Fun-Capability-Index8789.ps1',import.meta.url)),'utf8');
+ assert.match(script,/param\(\[switch\]\$Apply\)/);
+ assert.match(script,/if\(-not \$Apply\)\{Write-Host 'FUN_CAPABILITY_LIVE_DEPLOY=NOT_PERFORMED'/);
+ assert.match(script,/COGNITION_VOLATILE_DATA_PRESENT/);
+ assert.match(script,/AssertEmptyCognitiveMemory \$pre\.Cognitive/);
+ assert.match(script,/AssertEmptyCognitiveMemory \(Json '\/api\/cognition\/status' 15\)/);
+ assert.match(script,/GetJson|function Json\(/);
+ assert.match(script,/CheckReaDenied/);
+ assert.match(script,/\$env:REA_ALLOWED_TOOLS=''/);
+ assert.match(script,/PortSnap \$port/);
+ assert.match(script,/STOPPED/);
+ assert.match(script,/HASH_MISMATCH|HASH_MISMATCH|HASH|Hash/);
+ assert.match(script,/FUN_CAPABILITY_LIVE_DEPLOY=PASS/);
+ assert.match(script,/FUN_CAPABILITY_ROLLBACK_STARTED_PID/);
+ const stop = [...script.matchAll(/Stop-Process -Id ([^\r\n]+)/g)].map(m=>m[1]);
+ assert.equal(stop.length,2,'only old verified dashboard and new owned dashboard may be stopped');
+ assert.ok(stop.every(x=>x.includes('$OldProcess')||x.includes('$NewProcess.Id')));
+ assert.doesNotMatch(script,/\/ai\/runtime\/llama-cpp\/stop|\/api\/stop|\/api\/activate|platform\.start\(/);
+});
