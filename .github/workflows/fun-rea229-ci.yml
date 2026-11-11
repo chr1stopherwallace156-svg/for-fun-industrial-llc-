@@ -9,6 +9,8 @@ on:
       - 'src/experimental/rea229-client.js'
       - 'src/experimental/rea-qwen-direct-pilot.mjs'
       - 'scripts/Diagnose-Fun-Qwen-Rea229.mjs'
+      - 'scripts/Diagnose-Fun-Rea-Binary-Error.mjs'
+      - 'intelligence-checks/rea-binary-error-diagnostic-case.mjs'
       - 'intelligence-checks/qwen-rea-direct-pilot-case.mjs'
       - 'scripts/Run-Fun-Rea229-Sidecar8797.mjs'
       - 'Start-Fun-Rea229-Sidecar8797.ps1'
@@ -35,11 +37,13 @@ jobs:
           node --check src/experimental/rea229-client.js
           node --check src/experimental/rea-qwen-direct-pilot.mjs
           node --check scripts/Diagnose-Fun-Qwen-Rea229.mjs
+          node --check scripts/Diagnose-Fun-Rea-Binary-Error.mjs
+          node --check intelligence-checks/rea-binary-error-diagnostic-case.mjs
           node --check intelligence-checks/qwen-rea-direct-pilot-case.mjs
           node --check scripts/Run-Fun-Rea229-Sidecar8797.mjs
           node --check intelligence-checks/rea229-full-case.mjs
       - name: REA 229 model and MCP offline qualification
-        run: node --test intelligence-checks/rea229-full-case.mjs intelligence-checks/qwen-rea-direct-pilot-case.mjs
+        run: node --test intelligence-checks/rea229-full-case.mjs intelligence-checks/qwen-rea-direct-pilot-case.mjs intelligence-checks/rea-binary-error-diagnostic-case.mjs
       - name: Windows PowerShell script syntax
         if: runner.os == 'Windows'
         shell: pwsh
