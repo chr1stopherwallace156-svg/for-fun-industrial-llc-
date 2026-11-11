@@ -24,6 +24,9 @@ export function routeUnifiedTask(prompt){
   return {kind:'rea_readonly',tool:'inspect_analysis_settings',execution:'read_only'};
  if(/\b(?:rea|mcp)\b/i.test(prompt)&&/\b(?:binary session|provider status|provider availability|session status|available providers)\b/i.test(prompt))
   return {kind:'rea_readonly',tool:'binary_session',execution:'read_only'};
+ if(/\b(?:rea|mcp)\b/i.test(prompt)&&
+    /\b(?:inspect|analy[sz]e|reverse.engineer|examine|open|compare|audit|read|scan|test|execute|run)\b/i.test(prompt))
+  return {kind:'rea_action_review',execution:'requires_explicit_click'};
  if(/\b(?:run|execute|calculate|compute|train|start|change|modify|create|update)\b/i.test(prompt)&&
     /\b(?:graph|tensor|neural|local tools?|compute|workflow|simulation)\b/i.test(prompt))
   return {kind:'local_action_review',execution:'requires_explicit_click'};
@@ -38,12 +41,13 @@ export function routeUnifiedTask(prompt){
 }
 export async function fixedJson(url,body=null,{timeout=180000}={}){
  if(![PARENT+'/api/ai/tools',REA+'/api/rea229/status',REA+'/api/rea229/tools?limit=229',
-  LOCAL+'/api/ai/auto-local/status',REA+'/api/rea229/call',LOCAL+'/api/ai/auto-local/run',
+  LOCAL+'/api/ai/auto-local/status',REA+'/api/rea229/call',
+  REA+'/api/rea229/run',LOCAL+'/api/ai/auto-local/run',
   LLAMA].includes(url))fail('OUTBOUND_ENDPOINT_NOT_ALLOWED');
  const isPost=body!==null;
  const response=await fetch(url,{method:isPost?'POST':'GET',
   headers:isPost?{'content-type':'application/json',
-   ...(url===REA+'/api/rea229/call'?{'origin':REA,'x-fi-rea229':'operator-click'}:{}),
+   ...([REA+'/api/rea229/call',REA+'/api/rea229/run'].includes(url)?{'origin':REA,'x-fi-rea229':'operator-click'}:{}),
    ...(url===LOCAL+'/api/ai/auto-local/run'?{'origin':LOCAL,'x-fi-auto-local':'operator-click'}:{})
   }:{},
   body:isPost?JSON.stringify(body):undefined,redirect:'error',
@@ -104,9 +108,10 @@ export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWeb
    rea:{ready:r?.liveMcpHealth==='ready'&&r?.realReaToolCount===229,
     count:r?.realReaToolCount??0},
    local:{ready:l?.sidecar===true,count:t?.local_tool_count??0},
+   reaExplicitRunAvailable:r?.liveMcpHealth==='ready'&&r?.realReaToolCount===229,
    completedSessions:completed,failedSessions:failed,busy,
    capabilities:['qwen_chat','public_https_static_text','real_rea_readonly_session',
-     'explicit_click_local_registered_tools','task_classification'],
+     'explicit_click_rea_229_runner','explicit_click_local_registered_tools','task_classification'],
    notImplemented:['arbitrary_app_install','binary_upload','native_game_port',
      'browser_javascript_automation','arbitrary_shell']};
  }
@@ -136,13 +141,15 @@ export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWeb
     answer={reply:'This V1 chat cannot open an arbitrary local file from text alone. Supply a supported input path through an authorized, purpose-matched analyzer. No local file has been read or executed.',tokens:0};
    }else if(route.kind==='local_action_review'){
     answer={reply:'I can send this request to the existing 19-tool local executor after you click the separate Execute local tools control. It may change local compute state. Nothing has executed yet.',tokens:0};
+   }else if(route.kind==='rea_action_review'){
+    answer={reply:'This task needs REA tool execution. Review the exact request and click Execute REA tools separately if you want to authorize one bounded 229-tool REA session. Real REA calls can affect files, devices or processes. No REA tool has executed yet.',tokens:0};
    }else{
     answer=await infer(prompt,{available:{reaToolNames:229,localToolNames:19},
      note:'Count only; no tools executed and no remote websites opened.'});
    }
    completed++;
    return {version:'fi-unified-task-chat-8798-v1',state:actions.length?'answered_with_real_action':
-       route.kind==='local_action_review'?'awaiting_operator_click':'answered',
+       ['local_action_review','rea_action_review'].includes(route.kind)?'awaiting_operator_click':'answered',
     route:route.kind,execution:route.execution,actions,reply:answer.reply,
     modelTokens:answer.tokens??null,source:observation?.source??null,
     limitations:route.kind==='public_website'?
@@ -167,5 +174,27 @@ export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWeb
      reply:bounded(result.reply,3600),execution:'operator_explicit_click'};
   }finally{busy=false}
  }
- return Object.freeze({status,chat,executeLocal});
+ async function executeRea({prompt,operatorConfirmed}={}){
+  if(busy)fail('BUSY');
+  if(operatorConfirmed!==true)fail('REA_OPERATOR_CONFIRMATION_REQUIRED');
+  const route=routeUnifiedTask(prompt);
+  if(route.kind!=='rea_action_review')fail('REA_TASK_NOT_MATCHED');
+  busy=true;
+  try{
+   const status=await request(REA+'/api/rea229/status');
+   if(status.liveMcpHealth!=='ready'||status.realReaToolCount!==229)
+    fail('REA229_EXECUTOR_NOT_READY');
+   // Existing independent 8797 session owns live tools and bounded REA calls.
+   // Exactly one operator-started round, no automatic retries or sidecar restarts.
+   const response=await request(REA+'/api/rea229/run',{prompt,rounds:1});
+   const actions=Array.isArray(response.actions)?response.actions:[];
+   return {version:'fi-unified-task-chat-8798-v1',
+    state:actions.length?'rea_actions_executed':'rea_model_no_actions',
+    route:'rea_tools',execution:'operator_explicit_click',
+    actions:actions.map(x=>({tool:bounded(x.tool,120),round:x.round,
+     resultPreview:bounded(x.summary??'',3500)})),
+    reply:bounded(response.reply,3600),originalState:bounded(response.state,120)};
+  }finally{busy=false}
+ }
+ return Object.freeze({status,chat,executeLocal,executeRea});
 }
