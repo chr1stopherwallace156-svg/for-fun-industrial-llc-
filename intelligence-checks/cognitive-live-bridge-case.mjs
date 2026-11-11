@@ -108,3 +108,45 @@ test('patch detects inconsistent installed security and altered memory route',()
  assert.throws(()=>patchCognitiveLiveServer(x.replace(" if(req.method==='GET'&&req.url==='/api/security/status')return;",'')),/SECURITY_PRIMARY_INCONSISTENT/);
  assert.throws(()=>patchCognitiveLiveServer(x.replace('const enriched=await fiAutomaticMemory','const sample=await fiAutomaticMemory')),/EXISTING_CHAT_PIPELINE_UNKNOWN/);
 });
+
+test('cognitive readiness route avoids blocking external platform health',()=>{
+ const before=patchedFixture({security:false});
+ const after=patchCognitiveLiveServer(before);
+ const start=after.indexOf('if(req.url==="/api/cognition/health"');
+ const end=after.indexOf('if(req.url==="/api/cognition/status"');
+ assert.ok(start>0&&end>start);
+ const route=after.slice(start,end);
+ assert.match(route,/fiCognitive\.status\(\)/);
+ assert.doesNotMatch(route,/await fiCognitive\.liveStatus/);
+ assert.doesNotMatch(route,/platform\.status\(\)/);
+ assert.match(route,/localRequest\(req,res\)/);
+ assert.match(route,/reaExecutionGrants/);
+});
+
+test('full cognitive status returns with unverified services when health adapter stalls',async()=>{
+ const b=createLiveCognitionBridge({capabilityDefinitions:()=>fixedTools,
+  serviceStatus:()=>new Promise(()=>{})});
+ const before=Date.now();
+ const result=await b.liveStatus();
+ assert.ok(Date.now()-before<3000,'full status exceeded bounded health deadline');
+ assert.equal(result.version,'fi-cognitive-live-bridge-v1');
+ assert.equal(result.serviceHealth,'timed_out_unverified');
+ assert.equal(result.reaExecutionGrants,0);
+});
+
+test('Windows startup gate checks fast cognition health and independent compute identity',async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const {fileURLToPath}=await import('node:url');
+ const script=await readFile(fileURLToPath(new URL('../Deploy-Fun-Cognition-Live8789.ps1',import.meta.url)),'utf8');
+ const start=script.indexOf('function WaitFor8789(');
+ const end=script.indexOf('foreach($d in @(',start);
+ assert.ok(start>0&&end>start,'Windows gate bounds absent');
+ const gate=script.slice(start,end);
+ assert.match(gate,/GetJson '\/api\/cognition\/health'/);
+ assert.doesNotMatch(gate,/GetJson '\/api\/cognition\/status'/);
+ assert.doesNotMatch(gate,/GetJson '\/api\/ai\/status'/);
+ assert.match(gate,/127\.0\.0\.1:8791\/ai\/runtime\/llama-cpp/);
+ assert.match(gate,/reaExecutionGrants/);
+ assert.match(script,/\$After=VerifyExistingServices/);
+ assert.match(script,/FUN_COGNITION_LIVE_DEPLOY=PASS/);
+});
