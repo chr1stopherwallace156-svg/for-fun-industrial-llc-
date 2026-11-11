@@ -12,6 +12,7 @@ on:
       - 'src/experimental/unified-task-client.js'
       - 'scripts/Run-Fun-Unified-Chat8798.mjs'
       - 'Start-Fun-Unified-Chat8798.ps1'
+      - 'Repair-Fun-Unified-Web8798.ps1'
       - 'intelligence-checks/unified-task-chat-case.mjs'
       - '.github/workflows/fun-unified-task-chat-ci.yml'
 permissions:
@@ -46,6 +47,11 @@ jobs:
         run: |
           $tokens=$null
           $errors=$null
-          [Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'Start-Fun-Unified-Chat8798.ps1').Path,[ref]$tokens,[ref]$errors) | Out-Null
+          foreach($script in @('Start-Fun-Unified-Chat8798.ps1','Repair-Fun-Unified-Web8798.ps1')){
+            $tokens=$null
+            $errors=$null
+            [Management.Automation.Language.Parser]::ParseFile((Resolve-Path $script).Path,[ref]$tokens,[ref]$errors) | Out-Null
+            if($errors.Count){$errors | Format-List | Out-String | Write-Host; throw ('UNIFIED_PS_PARSE_HOLD_'+$script)}
+          }
           if($errors.Count){$errors | Format-List | Out-String | Write-Host; throw 'UNIFIED_PS_PARSE_HOLD'}
           Write-Host 'FUN_UNIFIED_PS_PARSE=PASS'
