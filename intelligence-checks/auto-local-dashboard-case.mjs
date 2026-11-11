@@ -30,7 +30,7 @@ function mockClient({noCalls=false,onCall=()=>{},wait=null}={}){
 }
 function serverFixture(){
  return [
- "import http from 'node:http';import path from 'node:path';import {fileURLToPath} from 'node:url';",
+ "import http from 'node:http';import path from 'node:path';import {fileURLToPath} from 'node:url';import {readFile} from 'node:fs/promises';",
  "const root=path.dirname(fileURLToPath(import.meta.url));",
  "/* FI_COGNITIVE_LIVE_PATCH_V1 FI_CAPABILITY_INDEX_LIVE_V1 FI_AUTO_COGNEE_CHAT_V1 FI_VOICE_MOBILE_DASHBOARD_V1",
  "/api/cognition/catalogue/status /api/cognition/status /api/cognition/catalogue/search /api/ai/tool-call /api/rea/call /api/ai/automatic-memory/status /api/cognition/health",
@@ -105,23 +105,25 @@ test('server patch is additive to cognition and existing tool approval routes',(
  assert.equal(result.status,0,'generated server syntax invalid: '+result.stderr);
  assert.throws(()=>patchAutoLocalDashboardServer(source),/ALREADY_INSTALLED/);
 });
-test('UI patch adds a distinct button and leaves ordinary chat and tool proposals unchanged',()=>{
+test('standalone panel works without old chat IDs and preserves existing HTML scripts',()=>{
  const original=uiFixture(),updated=patchAutoLocalDashboardUi(original);
- assert.match(updated,/id="chat-auto-run"/);
- assert.match(updated,/id="chat-auto-state"/);
- assert.match(updated,/\/api\/ai\/auto-local\/run/);
+ assert.match(updated,/FI_AUTO_LOCAL_DASHBOARD_UI_V2/);
+ assert.match(updated,/id="fi-auto-run"/);
+ assert.match(updated,/id="fi-auto-task"/);
+ assert.match(updated,/\/api\/ai\/auto-local\/client\.js/);
  assert.match(updated,/id="chat-send"/);
  assert.match(updated,/id="chat-proposals"/);
  assert.match(updated,/document\.getElementById\("chat-send"\)\.onclick=sendChat/);
- assert.match(updated,/node\.textContent=/);
- const script=[...updated.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)?.[1];
- assert.ok(script);
- assert.doesNotThrow(()=>new Script(script));
+ assert.ok(updated.includes(original.slice(0,original.indexOf('</body>'))));
  assert.throws(()=>patchAutoLocalDashboardUi(updated),/ALREADY_INSTALLED/);
+ const evolved='<html><body><main id="new-dashboard">Alternate page</main></body></html>';
+ const compatible=patchAutoLocalDashboardUi(evolved);
+ assert.match(compatible,/id="fi-auto-local-panel"/);
+ assert.ok(compatible.includes('id="new-dashboard"'));
 });
 test('patches reject missing baseline instead of silently rewriting an incompatible UI',()=>{
  assert.throws(()=>patchAutoLocalDashboardServer('const server=http.createServer(async(req,res)=>{try{'),/BASELINE_MISSING/);
- assert.throws(()=>patchAutoLocalDashboardUi('<html></html>'),/EXISTING_CHAT_MISSING/);
+ assert.throws(()=>patchAutoLocalDashboardUi('<html></html>'),/NO_BODY/);
 });
 test('new bridge has no direct REA calls, shell, platform mutation or independent daemon',async()=>{
  const {readFile}=await import('node:fs/promises');
@@ -132,7 +134,7 @@ test('new bridge has no direct REA calls, shell, platform mutation or independen
 
 test('all three additive server patches compose into one syntactically valid module',()=>{
  const base=[
-  "import http from 'node:http';import path from 'node:path';import {fileURLToPath} from 'node:url';",
+  "import http from 'node:http';import path from 'node:path';import {fileURLToPath} from 'node:url';import {readFile} from 'node:fs/promises';",
   "// FI_AUTO_COGNEE_CHAT_V1 FI_SOURCING_RETIRED_V1 FI_VOICE_MOBILE_DASHBOARD_V1",
   "const root=path.dirname(fileURLToPath(import.meta.url));",
   "const server=http.createServer(async(req,res)=>{try{",
@@ -158,12 +160,15 @@ test('patches real repository UI while retaining original chat functionality',as
  const before=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
  const after=patchAutoLocalDashboardUi(before);
  assert.equal(after.split('id="chat-send"').length,2);
- assert.equal(after.split('id="chat-auto-run"').length,2);
+ assert.equal(after.split('id="fi-auto-run"').length,2);
  assert.match(after,/Proposed platform \/ REA actions/);
  assert.match(after,/el\("chat-send"\)\.onclick=sendChat/);
- const js=[...after.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)?.[1];
- assert.ok(js);
- assert.doesNotThrow(()=>new Script(js));
+ assert.match(after,/script src="\/api\/ai\/auto-local\/client\.js" defer/);
+ const oldJs=[...before.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]);
+ const newJs=[...after.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x=>x[1]);
+ assert.deepEqual(newJs,oldJs);
+ const clientSource=await readFile(new URL('../src/experimental/auto-local-client.js',import.meta.url),'utf8');
+ assert.doesNotThrow(()=>new Script(clientSource));
 });
 test('Windows auto-dashboard deployment protects old cognition and independent processes',async()=>{
  const {readFile}=await import('node:fs/promises');
@@ -180,10 +185,19 @@ test('Windows auto-dashboard deployment protects old cognition and independent p
  assert.match(script,/index\.original\.html/);
  assert.match(script,/\$serverCurrent=Hash \$Server/);
  assert.match(script,/\$uiCurrent=Hash \$Ui/);
+ assert.match(script,/auto-local-client\.js/);
+ assert.match(script,/STANDALONE_UI_MARKER_NOT_FOUND/);
  assert.match(script,/FUN_AUTO_DASH_LIVE_DEPLOY=PASS/);
  assert.match(script,/FUN_AUTO_DASH_ROLLBACK_STARTED_PID/);
  const stops=[...script.matchAll(/Stop-Process -Id ([^\r\n]+)/g)].map(m=>m[1]);
  assert.equal(stops.length,2);
  assert.ok(stops.every(s=>s.includes('$OldPid')||s.includes('$NewProcess.Id')));
  assert.doesNotMatch(script,/\/ai\/runtime\/llama-cpp\/stop|\/api\/stop|\/api\/activate/);
+});
+
+test('same-origin client route is staged only and requires host validation',()=>{
+ const out=patchAutoLocalDashboardServer(serverFixture());
+ assert.match(out,/\/api\/ai\/auto-local\/client\.js/);
+ assert.match(out,/readFile\(path\.join\(root,"experimental","auto-local-client\.js"\)\)/);
+ assert.match(out,/x-content-type-options/);
 });
