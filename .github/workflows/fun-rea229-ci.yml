@@ -7,6 +7,9 @@ on:
     paths:
       - 'src/experimental/rea-full-229.mjs'
       - 'src/experimental/rea229-client.js'
+      - 'src/experimental/rea-qwen-direct-pilot.mjs'
+      - 'scripts/Diagnose-Fun-Qwen-Rea229.mjs'
+      - 'intelligence-checks/qwen-rea-direct-pilot-case.mjs'
       - 'scripts/Run-Fun-Rea229-Sidecar8797.mjs'
       - 'Start-Fun-Rea229-Sidecar8797.ps1'
       - 'intelligence-checks/rea229-full-case.mjs'
@@ -30,10 +33,13 @@ jobs:
         run: |
           node --check src/experimental/rea-full-229.mjs
           node --check src/experimental/rea229-client.js
+          node --check src/experimental/rea-qwen-direct-pilot.mjs
+          node --check scripts/Diagnose-Fun-Qwen-Rea229.mjs
+          node --check intelligence-checks/qwen-rea-direct-pilot-case.mjs
           node --check scripts/Run-Fun-Rea229-Sidecar8797.mjs
           node --check intelligence-checks/rea229-full-case.mjs
       - name: REA 229 model and MCP offline qualification
-        run: node --test intelligence-checks/rea229-full-case.mjs
+        run: node --test intelligence-checks/rea229-full-case.mjs intelligence-checks/qwen-rea-direct-pilot-case.mjs
       - name: Windows PowerShell script syntax
         if: runner.os == 'Windows'
         shell: pwsh
