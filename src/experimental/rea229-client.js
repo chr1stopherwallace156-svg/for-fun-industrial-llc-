@@ -73,6 +73,7 @@ exact.addEventListener('click',()=>{
  action(name,{name,arguments:args},'/api/rea229/call');
 });
 api('/api/rea229/status').then(data=>{
+ if(data.liveMcpHealth!=='ready'||data.realReaToolCount!==229)throw Error('REA_MCP_SESSION_NOT_READY');
  state.textContent='READY · '+data.realReaToolCount+' real MCP tools · no per-tool confirmation prompts';
 }).catch(error=>state.textContent='HOLD: '+String(error.message));
 })();
