@@ -54,9 +54,12 @@ export async function runDirectReaPilot({prompt,requestFn=request,log=()=>{}}={}
  if(!Array.isArray(all.tools)||all.tools.length!==229)rejectCode('CATALOGUE_NOT_229');
  const ranked=chooseReaDiagnosticTools(all.tools,prompt);
  log('READ_ONLY_CANDIDATES='+ranked.map(t=>t.name).join(' | '));
+ // A tool's full MCP input schema can advertise effects that this smoke test
+ // deliberately does not grant (binary_session: complete/refresh). Only show
+ // Qwen the no-arguments schema; the client supplies fixed safe status options.
  const tools=ranked.map(t=>({type:'function',function:{
   name:t.alias,description:('Read-only REA inspection: '+t.name+'. '+String(t.description||'')).slice(0,450),
-  parameters:t.inputSchema
+  parameters:t.name==='binary_session'?{type:'object',properties:{},additionalProperties:false}:t.inputSchema
  }}));
  // Qwen3 defaults to thinking, which can exhaust a short completion budget.
  // This call turns thinking OFF, retaining the existing live GGUF and llama.cpp.
@@ -89,15 +92,22 @@ export async function runDirectReaPilot({prompt,requestFn=request,log=()=>{}}={}
   try{args=JSON.parse(args)}catch{rejectCode('MODEL_ARGS_INVALID_JSON')}
  }
  if(!plain(args)||JSON.stringify(args).length>20000)rejectCode('MODEL_ARGS_INVALID');
- if(selected.name==='binary_session'&&
-    (Object.keys(args).some(key=>!['detail','refresh_candidates'].includes(key))||
-     (args.detail!==undefined&&args.detail!=='summary')||
-     (args.refresh_candidates!==undefined&&args.refresh_candidates!==false)))
-   rejectCode('SESSION_SUMMARY_ONLY');
+ // For this single read-only status task, model arguments are suggestions, NOT
+ // permission to choose a provider refresh or full report. Reject unknown
+ // properties; replace all accepted fields with the one safe contract before MCP.
+ let actualArgs=args;
+ if(selected.name==='binary_session'){
+  if(Object.keys(args).some(key=>!['detail','refresh_candidates'].includes(key)))
+   rejectCode('SESSION_UNKNOWN_ARGUMENTS');
+  actualArgs={detail:'summary',refresh_candidates:false};
+  if(JSON.stringify(args)!==JSON.stringify(actualArgs))
+   log('QWEN_ARGS_NORMALIZED_TO_FIXED_READ_ONLY_SUMMARY=TRUE');
+  log('MCP_EXECUTION_ARGS='+JSON.stringify(actualArgs));
+ }
  log('QWEN_SELECTED_REAL_REA_TOOL='+selected.name);
  // Validate that the selected operation remains the one exact allowed purpose.
  if(!ranked.some(t=>t.name===selected.name))rejectCode('TOOL_PURPOSE_CHANGED');
- const result=await requestFn(BASE+'/api/rea229/call',{name:selected.name,arguments:args});
+ const result=await requestFn(BASE+'/api/rea229/call',{name:selected.name,arguments:actualArgs});
  if(result?.tool!==selected.name)rejectCode('REAL_MCP_TOOL_ID_MISMATCH');
  if(result.result?.isError===true)rejectCode('REAL_MCP_TOOL_RETURNED_ERROR');
  const raw=JSON.stringify(result.result);
@@ -116,6 +126,6 @@ export async function runDirectReaPilot({prompt,requestFn=request,log=()=>{}}={}
   assistantReply=String(s?.choices?.[0]?.message?.content||'').slice(0,2400);
  }catch(error){log('MODEL_SUMMARY_HOLD='+String(error.message).slice(0,150))}
  return {state:'real_mcp_tool_executed',realReaToolCount:229,
-  actions:[{tool:selected.name,arguments:args,result:result.result}],reply:assistantReply,
+  actions:[{tool:selected.name,arguments:actualArgs,result:result.result}],reply:assistantReply,
   diagnostic};
 }
