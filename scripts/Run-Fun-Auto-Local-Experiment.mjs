@@ -3,6 +3,8 @@
 // per-call prompts through the existing Fun Industrial fixed-local-tool API.
 // No daemon, no shell executor, no REA initialization, no source changes.
 import {runAutoLocalExperiment,selectCurrentLocalTools} from '../src/experimental/auto-local-tools.mjs';
+import {resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
 const BASE='http://127.0.0.1:8789';
 function arg(flag,defaultValue){
  const i=process.argv.indexOf(flag);
@@ -61,6 +63,6 @@ async function main(){
  console.log('AUTO_LOCAL_SESSION='+result.state+' REGISTERED_LOCAL='+result.registeredLocal+' ROUNDS='+result.rounds+' EXECUTED='+counts.n);
  console.log('AUTO_LOCAL_AI_REPLY='+String(result.reply||'').slice(0,4000));
 }
-if(process.argv[1]&&import.meta.url==='file://'+process.argv[1].replaceAll('\\','/')){
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  main().catch(error=>{console.error('AUTO_LOCAL_HOLD='+String(error.message||error));process.exitCode=1});
 }
