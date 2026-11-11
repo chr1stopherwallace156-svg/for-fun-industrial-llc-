@@ -29,8 +29,10 @@ $Before=@{};foreach($P in $Protected){$Before[$P]=Listener $P;if(-not $Before[$P
 $R=Invoke-RestMethod 'http://127.0.0.1:8797/api/rea229/status' -TimeoutSec 15
 $L=Invoke-RestMethod 'http://127.0.0.1:8796/api/ai/auto-local/status' -TimeoutSec 15
 $T=Invoke-RestMethod 'http://127.0.0.1:8789/api/ai/tools' -TimeoutSec 15
+$AI=Invoke-RestMethod 'http://127.0.0.1:8789/api/ai/status' -TimeoutSec 15
 if($R.liveMcpHealth -ne 'ready' -or [int]$R.realReaToolCount -ne 229){Hold 'REA229_NOT_READY'}
 if($L.sidecar -ne $true -or [int]$T.local_tool_count -ne 19){Hold 'LOCAL19_NOT_READY'}
+if($AI.state -ne 'ready'){Hold 'QWEN_LOCAL_MODEL_NOT_READY'}
 $LogDir=Join-Path $env:LOCALAPPDATA ('FunIndustrial\UnifiedChat8798\'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,6))
 New-Item -ItemType Directory -Path $LogDir -Force|Out-Null
 try{
@@ -45,7 +47,7 @@ try{
    $Page=Invoke-WebRequest $Url -UseBasicParsing -TimeoutSec 5
    $JS=Invoke-WebRequest ($Url+'/api/unified/client.js') -UseBasicParsing -TimeoutSec 5
    if($S.version -eq 'fi-unified-task-chat-8798-v1' -and $S.rea.ready -eq $true -and $S.local.ready -eq $true -and
-      [int]$S.rea.count -eq 229 -and [int]$S.local.count -eq 19 -and
+      [int]$S.rea.count -eq 229 -and [int]$S.local.count -eq 19 -and $S.ai.ready -eq $true -and
       $Page.Content -match 'id="task"' -and $Page.Content -match 'id="local-consent"' -and
       $JS.Content -match 'FI_UNIFIED_TASK_CHAT_CLIENT_V1'){$Ready=$true;break}
   }catch{}
@@ -55,8 +57,9 @@ try{
  $R2=Invoke-RestMethod 'http://127.0.0.1:8797/api/rea229/status' -TimeoutSec 15
  $L2=Invoke-RestMethod 'http://127.0.0.1:8796/api/ai/auto-local/status' -TimeoutSec 15
  $T2=Invoke-RestMethod 'http://127.0.0.1:8789/api/ai/tools' -TimeoutSec 15
+ $AI2=Invoke-RestMethod 'http://127.0.0.1:8789/api/ai/status' -TimeoutSec 15
  if($R2.liveMcpHealth -ne 'ready' -or [int]$R2.realReaToolCount -ne 229 -or
-    $L2.sidecar -ne $true -or [int]$T2.local_tool_count -ne 19){Hold 'ORIGINAL_SERVICES_CHANGED'}
+    $L2.sidecar -ne $true -or [int]$T2.local_tool_count -ne 19 -or $AI2.state -ne 'ready'){Hold 'ORIGINAL_SERVICES_CHANGED'}
  Write-Host ('FUN_UNIFIED_CHAT=PASS URL='+$Url+' PID='+$Child.Id)
  Write-Host 'QWEN_LLAMA_8088=PRESERVED REA_8797_229=PRESERVED LOCAL_8796_19=PRESERVED ORIGINAL_8789=PRESERVED COMPUTE_8791=PRESERVED'
  Write-Host 'UNIFIED_CHAT_MODE=READ_ONLY_AUTO LOCAL_EXECUTION=EXPLICIT_CLICK NO_BACKGROUND=TRUE'
