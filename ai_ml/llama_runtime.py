@@ -75,7 +75,14 @@ class LlamaCppRuntime:
         if not isinstance(context,int) or not 512<=context<=8192:raise ValueError("context must be between 512 and 8192")
         self.endpoint=f"http://127.0.0.1:{port}"
         if self._health():
-            if self._adopt_configured_external():
+            # A direct start request cannot silently adopt a *different*
+            # model from the one it explicitly requested.
+            configured_binary = os.environ.get("LLAMA_CPP_SERVER", "").strip()
+            configured_model = os.environ.get("LLAMA_CPP_MODEL", "").strip()
+            if (port == 8088 and configured_binary and configured_model and
+                binary == Path(configured_binary).expanduser().resolve() and
+                model == Path(configured_model).expanduser().resolve() and
+                self._adopt_configured_external()):
                 return {"state":"ready","endpoint":self.endpoint,"model_path":self.model_path,
                         "device":"cpu","ownership":"external_unmanaged","managed":False}
             raise RuntimeError("another llama.cpp server already owns the configured port")
