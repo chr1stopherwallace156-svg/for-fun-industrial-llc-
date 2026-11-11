@@ -147,9 +147,8 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  if(process.argv.length!==3||process.argv[2]!=='--serve'){
   console.log('FUN_REA229=INACTIVE. Explicit --serve required. Existing Fun Industrial processes unchanged.');
  }else{
+  let active=null;
   try{
-   let active=null;
-   try{
    const expectedNames=await parentSnapshot();
    active=await activateRea229({expectedNames});
    const confirm=await parentSnapshot();
@@ -157,20 +156,21 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
     throw Error('REA229_PARENT_CATALOGUE_CHANGED_AFTER_INDEPENDENT_START');
    console.log('FUN_REA229_READY='+ORIGIN+' REAL_REA_TOOLS=229 LOCAL_8789=UNCHANGED AUTO_8796=UNCHANGED');
    let closing=false;
-   const end=async()=>{if(closing)return;closing=true;
+   const end=async()=>{
+    if(closing)return;closing=true;
     await new Promise(resolve=>active.server.close(resolve));
-    await active.adapter.stop();process.exit(0);
+    await active.adapter.stop();
+    process.exit(0);
    };
    process.on('SIGINT',()=>{end().catch(()=>process.exit(1))});
    process.on('SIGTERM',()=>{end().catch(()=>process.exit(1))});
-   }catch(error){
-    if(active){
-     await new Promise(resolve=>active.server.close(resolve));
-     await active.adapter.stop();
-    }
-    console.error('FUN_REA229_HOLD='+String(error?.message||error));
-    process.exitCode=1;
+  }catch(error){
+   if(active){
+    await new Promise(resolve=>active.server.close(resolve));
+    await active.adapter.stop();
    }
+   console.error('FUN_REA229_HOLD='+String(error?.message||error));
+   process.exitCode=1;
   }
  }
 }
