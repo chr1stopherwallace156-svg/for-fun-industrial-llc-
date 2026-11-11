@@ -7,6 +7,9 @@ on:
     paths:
       - 'src/experimental/auto-local-dashboard.mjs'
       - 'src/experimental/auto-local-client.js'
+      - 'scripts/Run-Fun-Auto-Sidecar8796.mjs'
+      - 'Start-Fun-Auto-Sidecar8796.ps1'
+      - 'intelligence-checks/auto-sidecar-case.mjs'
       - 'scripts/patch-auto-local-dashboard-*.mjs'
       - 'intelligence-checks/auto-local-dashboard-case.mjs'
       - 'Deploy-Fun-Auto-Local-Dashboard8789.ps1'
@@ -30,11 +33,13 @@ jobs:
         run: |
           node --check src/experimental/auto-local-dashboard.mjs
           node --check src/experimental/auto-local-client.js
+          node --check scripts/Run-Fun-Auto-Sidecar8796.mjs
+          node --check intelligence-checks/auto-sidecar-case.mjs
           node --check scripts/patch-auto-local-dashboard-server.mjs
           node --check scripts/patch-auto-local-dashboard-ui.mjs
           node --check intelligence-checks/auto-local-dashboard-case.mjs
       - name: Offline dashboard integration tests
-        run: node --test intelligence-checks/auto-local-dashboard-case.mjs intelligence-checks/auto-local-tools-case.mjs
+        run: node --test intelligence-checks/auto-sidecar-case.mjs intelligence-checks/auto-local-dashboard-case.mjs intelligence-checks/auto-local-tools-case.mjs
       - name: Windows guarded deployer parse check
         if: runner.os == 'Windows'
         shell: pwsh
@@ -46,3 +51,8 @@ jobs:
           [Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f).Path,[ref]$tokens,[ref]$errors) | Out-Null
           if ($errors.Count) { $errors | Format-List | Out-String | Write-Host; throw 'AUTO_DASH_DEPLOYER_PARSE_HOLD' }
           Write-Host 'FUN_AUTO_DASH_DEPLOYER_PARSE=PASS'
+          $t=$null
+          $e=$null
+          [Management.Automation.Language.Parser]::ParseFile((Resolve-Path './Start-Fun-Auto-Sidecar8796.ps1').Path,[ref]$t,[ref]$e) | Out-Null
+          if($e.Count){$e | Format-List | Out-String | Write-Host; throw 'AUTO_SIDECAR_BOOTSTRAP_PARSE_HOLD'}
+          Write-Host 'FUN_AUTO_SIDECAR_BOOTSTRAP_PARSE=PASS'
