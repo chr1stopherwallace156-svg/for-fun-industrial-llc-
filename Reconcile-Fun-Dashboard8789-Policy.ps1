@@ -28,11 +28,19 @@ function CheckDir([string]$dir){
  if(-not(Test-Path -LiteralPath $dir -PathType Container)){Hold ('MISSING_DIR_'+$dir)}
  if((Get-Item -LiteralPath $dir -ErrorAction Stop).Attributes -band [IO.FileAttributes]::ReparsePoint){Hold ('SYMLINK_DIR_'+$dir)}
 }
-function HashText([string]$input){
- $bytes=[Text.Encoding]::UTF8.GetBytes($input)
+function HashText([string]$value){
+ # PowerShell reserves $input for pipeline enumeration. A parameter named
+ # $input silently hashes the empty string, invalidating review approval.
+ if([string]::IsNullOrWhiteSpace($value)){throw 'FUN_POLICY_DIGEST_EMPTY_INPUT_DENIED'}
+ $bytes=[Text.Encoding]::UTF8.GetBytes($value)
+ if($bytes.Length -le 0){throw 'FUN_POLICY_DIGEST_ZERO_BYTES_DENIED'}
  $sha=[Security.Cryptography.SHA256]::Create()
  try{return ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-','').ToLowerInvariant()}
  finally{$sha.Dispose()}
+}
+# Independently check the implementation against SHA-256("abc").
+if((HashText 'abc') -cne 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'){
+ Hold 'POLICY_REVIEW_SHA256_KNOWN_ANSWER_FAILED'
 }
 function HashFile([string]$file){return (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()}
 function Owner8789(){
@@ -159,7 +167,17 @@ $readable=[ordered]@{
  protectedListenerFingerprint=HashText (($ports.GetEnumerator()|Sort-Object Name|ForEach-Object {$_.Name+':'+$_.Value}) -join ';')
 }
 $json=$readable|ConvertTo-Json -Depth 6 -Compress
+if([string]::IsNullOrWhiteSpace($json) -or $json.Length -lt 500 -or
+   -not $json.Contains('"originalPolicySha256"') -or
+   -not $json.Contains('"serverSha256"') -or
+   -not $json.Contains('"reaApprovedNamesHash"')){
+ Hold 'POLICY_REVIEW_SERIALIZATION_INVALID'
+}
 $reviewDigest=HashText $json
+if($reviewDigest -ceq 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'){
+ Hold 'POLICY_REVIEW_EMPTY_DIGEST_DENIED'
+}
+Write-Host "POLICY_REVIEW_INPUT_UTF8_BYTES=$([Text.Encoding]::UTF8.GetByteCount($json))"
 Write-Host 'FUN_DASHBOARD_POLICY_REVIEW=PASS'
 Write-Host "CURRENT_PID=$($owner.Pid) ORIGINAL_PINNED_PID=$($policy.verifiedExistingPid)"
 Write-Host "SERVER_SHA256=$serverHash"
