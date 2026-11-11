@@ -11,3 +11,14 @@ Run in the existing FunIndustrial-QwenREA-Pilot-V1 checkout, not in the installe
 The next proof requires READ_ONLY_CANDIDATES=inspect_analysis_settings, MODEL_METADATA showing one structured call, QWEN_SELECTED_REAL_REA_TOOL=inspect_analysis_settings, QWEN_REA_PILOT_STATE=real_mcp_tool_executed, and REAL_REA_RESULT with isError not true. This has not yet been observed on the Windows host.
 
 Targeted qualification: 25 tests (15 existing REA runner + 10 purpose-matching pilot) PASS on Windows and Ubuntu in the updated GitHub Actions run. Tool names and annotation heuristics are not a sandbox; the narrow test limits potential operations by exact verified name.
+## Live catalogue correction: guidance tool absent
+
+The operator searched the complete live 229-tool catalogue after a pilot attempt to use `search_guidance` failed at `REQUIRED_READ_ONLY_TOOL_NOT_INSTALLED`. That search returned reverse-engineering operations including Hopper documents, Ghidra memory inspection and Android-specific operations, but no installed `search_guidance`. Do not substitute generic search operations or call a non-installed tool.
+
+REA's source defines the `binary_session` MCP operation as a read-only session status and provider availability report. It accepts optional `detail` (summary or complete) and `refresh_candidates` fields. The new diagnostic route matches explicit REA MCP binary session/provider status queries, selects **only the exact `binary_session` name if it exists in the live catalogue**, and rejects prompts for unrelated tasks.
+
+For the bounded first test, any model-proposed `detail: complete` or `refresh_candidates: true` is refused before the actual MCP execution. The default `{}` and optional `detail: summary`, `refresh_candidates: false` are admitted. This avoids pulling expensive full provider details or running fresh candidate probes in this initial check.
+
+Invoke the pilot from the existing separate checkout, using an explicit read-only session-status prompt. `READ_ONLY_CANDIDATES=binary_session` and `QWEN_SELECTED_REAL_REA_TOOL=binary_session` should precede a successful MCP result. If the tool is not installed, the pilot stops with `REQUIRED_READ_ONLY_TOOL_NOT_INSTALLED` without model inference or a tool call.
+
+Qualification: 28/28 PASS on Windows and Linux for the full REA plus Qwen pilot suite. The actual Windows binary session test has NOT yet run; only the prior `inspect_analysis_settings` live operation has completed successfully.
