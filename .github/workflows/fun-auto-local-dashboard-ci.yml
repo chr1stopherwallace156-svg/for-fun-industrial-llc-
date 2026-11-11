@@ -6,6 +6,7 @@ on:
   pull_request:
     paths:
       - 'src/experimental/auto-local-dashboard.mjs'
+      - 'src/experimental/auto-local-client.js'
       - 'scripts/patch-auto-local-dashboard-*.mjs'
       - 'intelligence-checks/auto-local-dashboard-case.mjs'
       - 'Deploy-Fun-Auto-Local-Dashboard8789.ps1'
@@ -28,6 +29,7 @@ jobs:
       - name: JavaScript syntax
         run: |
           node --check src/experimental/auto-local-dashboard.mjs
+          node --check src/experimental/auto-local-client.js
           node --check scripts/patch-auto-local-dashboard-server.mjs
           node --check scripts/patch-auto-local-dashboard-ui.mjs
           node --check intelligence-checks/auto-local-dashboard-case.mjs
