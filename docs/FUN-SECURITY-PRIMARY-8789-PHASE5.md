@@ -1,5 +1,28 @@
 # Fun Industrial — Security integration into the primary dashboard (Phase 5)
 
+> **November 10 deployment update — this section supersedes previous instructions requiring stale source pins, periodic read-only policy reconciliations, or the 204-file provisional baseline as an installation gate.**
+>
+> The previous exact-hash autostart watchdog is being **removed**, not repaired again. The actual security scanner is original English-only local defensive code; this does not install the third-party Chinese-language Fscan project. Existing REA operator permissions, localhost binding, voice, Cognee memory, llama.cpp, compute and the NetBird 8443 gateway remain protected.
+
+## One actual deployment command (legacy autostart removal + Phase 5 apply)
+
+For an existing checkout, run this **single** Windows PowerShell command after reviewing the changes:
+
+~~~powershell
+git -C "$HOME\FunIndustrial-SecurityPrimary-V1" pull --ff-only origin feature/fun-security-primary-8789-phase5-20261110; if($LASTEXITCODE -ne 0){throw 'PHASE5_SOURCE_UPDATE_FAILED'}; powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$HOME\FunIndustrial-SecurityPrimary-V1\Retire-Legacy-Pins-And-Deploy.ps1"
+~~~
+
+This does real work, not just preview: backs up policy/watchdog/scheduled task, stops and unregisters **only** FunIndustrial-Dashboard8789-Autostart, archives its source-PID policy, confirms 8789 is still owned by the original Node dashboard, performs compatibility tests and staged patching, then applies the English-only security chat patch to the primary dashboard and briefly restarts **only** its 8789 Node process. It checks voice, memory, AI, the REA catalogue and exact approved tool names and protected service port ownership. The previously installed fi_security_local_audit tool is reused where it is already a zero-argument local-only tool instead of duplicated.
+
+**Consequence:** the old watchdog's automatic start at Windows logon is also removed. The dashboard will **not autostart at the next Windows login** until a separate simple, pin-free autostart is requested and installed. The gateway service is not restarted by this script, but it cannot serve the dashboard during 8789's brief restart or while the dashboard is offline after reboot. The backed-up original watchdog and policy are retained under AppData for recovery, never reactivated automatically.
+
+If an individual compatibility test fails, the installer stops rather than deleting user data or starting other services. It attempts an 8789-only rollback if postflight fails after a restart. Rollback is best effort, and live success requires FUN_PHASE5_ONE_RUN=PASS, not merely CI passing.
+
+## Historical troubleshooting below
+
+The older instructions following this paragraph describe the legacy guarded rollout and remain as an audit trail; **do not use the old -Approve / -Apply sequence** now that the source-pin supervisor is being retired.
+
+
 ## Ports and scope
 - 8789 is the EXISTING Fun Industrial dashboard, AI chat, voice, automatic memory, web and workflows. The new security button is added inside its existing chat panel.
 - 8443 is the EXISTING private NetBird/HTTPS gateway to 8789. Its process, TLS configuration, client allowlist and routing are not changed.
