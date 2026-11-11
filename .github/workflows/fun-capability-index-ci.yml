@@ -1,0 +1,43 @@
+name: Fun unified capability index qualification
+on:
+  push:
+    branches:
+      - feature/fun-unified-capability-registry-v1-20261111
+  pull_request:
+    paths:
+      - 'src/cognition/capability-*.mjs'
+      - 'scripts/patch-capability-live.mjs'
+      - 'intelligence-checks/capability-index-case.mjs'
+      - 'Stage-Fun-Capability-Index8789.ps1'
+      - '.github/workflows/fun-capability-index-ci.yml'
+permissions:
+  contents: read
+jobs:
+  capability-index:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Node syntax
+        run: |
+          node --check src/cognition/capability-index.mjs
+          node --check src/cognition/capability-chat.mjs
+          node --check scripts/patch-capability-live.mjs
+          node --check intelligence-checks/capability-index-case.mjs
+      - name: Offline capability qualification
+        run: node --test intelligence-checks/capability-index-case.mjs
+      - name: Windows stage script syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $t=$null
+          $e=$null
+          [Management.Automation.Language.Parser]::ParseFile((Resolve-Path './Stage-Fun-Capability-Index8789.ps1').Path,[ref]$t,[ref]$e) | Out-Null
+          if($e.Count){$e | Format-List | Out-String | Write-Host; throw 'CAPABILITY_POWERSHELL_SYNTAX_HOLD'}
+          Write-Host 'FUN_CAPABILITY_STAGE_POWERSHELL_PARSE=PASS'
