@@ -64,3 +64,18 @@ The first public website request `Analyze https://example.org ...` returned HTTP
 The live REA settings model explanation contained `300000 milliseconds (0.3 seconds)`, an arithmetic error: 300000ms = **300 seconds**, while 30000ms = 30 seconds. New `src/experimental/unified-fact-guard.mjs` post-processes parenthesized milliseconds-to-seconds values deterministically before the chat returns the model response. It reports `unitCorrections` in chat JSON; this **new code is staged in GitHub and is not active in the existing 8798 process until an operator-approved, PID-verified 8798-only replacement**. Raw REA evidence remains unchanged, and no permissions are altered. Unit guard covers this specific numeric expression, not general numerical or factual correctness.
 
 Latest offline targeted qualification after these changes: 36/36 Windows PASS, 36/36 Ubuntu PASS and PowerShell launcher syntax PASS. The existing running 8798/8797/8796/8789/8088/8791 processes have not been restarted by the GitHub edits.
+## Live web fetch failure and owner-verified repair (2026-11-11)
+
+The operator verified the original 8798 unified chat's general Qwen request and a real 8797 `inspect_analysis_settings` read-only tool success. Its public website route returned HTTP 422. The isolated diagnostic of `https://example.org/` then reported `WEB_DIAG_DNS_A_COUNT=2` and `WEB_DIAG_CAUSE=WEB_REQUEST_ERROR_ERR_INVALID_IP_ADDRESS`.
+
+### Root cause and code fix
+
+The `https.request` custom DNS lookup callback returned the pinned IP as a string even when Node's connection logic requested `{all:true}`. Newer Node releases require an array of `{address,family}` records for that mode and raise `ERR_INVALID_IP_ADDRESS` if the shape is wrong. The new `createPinnedPublicLookup` returns `[{address:<prevalidated public IPv4>,family:4}]` when `all:true`, and the traditional `(address,4)` signature otherwise, retaining DNS resolution and public-address checks. `family:4` remains forced. Unit guard additionally corrects `300000 milliseconds (0.3 seconds)` to `300 seconds` in *model summaries*, without rewriting the original MCP evidence.
+
+### Safe operator deployment
+
+The updated source cannot change an already-running 8798 process until that process is restarted. `Repair-Fun-Unified-Web8798.ps1 -Apply` first checks the corrected new source by fetching `https://example.org/` through the isolated diagnostic. **If the diagnostic fails, it leaves the currently-running 8798 untouched.** Only after success, it verifies the exact current loopback port 8798 owner (`node.exe` with the known script path and `--serve`) and snapshots unrelated listener PID mappings 8789/8796/8797/8088/8791 plus live original Qwen and 229/19 health. It then stops only that verified 8798 PID and invokes the existing protected `Start-Fun-Unified-Chat8798.ps1` startup routine. It checks new loopback PID/status and protected listener identities. No other services should be stopped or restarted.
+
+Use from your existing pilot checkout after `git pull --ff-only origin feature/fun-unified-task-chat-8798-v1-20261111`. Do not restart 8789, 8796, 8797, 8088, 8791 or Elektron Ollama.
+
+Successful preflight should print `WEB_DIAG_RESULT=PASS` and later `FUN_WEB_REPAIR=PASS`. Then re-test the real unified chat `Analyze https://example.org/ and explain what the page contains.` through the HTTP 8798 chat API; expected `route=public_website` with source URL. This remains **unverified on the operator's Windows host** until that command is run. GitHub Actions tests are synthetic and cover callback shape, DNS pinning, response limits and redirect refusals. Do not assume a successful public website fetch solely from CI.
