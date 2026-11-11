@@ -69,13 +69,29 @@ export function patchPrimaryServer(source){
 export function patchPrimaryTools(source){
  if(typeof source!=="string"||source.includes(MARK))throw Error("SECURITY_TOOLS_ALREADY_PATCHED_OR_INVALID");
  const anchor='export function openAiToolDefinitions(reaTools=[]){';
- const insert=[
-  '// '+MARK+' — fixed zero-argument tool; REA policies unchanged.',
-  'platformTools.push({name:"fi_security_local_audit",',
-  ' description:"Propose a local Fun Industrial security inspection. No remote targets or exploits. Operator must approve.",',
-  ' parameters:{type:"object",properties:{},required:[],additionalProperties:false},',
-  ' localSecurity:true});'
- ].join("\n");
+ // Older Fun Industrial installations already include a bounded zero-arg
+ // local audit entry. Reuse that entry instead of adding a duplicate name.
+ // Never overwrite/upgrade a pre-existing tool with unexpected parameters.
+ const occurrences=[...source.matchAll(/name\s*:\s*["']fi_security_local_audit["']/g)];
+ if(occurrences.length>1)throw Error("SECURITY_TOOL_REGISTRY_DUPLICATE_EXISTING");
+ let insert;
+ if(occurrences.length===1){
+  const start=occurrences[0].index;
+  const chunk=source.slice(start,start+800);
+  if(!/parameters\s*:\s*object\(\s*\{\s*\}\s*,\s*\[\s*\]\s*\)/.test(chunk)||
+     !/localSecurity\s*:\s*true/.test(chunk)){
+   throw Error("SECURITY_EXISTING_TOOL_NOT_BOUNDED");
+  }
+  insert='// '+MARK+' — preserve existing zero-argument local audit; REA permissions unchanged.';
+ }else{
+  insert=[
+   '// '+MARK+' — fixed zero-argument local audit; REA permissions unchanged.',
+   'platformTools.push({name:"fi_security_local_audit",',
+   ' description:"Propose local Fun Industrial security inspection. Operator must approve.",',
+   ' parameters:{type:"object",properties:{},required:[],additionalProperties:false},',
+   ' localSecurity:true});'
+  ].join("\n");
+ }
  const out=once(source,anchor,insert+"\n"+anchor,"REGISTRY");
  if(!out.includes('export function getPlatformTool(name)'))throw Error("SECURITY_TOOL_LOOKUP_MISSING");
  return out;
