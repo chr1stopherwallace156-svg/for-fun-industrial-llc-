@@ -14,7 +14,7 @@ $CognitionDir=Join-Path $Live 'src\cognition'
 $Work=Join-Path $env:LOCALAPPDATA ('FunIndustrial\CognitionLive8789\'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,8))
 $OriginalPid=0;$NodeExe=$null;$Restarted=$false;$Changed=$false;$NewProcess=$null
 $ProtectedPorts=@(8088,8791,8443,4479,8794)
-$PortBefore=@{};$ModuleExisted=@{};$PreTools=@();$PreRea=@();$MemoryBudget=90000;$script:SecurityInstalled=$false
+$PortBefore=@{};$ModuleExisted=@{};$PreTools=@();$PreRea=@();$PreReaState='';$MemoryBudget=90000;$script:SecurityInstalled=$false
 function Hold([string]$reason){throw ('FUN_COGNITION_LIVE_HOLD='+$reason)}
 function CheckFile([string]$p){
  if(-not (Test-Path -LiteralPath $p -PathType Leaf)){Hold ('FILE_NOT_FOUND_'+$p)}
@@ -52,18 +52,39 @@ function VerifyExistingServices(){
  $voice=GetJson '/api/voice/mobile/status'
  $ai=GetJson '/api/ai/status'
  $definitions=GetJson '/api/ai/tools' 40
- $rea=GetJson '/api/rea/tools' 40
+ $platform=GetJson '/api/status' 30
  $compute=Invoke-RestMethod -Uri 'http://127.0.0.1:8791/ai/runtime/llama-cpp' -TimeoutSec 8
  if($memory.enabledByDefault -ne $true -or $voice.enabled -ne $true){Hold 'PROTECTED_SERVICES_UNHEALTHY'}
  if($ai.state -ne 'ready' -or $compute.state -ne 'ready'){Hold 'LIVE_MODEL_COMPUTE_UNAVAILABLE_FIX_FIRST'}
+ if($platform.application -ne 'Fun Industrial Platform' -or $platform.safety.localFirstMode -ne $true -or $platform.vpn_policy.required -ne $false){Hold 'LOCAL_FIRST_BASELINE_UNEXPECTED'}
  $names=@($definitions.tools | ForEach-Object {$_.function.name})
  if($names.Count -lt 4 -or @($names|Sort-Object -Unique).Count -ne $names.Count){Hold 'TOOL_REGISTRY_UNEXPECTED'}
- return @{Names=$names;Allowed=@($rea.tools|ForEach-Object {$_.name});MemoryBudget=[int]$memory.recallBudgetMs}
+ # An inactive REA session may be preserved as inactive; do not initialize it.
+ # A previously active session must NOT be silently discarded by dashboard restart.
+ $reaService=@($platform.services | Where-Object {$_.id -eq 'rea'})
+ if($reaService.Count -ne 1){Hold 'REA_SERVICE_STATUS_AMBIGUOUS'}
+ if($reaService[0].state -ne 'stopped'){Hold 'REA_NOT_STOPPED_REQUIRES_SEPARATE_OPERATOR_REVIEW'}
+ $reaDenied=$false
+ try{
+  $unexpected=GetJson '/api/rea/tools' 12
+  Hold 'REA_TOOLS_UNEXPECTEDLY_ACCESSIBLE'
+ }catch{
+  # Do not treat an unrelated HTTP or identity error as the expected 403.
+  if($_.Exception.Message -like '*REA_TOOLS_UNEXPECTEDLY_ACCESSIBLE*'){throw}
+  $statusCode=0
+  if($_.Exception.Response){$statusCode=[int]$_.Exception.Response.StatusCode}
+  if($statusCode -eq 403){$reaDenied=$true}else{Hold ('REA_STOPPED_UNEXPECTED_HTTP_'+$statusCode)}
+ }
+ if(-not $reaDenied){Hold 'REA_DENIAL_NOT_CONFIRMED'}
+ if([int]$definitions.rea_tool_count -ne 0 -or -not [string]::IsNullOrWhiteSpace([string]($definitions.tools|Where-Object {$_.function.name -like 'rea__*'}|Select-Object -First 1))){Hold 'REA_TOOL_VISIBILITY_UNEXPECTED'}
+ # No REA tools or execution privileges are carried into the new dashboard.
+ return @{Names=$names;Allowed=@();ReaState='stopped';MemoryBudget=[int]$memory.recallBudgetMs}
 }
 function Launch8789([string]$name){
- # Reuse actual Node executable, preserved REA allowlist and Cognee recall budget.
+ # Reuse actual Node executable; keep previously stopped REA deny-by-default.
+ # Never derive an execution allowlist from a catalogue.
  $env:HOST='127.0.0.1';$env:PORT='8789';$env:COMPUTE_PORT='8791';$env:LOCAL_FIRST_MODE='true'
- $env:REA_ALLOWED_TOOLS=($script:PreRea -join ',')
+ $env:REA_ALLOWED_TOOLS='' # No REA permission grants during cognition deployment
  $env:FI_COGNEE_RECALL_BUDGET_MS=[string]$script:MemoryBudget
  $env:FUN_VOICE_HOME=Join-Path $env:LOCALAPPDATA 'FunIndustrial\VoiceLab'
  return Start-Process -FilePath $script:NodeExe -ArgumentList 'src/server.mjs' -WorkingDirectory $Live -PassThru -RedirectStandardOutput ($name+'.stdout.log') -RedirectStandardError ($name+'.stderr.log')
@@ -129,7 +150,8 @@ if(-not $Apply){Write-Host 'FUN_COGNITION_LIVE_DEPLOY=NOT_PERFORMED RUN_WITH_-Ap
 try {
  # No runtime mutations until all preflight requirements are verified.
  $Pre=VerifyExistingServices
- $PreTools=@($Pre.Names);$PreRea=@($Pre.Allowed);$MemoryBudget=[int]$Pre.MemoryBudget
+ $PreTools=@($Pre.Names);$PreRea=@($Pre.Allowed);$PreReaState=[string]$Pre.ReaState;$MemoryBudget=[int]$Pre.MemoryBudget
+ Write-Host 'FUN_COGNITION_REA_BASELINE=STOPPED_AND_DENIED_PRESERVED'
  if($MemoryBudget -lt 1000 -or $MemoryBudget -gt 180000){Hold 'MEMORY_BUDGET_INVALID'}
  foreach($port in $ProtectedPorts){$PortBefore[$port]=PortSnapshot $port}
  if(-not $PortBefore[8088] -or -not $PortBefore[8791]){Hold 'LIVE_COMPUTE_OR_LLAMA_PORT_MISSING'}
@@ -152,11 +174,11 @@ try {
  $After=VerifyExistingServices
  if($script:SecurityInstalled -ne $Original.Contains('FI_SECURITY_PRIMARY_8789_V1')){Hold 'SECURITY_BASELINE_CHANGED'}
  if(($After.Names -join '|') -cne ($PreTools -join '|')){Hold 'TOOL_REGISTRY_CHANGED'}
- if(($After.Allowed -join '|') -cne ($PreRea -join '|')){Hold 'REA_ALLOWED_TOOLS_CHANGED'}
+ if($After.ReaState -ne $PreReaState -or ($After.Allowed -join '|') -cne ($PreRea -join '|')){Hold 'REA_STATE_OR_ALLOWLIST_CHANGED'}
  foreach($port in $ProtectedPorts){if((PortSnapshot $port) -cne $PortBefore[$port]){Hold ('PROTECTED_PORT_OWNER_CHANGED_'+$port)}}
  $status=GetJson '/api/cognition/status'
  if($status.automaticKnowledgeWrites -ne $false -or $status.reaExecutionGrants -ne 0){Hold 'COGNITION_AUTHORITY_REGRESSION'}
- Write-Host 'FUN_COGNITION_LIVE_DEPLOY=PASS CHAT=WIRED API=READY TOOLS=UNCHANGED REA=UNCHANGED'
+ Write-Host 'FUN_COGNITION_LIVE_DEPLOY=PASS CHAT=WIRED API=READY LOCAL_TOOLS=UNCHANGED REA=STOPPED_DENIED'
  Write-Host ('FUN_COGNITION_URL='+$Base+'/api/cognition/status')
  Write-Host ('FUN_COGNITION_BACKUP='+$Work)
 }catch{
