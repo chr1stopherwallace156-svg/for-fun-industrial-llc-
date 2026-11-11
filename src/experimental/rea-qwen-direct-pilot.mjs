@@ -6,7 +6,7 @@ const BASE='http://127.0.0.1:8797';
 const LLAMA='http://127.0.0.1:8088/v1/chat/completions';
 const ORIGIN=BASE;
 const plain=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
-const sys='You are Fun Industrial Qwen in a one-shot REA verification task. The human operator requested inspection of this MCP session and authorized use of the ONE advertised read-only REA inspection function. To answer with real evidence, emit an OpenAI structured function tool_call with JSON arguments matching its schema. Do not propose a different tool, modify settings, access Android, or claim a result before the tool returns. /no_think';
+const sys='You are Fun Industrial Qwen in a one-shot REA verification task. The human operator requested inspection of this MCP session and authorized use of the ONE advertised read-only REA inspection function. To answer with real evidence, emit an OpenAI structured function tool_call with JSON arguments matching its schema. If the function is binary_session, request detail summary and refresh_candidates false. Do not propose a different tool, modify settings, access Android, or claim a result before the tool returns. /no_think';
 const rejectCode=code=>{throw Error('QWEN_REA_PILOT_'+code)};
 // An MCP tool's name containing 'read' is not a filesystem-reading capability.
 // The earlier heuristic offered read_adb_setting for a .mjs file, causing a
@@ -14,15 +14,19 @@ const rejectCode=code=>{throw Error('QWEN_REA_PILOT_'+code)};
 const matchPrompt={
  settings:p=>/\b(?:rea|mcp)\b/i.test(p)&&/\banalys[ie]s\b/i.test(p)&&
   /\bsettings?\b/i.test(p)&&!/\.(?:js|mjs|cjs|ts|tsx|jsx)\b/i.test(p),
+ status:p=>/\b(?:rea|mcp)\b/i.test(p)&&
+  /\b(?:binary.session|session.status|providers?|capabilit(?:y|ies)|availab(?:le|ility))\b/i.test(p)&&
+  /\b(?:status|inspect|inspectable|check|report|show|list|available|availability)\b/i.test(p)&&
+  !/\.(?:js|mjs|cjs|ts|tsx|jsx)\b/i.test(p),
  guidance:p=>/\b(?:rea|mcp)\b/i.test(p)&&/\b(?:installed|built.?in|internal|tool)\b/i.test(p)&&
   /\bguidance\b/i.test(p)&&!/\.(?:js|mjs|cjs|ts|tsx|jsx)\b/i.test(p)
 };
 export function chooseReaDiagnosticTools(catalogue,prompt){
  if(!Array.isArray(catalogue)||catalogue.length!==229)rejectCode('CATALOGUE_NOT_229');
  if(typeof prompt!=='string'||prompt.length<10||prompt.length>1800)rejectCode('INVALID_PROMPT');
- const category=matchPrompt.settings(prompt)?'settings':matchPrompt.guidance(prompt)?'guidance':null;
+ const category=matchPrompt.settings(prompt)?'settings':matchPrompt.status(prompt)?'status':matchPrompt.guidance(prompt)?'guidance':null;
  if(!category)rejectCode('NO_VERIFIED_COMPATIBLE_READ_ONLY_REA_TOOL_FOR_TASK');
- const names=category==='settings'?['inspect_analysis_settings']:['search_guidance'];
+ const names=category==='settings'?['inspect_analysis_settings']:category==='status'?['binary_session']:['search_guidance'];
  const selected=names.map(name=>catalogue.find(t=>t?.name===name));
  if(selected.some(t=>!t))rejectCode('REQUIRED_READ_ONLY_TOOL_NOT_INSTALLED');
  for(const tool of selected){
