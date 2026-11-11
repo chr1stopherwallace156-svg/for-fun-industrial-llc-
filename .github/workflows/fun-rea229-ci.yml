@@ -1,0 +1,55 @@
+name: Fun REA 229 full MCP execution qualification
+on:
+  push:
+    branches:
+      - feature/fun-rea-229-execution-8797-v1-20261111
+  pull_request:
+    paths:
+      - 'src/experimental/rea-full-229.mjs'
+      - 'src/experimental/rea229-client.js'
+      - 'src/experimental/rea-qwen-direct-pilot.mjs'
+      - 'scripts/Diagnose-Fun-Qwen-Rea229.mjs'
+      - 'scripts/Diagnose-Fun-Rea-Binary-Error.mjs'
+      - 'intelligence-checks/rea-binary-error-diagnostic-case.mjs'
+      - 'intelligence-checks/qwen-rea-direct-pilot-case.mjs'
+      - 'scripts/Run-Fun-Rea229-Sidecar8797.mjs'
+      - 'Start-Fun-Rea229-Sidecar8797.ps1'
+      - 'intelligence-checks/rea229-full-case.mjs'
+      - '.github/workflows/fun-rea229-ci.yml'
+permissions:
+  contents: read
+jobs:
+  rea229:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax
+        run: |
+          node --check src/experimental/rea-full-229.mjs
+          node --check src/experimental/rea229-client.js
+          node --check src/experimental/rea-qwen-direct-pilot.mjs
+          node --check scripts/Diagnose-Fun-Qwen-Rea229.mjs
+          node --check scripts/Diagnose-Fun-Rea-Binary-Error.mjs
+          node --check intelligence-checks/rea-binary-error-diagnostic-case.mjs
+          node --check intelligence-checks/qwen-rea-direct-pilot-case.mjs
+          node --check scripts/Run-Fun-Rea229-Sidecar8797.mjs
+          node --check intelligence-checks/rea229-full-case.mjs
+      - name: REA 229 model and MCP offline qualification
+        run: node --test intelligence-checks/rea229-full-case.mjs intelligence-checks/qwen-rea-direct-pilot-case.mjs intelligence-checks/rea-binary-error-diagnostic-case.mjs
+      - name: Windows PowerShell script syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $t=$null
+          $e=$null
+          [Management.Automation.Language.Parser]::ParseFile((Resolve-Path './Start-Fun-Rea229-Sidecar8797.ps1').Path,[ref]$t,[ref]$e) | Out-Null
+          if($e.Count){$e | Format-List | Out-String | Write-Host; throw 'REA229_BOOTSTRAP_POWERSHELL_PARSE_HOLD'}
+          Write-Host 'FUN_REA229_BOOTSTRAP_PARSE=PASS'
