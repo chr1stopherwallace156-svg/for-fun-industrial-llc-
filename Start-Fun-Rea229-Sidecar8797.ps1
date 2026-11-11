@@ -49,7 +49,7 @@ $ParentNames=(@($C.tools|ForEach-Object {$_.name}|Sort-Object) -join [char]10)
 $LogDir=Join-Path $env:LOCALAPPDATA ('FunIndustrial\REA229Full8797\'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,6))
 New-Item -ItemType Directory -Path $LogDir -Force|Out-Null
 try{
- $Child=Start-Process -FilePath $Node -ArgumentList @(('"'+$Source+'"'),'--serve') -WorkingDirectory $Repo -PassThru -ErrorAction Stop -RedirectStandardOutput (Join-Path $LogDir 'rea229.stdout.log') -RedirectStandardError (Join-Path $LogDir 'rea229.stderr.log')
+ $Child=Start-Process -FilePath $Node -ArgumentList @(('"'+$Source+'"'),'--serve') -WorkingDirectory $Primary -PassThru -ErrorAction Stop -RedirectStandardOutput (Join-Path $LogDir 'rea229.stdout.log') -RedirectStandardError (Join-Path $LogDir 'rea229.stderr.log')
  $Healthy=$false
  for($i=0;$i -lt 135;$i++){
   Start-Sleep -Milliseconds 500
