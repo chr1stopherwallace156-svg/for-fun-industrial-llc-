@@ -22,3 +22,11 @@ For the bounded first test, any model-proposed `detail: complete` or `refresh_ca
 Invoke the pilot from the existing separate checkout, using an explicit read-only session-status prompt. `READ_ONLY_CANDIDATES=binary_session` and `QWEN_SELECTED_REAL_REA_TOOL=binary_session` should precede a successful MCP result. If the tool is not installed, the pilot stops with `REQUIRED_READ_ONLY_TOOL_NOT_INSTALLED` without model inference or a tool call.
 
 Qualification: 28/28 PASS on Windows and Linux for the full REA plus Qwen pilot suite. The actual Windows binary session test has NOT yet run; only the prior `inspect_analysis_settings` live operation has completed successfully.
+
+## Next live observation: binary_session model selected but the argument guard held
+
+The Windows user tested the read-only binary_session diagnostic. The model emitted one structured tool call with `completion_tokens=100` and `finish_reason=tool_calls`, but the client returned `QWEN_REA_PILOT_SESSION_SUMMARY_ONLY` before REA execution. This proves Qwen selected the intended tool but requested parameters outside the diagnostic's admitted summary-only contract. No MCP call occurred in that run.
+
+Latest client change: advertise the model with an **empty function parameters schema** for the `binary_session` smoke test. Client verifies the exact tool/alias, validates JSON object shape and known keys, then executes only the fixed `{"detail":"summary","refresh_candidates":false}` arguments regardless of model-proposed optional values. Explicit log messages show when proposals are normalized and the actual `MCP_EXECUTION_ARGS`. Unknown additional fields are rejected without execution. This bounds server operations, avoids provider refresh and avoids full status reports. It leaves all 8789/8796/8797 server processes, model and separate Elekton Ollama untouched.
+
+GitHub Actions targeted tests now 29/29 PASS on Windows and Ubuntu. Tests show a no-argument model-generated function call translates to fixed summary parameters, an overly broad `complete` / `refresh_candidates:true` proposal is executed only after documented normalization to safe defaults, unknown fields reject before the MCP call, and the exact tool name remains enforced. The repaired live Windows test remains to be run; no success should be claimed until the operator supplies actual MCP results.
