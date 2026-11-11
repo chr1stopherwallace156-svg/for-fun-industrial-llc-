@@ -53,3 +53,35 @@ On iPhone Safari use your EXISTING SSH forward to 8789 or your existing authenti
 - A Node dashboard restart may reconnect its managed REA process; no REA tool execution permission is added.
 - Never bypass a HOLD or change watchdog hashes by hand. The script refuses an incompatible autostart policy; it only refreshes verified server/HTML hashes after qualified deployment.
 - This is not a full Fscan replacement, vulnerability database, anti-malware certification, host firewall policy, or arbitrary-target scanner.
+
+## Fix an existing 8789 autostart policy HASH/PID mismatch (November 10 repair)
+
+If the stage-only deployment refuses with AUTOSTART_SOURCE_PIN_MISMATCH, **do not manually edit policy.json**, rerun -Apply, or disable the scheduled watchdog. The November 9 policy may refer to the old source and PID while the November 10 dashboard has updated source. A 204/204 provisional baseline PASS alone does not authorize trusting new source.
+
+The guarded reconciliation helper is located at Reconcile-Fun-Dashboard8789-Policy.ps1 in this branch.
+
+First update your already-cloned Phase 5 checkout and verify it is the expected branch:
+
+~~~powershell
+git -C "$HOME\FunIndustrial-SecurityPrimary-V1" pull --ff-only origin feature/fun-security-primary-8789-phase5-20261110; if($LASTEXITCODE -ne 0){throw 'SECURITY_RECONCILE_SOURCE_PULL_HOLD'}
+~~~
+
+Run the **read-only, no-file-change** review first:
+
+~~~powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$HOME\FunIndustrial-SecurityPrimary-V1\Reconcile-Fun-Dashboard8789-Policy.ps1"
+~~~
+
+The review confirms: exact original 204-file pinned baseline, a single verified Node owner of 127.0.0.1:8789, executable identity matching original supervisor nodePath, process start time **not earlier** than the modified deployed code, live HTML matching installed HTML, source syntax and voice/memory markers, healthy existing AI/voice/memory endpoints, current REA catalogue identical to original 229 names, same approved REA tool set as original policy, and protected independent service listeners. It then displays the current SHA-256 source hashes and a **POLICY_REVIEW_DIGEST**. No service/process/task/policy changes occur.
+
+If any HOLD appears, stop. In particular, RUNNING_PROCESS_PREDATES_DEPLOYED_FILES_REVIEW_RESTART_REQUIRED means the source on disk may differ from code the running process loaded. An external dashboard-only, independently reviewed restart/qualification is required. Do not re-pin that process.
+
+**Only after reviewing the installed source changes and accepting that exact report** may the operator run:
+
+~~~powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$HOME\FunIndustrial-SecurityPrimary-V1\Reconcile-Fun-Dashboard8789-Policy.ps1" -Approve -ExpectedReviewDigest PASTE_THE_VERIFIED_64_HEX_REVIEW_DIGEST
+~~~
+
+Replace PASTE_THE_VERIFIED_64_HEX_REVIEW_DIGEST with the exact 64-character digest from the preview. The script reruns verification and refuses any changed process/files/policy. It backs up the previous policy and its review evidence, then updates **only** the exact server/HTML hash pins and observed PID/start-time fields in the policy. It preserves other policy contents, REA permissions, the dashboard process, 8443 gateway, llama.cpp and Python API. It waits for the EXISTING supervisor to report running/EXISTING_DASHBOARD_PRESERVED. On failure it attempts to restore the prior policy and reports the backup location. **This is a permission-controlled policy update, not evidence of malware-free code.**
+
+After FUN_DASHBOARD_POLICY_RECONCILE=PASS, rerun the Phase 5 stage-only command, check STAGE=PASS, and only then the separate operator-authorized -Apply deployment. The primary deployment may legitimately change the 204-file baseline; that requires a separately reviewed new candidate and pin.
