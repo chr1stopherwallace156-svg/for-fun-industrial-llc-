@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 const MARK='FI_CAPABILITY_INDEX_LIVE_V1';
 const ROOT='const root=path.dirname(fileURLToPath(import.meta.url));';
 const SERVER='const server=http.createServer(async(req,res)=>{try{';
-const CHAT='try{enriched={...enriched,payload:fiCognitive.enrichChat(enriched.payload,body)};}';
+const CHAT='try{enriched={...enriched,payload:fiCognitive.enrichChat(enriched.payload,body)};}\n catch(_cognitiveError){/* no cognitive failure may break existing local AI chat */}';
 function exactlyOnce(text,anchor,replace){
  if(text.split(anchor).length!==2)throw Error('CAPABILITY_PATCH_ANCHOR_NOT_UNIQUE_'+anchor.slice(0,60));
  return text.replace(anchor,()=>replace);
@@ -47,6 +47,9 @@ export function patchCapabilityLive(source){
   ' }'
  ].join('\n');
  result=exactlyOnce(result,SERVER,routes);
+ // Replace the entire existing cognitive try/catch pair as one atomic unit.
+ // Replacing just the try block would strand its original catch after the
+ // new capability try/catch, creating invalid JavaScript.
  result=exactlyOnce(result,CHAT,
   CHAT+'\n // '+MARK+': optional bounded reference data, never callable model tools.\n'+
   ' try{enriched={...enriched,payload:decorateCapabilityChat(enriched.payload,body,fiCapabilityIndex)};}'+
