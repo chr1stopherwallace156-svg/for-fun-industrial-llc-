@@ -59,3 +59,15 @@ The launch gate now requires (1) the same verified 8789 Node PID, (2) the correc
 GET /api/cognition/status also caps its separate platform-health summary at 1.5 seconds, reporting timed_out_unverified rather than hanging indefinitely. **This is a targeted possible-false-negative repair, not proof that the first failure was caused by slow REA health.**
 
 Before another Apply, confirm the prior rollback successfully restored the ordinary chat and that port 8789 is owned by the expected Node process. Always run the stage-only script first. Do not bypass owner/authority/compute checks, and do not stop Ollama or external llama.cpp.
+
+## November 11: REA stopped, cognition still deployable
+
+On the user's host, `GET /api/status` reported `LOCAL_FIRST=true`, `VPN_REQUIRED=false`, compute running, AI ready, and REA stopped. `GET /api/rea/tools` returned HTTP 403 with `REA MCP is not ready.` This is not proof of a malfunction requiring REA activation. The cognitive kernel is local and does not execute REA tools.
+
+The updated guarded deployment permits **only** this precise REA baseline: one `rea` service with state `stopped`, HTTP 403 from `/api/rea/tools`, zero exposed `rea__*` tool definitions, and `rea_tool_count=0`. If REA was running, if the catalogue becomes accessible, if service identity is ambiguous, or if any unexpected error occurs, the deployer HOLDS. It never sends REA initialize, `/api/activate`, or an REA tool call. The new dashboard launches with a forced empty runtime REA allowlist, preventing new REA execution authority. This changes no persisted `.env` permissions; runtime REA access remains disabled.
+
+The full preflight and postflight continue to require ready llama.cpp via compute 8791, default-on Cognee, mobile voice, unchanged fixed local tool registry, unchanged protected listener identities, and cognitive status with `reaExecutionGrants=0`. A successful deployment does not initialize the 229 REA MCP tools; that is a separate, explicitly reviewed operator-approval capability project.
+
+Use only the current `feature/fun-cognition-live8789-v1-20261110` branch, NOT the draft external-llama adoption repair: the live Windows runtime already has external-model adoption and the Qwen llama.cpp model was re-adopted successfully without any source change. If the AI model returns stopped again, invoke the existing adoption API under operator review rather than replacing code.
+
+Before deploying, stage-only pull and run; check output; apply only against a healthy 8789+8791+8088 system. Do not claim live status until the deployment's PASS is independently verified.
