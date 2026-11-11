@@ -45,7 +45,25 @@ test("backup and revalidation before policy update with rollback",()=>{
  for(const marker of [
   "policy.original.json","review.json","FILES_OR_PROCESS_CHANGED_SINCE_REVIEW",
   "ORIGINAL_POLICY_CHANGED_BEFORE_REPLACE","POLICY_BACKUP=",
-  "SUPERVISOR_DID_NOT_ACCEPT_RECONCILED_POLICY","Copy-Item -LiteralPath (Join-Path $backup 'policy.original.json')",
+  "SUPERVISOR_REJECTED_POLICY_FRESH_TICKS_","AUTOSTART_POLICY_ROLLBACK=VERIFIED",
   "FUN_DASHBOARD_POLICY_RECONCILE=PASS"
  ])assert.ok(src.includes(marker),marker);
+});
+
+test("candidate policy is re-read from disk, and watchdog acceptance requires new timestamp",()=>{
+ for(const marker of [
+  "WRITTEN_POLICY_BYTES_DIFFER_FROM_VERIFIED_CANDIDATE",
+  "PERSISTED_POLICY_ROUNDTRIP_INVALID",
+  "AUTOSTART_SUPERVISOR_STATUS_STALE_BEFORE_UPDATE",
+  "WATCHDOG_BEFORE_POLICY_UPDATE=",
+  "WATCHDOG_FRESH_REPORT_",
+  "SUPERVISOR_NOT_POLLING_AFTER_POLICY_WRITE",
+  "SUPERVISOR_REJECTED_POLICY_FRESH_TICKS_",
+  "AUTOSTART_POLICY_ROLLBACK=VERIFIED",
+  "ROLLBACK_FILE_HASH_MISMATCH",
+  "if($stamp -le $lastTick){continue}"
+ ])assert.ok(src.includes(marker),marker);
+ assert.ok(src.indexOf("Move-Item -LiteralPath $candidate -Destination $PolicyFile")<src.indexOf("WATCHDOG_FRESH_REPORT_"));
+ assert.match(src,/\$freshTicks=0/);
+ assert.match(src,/if\(\$freshTicks -eq 0\)/);
 });
