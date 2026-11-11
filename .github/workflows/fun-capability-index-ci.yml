@@ -9,6 +9,7 @@ on:
       - 'scripts/patch-capability-live.mjs'
       - 'intelligence-checks/capability-index-case.mjs'
       - 'Stage-Fun-Capability-Index8789.ps1'
+      - 'Deploy-Fun-Capability-Index8789.ps1'
       - '.github/workflows/fun-capability-index-ci.yml'
 permissions:
   contents: read
@@ -41,3 +42,8 @@ jobs:
           [Management.Automation.Language.Parser]::ParseFile((Resolve-Path './Stage-Fun-Capability-Index8789.ps1').Path,[ref]$t,[ref]$e) | Out-Null
           if($e.Count){$e | Format-List | Out-String | Write-Host; throw 'CAPABILITY_POWERSHELL_SYNTAX_HOLD'}
           Write-Host 'FUN_CAPABILITY_STAGE_POWERSHELL_PARSE=PASS'
+          $t=$null
+          $e=$null
+          [Management.Automation.Language.Parser]::ParseFile((Resolve-Path './Deploy-Fun-Capability-Index8789.ps1').Path,[ref]$t,[ref]$e) | Out-Null
+          if($e.Count){$e | Format-List | Out-String | Write-Host; throw 'CAPABILITY_DEPLOY_POWERSHELL_SYNTAX_HOLD'}
+          Write-Host 'FUN_CAPABILITY_DEPLOY_POWERSHELL_PARSE=PASS'
