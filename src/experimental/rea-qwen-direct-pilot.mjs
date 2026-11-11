@@ -6,7 +6,7 @@ const BASE='http://127.0.0.1:8797';
 const LLAMA='http://127.0.0.1:8088/v1/chat/completions';
 const ORIGIN=BASE;
 const plain=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
-const sys='You are Fun Industrial Qwen in a one-shot REA verification task. The human operator requested inspection of this MCP session and authorized use of the ONE advertised read-only REA inspection function. To answer with real evidence, emit an OpenAI structured function tool_call with JSON arguments matching its schema. If the function is binary_session, request detail summary and refresh_candidates false. Do not propose a different tool, modify settings, access Android, or claim a result before the tool returns. /no_think';
+const sys='You are Fun Industrial Qwen in a one-shot REA verification task. The human operator requested inspection of this MCP session and authorized use of the ONE advertised read-only REA inspection function. To answer with real evidence, emit an OpenAI structured function tool_call with JSON arguments matching its schema. If the function is binary_session, use an empty JSON arguments object. Do not propose a different tool, modify settings, access Android, or claim a result before the tool returns. /no_think';
 const rejectCode=code=>{throw Error('QWEN_REA_PILOT_'+code)};
 // An MCP tool's name containing 'read' is not a filesystem-reading capability.
 // The earlier heuristic offered read_adb_setting for a .mjs file, causing a
@@ -92,16 +92,25 @@ export async function runDirectReaPilot({prompt,requestFn=request,log=()=>{}}={}
   try{args=JSON.parse(args)}catch{rejectCode('MODEL_ARGS_INVALID_JSON')}
  }
  if(!plain(args)||JSON.stringify(args).length>20000)rejectCode('MODEL_ARGS_INVALID');
- // For this single read-only status task, model arguments are suggestions, NOT
- // permission to choose a provider refresh or full report. Reject unknown
- // properties; replace all accepted fields with the one safe contract before MCP.
+ // The live MCP input schema, not the upstream docs, owns the contract.
+ // The installed REA rejected both 'detail' and 'refresh_candidates' as
+ // unrecognized. For this read-only status pilot, submit NO arguments.
+ // If the live schema requires fields, refuse instead of guessing values.
  let actualArgs=args;
  if(selected.name==='binary_session'){
+  const schema=selected.inputSchema;
+  if(!plain(schema)||schema.type!=='object')rejectCode('LIVE_BINARY_SCHEMA_INVALID');
+  if(schema.required!==undefined&&
+     (!Array.isArray(schema.required)||schema.required.length!==0))
+   rejectCode('LIVE_BINARY_SCHEMA_REQUIRES_ARGUMENTS');
+  if(schema.additionalProperties===true||schema.patternProperties!==undefined||
+     schema.anyOf!==undefined||schema.oneOf!==undefined||schema.allOf!==undefined)
+   rejectCode('LIVE_BINARY_SCHEMA_NOT_BOUNDED');
   if(Object.keys(args).some(key=>!['detail','refresh_candidates'].includes(key)))
    rejectCode('SESSION_UNKNOWN_ARGUMENTS');
-  actualArgs={detail:'summary',refresh_candidates:false};
-  if(JSON.stringify(args)!==JSON.stringify(actualArgs))
-   log('QWEN_ARGS_NORMALIZED_TO_FIXED_READ_ONLY_SUMMARY=TRUE');
+  actualArgs={};
+  log('LIVE_BINARY_SCHEMA_REQUIRED='+JSON.stringify(schema.required??[]));
+  if(Object.keys(args).length)log('QWEN_ARGS_DISCARDED_TO_LIVE_SCHEMA=TRUE');
   log('MCP_EXECUTION_ARGS='+JSON.stringify(actualArgs));
  }
  log('QWEN_SELECTED_REAL_REA_TOOL='+selected.name);
