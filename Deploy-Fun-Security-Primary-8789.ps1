@@ -81,6 +81,13 @@ if(Test-Path -LiteralPath $PolicyFile -PathType Leaf){
  Hold 'LEGACY_AUTOSTART_POLICY_STILL_PRESENT_USE_RETIRE_AND_DEPLOY'
 }
 $OldPid=Pid8789
+# Restart only with the exact Node executable that currently owns 8789.
+# Do not swap in an unrelated PATH Node installation after the upgrade.
+$existingNodeProcess=Get-CimInstance Win32_Process -Filter ("ProcessId="+$OldPid) -ErrorAction Stop
+$originalNodePath=[string]$existingNodeProcess.ExecutablePath
+if([string]::IsNullOrWhiteSpace($originalNodePath)){Hold 'RUNNING_8789_NODE_EXE_PATH_NOT_VERIFIABLE'}
+CheckFile $originalNodePath
+$Node=$originalNodePath
 $v=Api '/api/voice/mobile/status'
 $m=Api '/api/ai/automatic-memory/status'
 $a=Api '/api/ai/status'
