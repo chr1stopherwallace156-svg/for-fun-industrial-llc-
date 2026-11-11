@@ -1,23 +1,37 @@
 // FI_QWEN_REA_DIRECT_PILOT_V1
 // Operator launches one local, read-only, live Qwen -> MCP test.
 // Does NOT restart any service. No fallback model text is mislabelled as a tool.
-import {rankReaTools} from './rea-full-229.mjs';
 
 const BASE='http://127.0.0.1:8797';
 const LLAMA='http://127.0.0.1:8088/v1/chat/completions';
 const ORIGIN=BASE;
 const plain=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
-const sys='You are Fun Industrial Qwen. The user explicitly started a single read-only REA tool-use test. A small list of REAL REA tools is provided. Choose a relevant read-only inspection tool and return an OpenAI structured function tool_call with JSON arguments (not a description of a proposal). Never invent a tool name or make changes to files. If none of the functions can inspect the requested source, answer that no matching tool exists. /no_think';
+const sys='You are Fun Industrial Qwen in a one-shot REA verification task. The human operator requested inspection of this MCP session and authorized use of the ONE advertised read-only REA inspection function. To answer with real evidence, emit an OpenAI structured function tool_call with JSON arguments matching its schema. Do not propose a different tool, modify settings, access Android, or claim a result before the tool returns. /no_think';
 const rejectCode=code=>{throw Error('QWEN_REA_PILOT_'+code)};
-const maybeReadOnly=t=>{
- const name=t.name.toLowerCase().replace(/[._:/-]+/g,'_');
- const desc=String(t.description||'').toLowerCase();
- if(!/(^|_)(inspect|read|list|analyze|analyse|parse|search|describe|query|get|extract|review|scan|audit|check|stat|info)(_|$)/.test(name))return false;
- // Explicitly reject names advertising mutation, execution, modification, or network writes.
- if(/(^|_)(write|delete|remove|execute|install|patch|update|modify|kill|stop|start|run|deploy|exploit|repair|fix|send|post|upload|download|connect|create|spawn|shell)(_|$)/.test(name))return false;
- if(/\b(write|delete|remove|modify|install|execute commands|exploit|replace files|repair files|upload|download|deploy|create files|start processes)\b/.test(desc))return false;
- return true;
+// An MCP tool's name containing 'read' is not a filesystem-reading capability.
+// The earlier heuristic offered read_adb_setting for a .mjs file, causing a
+// genuine but unrelated REA tools/call error. Use exact purpose-bound profiles.
+const matchPrompt={
+ settings:p=>/\b(?:rea|mcp)\b/i.test(p)&&/\banalys[ie]s\b/i.test(p)&&
+  /\bsettings?\b/i.test(p)&&!/\.(?:js|mjs|cjs|ts|tsx|jsx)\b/i.test(p),
+ guidance:p=>/\b(?:rea|mcp)\b/i.test(p)&&/\b(?:installed|built.?in|internal|tool)\b/i.test(p)&&
+  /\bguidance\b/i.test(p)&&!/\.(?:js|mjs|cjs|ts|tsx|jsx)\b/i.test(p)
 };
+export function chooseReaDiagnosticTools(catalogue,prompt){
+ if(!Array.isArray(catalogue)||catalogue.length!==229)rejectCode('CATALOGUE_NOT_229');
+ if(typeof prompt!=='string'||prompt.length<10||prompt.length>1800)rejectCode('INVALID_PROMPT');
+ const category=matchPrompt.settings(prompt)?'settings':matchPrompt.guidance(prompt)?'guidance':null;
+ if(!category)rejectCode('NO_VERIFIED_COMPATIBLE_READ_ONLY_REA_TOOL_FOR_TASK');
+ const names=category==='settings'?['inspect_analysis_settings']:['search_guidance'];
+ const selected=names.map(name=>catalogue.find(t=>t?.name===name));
+ if(selected.some(t=>!t))rejectCode('REQUIRED_READ_ONLY_TOOL_NOT_INSTALLED');
+ for(const tool of selected){
+  if(typeof tool.alias!=='string'||!/^rea_tool_[0-9]{3}$/.test(tool.alias)
+   ||!plain(tool.inputSchema)||tool.inputSchema.type!=='object'
+   ||typeof tool.name!=='string')rejectCode('READ_ONLY_TOOL_SCHEMA_INVALID');
+ }
+ return selected;
+}
 async function request(url,body=null, fetchImpl=fetch) {
  const isPost=body!==null;
  const response=await fetchImpl(url,{
@@ -36,9 +50,7 @@ export async function runDirectReaPilot({prompt,requestFn=request,log=()=>{}}={}
  if(status.liveMcpHealth!=='ready'||status.realReaToolCount!==229)rejectCode('REA_MCP_NOT_READY');
  const all=await requestFn(BASE+'/api/rea229/tools?limit=229');
  if(!Array.isArray(all.tools)||all.tools.length!==229)rejectCode('CATALOGUE_NOT_229');
- const filtered=all.tools.filter(maybeReadOnly);
- const ranked=rankReaTools(filtered,prompt,{limit:4});
- if(!ranked.length)rejectCode('NO_READ_ONLY_TOOL_CANDIDATE');
+ const ranked=chooseReaDiagnosticTools(all.tools,prompt);
  log('READ_ONLY_CANDIDATES='+ranked.map(t=>t.name).join(' | '));
  const tools=ranked.map(t=>({type:'function',function:{
   name:t.alias,description:('Read-only REA inspection: '+t.name+'. '+String(t.description||'')).slice(0,450),
@@ -76,6 +88,8 @@ export async function runDirectReaPilot({prompt,requestFn=request,log=()=>{}}={}
  }
  if(!plain(args)||JSON.stringify(args).length>20000)rejectCode('MODEL_ARGS_INVALID');
  log('QWEN_SELECTED_REAL_REA_TOOL='+selected.name);
+ // Validate that the selected operation remains the one exact allowed purpose.
+ if(!ranked.some(t=>t.name===selected.name))rejectCode('TOOL_PURPOSE_CHANGED');
  const result=await requestFn(BASE+'/api/rea229/call',{name:selected.name,arguments:args});
  if(result?.tool!==selected.name)rejectCode('REAL_MCP_TOOL_ID_MISMATCH');
  if(result.result?.isError===true)rejectCode('REAL_MCP_TOOL_RETURNED_ERROR');
