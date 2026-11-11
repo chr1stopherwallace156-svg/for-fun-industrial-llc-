@@ -1,0 +1,13 @@
+# Qwen REA pilot V2: purpose-based tool matching
+
+Observed live output on Windows: the model returned finish_reason=tool_calls, completion_tokens=65, structured_calls=1 and selected read_adb_setting. The REA MCP endpoint returned HTTP 422 with REA229_MCP_TOOL_RETURNED_ERROR, so the model-to-executor dispatch worked, but the selected Android operation did not complete. No successful REA inspection result was returned.
+
+Root cause in pilot code: a loose read-only name heuristic treated unrelated read_adb_setting, inspect_analysis_settings, read_bytes and list_jeb_units as interchangeable file-inspection tools. This is incorrect. read_adb_setting is Android-specific; read_bytes inspects initialized Ghidra analysis memory; neither reads arbitrary JavaScript source from a Windows path.
+
+V2 removes fuzzy read/list matching. For the next proof it only offers the exact catalogued inspect_analysis_settings tool when the operator requests inspection of REA MCP analysis settings. It refuses arbitrary JavaScript source file inspection with NO_VERIFIED_COMPATIBLE_READ_ONLY_REA_TOOL_FOR_TASK, before making a model inference or executing anything. A separate installed-guidance scenario supports exact search_guidance only when explicitly requested. Every selected candidate must match the live 229 entry and schema and unique stable alias.
+
+Run in the existing FunIndustrial-QwenREA-Pilot-V1 checkout, not in the installed 8797 source. Pull --ff-only and call Diagnose-Fun-Qwen-Rea229.mjs --run --prompt "Inspect the current REA MCP analysis settings using a real read-only session tool. Report the returned settings without modifying them." The live pilot reuses 8797 and 8088 without restarting either.
+
+The next proof requires READ_ONLY_CANDIDATES=inspect_analysis_settings, MODEL_METADATA showing one structured call, QWEN_SELECTED_REAL_REA_TOOL=inspect_analysis_settings, QWEN_REA_PILOT_STATE=real_mcp_tool_executed, and REAL_REA_RESULT with isError not true. This has not yet been observed on the Windows host.
+
+Targeted qualification: 25 tests (15 existing REA runner + 10 purpose-matching pilot) PASS on Windows and Ubuntu in the updated GitHub Actions run. Tool names and annotation heuristics are not a sandbox; the narrow test limits potential operations by exact verified name.
