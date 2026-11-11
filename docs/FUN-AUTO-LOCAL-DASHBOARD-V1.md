@@ -41,3 +41,28 @@ The guarded deployer now stages and (only with operator `-Apply`) copies the new
 Targeted qualification after the change: 26/26 Windows + Ubuntu PASS; Windows PowerShell parse PASS. This includes a mocked evolved page that has no legacy chat elements and confirms its existing text remains. This is not a confirmation of a live deployment on the operator's Windows host.
 
 The next action is to `git pull --ff-only` the existing `FunIndustrial-AutoDashboard-V1` checkout and run the deployer **without** `-Apply`. Only consider guarded activation if the actual Windows stage emits `FUN_AUTO_DASH_STAGE=PASS` and `FUN_AUTO_DASH_LIVE_DEPLOY=NOT_PERFORMED`. After activation, visit the root dashboard `http://127.0.0.1:8789/`, where the new standalone panel will appear. The normal chat remains unaffected.
+
+## November 11: live REA 229 tools READY, preserve the existing dashboard process
+
+A new operator diagnostic from their Windows host confirms:
+- REA service state `ready`, handshake complete, 229 tools available
+- `GET /api/rea/tools` returns HTTP 200
+- `GET /api/ai/tools` includes 19 fixed local tools and 229 REA entries
+- llama.cpp AI remains `ready`
+- the automatic dashboard routes have NOT been installed
+
+The previous guarded `-Apply` held at `REA_STATE_CHANGED` because its REA-stopped preflight no longer matches reality. **Do not relax that check and restart the 8789 Node process.** The active REA MCP adapter owns a child process and stores the tool session in the existing Node process; restarting it would destroy the initialized session.
+
+### Safe non-restarting alternative: standalone dashboard at 127.0.0.1:8796
+
+Use `Start-Fun-Auto-Sidecar8796.ps1` from the feature checkout. It runs 32 isolated tests, validates file/module syntax, exact model/cognitive/index identities, local 19+229 tool counts, REA ready, and checks owner snapshots on 8789, 8088, 8791, 8794, 4479. If 8796 is already in use, the launcher refuses to replace the owner. It starts **only** a new Node sidecar at 127.0.0.1:8796; it does NOT edit the existing dashboard files or restart anything. Successful startup reads the new UI, client, and status endpoints, compares protected PIDs, and verifies REA still reports ready with all 229 exposed.
+
+The sidecar's root page has a self-contained "Automatic Local Tools" panel. Its client JavaScript is CSP-compatible and accepts a click from that page only. The same-origin JSON run endpoint requires a matching browser Origin and `x-fi-auto-local: operator-click`, preventing ordinary cross-site forms from triggering execution. It has no shell or REA execution routes and no background jobs.
+
+The auto-local bridge filters the combined 248-tool registry to the **19** fixed `fi_*` entries before passing any function schema to Qwen. The runner automatically executes selected local tools during a bounded operator-started task, without per-call prompts. The 229 REA tool definitions remain visible on the original 8789 dashboard but are never passed to this executor, and the existing `/api/ai/tool-call` endpoint still rejects `rea__*` executions. **Catalogue visibility is not execution permission.**
+
+Open **http://127.0.0.1:8796/** on the Windows host for the new panel, leaving **http://127.0.0.1:8789/** unchanged. To halt the standalone sidecar after testing, use only its recorded PID; never call `/api/stop` on the parent or kill Node processes by name. No install-on-start, autostart, or automatic recurring task is added.
+
+Offline qualification: 32/32 targeted tests PASS on Windows and Ubuntu. The tests include mixed REA-ready 19+229 catalogues, one automatic local graph action, same-origin/CSRF checks, independent HTTP status/UI/client, and Windows bootstrap parser. The user's actual Windows sidecar has NOT been started yet; only their prior 8789 process and REA health have been observed.
+
+**Important:** legacy `Deploy-Fun-Auto-Local-Dashboard8789.ps1 -Apply` remains incompatible with REA ready by design; never run it on the current 229-ready host. The new sidecar is the supported path for this exact host state.
