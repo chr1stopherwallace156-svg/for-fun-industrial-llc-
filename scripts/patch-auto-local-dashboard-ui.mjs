@@ -4,7 +4,7 @@ import {readFileSync,writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const MARK='FI_AUTO_LOCAL_DASHBOARD_UI_V2';
-const PANEL=\`
+const PANEL=`
 <!-- FI_AUTO_LOCAL_DASHBOARD_UI_V2: separately triggered local execution panel -->
 <section id="fi-auto-local-panel" aria-label="Fun Industrial automatic local tools" style="padding:16px;margin:16px 0;border:1px solid #40566c;border-radius:12px;background:#172331;color:#eaf1f8">
   <h2>Fun Industrial · Automatic Local Tools</h2>
@@ -16,7 +16,7 @@ const PANEL=\`
   <div id="fi-auto-output" aria-live="polite" style="max-height:460px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:12px"></div>
 </section>
 <script src="/api/ai/auto-local/client.js" defer></script>
-\`;
+`;
 export function patchAutoLocalDashboardUi(source){
  if(typeof source!=='string'||source.includes(MARK)||source.includes('id="fi-auto-local-panel"'))
   throw Error('AUTO_DASH_UI_ALREADY_INSTALLED_OR_INVALID');
