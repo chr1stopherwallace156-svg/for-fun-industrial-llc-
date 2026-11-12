@@ -18,6 +18,8 @@ function fixture(reaCount=0,reaReady=false){
 }
 test('one-command REA can independently initialize with exactly 19 local and zero parent grants',()=>{
  assert.equal(classifyParentReadinessV43(fixture()),null);
+ const filtered=fixture();filtered.status.services[0].state='ready';
+ assert.equal(classifyParentReadinessV43(filtered),null); // initialized parent, zero filtered grants
  assert.deepEqual(classifyParentReadinessV43(fixture(229,true)),parentNames);
 });
 test('REA parent identity drifts fail closed; no unknown catalogue can masquerade as absence',()=>{
