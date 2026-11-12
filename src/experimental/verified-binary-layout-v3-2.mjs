@@ -82,7 +82,7 @@ function liveExact(status,catalogue){
  if(!tool)fail('EXACT_TOOL_NOT_REGISTERED');
  return strictPathSchema(tool.inputSchema);
 }
-export async function probeApprovedBinary(filePath,{root=rootDefault()}={}){
+export async function probeApprovedLayoutBinary(filePath,{root=rootDefault()}={}){
  const basename=validateFilename(filePath);
  if(typeof root!=='string'||!path.isAbsolute(root))fail('APPROVED_ROOT_INVALID');
  const rootResolved=path.resolve(root),wanted=path.isAbsolute(filePath)?path.resolve(filePath):path.resolve(rootResolved,filePath);
@@ -130,8 +130,8 @@ export async function probeApprovedBinary(filePath,{root=rootDefault()}={}){
   });
  }finally{await fd.close()}
 }
-export function createVerifiedFileV31({
- request,probe=probeApprovedBinary,clock=Date.now,
+export function createVerifiedBinaryLayoutV32({
+ request,probe=probeApprovedLayoutBinary,clock=Date.now,
  tokenFactory=()=>randomBytes(24).toString('hex'),root=rootDefault()
 }={}){
  if(typeof request!=='function'||typeof probe!=='function'||typeof clock!=='function'||
