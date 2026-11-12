@@ -8,6 +8,7 @@ $Repo=$PSScriptRoot
 $Runner=Join-Path $Repo 'scripts\Run-Fun-Unified-Chat8798.mjs'
 $Diagnostic=Join-Path $Repo 'scripts\Diagnose-Fun-Unified-Web8798.mjs'
 $AdaptiveDiagnostic=Join-Path $Repo 'scripts\Diagnose-Fun-Adaptive-V2.mjs'
+$V3Diagnostic=Join-Path $Repo 'scripts\Diagnose-Fun-Verified-V3.mjs'
 $Starter=Join-Path $Repo 'Start-Fun-Unified-Chat8798.ps1'
 $Node=(Get-Command node.exe -ErrorAction Stop).Source
 $Protected=@(8789,8796,8797,8088,8791)
@@ -23,7 +24,7 @@ if(-not $Apply){
  Write-Host 'FUN_WEB_REPAIR=INACTIVE. Explicit -Apply required.'
  exit 0
 }
-foreach($F in @($Runner,$Diagnostic,$AdaptiveDiagnostic,$Starter)){
+foreach($F in @($Runner,$Diagnostic,$AdaptiveDiagnostic,$V3Diagnostic,$Starter)){
  if(-not (Test-Path -LiteralPath $F -PathType Leaf)){Hold ('SOURCE_MISSING_'+$F)}
  if((Get-Item -LiteralPath $F).Attributes -band [IO.FileAttributes]::ReparsePoint){Hold ('SYMLINK_REFUSED_'+$F)}
 }
@@ -40,10 +41,17 @@ if($LASTEXITCODE -ne 0){Hold 'WEB_DIAGNOSTIC_FAILED_8798_PRESERVED'}
 if($LASTEXITCODE -ne 0){Hold 'ADAPTIVE_V2_SYNTAX_8798_PRESERVED'}
 & $Node $AdaptiveDiagnostic --plan 'Find tools to inspect a Rust binary'
 if($LASTEXITCODE -ne 0){Hold 'ADAPTIVE_V2_LIVE_PREFLIGHT_FAILED_8798_PRESERVED'}
+# Exact read-only V3 pilot prepares from the real 8797 catalogue without
+# calling any MCP tool; a failed schema preflight preserves the old 8798.
+& $Node --check $V3Diagnostic
+if($LASTEXITCODE -ne 0){Hold 'V3_DIAGNOSTIC_SYNTAX_8798_PRESERVED'}
+& $Node $V3Diagnostic --prepare-only
+if($LASTEXITCODE -ne 0){Hold 'V3_LIVE_PREFLIGHT_FAILED_8798_PRESERVED'}
 # Perform the entire offline V1+V2 qualification BEFORE stopping the old 8798.
 # A parsing/test failure must not tear down a working chat instance.
 $PreflightSources=@(
  (Join-Path $Repo 'src\experimental\adaptive-capability-v2.mjs'),
+ (Join-Path $Repo 'src\experimental\verified-rea-v3.mjs'),
  (Join-Path $Repo 'src\experimental\unified-task-chat.mjs'),
  (Join-Path $Repo 'src\experimental\unified-task-client.js'),
  (Join-Path $Repo 'scripts\Run-Fun-Unified-Chat8798.mjs')
@@ -55,10 +63,11 @@ foreach($Source in $PreflightSources){
 }
 Push-Location $Repo
 try{
- & $Node --test 'intelligence-checks\unified-task-chat-case.mjs' 'intelligence-checks\adaptive-capability-v2-case.mjs'
+ & $Node --test 'intelligence-checks\unified-task-chat-case.mjs' 'intelligence-checks\adaptive-capability-v2-case.mjs' 'intelligence-checks\verified-rea-v3-case.mjs'
  if($LASTEXITCODE -ne 0){Hold 'ADAPTIVE_V2_OFFLINE_TESTS_FAILED_8798_PRESERVED'}
 }finally{Pop-Location}
 Write-Host 'ADAPTIVE_V2_PREFLIGHT=PASS EXACT_229_AND_19_CATALOGUES_VERIFIED NO_TOOL_EXECUTION=TRUE'
+Write-Host 'V3_GUARDED_PREFLIGHT=PASS READONLY_TOOL_SCHEMA_VERIFIED MCP_CALLS=0'
 $Before=@{}
 foreach($Port in $Protected){
  $Before[$Port]=@(Listen $Port)
@@ -103,4 +112,4 @@ $New=Invoke-RestMethod 'http://127.0.0.1:8798/api/unified/status' -TimeoutSec 15
 if($New.version -ne 'fi-unified-task-chat-8798-v1' -or !$New.rea.ready -or !$New.local.ready -or !$New.ai.ready){Hold 'NEW_8798_HEALTH_HOLD'}
 Write-Host ('FUN_WEB_REPAIR=PASS OLD_8798_PID='+$OldPid+' NEW_8798_PID='+$NewPid)
 Write-Host 'ONLY_8798_RESTARTED=TRUE QWEN_8088=UNCHANGED REA_8797=UNCHANGED LOCAL_8796=UNCHANGED ORIGINAL_8789=UNCHANGED COMPUTE_8791=UNCHANGED'
-Write-Host 'NEXT=RUN_LIVE_CAPABILITY_DISCOVERY_FROM_CHAT'
+Write-Host 'NEXT=V3_PREPARE_AND_SEPARATE_OPERATOR_CONFIRM_ONLY'
