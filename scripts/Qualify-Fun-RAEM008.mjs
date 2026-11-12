@@ -3,13 +3,11 @@ import {mkdtemp,rm,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {sampleHost} from '../src/resource-aware/host-snapshot.mjs';
-import {evaluateAdmission} from '../src/resource-aware/raem.mjs';
-import {chooseAdaptiveIncidentBudget} from '../src/resource-aware/adaptive-incident-budget.mjs';
+import {evaluateSyntheticBalancedAdmission} from '../src/resource-aware/synthetic-admission-profile.mjs';
 import {CatalogueSnapshotStore,checkPublicCatalogue,CATALOGUE_URL} from '../src/resource-aware/hibp-catalogue.mjs';
 
 const host=await sampleHost({sampleDelayMs:150});
-const upstream=evaluateAdmission(host,{id:'raem_catalogue_offline_demo',minimumMiB:64,targetMiB:128,maximumMiB:128});
-const admission=chooseAdaptiveIncidentBudget(upstream,process.memoryUsage().rss/(1024*1024));
+const admission=evaluateSyntheticBalancedAdmission(host,process.memoryUsage().rss/(1024*1024));
 console.log('RAEM_008_PRECHECK='+JSON.stringify({host,admission}));
 if(admission.state!=='GRANT'){
   console.log('RAEM_008_RESULT=HOLD '+admission.reason);
@@ -27,7 +25,7 @@ if(admission.state!=='GRANT'){
   return new Response(JSON.stringify(active),{status:200,headers:{'content-type':'application/json'}});
  };
  const makeOptions=store=>({store,fetchImpl,operatorApproved:true,
-  maxProcessRssMiB:admission.grantedMiB,minimumHostFreeMiB:admission.reserveMiB+8});
+  maxProcessRssMiB:admission.grantedMiB,minimumHostFreeMiB:admission.runtimeFreeFloorMiB});
  try{
   const first=new CatalogueSnapshotStore(opts);
   const one=await checkPublicCatalogue({...makeOptions(first),nowMs:1000});
