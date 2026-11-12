@@ -82,6 +82,7 @@ $PreflightSources=@(
  (Join-Path $Repo 'src\experimental\verified-binary-layout-v3-2.mjs'),
  (Join-Path $Repo 'src\experimental\verified-pe-inspection-v3-4.mjs'),
  (Join-Path $Repo 'src\experimental\unified-gateway-v4.mjs'),
+ (Join-Path $Repo 'src\experimental\embedded-local-tools-v4-2.mjs'),
  (Join-Path $Repo 'scripts\Diagnose-Fun-Unified-V4.mjs'),
  (Join-Path $Repo 'scripts\Diagnose-Fun-Verified-PE-V34.mjs'),
  (Join-Path $Repo 'src\experimental\unified-task-chat.mjs'),
@@ -95,7 +96,7 @@ foreach($Source in $PreflightSources){
 }
 Push-Location $Repo
 try{
- & $Node --test 'intelligence-checks\unified-task-chat-case.mjs' 'intelligence-checks\adaptive-capability-v2-case.mjs' 'intelligence-checks\verified-rea-v3-case.mjs' 'intelligence-checks\verified-file-v3-1-case.mjs' 'intelligence-checks\verified-binary-layout-v3-2-case.mjs' 'intelligence-checks\verified-pe-inspection-v3-4-case.mjs' 'intelligence-checks\unified-runtime-v4-case.mjs'
+ & $Node --test 'intelligence-checks\unified-task-chat-case.mjs' 'intelligence-checks\adaptive-capability-v2-case.mjs' 'intelligence-checks\verified-rea-v3-case.mjs' 'intelligence-checks\verified-file-v3-1-case.mjs' 'intelligence-checks\verified-binary-layout-v3-2-case.mjs' 'intelligence-checks\verified-pe-inspection-v3-4-case.mjs' 'intelligence-checks\unified-runtime-v4-case.mjs' 'intelligence-checks\embedded-local-v4-2-case.mjs'
  if($LASTEXITCODE -ne 0){Hold 'ADAPTIVE_V2_OFFLINE_TESTS_FAILED_8798_PRESERVED'}
 }finally{Pop-Location}
 Write-Host 'ADAPTIVE_V2_PREFLIGHT=PASS EXACT_229_AND_19_CATALOGUES_VERIFIED NO_TOOL_EXECUTION=TRUE'
@@ -104,6 +105,7 @@ Write-Host 'V31_GUARDED_PREFLIGHT=PASS LIVE_PATH_SCHEMA_VERIFIED FILES_OPENED=0 
 Write-Host 'V32_GUARDED_PREFLIGHT=PASS LIVE_LAYOUT_PATH_SCHEMA_VERIFIED FILES_OPENED=0 MCP_CALLS=0'
 Write-Host 'V34_OFFLINE_PREFLIGHT=PASS FIVE_PE_TOOLS_SCHEMA_BOUND NO_LIVE_MCP_CALLS=TRUE'
 Write-Host 'V4_GUARDED_PREFLIGHT=PASS SINGLE_ENTRYPOINT_WORKERS_UNCHANGED NO_TOOL_CALLS=TRUE'
+Write-Host 'V42_EMBEDDED_LOCAL_OFFLINE_PREFLIGHT=PASS LEGACY_EXECUTOR_NOT_CALLED NO_MCP_EXECUTION=TRUE'
 $Before=@{}
 foreach($Port in $Protected){
  $Before[$Port]=@(Listen $Port)
@@ -146,9 +148,11 @@ foreach($Port in $Protected){
 }
 $New=Invoke-RestMethod 'http://127.0.0.1:8798/api/unified/status' -TimeoutSec 15
 if($New.version -ne 'fi-unified-task-chat-8798-v1' -or !$New.rea.ready -or !$New.local.ready -or !$New.ai.ready -or !$New.verifiedPeV34.enabled){Hold 'NEW_8798_HEALTH_HOLD'}
+if($New.localExecutionPath -ne 'embedded_in_8798' -or $New.embeddedLocalV42.enabled -ne $true -or $New.embeddedLocalV42.reaExecutionGrants -ne 0 -or $New.embeddedLocalV42.legacy8796ExecutionPostUsed -ne $false){Hold 'V42_EMBEDDED_EXECUTOR_STATUS_HOLD'}
 $V4=Invoke-RestMethod 'http://127.0.0.1:8798/api/unified/v4/status' -TimeoutSec 15
 if($V4.version -ne 'fi-unified-runtime-v4-stage1' -or $V4.state -ne 'ready' -or !$V4.registered.verifiedCounts){Hold 'V4_NEW_8798_NOT_READY'}
 Write-Host ('FUN_WEB_REPAIR=PASS OLD_8798_PID='+$OldPid+' NEW_8798_PID='+$NewPid)
 Write-Host 'ONLY_8798_RESTARTED=TRUE QWEN_8088=UNCHANGED REA_8797=UNCHANGED LOCAL_8796=UNCHANGED ORIGINAL_8789=UNCHANGED COMPUTE_8791=UNCHANGED'
 Write-Host 'V4_SINGLE_ENTRYPOINT=ACTIVE INTERNAL_SERVICE_PORTS_STILL_RUNNING=TRUE'
-Write-Host 'NEXT=STAGE2_EMBED_LOCAL_TOOL_ROUTING_WITHOUT_DROPPING_APPROVALS'
+Write-Host 'V42_EMBEDDED_LOCAL=ACTIVE LEGACY_8796_PRESERVED=TRUE PARENT_8789_UNCHANGED=TRUE'
+Write-Host 'NEXT=V42_OPERATOR_APPROVED_SINGLE_LOCAL_ACTION_VALIDATION'
