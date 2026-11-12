@@ -131,6 +131,92 @@ if(v3choice&&v3prepare&&v3confirm&&v3cancel&&v3preview){
   }finally{clearV3();toggle(false)}
  });
 }
+
+const v31file=el('v31-file'),v31prepare=el('v31-prepare'),
+ v31confirm=el('v31-confirm'),v31cancel=el('v31-cancel'),
+ v31preview=el('v31-preview'),v31root=el('v31-root');
+let v31Token=null;
+function clearV31(){
+ v31Token=null;
+ if(v31confirm)v31confirm.disabled=true;
+ if(v31cancel)v31cancel.disabled=true;
+ if(v31file)v31file.disabled=false;
+ if(v31preview)v31preview.textContent='No staged file prepared.';
+}
+if(v31file&&v31prepare&&v31confirm&&v31cancel&&v31preview&&v31root){
+ api('/api/unified/v3.1/status').then(s=>{
+  v31root.textContent='Approved input directory: '+String(s.approvedDirectory);
+ }).catch(e=>{v31root.textContent='V3.1 status unavailable: '+String(e.message||e)});
+ v31file.addEventListener('input',()=>{if(v31Token)clearV31()});
+ v31prepare.addEventListener('click',async()=>{
+  if(busy||v31Token)return;
+  const filename=v31file.value.trim();
+  if(!/^[A-Za-z0-9][A-Za-z0-9._-]{0,180}$/.test(filename)){
+   v31preview.textContent='Provide only a staged binary filename (no folders or paths).';return;
+  }
+  toggle(true);v31prepare.disabled=true;
+  try{
+   const result=await api('/api/unified/v3.1/prepare',{
+    name:'inspect_rust_binary',filePath:filename});
+   if(result.state!=='awaiting_separate_operator_confirmation'||
+     result.preview?.name!=='inspect_rust_binary'||
+     result.executionCount!==0)throw Error('PREPARATION_NOT_VERIFIED');
+   v31Token=result.token;
+   v31file.disabled=true;
+   v31preview.textContent=[
+    'Review EXACT static inspection:',
+    'Tool: '+result.preview.name,
+    'Arguments: '+JSON.stringify(result.preview.args),
+    'File SHA-256: '+result.preview.file.sha256,
+    'File bytes: '+result.preview.file.bytes,
+    'File format signature: '+result.preview.file.format,
+    'Schema SHA-256: '+result.preview.schemaHash,
+    'Specific provider readiness remains unproven.',
+    'Expires: '+new Date(result.expiresAtUnixMs).toLocaleTimeString(),
+    'Approve only if this is your authorized file.',
+    'There will be exactly ONE MCP call and no retry.'
+   ].join('\n');
+   v31confirm.disabled=false;v31cancel.disabled=false;
+   event('V3.1 PREPARED; NO MCP CALL. Tool=inspect_rust_binary sha256='+String(result.preview.file.sha256));
+   status.textContent='V3.1 awaiting separate explicit approval';
+  }catch(error){
+   clearV31();event('V3.1 PREPARE HOLD '+String(error.message||error));
+   v31preview.textContent='V3.1 HOLD: '+String(error.message||error);
+  }finally{toggle(false);v31prepare.disabled=!!v31Token||busy;}
+ });
+ v31cancel.addEventListener('click',async()=>{
+  if(busy||!v31Token)return;toggle(true);
+  try{const outcome=await api('/api/unified/v3.1/cancel',{});
+   event('V3.1 CANCELED '+String(outcome.state))}
+  catch(e){event('V3.1 CANCEL HOLD '+String(e.message||e))}
+  finally{clearV31();v31prepare.disabled=false;toggle(false)}
+ });
+ v31confirm.addEventListener('click',async()=>{
+  if(busy||!v31Token)return;
+  const token=v31Token;v31Token=null;toggle(true);
+  v31preview.textContent='One approved inspection submitted. Uncertain outcome will NOT be retried.';
+  try{
+   const result=await api('/api/unified/v3.1/confirm',{
+    token,operatorConfirmed:true});
+   event('V3.1 STATE='+String(result.state)+' MCP_CALLS='+String(result.executionCount));
+   if(result.receipt){
+    event('V3.1 FILE BEFORE='+String(result.receipt.fileSha256Before)+
+      ' AFTER='+String(result.receipt.fileSha256After));
+    event('V3.1 RESULT HASH='+String(result.receipt.resultHash)+
+      ' RECEIPT='+String(result.receipt.receiptHash));
+   }
+   if(result.preview)event('V3.1 UNTRUSTED OUTPUT: '+String(result.preview));
+   v31preview.textContent='V3.1 '+String(result.state)+
+     '\nCheck execution evidence. A correct envelope is not proof of Rust source language or analysis accuracy.';
+   status.textContent='V3.1 '+String(result.state);
+  }catch(error){
+   v31preview.textContent='V3.1 HOLD/UNCERTAIN: '+String(error.message||error)+
+     '\nDo not retry automatically.';
+   event('V3.1 OUTCOME HOLD '+String(error.message||error));
+  }finally{clearV31();v31prepare.disabled=false;toggle(false)}
+ });
+}
+
 send.addEventListener('click',async()=>{
  if(busy)return;
  const prompt=task.value.trim();
