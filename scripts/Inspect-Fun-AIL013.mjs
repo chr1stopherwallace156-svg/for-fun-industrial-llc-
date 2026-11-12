@@ -5,7 +5,7 @@ import {chooseAdaptiveIncidentBudget} from '../src/resource-aware/adaptive-incid
 import {LocalAilSourceRegistry} from '../src/integrations/ail-source-registry.mjs';
 const args=process.argv.slice(2);
 const dry=args.length===0||(args.length===1&&args[0]==='--dry-run');
-const read=args.length===5&&args[0]==='--source-id'&&args[2]==='--file'&&args[4]==='--sha256';
+const read=args.length===6&&args[0]==='--source-id'&&args[2]==='--file'&&args[4]==='--sha256';
 if(!dry&&!read)throw Error('RAEM013_ARGS_INVALID');
 const host=await sampleHost({sampleDelayMs:150});
 const prior=evaluateAdmission(host,{id:'ail_metadata_local_source',minimumMiB:64,targetMiB:128,maximumMiB:128});
@@ -16,6 +16,11 @@ else{
  const registry=new LocalAilSourceRegistry();
  registry.register({id:args[1],path:args[3],expectedSha256:args[5]});
  console.log('RAEM_013_SOURCES='+JSON.stringify(registry.list()));
- console.log('RAEM_013_RESULT=PLAN_ONLY_APPROVAL_REQUIRED');
+ if(grant.state!=='GRANT')console.log('RAEM_013_RESULT=HOLD '+grant.reason);
+ else{
+  const result=await registry.inspect(args[1],{operatorApproved:true,maxProcessRssMiB:grant.grantedMiB,minimumHostFreeMiB:grant.reserveMiB+64});
+  console.log('RAEM_013_SUMMARY='+JSON.stringify(result));
+  console.log('RAEM_013_RESULT='+(result.state==='PASS'?'PASS LOCAL_METADATA_ONLY':'HOLD '+result.reason));
+ }
 }
-console.log('RAEM_013_END=NO_FILE_READ_NO_NETWORK_NO_BACKGROUND_WORK_NO_SERVICE_CHANGES');
+console.log('RAEM_013_END=NO_FILE_WRITES_NO_NETWORK_NO_BACKGROUND_WORK_NO_SERVICE_CHANGES');
