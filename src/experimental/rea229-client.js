@@ -29,13 +29,16 @@ async function action(title,body,path){
   const data=await api(path,body);
   const actions=Array.isArray(data.actions)?data.actions:(data.tool?[data]:[]);
   for(const a of actions){
-   note('EXECUTED REA tool: '+String(a.tool)+(a.round?' · round '+a.round:''));
-   const value=a.summary||JSON.stringify(a.result??null);
+   const failed=a.result?.isError===true||a.state==='provider_mcp_error_reported';
+   note((failed?'REA MCP TOOL ERROR (not successful analysis): ':'EXECUTED REA tool: ')+
+    String(a.tool)+(a.round?' · round '+a.round:''));
+   const value=failed?JSON.stringify(a.mcpErrorEvidence??{errorClass:'unclassified_mcp_error'}):
+    a.summary||JSON.stringify(a.result??null);
    note(String(value).slice(0,12000));
   }
   if(!actions.length)note('No REA tool was executed in this session.');
   if(data.reply)note('Qwen: '+data.reply);
-  state.textContent=String(data.state||'done')+' · REA=229 real tools · actions='+actions.length;
+  state.textContent=actions.some(a=>a.result?.isError===true)?'MCP PROVIDER ERROR · no successful result':String(data.state||'done')+' · REA=229 real tools · actions='+actions.length;
  }catch(error){note('HOLD: '+String(error.message||error));state.textContent='HOLD: '+String(error.message||error).slice(0,180)}
  finally{toggle(false)}
 }

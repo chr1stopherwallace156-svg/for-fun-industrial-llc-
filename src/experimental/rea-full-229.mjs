@@ -1,3 +1,4 @@
+import {boundedMcpErrorEvidence} from './rea-error-evidence-v33.mjs';
 // FI_REA_229_FULL_MCP_RUNNER_V1
 // A second independent REA MCP session. The operator can request ANY real
 // catalogued tool, and a one-run Qwen session may execute relevant REA tools
@@ -128,7 +129,15 @@ export function createFullReaRunner({adapter,infer}={}){
    const res=await adapter.callTool(name,args);
    if(res?.tool!==name)err('MCP_TOOL_RESULT_IDENTITY_MISMATCH');
    callsExecuted++;
-   if(res.result?.isError===true)err('MCP_TOOL_RETURNED_ERROR');
+   if(res.result?.isError===true){
+    // An MCP provider rejection is an observed tool outcome, not a transport
+    // failure. Return only locally classified, digest-bound error evidence;
+    // never expose arbitrary provider text, paths, or prompts over HTTP.
+    const evidence=boundedMcpErrorEvidence(res.result);
+    return {tool:name,state:'provider_mcp_error_reported',
+     result:{isError:true,structuredContent:{errorEvidence:evidence}},
+     mcpErrorEvidence:evidence,realReaToolCount:229};
+   }
    return {tool:name,result:res.result,realReaToolCount:229};
   }finally{busy=false}
  }

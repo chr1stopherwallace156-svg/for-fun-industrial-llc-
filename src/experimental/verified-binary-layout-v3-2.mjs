@@ -257,6 +257,42 @@ export function createVerifiedBinaryLayoutV32({
    catch(e){postError=short(e?.message)}
    const sameFile=fingerprintEqual(after,permit.file);
    const toolMatches=outcome?.tool===NAME;
+   // V3.3 exact 8797 replies with a bounded isError envelope rather than
+   // suppressing all detail. It remains FAILED analysis, never a positive
+   // tool receipt; untrusted raw provider text never reaches 8798.
+   if(toolMatches&&outcome?.result?.isError===true){
+    const info=outcome.mcpErrorEvidence;
+    const allowedClasses=new Set(['access_denied','provider_unavailable',
+     'input_validation','file_unavailable','format_not_supported',
+     'analysis_timeout','unclassified_mcp_error']);
+    const valid=obj(info)&&info.version==='fi-rea-mcp-error-evidence-v1'&&
+     allowedClasses.has(info.errorClass)&&info.resultIsError===true&&
+     info.analysisSucceeded===false&&info.diagnosticTextExposed===false&&
+     /^[a-f0-9]{64}$/.test(info.evidenceDigestSha256??'')&&
+     ['first_131072_utf16_code_units','complete_json_utf8'].includes(info.digestScope);
+    if(valid){
+     const receipt={version:'fi-verified-binary-layout-v3.2',tool:NAME,
+      state:'provider_mcp_error_reported',schemaHash:permit.schemaHash,
+      argumentsHash:permit.argsHash,fileSha256Before:permit.file.sha256,
+      fileSha256After:after?.sha256??null,fileIdentityVerified:sameFile,
+      fileBytes:permit.file.bytes,providerErrorCode:'REA229_MCP_TOOL_RETURNED_ERROR',
+      providerDetailedCause:info.errorClass,
+      providerErrorClassHeuristic:true,providerEvidenceHash:info.evidenceDigestSha256,
+      providerEvidenceScope:info.digestScope,resultHash:null,
+      resultEnvelopeAvailable:true,analysisContentAccuracyVerified:false,
+      providerSideEffectsIndependentlyVerified:false,
+      postError,approved:true,tokenConsumed:true,requestSubmitted:true,
+      automaticRetries:0,completedAtUnixMs:clock()};
+     receipt.receiptHash=hash(receipt);
+     lastReceipt={...receipt};unknown++;
+     return {version:'fi-verified-binary-layout-v3.2',
+      state:'provider_mcp_error_reported',reason:'REA229_MCP_TOOL_RETURNED_ERROR',
+      executionCount:'unverified',approved:true,tokenConsumed:true,
+      requestSubmitted:true,manualVerificationRequired:true,receipt,
+      preview:'REA provider error category (heuristic): '+info.errorClass+
+       '; no analysis result; no automatic retry'};
+    }
+   }
    const evidence=obj(outcome?.result?.structuredContent)||
      (Array.isArray(outcome?.result?.content)&&outcome.result.content.length>0);
    const envelope=obj(outcome?.result)&&outcome.result.isError!==true&&evidence;
@@ -281,7 +317,9 @@ export function createVerifiedBinaryLayoutV32({
    return {version:'fi-verified-binary-layout-v3.2',state,
     executionCount:state==='verified_static_inspection'?1:'unverified',
     requestSubmitted:true,approved:true,tokenConsumed:true,
-    receipt,preview:short(outputJson,3800)};
+    receipt,preview:outcome?.result?.isError===true?
+     'MCP provider error evidence unavailable or invalid; raw error text withheld; manual review required':
+     short(outputJson,3800)};
   }finally{busy=false}
  }
  function cancel(){
