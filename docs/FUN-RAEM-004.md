@@ -27,3 +27,14 @@ node .\scripts\Qualify-Fun-RAEM004.mjs
 ```
 
 Look for `RAEM_004_RESULT` and `RAEM_004_SCALING`. A HOLD due to memory pressure is a protective outcome. Keep Qwen/REA/Ollama/dashboard untouched. No merge until Windows qualification.
+
+
+## RAEM-004a adaptive low-headroom qualification
+
+After Windows reported 78 MiB above the original reserve, the original 128 MiB minimum correctly returned HOLD. This update retains the **same host reserve** and uses a 64 MiB minimum admission with a 128 MiB desired target. A second adapter checks current Node process RSS and reserves another 8 MiB of host headroom plus 8 MiB of process growth. It never grants more than RAEM-001 allowed.
+
+Examples: 78 MiB headroom with 52 MiB process RSS gives a 70 MiB *advisory* worker ceiling; the benchmark may run and periodically check observed RSS. If baseline process RSS is already 70 MiB, it returns HOLD. The reserved memory is not a hard allocation or OS-enforced limit. No service should be stopped or restarted to make a benchmark run.
+
+Six focused tests in `intelligence-checks/resource-aware-adaptive-budget-case.mjs` verify reduced grants, upstream ceilings, the full target, pressure holds and invalid input.
+
+Run the revised benchmark from the existing RAEM-004 test checkout after a fast-forward pull. Output `RAEM_004_PRECHECK` includes the adapted budget. A HOLD remains expected if the available resources or Node baseline memory have changed. Neither the old test output nor the new tests demonstrate full AIL performance.
