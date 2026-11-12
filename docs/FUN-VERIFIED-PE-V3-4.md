@@ -17,6 +17,28 @@ Every prepare checks live 229-tool MCP catalogue, rejects duplicate names and un
 
 A separate, one-use 48-hex token expires after 2 minutes. Confirm consumes it before network actions, rechecks the schema, file identity and path, then submits *at most one* `/api/rea229/call` with the selected name and exact path. No model-selected tool, automatic retry, loop, arbitrary shell, download, file execution, REA status mutation or background job is part of this pilot. Cancel makes no MCP call.
 
+## Canonical path-pattern compatibility
+Live schema diagnosis exposed an extra `path.pattern` on at least one PE tool schema. The adapter now accepts **only** the canonical NUL-excluding expression `^[^\\x00]*# Fun Industrial V3.4 — exact Windows PE inspection pilot
+
+## Evidence and scope
+The operator verified the existing staged Windows sample `fun_v31_windows_probe.exe` as a **PE x64** binary: Machine `0x8664`, seven sections, SHA-256 `f51fab8041e5023d7290b540a2106f051ef0bd2bc3443c9daf318628b560fa29`. The live REA catalogue registered five tools with a mandatory `path` argument:
+- `inspect_pe_imports`
+- `inspect_native_exports`
+- `inspect_pe_resources`
+- `inspect_byte_entropy`
+- `inspect_pe_load_config`
+
+`inspect_binary_hardening` was **not confirmed** and is **not authorized**. V3.2's `inspect_binary_layout` returned two real MCP tool rejections; the cause remains unknown and the earlier request must not be replayed.
+
+## V3.4 new isolated capability
+`src/experimental/verified-pe-inspection-v3-4.mjs` and the dedicated `/api/unified/v3.4/` endpoints add five *individually selected* exact REA tools, not multi-tool orchestration. The operator provides only a basename for a staged `.exe` or `.dll` file; nested, external or symlink/hardlink inputs fail before execution. The original V3.2 file probe checks the approved directory, canonical file path, size up to 64 MiB, regular file identity and full-file SHA-256. V3.4 additionally checks the native DOS header, PE signature, x64 machine 0x8664, a bounded nonzero section count, and PE32+ optional header 0x20b. V3.4 compares the complete SHA-256 and file identity before and after header reading, and again before and after the MCP call.
+
+Every prepare checks live 229-tool MCP catalogue, rejects duplicate names and unknown schema assertions, and requires *exactly one mandatory `path:string`* plus `additionalProperties:false`. It passes no optional parameters. Actual provider availability is **unverified**, even when the tool is registered. Preparation does not call MCP.
+
+A separate, one-use 48-hex token expires after 2 minutes. Confirm consumes it before network actions, rechecks the schema, file identity and path, then submits *at most one* `/api/rea229/call` with the selected name and exact path. No model-selected tool, automatic retry, loop, arbitrary shell, download, file execution, REA status mutation or background job is part of this pilot. Cancel makes no MCP call.
+
+ when supplied, while rejecting any other regex or unknown path keywords. Existing staged basename, regular-file, approved-root and exact path validation remain mandatory. Optional provider fields may be advertised, but V3.4 transmits only the required `path` argument. This code-level change does **not** constitute a live preflight or provider-use PASS; the five-tool schema diagnostic must be repeated against the current catalogue.
+
 ## Honest evidence handling
 - `verified_mcp_envelope` means exact tool identity, non-error result envelope and unchanged source file. It does **not** independently establish findings' correctness or provider-side effect freedom.
 - `provider_mcp_error_reported` preserves V3.3's bounded sanitized error class and hash, with `analysisAccuracyVerified:false`. Never mislabel a negative receipt as success.
