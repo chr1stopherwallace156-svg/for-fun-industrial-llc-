@@ -8,6 +8,7 @@ import {createAdaptivePlanner} from './adaptive-capability-v2.mjs';
 import {createVerifiedReaV3} from './verified-rea-v3.mjs';
 import {createVerifiedFileV31} from './verified-file-v3-1.mjs';
 import {createVerifiedBinaryLayoutV32} from './verified-binary-layout-v3-2.mjs';
+import {createVerifiedPeInspectionV34} from './verified-pe-inspection-v3-4.mjs';
 const BASE='http://127.0.0.1:8798';
 const REA='http://127.0.0.1:8797';
 const LOCAL='http://127.0.0.1:8796';
@@ -86,6 +87,7 @@ export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWeb
  const verifiedRea=createVerifiedReaV3({request});
  const verifiedFile=createVerifiedFileV31({request});
  const verifiedLayout=createVerifiedBinaryLayoutV32({request});
+ const verifiedPe=createVerifiedPeInspectionV34({request});
  async function infer(prompt,observation=null,context=[]){
   const result=await request(LLAMA,{model:'local-model',messages:[
    {role:'system',content:baseModelSystem},
@@ -143,8 +145,9 @@ export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWeb
    verifiedReaV3:verifiedRea.status(),
    verifiedFileV31:verifiedFile.status(),
    verifiedLayoutV32:verifiedLayout.status(),
+   verifiedPeV34:verifiedPe.status(),
    completedSessions:completed,failedSessions:failed,busy,
-   capabilities:['qwen_chat','public_https_static_text','adaptive_live_capability_planning_v2','exact_verified_rea_v3_operator_approved','staged_file_schema_bound_v3_1','staged_binary_layout_v3_2','real_rea_readonly_session',
+   capabilities:['qwen_chat','public_https_static_text','adaptive_live_capability_planning_v2','exact_verified_rea_v3_operator_approved','staged_file_schema_bound_v3_1','staged_binary_layout_v3_2','staged_pe_five_tool_v3_4','real_rea_readonly_session',
      'explicit_click_rea_229_runner','explicit_click_local_registered_tools','task_classification'],
    notImplemented:['arbitrary_app_install','binary_upload','native_game_port',
      'browser_javascript_automation','arbitrary_shell']};
@@ -261,8 +264,13 @@ export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWeb
  async function prepareVerifiedLayout(body){return verifiedLayout.prepare(body)}
  async function confirmVerifiedLayout(body){return verifiedLayout.confirm(body)}
  function cancelVerifiedLayout(){return verifiedLayout.cancel()}
+ function verifiedPeStatus(){return verifiedPe.status()}
+ async function prepareVerifiedPe(body){return verifiedPe.prepare(body)}
+ async function confirmVerifiedPe(body){return verifiedPe.confirm(body)}
+ function cancelVerifiedPe(){return verifiedPe.cancel()}
  return Object.freeze({status,chat,executeLocal,executeRea,planCapabilities,
   verifiedReaStatus,prepareVerifiedRea,executeVerifiedRea,cancelVerifiedRea,
   verifiedFileStatus,prepareVerifiedFile,confirmVerifiedFile,cancelVerifiedFile,
-  verifiedLayoutStatus,prepareVerifiedLayout,confirmVerifiedLayout,cancelVerifiedLayout});
+  verifiedLayoutStatus,prepareVerifiedLayout,confirmVerifiedLayout,cancelVerifiedLayout,
+  verifiedPeStatus,prepareVerifiedPe,confirmVerifiedPe,cancelVerifiedPe});
 }
