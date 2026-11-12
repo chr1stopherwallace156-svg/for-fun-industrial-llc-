@@ -125,3 +125,12 @@ test('malformed configuration and unsorted duplicates are rejected',()=>{
  assert.throws(()=>new CatalogueSnapshotStore({root:'relative'}),/RAEM008_CONFIG_INVALID/);
  assert.throws(()=>reconcileCatalogue([row('ExampleOne'),row('ExampleOne')],[]),/RAEM008_DUPLICATE_PROVIDER_NAME/);
 });
+
+test('unexpected catalogue collapse holds without replacing prior checkpoint',async t=>{
+ const {store}=await fixture(t);
+ const first=await check(store,1000,[row('ExampleOne'),row('ExampleTwo'),row('ExampleThree')]);
+ assert.equal(first.state,'PASS');
+ const second=await check(store,21601000,[]);
+ assert.equal(second.state,'HOLD');assert.equal(second.reason,'CATALOGUE_SUDDEN_SHRINK');
+ const state=await store.read();assert.equal(state.records.length,3);assert.equal(state.checkedAtMs,1000);
+});
