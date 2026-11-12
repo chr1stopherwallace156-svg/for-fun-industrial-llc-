@@ -393,6 +393,30 @@ if(v34file&&v34choice&&v34prepare&&v34confirm&&v34cancel&&v34preview&&v34root){
 }
 
 
+
+const v4button=el('v4-refresh'),v4summary=el('v4-summary'),v4services=el('v4-services');
+if(v4button&&v4summary&&v4services){
+ const checkV4=async()=>{
+  v4button.disabled=true;
+  v4summary.textContent='Reading the current service health (no actions)…';
+  try{
+   const report=await api('/api/unified/v4/status');
+   if(report.version!=='fi-unified-runtime-v4-stage1')throw Error('V4_IDENTITY_MISMATCH');
+   v4summary.textContent='V4 '+report.state+
+    ' · 1 user-facing address · '+String(report.registered?.rea??'?')+
+    ' REA · '+String(report.registered?.local??'?')+' local tools';
+   v4services.textContent=report.services.map(item=>
+    String(item.id)+': '+(item.ready?'ready':'unavailable')+
+    ' (internal '+String(item.port)+')').join('\n');
+   event('V4 READ-ONLY: '+report.state+
+    ' | legacy ports not retired | no tool calls or restarts');
+  }catch(e){v4summary.textContent='V4 STATUS HOLD: '+String(e.message||e);
+  }finally{v4button.disabled=false}
+ };
+ v4button.addEventListener('click',checkV4);
+ // No background polling, timers or service changes.
+}
+
 send.addEventListener('click',async()=>{
  if(busy)return;
  const prompt=task.value.trim();
