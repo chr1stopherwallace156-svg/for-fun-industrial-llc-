@@ -16,6 +16,7 @@ const HTML='<!doctype html><html lang="en"><head><meta charset="utf-8"><meta nam
 '<section class="panel"><label for="task">Your request</label><textarea id="task" maxlength="2200" placeholder="Analyze https://example.org and summarize its static page text, or ask if Warzone can run on iPhone, or inspect REA MCP session status"></textarea><div class="actions"><button type="button" id="send">Send to Qwen</button></div>'+
 '<section class="panel" id="v3-panel"><h2>V3 · Verified exact REA inspection</h2><p>One allowlisted read-only MCP tool, exact empty arguments, live schema check, and a separate approval. This does not authorize other 229 tools.</p><label for="v3-choice">Exact inspected tool</label><select id="v3-choice"><option value="inspect_analysis_settings">inspect_analysis_settings</option><option value="binary_session">binary_session</option></select><div class="actions"><button id="v3-prepare" type="button">1. Prepare exact inspection</button><button id="v3-confirm" type="button" disabled>2. Confirm once and execute</button><button id="v3-cancel" type="button" disabled>Cancel preparation</button></div><div id="v3-preview" aria-live="polite" class="status">No V3 execution prepared.</div></section>'+
 '<section class="panel" id="v31-panel"><h2>V3.1 · Staged executable inspection</h2><p>Inspect a pre-existing PE/ELF file placed directly inside your approved input directory. Only inspect_rust_binary is eligible for this pilot. A separate confirmation is required.</p><p id="v31-root" class="muted">Loading approved directory…</p><label for="v31-file">Staged binary filename (e.g. sample.exe)</label><input id="v31-file" type="text" maxlength="180" placeholder="sample.exe" autocomplete="off"><div class="actions"><button type="button" id="v31-prepare">1. Verify file and prepare</button><button type="button" id="v31-confirm" disabled>2. Approve one inspection</button><button type="button" id="v31-cancel" disabled>Cancel</button></div><div id="v31-preview" class="status" aria-live="polite">No file prepared.</div></section>'+
+'<section class="panel" id="v32-panel"><h2>V3.2 · General PE/ELF binary layout</h2><p>Inspect a pre-existing PE/ELF file placed directly inside your approved input directory. Only inspect_binary_layout is eligible for this pilot. A separate confirmation is required.</p><p id="v32-root" class="muted">Loading approved directory…</p><label for="v32-file">Staged binary filename (e.g. sample.exe)</label><input id="v32-file" type="text" maxlength="180" placeholder="sample.exe" autocomplete="off"><div class="actions"><button type="button" id="v32-prepare">1. Verify file and prepare</button><button type="button" id="v32-confirm" disabled>2. Approve one inspection</button><button type="button" id="v32-cancel" disabled>Cancel</button></div><div id="v32-preview" class="status" aria-live="polite">No file prepared.</div></section>'+
 '<div id="action-review"><p><strong>Tool execution requires a separate explicit decision.</strong> REA tools may change files, devices or processes; local tools may change compute state. Review the request before authorizing.</p><label><input type="checkbox" id="local-consent">I authorize this one local-tools session for the request above</label><button type="button" id="local-execute" disabled>Execute reviewed tools</button></div></section>'+
 '<section class="panel"><h2>Execution evidence</h2><div id="event-log"></div><p class="muted">Read-only tasks may run after you send. Local tools require a separate review. No background operation, automatic downloads, arbitrary shell, or DRM/anti-cheat bypass.</p></section><script src="/api/unified/client.js" defer></script></main></body></html>';
 function send(res,status,value,type='application/json; charset=utf-8'){
@@ -47,10 +48,23 @@ export function createUnifiedChatServer({app=createUnifiedTaskChat(),readClient=
    if(req.method==='GET'&&u.pathname==='/api/unified/status'&&!u.search)return send(res,200,await app.status());
    if(req.method==='GET'&&u.pathname==='/api/unified/v3/status'&&!u.search)return send(res,200,app.verifiedReaStatus());
    if(req.method==='GET'&&u.pathname==='/api/unified/v3.1/status'&&!u.search)return send(res,200,app.verifiedFileStatus());
-   if(req.method==='POST'&&['/api/unified/chat','/api/unified/capabilities/plan','/api/unified/local/execute','/api/unified/rea/execute','/api/unified/v3/prepare','/api/unified/v3/confirm','/api/unified/v3/cancel','/api/unified/v3.1/prepare','/api/unified/v3.1/confirm','/api/unified/v3.1/cancel'].includes(u.pathname)&&!u.search){
+   if(req.method==='GET'&&u.pathname==='/api/unified/v3.2/status'&&!u.search)return send(res,200,app.verifiedLayoutStatus());
+   if(req.method==='POST'&&['/api/unified/chat','/api/unified/capabilities/plan','/api/unified/local/execute','/api/unified/rea/execute','/api/unified/v3/prepare','/api/unified/v3/confirm','/api/unified/v3/cancel','/api/unified/v3.1/prepare','/api/unified/v3.1/confirm','/api/unified/v3.1/cancel','/api/unified/v3.2/prepare','/api/unified/v3.2/confirm','/api/unified/v3.2/cancel'].includes(u.pathname)&&!u.search){
     if(req.headers.origin!==ORIGIN||req.headers['x-fi-unified']!=='operator-click')
      return send(res,403,{error:'UNIFIED_CLICK_ORIGIN_REQUIRED'});
     const data=await body(req);
+    if(u.pathname==='/api/unified/v3.2/prepare'){
+     if(Object.keys(data).some(k=>!['name','filePath'].includes(k)))throw Error('V32_PREPARE_FIELDS_NOT_ALLOWED');
+     return send(res,200,await app.prepareVerifiedLayout(data));
+    }
+    if(u.pathname==='/api/unified/v3.2/confirm'){
+     if(Object.keys(data).some(k=>!['token','operatorConfirmed'].includes(k)))throw Error('V32_CONFIRM_FIELDS_NOT_ALLOWED');
+     return send(res,200,await app.confirmVerifiedLayout(data));
+    }
+    if(u.pathname==='/api/unified/v3.2/cancel'){
+     if(Object.keys(data).length)throw Error('V32_CANCEL_FIELDS_NOT_ALLOWED');
+     return send(res,200,app.cancelVerifiedLayout());
+    }
     if(u.pathname==='/api/unified/v3.1/prepare'){
      if(Object.keys(data).some(k=>!['name','filePath'].includes(k)))throw Error('V31_PREPARE_FIELDS_NOT_ALLOWED');
      return send(res,200,await app.prepareVerifiedFile(data));
