@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {resolve} from 'node:path';
+import {planAilAcquisition,validateAilNetworkCandidate} from '../src/integrations/ail-acquisition-plan.mjs';
+const good=()=>({sourceKind:'operator_supplied_metadata_export',sourceId:'local_ail',destination:resolve('synthetic.jsonl'),expectedSha256:'a'.repeat(64)});
+test('valid local acquisition plan is non-executing and requires approval',()=>{const p=planAilAcquisition(good());assert.equal(p.state,'PLAN_ONLY');assert.equal(p.networkEnabled,false);assert.equal(p.requiresOperatorApproval,true);assert.equal(p.maxBytes,4194304);});
+test('rejects unverified network source kinds',()=>{assert.throws(()=>planAilAcquisition({...good(),sourceKind:'https'}),/PLAN_INVALID/);});
+test('rejects malformed source identifier and checksum',()=>{assert.throws(()=>planAilAcquisition({...good(),sourceId:'../bad'}),/PLAN_INVALID/);assert.throws(()=>planAilAcquisition({...good(),expectedSha256:'wrong'}),/PLAN_INVALID/);});
+test('rejects relative and non-jsonl paths',()=>{assert.throws(()=>planAilAcquisition({...good(),destination:'relative.jsonl'}),/PLAN_INVALID/);assert.throws(()=>planAilAcquisition({...good(),destination:resolve('secret.txt')}),/PLAN_INVALID/);});
+test('rejects unexpected fields including authority and credentials',()=>{assert.throws(()=>planAilAcquisition({...good(),apiKey:'secret'}),/PLAN_INVALID/);});
+test('network candidate remains held pending real endpoint validation',()=>{const r=validateAilNetworkCandidate({url:'https://example.com'});assert.equal(r.state,'HOLD');assert.equal(r.networkEnabled,false);});
+test('source plans are deterministic and frozen',()=>{const p=planAilAcquisition(good());assert.ok(Object.isFrozen(p));assert.deepEqual(p,planAilAcquisition(good()));});
