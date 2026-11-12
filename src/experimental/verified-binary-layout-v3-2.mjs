@@ -214,9 +214,41 @@ export function createVerifiedBinaryLayoutV32({
     submitted=true;
     outcome=await request(CALL,{name:NAME,arguments:args});
    }catch(e){
+    // The exact REA runner validated tool identity and received isError:true,
+    // then returned this fixed HTTP 422. This proves a provider error was
+    // reported, NOT that the inspected file was safely processed or untouched.
+    // Never turn an arbitrary 422, 503, network error or timeout into a known
+    // provider rejection; those remain unknown and non-replayable.
+    const reason=short(e?.message);
+    if(reason==='UNIFIED_CHAT_UPSTREAM_422_REA229_MCP_TOOL_RETURNED_ERROR'){
+     let after=null,postError=null;
+     try{after=await probe(permit.file.path,{root})}
+     catch(error){postError=short(error?.message)}
+     const sameFile=fingerprintEqual(after,permit.file);
+     const receipt={
+      version:'fi-verified-binary-layout-v3.2',tool:NAME,
+      state:'provider_mcp_error_reported',schemaHash:permit.schemaHash,
+      argumentsHash:permit.argsHash,fileSha256Before:permit.file.sha256,
+      fileSha256After:after?.sha256??null,fileIdentityVerified:sameFile,
+      fileBytes:permit.file.bytes,providerErrorCode:'REA229_MCP_TOOL_RETURNED_ERROR',
+      providerDetailedCause:'not_returned_by_8797',
+      resultHash:null,resultEnvelopeAvailable:false,
+      analysisContentAccuracyVerified:false,
+      providerSideEffectsIndependentlyVerified:false,
+      postError,approved:true,tokenConsumed:true,requestSubmitted:true,
+      automaticRetries:0,completedAtUnixMs:clock()
+     };
+     receipt.receiptHash=hash(receipt);
+     lastReceipt={...receipt};
+     unknown++;
+     return {version:'fi-verified-binary-layout-v3.2',
+      state:'provider_mcp_error_reported',reason,
+      approved:true,tokenConsumed:true,requestSubmitted:true,
+      executionCount:'unverified',manualVerificationRequired:true,receipt};
+    }
     unknown++;
     return {version:'fi-verified-binary-layout-v3.2',
-     state:'outcome_unknown_do_not_retry',reason:short(e?.message),
+     state:'outcome_unknown_do_not_retry',reason,
      approved:true,tokenConsumed:true,requestSubmitted:true,
      executionCount:'unknown',manualVerificationRequired:true};
    }
