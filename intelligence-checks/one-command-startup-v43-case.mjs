@@ -137,3 +137,41 @@ test('V4.3 independent REA broker keeps previous --serve baseline, adds standalo
  assert.match(source,/runner\.initialize\(\{expectedNames\}\)/);
  assert.doesNotMatch(source,/setInterval\(/);
 });
+
+test('V4.3 invokes private iPhone HTTPS only after unified health gates and before overall PASS',async()=>{
+ const script=await readFile(new URL('../Start-Fun-Industrial.ps1',import.meta.url),'utf8');
+ const check=script.indexOf("Hold 'FINAL_GATEWAY_VERIFICATION_FAILED'");
+ const launch=script.indexOf('& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $GatewayHelper');
+ const success=script.indexOf("Write-Host 'FUN_INDUSTRIAL_ONE_COMMAND=PASS'");
+ assert.ok(check>=0&&launch>check&&success>launch);
+ assert.match(script,/if\(\$LASTEXITCODE -ne 0\)\{Hold '8443_PRIVATE_HTTPS_START_OR_ATTEST_FAILED_NO_RETRY'\}/);
+ assert.match(script,/FUN_PRIVATE_IPHONE_HTTPS=https:\/\/100\.109\.4\.20:8443\/ BACKEND=8789/);
+ assert.match(script,/Start-Fun-Private-Gateway-V43\.ps1/);
+});
+test('V4.3 private HTTPS adoption is pinned, non-destructive, and has distinct secret-handling paths',async()=>{
+ const source=await readFile(new URL('../Start-Fun-Private-Gateway-V43.ps1',import.meta.url),'utf8');
+ const launcher=await readFile(new URL('../Start-Fun-iPhone-HTTPS.ps1',import.meta.url),'utf8');
+ assert.match(source,/Get-FunPrivateGatewayPortState/);
+ assert.match(source,/PORT_8443_CONFLICT_OR_NONPRIVATE_BIND/);
+ assert.match(source,/PRIVATE_GATEWAY_CONFIG_OR_IPHONE_PEER_CHANGED/);
+ assert.match(source,/NETBIRD_PRIVATE_IP_NOT_READY_NO_NETWORK_CHANGES/);
+ assert.match(source,/ORIGINAL_8789_VOICE_UPLOAD_NOT_READY/);
+ assert.match(source,/FI_GATEWAY_PRIVATE_ATTEST=PASS TLS_PIN=EXACT LOCAL_ACCESS_DENIED=403/);
+ assert.match(source,/GATEWAY_OWNER_NOT_NODE/);
+ assert.match(source,/GATEWAY_OWNER_COMMAND_MISMATCH/);
+ assert.match(source,/GATEWAY_TLS_PIN_OR_LOCAL_DENIAL_FAILED/);
+ assert.match(source,/private-gateway-attest\.mjs/);
+ assert.match(source,/gateway-password\.dpapi/);
+ assert.match(source,/if\(\$hasCredential\)/);
+ assert.match(source,/-UseStoredCredential/);
+ assert.match(source,/FUN_PRIVATE_HTTPS_CHECK_ONLY=READY_TO_START NO_CHANGES/);
+ assert.match(source,/FUN_IPHONE_HTTPS_BACKEND=127\.0\.0\.1:8789 VOICE_ENABLED=TRUE/);
+ assert.match(source,/FUN_PRIVATE_HTTPS_IPHONE_REAL_DEVICE_CHECK=NOT_PERFORMED/);
+ assert.match(launcher,/Read-Host "Enter a NEW private iPhone gateway password/);
+ assert.match(launcher,/param\(\[switch\]\$UseStoredCredential\)/);
+ assert.match(launcher,/FI_GATEWAY_PRIVATE_BIND_HOLD/);
+ assert.doesNotMatch(launcher,/\$\(if\(/);
+ const runtime=source.split('\n').filter(line=>!line.trimStart().startsWith('#')).join('\n');
+ for(const forbidden of ['Stop-Process','taskkill','netbird up','netbird down','/api/activate','/api/ai/start'])
+  assert.equal(runtime.includes(forbidden),false,forbidden);
+});
