@@ -183,10 +183,10 @@ test('malformed error payload or post-inspection file drift never counts as posi
 test('true synthetic PE32+ x64 header is parsed locally without launching the file',async t=>{
  const root=await mkdtemp(path.join(tmpdir(),'fi-v34-'));t.after(()=>rm(root,{recursive:true,force:true}));
  const file=path.join(root,'real.exe');
- const bytes=Buffer.alloc(512);bytes.writeUInt16LE(0x5a4d,0);
+ const bytes=Buffer.alloc(1024);bytes.writeUInt16LE(0x5a4d,0);
  bytes.writeInt32LE(128,60);bytes.writeUInt32LE(0x4550,128);
  bytes.writeUInt16LE(0x8664,132);bytes.writeUInt16LE(7,134);
- bytes.writeUInt16LE(0x20b,152);
+ bytes.writeUInt16LE(240,148);bytes.writeUInt16LE(0x20b,152);
  await writeFile(file,bytes);
  const p=await probeApprovedPeBinary('real.exe',{root});
  assert.equal(p.path,await realpath(file));
@@ -194,6 +194,9 @@ test('true synthetic PE32+ x64 header is parsed locally without launching the fi
  assert.equal(p.sections,7);
  assert.equal(p.optionalMagic,0x20b);
  assert.equal(p.sha256.length,64);
+ bytes.writeUInt16LE(800,148);await writeFile(file,bytes);
+ await assert.rejects(probeApprovedPeBinary('real.exe',{root}),/V34_PE_HEADER_OR_SECTION_TABLE_TRUNCATED/);
+ bytes.writeUInt16LE(240,148);await writeFile(file,bytes);
  await assert.rejects(probeApprovedPeBinary('../real.exe',{root}),/V34_/);
  await assert.rejects(probeApprovedPeBinary('real.elf',{root}),/V34_/);
  bytes.writeUInt16LE(0x014c,132);await writeFile(file,bytes);
