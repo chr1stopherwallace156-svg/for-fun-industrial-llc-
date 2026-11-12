@@ -133,6 +133,18 @@ export function createVerifiedFileV31({
   const [status,catalogue]=await Promise.all([request(READ_STATUS),request(READ_TOOLS)]);
   return liveExact(status,catalogue);
  }
+ async function preflight(){
+  if(busy)fail('BUSY');
+  busy=true;
+  try{
+   const schema=await live();
+   return {version:'fi-verified-file-v3.1',state:'schema_compatible_file_not_probed',
+    tool:NAME,requiredArguments:['path'],schemaHash:schema.schemaHash,
+    approvedDirectory:root,executionCount:0,approvalGranted:false,
+    providerReady:'mcp_session_only',specificProvider:'unverified',
+    fileStaged:false,readOnlyCatalogueRequests:2};
+  }finally{busy=false}
+ }
  function status(){
   return {version:'fi-verified-file-v3.1',state:'ready_to_prepare',tool:NAME,
    enabled:true,approvedDirectory:root,maxBytes:MAX_BYTES,
@@ -208,14 +220,18 @@ export function createVerifiedFileV31({
    const evidence=obj(outcome?.result?.structuredContent)||
      (Array.isArray(outcome?.result?.content)&&outcome.result.content.length>0);
    const envelope=obj(outcome?.result)&&outcome.result.isError!==true&&evidence;
-   const state=toolMatches&&envelope&&sameFile?'verified_static_inspection':
+   const state=toolMatches&&envelope&&sameFile&&JSON.stringify(outcome?.result??null).length<=131072?'verified_static_inspection':
     'result_hold_manual_review';
+   const outputJson=JSON.stringify(outcome?.result??null);
+   const boundedOutput=outputJson.length<=131072;
    const receipt={version:'fi-verified-file-v3.1',tool:NAME,
     schemaHash:permit.schemaHash,argumentsHash:permit.argsHash,
     fileSha256Before:permit.file.sha256,fileSha256After:after?.sha256??null,
     fileIdentityVerified:sameFile,fileBytes:permit.file.bytes,
-    resultHash:hash(outcome?.result??null),toolIdentityVerified:toolMatches,
-    evidenceEnvelopeVerified:envelope,providerSuccessProven:toolMatches&&envelope,
+    resultHash:boundedOutput?hash(outputJson):null,resultTooLarge:!boundedOutput,
+    toolIdentityVerified:toolMatches,
+    evidenceEnvelopeVerified:envelope,providerReturnedNonErrorEnvelope:toolMatches&&envelope,
+    rustLanguageVerified:false,analysisContentAccuracyVerified:false,
     fileChangedOrUnverifiable:!sameFile,postError,
     approved:true,tokenConsumed:true,requestSubmitted:submitted,
     completedAtUnixMs:clock(),automaticRetries:0,state};
@@ -225,7 +241,7 @@ export function createVerifiedFileV31({
    return {version:'fi-verified-file-v3.1',state,
     executionCount:state==='verified_static_inspection'?1:'unverified',
     requestSubmitted:true,approved:true,tokenConsumed:true,
-    receipt,preview:short(JSON.stringify(outcome?.result??null),3800)};
+    receipt,preview:short(outputJson,3800)};
   }finally{busy=false}
  }
  function cancel(){
@@ -233,5 +249,5 @@ export function createVerifiedFileV31({
   return {version:'fi-verified-file-v3.1',state:'cancelled_no_execution',
    executionCount:0,approved:false};
  }
- return Object.freeze({prepare,confirm,cancel,status});
+ return Object.freeze({prepare,confirm,cancel,status,preflight});
 }
