@@ -66,7 +66,7 @@ function ConfirmGatewayOwner([int]$processId){
  if(-not $proc -or $proc.Name -cne 'node.exe'){GatewayHold 'GATEWAY_OWNER_NOT_NODE'}
  # A visible non-gateway command line cannot be overridden by a passing HTTP response.
  if(-not [string]::IsNullOrWhiteSpace([string]$proc.CommandLine) -and
-  $proc.CommandLine -notmatch 'gateway-entry\.mjs(?:\s|["' + "'" + ']|$)'){
+  $proc.CommandLine -notmatch 'gateway-entry\.mjs'){
   GatewayHold 'GATEWAY_OWNER_COMMAND_MISMATCH'
  }
  if(-not(VerifyAttestation)){GatewayHold 'GATEWAY_TLS_PIN_OR_LOCAL_DENIAL_FAILED'}
@@ -80,7 +80,8 @@ if($before.State -eq 'existing'){
  $verified=ConfirmGatewayOwner ([int]$before.ListenerProcessId)
  Write-Host ('FUN_ADOPTED_PRIVATE_HTTPS_8443=PID_'+$verified)
 }elseif($CheckOnly){
- Write-Host 'FUN_PRIVATE_HTTPS_CHECK_ONLY=STOPPED NO_START'
+ Write-Host 'FUN_PRIVATE_HTTPS_CHECK_ONLY=READY_TO_START NO_CHANGES'
+ return
 }else{
  # An absent credential is not permission to store one. Interactively ask
  # for a new 24+ character password; use encrypted DPAPI only when enrolled.
@@ -103,7 +104,10 @@ if($before.State -eq 'existing'){
  $verified=ConfirmGatewayOwner ([int]$after.ListenerProcessId)
  Write-Host ('FUN_STARTED_PRIVATE_HTTPS_8443=PID_'+$verified)
 }
-if((Snapshot).State -ne 'existing'){GatewayHold 'PRIVATE_GATEWAY_DISAPPEARED'}
+$stable=Snapshot
+if($stable.State -ne 'existing' -or [int]$stable.ListenerProcessId -ne [int]$verified){
+ GatewayHold 'PRIVATE_GATEWAY_LISTENER_CHANGED'
+}
 Write-Host 'FUN_PRIVATE_HTTPS=PASS TLS_PIN=EXACT PEER_IP_ONLY=TRUE'
 Write-Host 'FUN_IPHONE_SAFARI=https://100.109.4.20:8443/'
 Write-Host 'FUN_IPHONE_HTTPS_BACKEND=127.0.0.1:8789 VOICE_ENABLED=TRUE'
