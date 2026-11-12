@@ -8,8 +8,10 @@ test('8797 guarded refresher defaults inert and requires exact independent apply
  assert.match(src,/AUTHORIZE REA 8797 RESTART/);
  assert.match(src,/EXPLICIT_APPROVAL_PHRASE_REQUIRED/);
  const inactive=src.indexOf('REA8797_GUARDED=INACTIVE');
- const snapshot=src.indexOf('Get-NetTCPConnection');
- assert.ok(inactive>=0&&snapshot>inactive,'inert path before service inspection');
+ const firstAudit=src.indexOf('foreach($File in $Files)');
+ assert.ok(inactive>=0&&firstAudit>inactive,'inert path before service inspection');
+ assert.ok(src.indexOf('exit 0',inactive)>inactive&&src.indexOf('exit 0',inactive)<firstAudit,
+  'default mode returns before performing any preflight actions');
  assert.match(src,/if\(\$CheckOnly -and \$Apply\)/);
  assert.match(src,/if\(\$CheckOnly\)\{[\s\S]*?RESTARTS=0 MCP_CALLS=0/);
 });
