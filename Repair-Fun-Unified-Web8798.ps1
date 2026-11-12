@@ -40,6 +40,25 @@ if($LASTEXITCODE -ne 0){Hold 'WEB_DIAGNOSTIC_FAILED_8798_PRESERVED'}
 if($LASTEXITCODE -ne 0){Hold 'ADAPTIVE_V2_SYNTAX_8798_PRESERVED'}
 & $Node $AdaptiveDiagnostic --plan 'Find tools to inspect a Rust binary'
 if($LASTEXITCODE -ne 0){Hold 'ADAPTIVE_V2_LIVE_PREFLIGHT_FAILED_8798_PRESERVED'}
+# Perform the entire offline V1+V2 qualification BEFORE stopping the old 8798.
+# A parsing/test failure must not tear down a working chat instance.
+$PreflightSources=@(
+ (Join-Path $Repo 'src\experimental\adaptive-capability-v2.mjs'),
+ (Join-Path $Repo 'src\experimental\unified-task-chat.mjs'),
+ (Join-Path $Repo 'src\experimental\unified-task-client.js'),
+ (Join-Path $Repo 'scripts\Run-Fun-Unified-Chat8798.mjs')
+)
+foreach($Source in $PreflightSources){
+ if(-not (Test-Path -LiteralPath $Source -PathType Leaf)){Hold ('ADAPTIVE_V2_SOURCE_MISSING_'+$Source)}
+ & $Node --check $Source
+ if($LASTEXITCODE -ne 0){Hold ('ADAPTIVE_V2_SYNTAX_HOLD_'+$Source)}
+}
+Push-Location $Repo
+try{
+ & $Node --test 'intelligence-checks\unified-task-chat-case.mjs' 'intelligence-checks\adaptive-capability-v2-case.mjs'
+ if($LASTEXITCODE -ne 0){Hold 'ADAPTIVE_V2_OFFLINE_TESTS_FAILED_8798_PRESERVED'}
+}finally{Pop-Location}
+Write-Host 'ADAPTIVE_V2_PREFLIGHT=PASS EXACT_229_AND_19_CATALOGUES_VERIFIED NO_TOOL_EXECUTION=TRUE'
 $Before=@{}
 foreach($Port in $Protected){
  $Before[$Port]=@(Listen $Port)
