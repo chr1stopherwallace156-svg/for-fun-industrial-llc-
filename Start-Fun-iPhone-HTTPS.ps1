@@ -123,7 +123,8 @@ try{
  & $Node $Selftest
  if($LASTEXITCODE -ne 0){throw "FI_GATEWAY_TLS_SELFTEST_HOLD"}
  Write-Host "FI_IPHONE_GATEWAY_START=PASS PID=$($start.Id) BIND=$($Config.pcIp):8443 PEER=$($Config.iphonePeerIp)"
- Write-Host ("FI_IPHONE_GATEWAY_USERNAME=fiiphone PASSWORD="+$(if($UseStoredCredential){"DPAPI_PROTECTED_AT_REST"}else{"OPERATOR_HELD_NOT_SAVED"}))
+ if($UseStoredCredential){$passwordMode='DPAPI_PROTECTED_AT_REST'}else{$passwordMode='OPERATOR_HELD_NOT_SAVED'}
+ Write-Host ("FI_IPHONE_GATEWAY_USERNAME=fiiphone PASSWORD="+$passwordMode)
  Write-Host ("FI_IPHONE_SAFARI_URL=https://"+$Config.publicHost)
  Write-Host "FI_IPHONE_GATEWAY_FIREWALL_AND_NETBIRD_POLICIES=NOT_CHANGED"
  Write-Host "FI_IPHONE_GATEWAY_TRUST_ON_PHONE=REQUIRES_SAFARI_VERIFICATION"
