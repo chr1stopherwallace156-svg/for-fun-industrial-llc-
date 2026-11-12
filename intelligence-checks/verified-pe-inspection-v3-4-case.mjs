@@ -6,6 +6,7 @@ import {tmpdir} from 'node:os';
 import {mkdtemp,writeFile,rm,realpath} from 'node:fs/promises';
 import {createVerifiedPeInspectionV34,probeApprovedPeBinary,PE_TOOLS} from '../src/experimental/verified-pe-inspection-v3-4.mjs';
 import {createUnifiedTaskChat} from '../src/experimental/unified-task-chat.mjs';
+import {diagnosePe34} from '../scripts/Diagnose-Fun-Verified-PE-V34.mjs';
 import {createUnifiedChatServer} from '../scripts/Run-Fun-Unified-Chat8798.mjs';
 const REA='http://127.0.0.1:8797',TOKEN='ba'.repeat(24);
 const sample=()=>({path:'C:\\FunIndustrial-Approved-Inputs\\known.exe',
@@ -35,6 +36,22 @@ function fixture(){
  return {engine,state,request,requests,probe,
   advance:ms=>now+=ms,setProof:p=>proof=p,setError:e=>error=e,calls:()=>calls};
 }
+test('V3.4 live schema diagnostic only issues ten catalogue/status GETs and no tool calls',async()=>{
+ const f=fixture(),lines=[];const hashes=await diagnosePe34({request:f.request,write:s=>lines.push(s)});
+ assert.equal(hashes.length,5);
+ assert.equal(f.requests.length,10);
+ assert.equal(f.calls(),0);
+ assert.ok(lines.includes('V34_SCHEMA_PREFLIGHT=PASS EXACT_TOOLS=5'));
+ assert.ok(lines.includes('V34_MCP_CALLS=0 FILES_OPENED=0 APPROVAL_GRANTED=FALSE PROCESSES_MODIFIED=FALSE'));
+});
+test('V3.4 diagnostic is inert unless explicitly --schema-only',async()=>{
+ const {spawnSync}=await import('node:child_process');
+ const {fileURLToPath}=await import('node:url');
+ const filename=fileURLToPath(new URL('../scripts/Diagnose-Fun-Verified-PE-V34.mjs',import.meta.url));
+ const out=spawnSync(process.execPath,[filename],{encoding:'utf8',timeout:12000});
+ assert.equal(out.status,0,out.stderr);
+ assert.match(out.stdout,/V34_DIAGNOSTIC=INACTIVE/);
+});
 test('V3.4 exposes exactly five PE names and preflight makes two GETs, no MCP tool call',async()=>{
  const f=fixture(),e=f.engine();
  assert.deepEqual([...PE_TOOLS],['inspect_pe_imports','inspect_native_exports',
