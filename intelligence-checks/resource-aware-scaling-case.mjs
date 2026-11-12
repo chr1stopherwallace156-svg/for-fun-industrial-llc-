@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {summarizeScaling} from '../src/resource-aware/scaling-profile.mjs';
+const sample=(size,rss,state='PASS')=>({inputMiB:size,peakRssMiB:rss,state,elapsedMs:1000,processedBytes:state==='PASS'?size*1024*1024:0});
+test('reports candidate only on fourfold scale with controlled RSS growth',()=>{const r=summarizeScaling([sample(128,55),sample(512,60),sample(1024,62)]);assert.equal(r.assessment,'BOUNDED_SCALING_CANDIDATE');assert.equal(r.inputScale,8);});
+test('reports insufficient completion if second sample held',()=>{const r=summarizeScaling([sample(128,55),sample(512,55,'HOLD')]);assert.equal(r.assessment,'INSUFFICIENT_COMPLETED_SAMPLES');});
+test('does not claim bounded scaling on high RSS growth',()=>{const r=summarizeScaling([sample(128,55),sample(512,100),sample(1024,135)]);assert.equal(r.assessment,'NEEDS_FURTHER_QUALIFICATION');});
+test('does not claim bounded scaling if input scaled too little',()=>{const r=summarizeScaling([sample(128,55),sample(256,55)]);assert.equal(r.assessment,'NEEDS_FURTHER_QUALIFICATION');});
+test('rejects forged successful data counts',()=>assert.throws(()=>summarizeScaling([{...sample(128,55),processedBytes:1},sample(512,62)]),/INCOMPLETE/));
+test('rejects out-of-order samples',()=>assert.throws(()=>summarizeScaling([sample(512,55),sample(128,62)]),/INVALID/));
+test('calculates MiB/s and retains observed values',()=>{const r=summarizeScaling([sample(128,55),sample(512,60)]);assert.equal(r.measurements[0].throughputMiBps,128);assert.equal(r.measurements[1].throughputMiBps,512);});
