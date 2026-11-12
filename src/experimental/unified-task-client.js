@@ -8,6 +8,17 @@ const task=el('task'),send=el('send'),history=el('history'),
 if(!task||!send||!history||!status||!review||!approve||!execute||!log)return;
 let busy=false,pending=null,pendingKind=null;
 const conversation=[];
+const v3choice=el('v3-choice'),v3prepare=el('v3-prepare'),
+ v3confirm=el('v3-confirm'),v3cancel=el('v3-cancel'),v3preview=el('v3-preview');
+let v3Token=null,v3PendingName=null;
+function clearV3(){
+ v3Token=null;v3PendingName=null;
+ if(v3confirm)v3confirm.disabled=true;
+ if(v3cancel)v3cancel.disabled=true;
+ if(v3choice)v3choice.disabled=false;
+ if(v3preview)v3preview.textContent='No V3 execution prepared.';
+}
+
 function appendContext(role,content){
  const limited=String(content||'').slice(0,1050);
  if(!limited.trim())return;
@@ -24,7 +35,12 @@ function event(text){
  node.textContent=String(text).slice(0,10000);
  log.appendChild(node);log.scrollTop=log.scrollHeight;
 }
-function toggle(state){busy=state;send.disabled=state;execute.disabled=state||!pending||!approve.checked}
+function toggle(state){
+ busy=state;send.disabled=state;execute.disabled=state||!pending||!approve.checked;
+ if(v3prepare)v3prepare.disabled=state||!!v3Token;
+ if(v3confirm)v3confirm.disabled=state||!v3Token;
+ if(v3cancel)v3cancel.disabled=state||!v3Token;
+}
 function resetReview(){
  pending=null;pendingKind=null;approve.checked=false;review.classList.remove('open');toggle(busy);
 }
@@ -59,6 +75,61 @@ function showActions(data){
  }
  if(data.source)event('Observation source: '+String(data.source));
  if(data.modelTokens!==null&&data.modelTokens!==undefined)event('Qwen completion tokens: '+String(data.modelTokens));
+}
+if(v3choice&&v3prepare&&v3confirm&&v3cancel&&v3preview){
+ v3choice.addEventListener('change',()=>{if(!busy)clearV3()});
+ v3prepare.addEventListener('click',async()=>{
+  if(busy||v3Token)return;
+  toggle(true);status.textContent='Checking live V3 tool schema (no execution)…';
+  try{
+   const name=v3choice.value;
+   const r=await api('/api/unified/v3/prepare',{name,arguments:{}});
+   if(r.state!=='awaiting_separate_operator_confirmation'||r.preview?.name!==name)
+    throw Error('V3_PREPARATION_INVALID');
+   v3Token=r.authorizationToken;v3PendingName=name;
+   v3choice.disabled=true;
+   v3preview.textContent='Prepared: '+name+'\\n'+
+    'Exact arguments: {}\\nSchema hash: '+String(r.preview.schemaHash)+'\\n'+
+    'MCP live: '+String(r.preview.liveMcpSessionReady)+
+    '\\nSpecific provider success is not yet proven.\\nExpires at: '+
+    new Date(r.expiresAtUnixMs).toLocaleTimeString()+
+    '\\nConfirmation executes exactly ONE MCP request.';
+   event('V3 PREPARED (NO EXECUTION): '+name+' schema='+String(r.preview.schemaHash));
+   status.textContent='V3 awaiting separate operator confirmation';
+  }catch(e){
+   clearV3();
+   event('V3 PREPARE HOLD: '+String(e.message||e));
+   status.textContent='V3 preparation HOLD';
+  }finally{toggle(false)}
+ });
+ v3cancel.addEventListener('click',async()=>{
+  if(busy||!v3Token)return;toggle(true);
+  try{
+   const r=await api('/api/unified/v3/cancel',{});
+   event('V3 CANCELED: '+String(r.state));
+  }catch(e){event('V3 CANCEL HOLD: '+String(e.message||e))}
+  finally{clearV3();toggle(false)}
+ });
+ v3confirm.addEventListener('click',async()=>{
+  if(busy||!v3Token||!v3PendingName)return;
+  const token=v3Token,name=v3PendingName;
+  // Remove the token locally before posting: never silently retry.
+  v3Token=null;v3PendingName=null;toggle(true);
+  v3preview.textContent='Submitting one approved REA inspection; no automatic retries.';
+  try{
+   const r=await api('/api/unified/v3/confirm',{authorizationToken:token,operatorConfirmed:true});
+   const outcome=String(r.state);
+   event('V3 TOOL='+name+' STATE='+outcome+' EXECUTED='+String(r.executedActions));
+   if(r.receipt)event('V3 RECEIPT HASH='+String(r.receipt.receiptHash)+
+    ' RESULT SHA256='+String(r.receipt.resultHash));
+   if(r.resultPreview)event('V3 RESULT (UNTRUSTED): '+String(r.resultPreview));
+   message('assistant','V3 '+outcome+' for '+name+'; inspect execution evidence for receipt.');
+   status.textContent='V3 '+outcome;
+  }catch(e){
+   event('V3 OUTCOME UNKNOWN OR HOLD: '+String(e.message||e)+' — DO NOT RETRY AUTOMATICALLY');
+   status.textContent='V3 uncertain outcome / hold';
+  }finally{clearV3();toggle(false)}
+ });
 }
 send.addEventListener('click',async()=>{
  if(busy)return;
