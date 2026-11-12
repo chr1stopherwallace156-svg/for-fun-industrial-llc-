@@ -85,13 +85,15 @@ export async function probeApprovedBinary(filePath,{root=rootDefault()}={}){
  const rootStat=await lstat(rootResolved).catch(()=>fail('APPROVED_ROOT_MISSING'));
  if(!rootStat.isDirectory()||rootStat.isSymbolicLink())fail('APPROVED_ROOT_NOT_REAL_DIRECTORY');
  const trueRoot=await realpath(rootResolved);
- if(nativeCase(trueRoot)!==nativeCase(rootResolved))fail('APPROVED_ROOT_REDIRECTED');
+ // Windows may canonicalize the drive or ancestor path differently from
+ // its original spelling. Trust only the real resolved parent of the fixed
+ // approved root; never permit a target whose own real parent differs.
  const stat=await lstat(wanted).catch(()=>fail('APPROVED_FILE_MISSING'));
  if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1)fail('NOT_SINGLE_REGULAR_FILE');
  if(!Number.isSafeInteger(stat.size)||stat.size<4||stat.size>MAX_BYTES)
   fail('SIZE_OUTSIDE_LIMIT');
  const absolute=await realpath(wanted);
- if(nativeCase(absolute)!==nativeCase(wanted)||nativeCase(path.dirname(absolute))!==nativeCase(trueRoot))
+ if(nativeCase(path.dirname(absolute))!==nativeCase(trueRoot)||path.basename(absolute)!==basename)
   fail('TARGET_REDIRECTED');
  const fd=await open(wanted,fsConstants.O_RDONLY|(fsConstants.O_NOFOLLOW||0));
  try{
