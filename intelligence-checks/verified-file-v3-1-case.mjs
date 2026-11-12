@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import {mkdtemp,writeFile,rm,link,symlink,truncate,rename} from 'node:fs/promises';
+import {mkdtemp,writeFile,rm,link,symlink,truncate,realpath} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
@@ -201,7 +201,7 @@ test('file probe rejects missing, nested, outside, wrong extension, and fake non
  await writeFile(good,Buffer.from([0x4d,0x5a,0x90,0,1,2,3,4]));
  const r=await probeApprovedBinary('known.exe',{root});
  assert.equal(r.format,'PE');assert.equal(r.bytes,8);assert.equal(r.sha256.length,64);
- assert.equal(r.path,good);
+ assert.equal(r.path,await realpath(good));
  for(const bad of ['missing.exe','known.txt','../known.exe','folder/known.exe',good+'.evil']){
   await assert.rejects(probeApprovedBinary(bad,{root}),/V31_/);
  }
