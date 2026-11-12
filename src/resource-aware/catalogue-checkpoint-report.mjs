@@ -10,7 +10,7 @@ const MAX_BYTES=1024*1024;
 const MAX_ENTRIES=4096;
 const REFRESH_MS=6*60*60*1000;
 const HEX=/^[a-f0-9]{64}$/;
-const validTime=n=>Number.isSafeInteger(n)&&n>=0&&n<=Number.MAX_SAFE_INTEGER;
+const validTime=n=>Number.isSafeInteger(n)&&n>=0&&n<=8640000000000000;
 const plain=o=>o!==null&&typeof o==='object'&&!Array.isArray(o);
 const exactKeys=(o,keys)=>Object.keys(o).length===keys.length&&keys.every(k=>Object.hasOwn(o,k));
 
