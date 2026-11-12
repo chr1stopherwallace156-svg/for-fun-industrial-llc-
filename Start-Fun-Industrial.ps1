@@ -72,8 +72,8 @@ function StartNode([int]$port,[string]$script,[string]$mode,[string]$cwd){
  if(Socket $port){Hold ('PORT_CLAIMED_BEFORE_START_'+$port)}
  $out=Join-Path $script:LogDir ($port.ToString()+'.stdout.log')
  $err=Join-Path $script:LogDir ($port.ToString()+'.stderr.log')
- $args=('"'+$script+'"')+$(if($mode){' '+$mode}else{''})
- $child=Start-Process -FilePath $script:Node -ArgumentList $args -WorkingDirectory $cwd -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+ $nodeArgs=('"'+$script+'"')+$(if($mode){' '+$mode}else{''})
+ $child=Start-Process -FilePath $script:Node -ArgumentList $nodeArgs -WorkingDirectory $cwd -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
  $script:Owned[$port]=$child.Id
  Write-Host "FUN_START_REQUEST_PORT_$port=PID_$($child.Id)"
 }
