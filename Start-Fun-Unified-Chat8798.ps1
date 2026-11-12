@@ -5,7 +5,7 @@ $Repo=$PSScriptRoot
 $Url='http://127.0.0.1:8798'
 $Runner=Join-Path $Repo 'scripts\Run-Fun-Unified-Chat8798.mjs'
 $Client=Join-Path $Repo 'src\experimental\unified-task-client.js'
-$Modules=@($Runner,$Client,(Join-Path $Repo 'src\experimental\unified-task-chat.mjs'),(Join-Path $Repo 'src\experimental\unified-public-web.mjs'),(Join-Path $Repo 'intelligence-checks\unified-task-chat-case.mjs'))
+$Modules=@($Runner,$Client,(Join-Path $Repo 'src\experimental\unified-task-chat.mjs'),(Join-Path $Repo 'src\experimental\unified-public-web.mjs'),(Join-Path $Repo 'intelligence-checks\unified-task-chat-case.mjs'),(Join-Path $Repo 'src\experimental\adaptive-capability-v2.mjs'),(Join-Path $Repo 'scripts\Diagnose-Fun-Adaptive-V2.mjs'),(Join-Path $Repo 'intelligence-checks\adaptive-capability-v2-case.mjs'))
 $Protected=@(8789,8796,8797,8088,8791)
 $Child=$null
 function Hold([string]$Code){throw ('FUN_UNIFIED_CHAT_HOLD='+$Code)}
@@ -22,7 +22,7 @@ $Node=(Get-Command node.exe -ErrorAction Stop).Source
 foreach($F in $Modules){& $Node --check $F;if($LASTEXITCODE -ne 0){Hold ('NODE_SYNTAX_'+$F)}}
 Push-Location $Repo
 try{
- & $Node --test 'intelligence-checks\unified-task-chat-case.mjs'
+ & $Node --test 'intelligence-checks\unified-task-chat-case.mjs' 'intelligence-checks\adaptive-capability-v2-case.mjs'
  if($LASTEXITCODE -ne 0){Hold 'OFFLINE_UNIFIED_TEST_HOLD'}
 }finally{Pop-Location}
 $Before=@{};foreach($P in $Protected){$Before[$P]=Listener $P;if(-not $Before[$P]){Hold ('REQUIRED_SERVICE_LISTENER_MISSING_'+$P)}}
@@ -62,7 +62,7 @@ try{
     $L2.sidecar -ne $true -or [int]$T2.local_tool_count -ne 19 -or $AI2.state -ne 'ready'){Hold 'ORIGINAL_SERVICES_CHANGED'}
  Write-Host ('FUN_UNIFIED_CHAT=PASS URL='+$Url+' PID='+$Child.Id)
  Write-Host 'QWEN_LLAMA_8088=PRESERVED REA_8797_229=PRESERVED LOCAL_8796_19=PRESERVED ORIGINAL_8789=PRESERVED COMPUTE_8791=PRESERVED'
- Write-Host 'UNIFIED_CHAT_MODE=READ_ONLY_AUTO LOCAL_EXECUTION=EXPLICIT_CLICK NO_BACKGROUND=TRUE'
+ Write-Host 'UNIFIED_CHAT_MODE=READ_ONLY_AUTO ADAPTIVE_V2=LIVE_CATALOGUE_PLANNING_ONLY LOCAL_EXECUTION=EXPLICIT_CLICK NO_BACKGROUND=TRUE'
  Write-Host ('FUN_UNIFIED_CHAT_LOGS='+$LogDir)
 }catch{
  if($Child){
