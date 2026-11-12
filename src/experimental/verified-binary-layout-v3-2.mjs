@@ -317,7 +317,9 @@ export function createVerifiedBinaryLayoutV32({
    return {version:'fi-verified-binary-layout-v3.2',state,
     executionCount:state==='verified_static_inspection'?1:'unverified',
     requestSubmitted:true,approved:true,tokenConsumed:true,
-    receipt,preview:short(outputJson,3800)};
+    receipt,preview:outcome?.result?.isError===true?
+     'MCP provider error evidence unavailable or invalid; raw error text withheld; manual review required':
+     short(outputJson,3800)};
   }finally{busy=false}
  }
  function cancel(){
