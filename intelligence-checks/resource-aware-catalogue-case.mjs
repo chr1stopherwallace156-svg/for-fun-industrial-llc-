@@ -87,7 +87,7 @@ test('rejects wrong content type and truncated JSON',async()=>{
 });
 test('rejects oversized responses without processing records',async()=>{
  const response=new Response('X'.repeat(8*1024*1024+1),{status:200,headers:{'content-type':'application/json'}});
- const r=await readBoundedCatalogueResponse(response);
+ const r=await readBoundedCatalogueResponse(response,{maxProcessRssMiB:1024});
  assert.equal(r.state,'HOLD');assert.equal(r.reason,'PROVIDER_RESPONSE_TOO_LARGE');
 });
 test('429/503 errors do not advance the checkpoint',async t=>{
