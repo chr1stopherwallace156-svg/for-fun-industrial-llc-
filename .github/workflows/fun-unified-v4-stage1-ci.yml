@@ -1,0 +1,49 @@
+name: Fun Industrial V4 single-entrypoint stage 1
+on:
+  push:
+    branches: [feature/fun-unified-runtime-v4-stage1-20261112]
+  pull_request:
+    paths:
+      - 'src/experimental/unified-gateway-v4.mjs'
+      - 'src/experimental/unified-task-client.js'
+      - 'scripts/Run-Fun-Unified-Chat8798.mjs'
+      - 'scripts/Diagnose-Fun-Unified-V4.mjs'
+      - 'intelligence-checks/unified-runtime-v4-case.mjs'
+      - 'Start-Fun-Unified-V4.ps1'
+      - 'Start-Fun-Unified-Chat8798.ps1'
+      - 'Repair-Fun-Unified-Web8798.ps1'
+      - '.github/workflows/fun-unified-v4-stage1-ci.yml'
+permissions:
+  contents: read
+jobs:
+  qualify:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.4'
+      - name: Syntax verification
+        run: |
+          node --check src/experimental/unified-gateway-v4.mjs
+          node --check scripts/Diagnose-Fun-Unified-V4.mjs
+          node --check scripts/Run-Fun-Unified-Chat8798.mjs
+          node --check src/experimental/unified-task-client.js
+          node --check intelligence-checks/unified-runtime-v4-case.mjs
+      - name: V1 - V4 synthetic offline regression
+        run: node --test intelligence-checks/unified-runtime-v4-case.mjs intelligence-checks/verified-pe-inspection-v3-4-case.mjs intelligence-checks/verified-binary-layout-v3-2-case.mjs intelligence-checks/verified-file-v3-1-case.mjs intelligence-checks/verified-rea-v3-case.mjs intelligence-checks/rea229-full-case.mjs intelligence-checks/unified-task-chat-case.mjs intelligence-checks/auto-sidecar-case.mjs intelligence-checks/adaptive-capability-v2-case.mjs
+      - name: Windows PowerShell syntax and read-only default
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach($p in @('Start-Fun-Unified-V4.ps1','Start-Fun-Unified-Chat8798.ps1','Repair-Fun-Unified-Web8798.ps1')){
+            $tokens=$null;$errors=$null
+            [Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p).Path,[ref]$tokens,[ref]$errors)|Out-Null
+            if($errors.Count){$errors|Format-List|Out-String|Write-Host;throw ('V4_PS_PARSE_HOLD_'+$p)}
+          }
+          Write-Host 'V4_WINDOWS_PS_PARSE=PASS'
