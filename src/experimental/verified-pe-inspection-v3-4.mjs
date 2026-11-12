@@ -37,48 +37,10 @@ function exactSchema(schema){
  if(!obj(schema.properties)||!obj(schema.properties.path)||schema.properties.path.type!=='string'||
    Object.keys(schema.properties.path).some(k=>!pathKeys.has(k)))
   hold('PATH_SCHEMA_UNSUPPORTED');
- // Only the canonical NUL-exclusion regex is accepted. Other provider path
- // patterns remain unsupported; never weaken the schema to guess compatibility.
+ // Accept only the canonical NUL-excluding path pattern if advertised.
+ // Unknown path-pattern constraints always fail closed.
  if(Object.prototype.hasOwnProperty.call(schema.properties.path,'pattern') &&
-   schema.properties.path.pattern!==String.raw`^[^\x00]*// FI_VERIFIED_PE_INSPECTION_V34 — one operator-approved, schema-bound PE inspection.
-// No model chooses an inspection, no binary launch, no background work, no automatic retries.
-// Provider behavior and analysis accuracy are never inferred from a successful MCP envelope.
-import os from 'node:os';
-import path from 'node:path';
-import {open} from 'node:fs/promises';
-import {createHash,randomBytes,timingSafeEqual} from 'node:crypto';
-import {probeApprovedLayoutBinary} from './verified-binary-layout-v3-2.mjs';
-
-const REA='http://127.0.0.1:8797';
-const STATUS=REA+'/api/rea229/status';
-const TOOLS=REA+'/api/rea229/tools?limit=229';
-const CALL=REA+'/api/rea229/call';
-export const PE_TOOLS=Object.freeze([
- 'inspect_pe_imports','inspect_native_exports','inspect_pe_resources',
- 'inspect_byte_entropy','inspect_pe_load_config'
-]);
-const names=new Set(PE_TOOLS);
-const rootDefault=()=>path.join(os.homedir(),'FunIndustrial-Approved-Inputs');
-const obj=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
-const hash=v=>createHash('sha256').update(typeof v==='string'?v:JSON.stringify(v)).digest('hex');
-const short=(s,n=240)=>String(s??'').replace(/[\x00-\x1f\x7f]/g,' ').slice(0,n);
-const hold=c=>{throw Error('V34_'+c)};
-const equal=(a,b)=>typeof a==='string'&&typeof b==='string'&&
- /^[a-f0-9]{48}$/.test(a)&&/^[a-f0-9]{48}$/.test(b)&&
- timingSafeEqual(Buffer.from(a,'hex'),Buffer.from(b,'hex'));
-const same=(a,b)=>!!a&&!!b&&a.sha256===b.sha256&&a.bytes===b.bytes&&
- a.fileIdentity===b.fileIdentity&&a.path===b.path&&
- a.machine===b.machine&&a.sections===b.sections&&a.optionalMagic===b.optionalMagic;
-const schemaKeys=new Set(['$schema','title','description','type','properties','required','additionalProperties','$id']);
-const pathKeys=new Set(['type','title','description','minLength','maxLength','pattern']);
-function exactSchema(schema){
- if(!obj(schema)||JSON.stringify(schema).length>16000||schema.type!=='object'||
-   Object.keys(schema).some(k=>!schemaKeys.has(k)))hold('SCHEMA_UNSUPPORTED');
- if(!Array.isArray(schema.required)||schema.required.length!==1||schema.required[0]!=='path')
-  hold('EXACT_PATH_REQUIREMENT_MISSING');
- if(!obj(schema.properties)||!obj(schema.properties.path)||schema.properties.path.type!=='string'||
-   Object.keys(schema.properties.path).some(k=>!pathKeys.has(k)))
-)
+   schema.properties.path.pattern!==String.raw`^[^\x00]*$`)
   hold('PATH_PATTERN_UNSUPPORTED');
  // The canonical MCP provider still independently validates all optional fields.
  // Only {path} is transmitted, never guessed or synthesized optional arguments.
