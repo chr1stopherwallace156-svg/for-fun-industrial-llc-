@@ -30,7 +30,7 @@ async function body(req){
  return b;
 }
 export function createUnifiedChatServer({app=createUnifiedTaskChat(),readClient=()=>readFile(CLIENT,'utf8')}={}){
- if(typeof app?.status!=='function'||typeof app?.chat!=='function'||typeof app?.executeLocal!=='function'||typeof app?.executeRea!=='function')
+ if(typeof app?.status!=='function'||typeof app?.chat!=='function'||typeof app?.executeLocal!=='function'||typeof app?.executeRea!=='function'||typeof app?.planCapabilities!=='function')
   throw Error('UNIFIED_APP_REQUIRED');
  return http.createServer(async(req,res)=>{
   try{
@@ -41,10 +41,14 @@ export function createUnifiedChatServer({app=createUnifiedTaskChat(),readClient=
    if(req.method==='GET'&&u.pathname==='/'&&!u.search)return send(res,200,HTML,'text/html; charset=utf-8');
    if(req.method==='GET'&&u.pathname==='/api/unified/client.js'&&!u.search)return send(res,200,await readClient(),'text/javascript; charset=utf-8');
    if(req.method==='GET'&&u.pathname==='/api/unified/status'&&!u.search)return send(res,200,await app.status());
-   if(req.method==='POST'&&['/api/unified/chat','/api/unified/local/execute','/api/unified/rea/execute'].includes(u.pathname)&&!u.search){
+   if(req.method==='POST'&&['/api/unified/chat','/api/unified/capabilities/plan','/api/unified/local/execute','/api/unified/rea/execute'].includes(u.pathname)&&!u.search){
     if(req.headers.origin!==ORIGIN||req.headers['x-fi-unified']!=='operator-click')
      return send(res,403,{error:'UNIFIED_CLICK_ORIGIN_REQUIRED'});
     const data=await body(req);
+    if(u.pathname==='/api/unified/capabilities/plan'){
+     if(Object.keys(data).some(k=>k!=='prompt'))throw Error('PLAN_FIELDS_NOT_ALLOWED');
+     return send(res,200,await app.planCapabilities(data));
+    }
     if(u.pathname==='/api/unified/chat'){
      if(Object.keys(data).some(k=>!['prompt','context'].includes(k)))throw Error('CHAT_FIELDS_NOT_ALLOWED');
      return send(res,200,await app.chat(data));
