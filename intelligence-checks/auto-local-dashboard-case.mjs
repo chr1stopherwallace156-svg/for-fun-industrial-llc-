@@ -17,12 +17,11 @@ function mockClient({noCalls=false,onCall=()=>{},wait=null}={}){
  const client=async(path,body)=>{
   paths.push(path);
   if(wait)await wait(path);
-  if(path==='/api/ai/status')return {state:'ready'};
+  if(path==='/__llama_health__')return {status:'ok'};
   if(path==='/api/cognition/health')return {version:'fi-cognitive-live-bridge-v1',reaExecutionGrants:0};
   if(path==='/api/cognition/catalogue/status')return {version:'fi-capability-index-v1',localCount:tools.length,executionGrants:0};
   if(path==='/api/ai/tools')return {tools,local_tool_count:tools.length,rea_tool_count:0};
-  if(path==='/api/ai/chat')return noCalls?{reply:'No matching capability',tool_calls:[]}:{
-   reply:'Using graph',tool_calls:[toolCall('fi_graph_analyze',{nodes:['A','B'],edges:[['A','B']]})]};
+  if(path==='/__raw_llama__')return {choices:[{message:noCalls?{content:'No matching capability',tool_calls:[]}:{content:'Using graph',tool_calls:[toolCall('fi_graph_analyze',{nodes:['A','B'],edges:[['A','B']]})]}}]};
   if(path==='/api/ai/tool-call'){onCall(body);return {tool:body.name,result:{nodes:2,edges:1}}}
   throw Error('UNEXPECTED_ROUTE_'+path);
  };
@@ -75,7 +74,7 @@ test('concurrent request is rejected and no other session starts',async()=>{
  let notified;
  const entered=new Promise(resolve=>notified=resolve);
  const mock=mockClient({wait:async(path)=>{
-  if(path==='/api/ai/status'){notified();await gate;}
+  if(path==='/__llama_health__'){notified();await gate;}
  }});
  const service=createAutoLocalDashboard({client:mock.client});
  const pending=service.run({prompt:'Analyze a graph'});
