@@ -11,6 +11,7 @@ $AdaptiveDiagnostic=Join-Path $Repo 'scripts\Diagnose-Fun-Adaptive-V2.mjs'
 $V3Diagnostic=Join-Path $Repo 'scripts\Diagnose-Fun-Verified-V3.mjs'
 $V31Diagnostic=Join-Path $Repo 'scripts\Diagnose-Fun-Verified-File-V31.mjs'
 $V32Diagnostic=Join-Path $Repo 'scripts\Diagnose-Fun-Verified-Binary-V32.mjs'
+$V34Diagnostic=Join-Path $Repo 'scripts\Diagnose-Fun-Verified-PE-V34.mjs'
 $Starter=Join-Path $Repo 'Start-Fun-Unified-Chat8798.ps1'
 $Node=(Get-Command node.exe -ErrorAction Stop).Source
 $Protected=@(8789,8796,8797,8088,8791)
@@ -26,7 +27,7 @@ if(-not $Apply){
  Write-Host 'FUN_WEB_REPAIR=INACTIVE. Explicit -Apply required.'
  exit 0
 }
-foreach($F in @($Runner,$Diagnostic,$AdaptiveDiagnostic,$V3Diagnostic,$V31Diagnostic,$V32Diagnostic,$Starter)){
+foreach($F in @($Runner,$Diagnostic,$AdaptiveDiagnostic,$V3Diagnostic,$V31Diagnostic,$V32Diagnostic,$V34Diagnostic,$Starter)){
  if(-not (Test-Path -LiteralPath $F -PathType Leaf)){Hold ('SOURCE_MISSING_'+$F)}
  if((Get-Item -LiteralPath $F).Attributes -band [IO.FileAttributes]::ReparsePoint){Hold ('SYMLINK_REFUSED_'+$F)}
 }
@@ -60,6 +61,12 @@ if($LASTEXITCODE -ne 0){Hold 'V31_LIVE_SCHEMA_NOT_SUPPORTED_8798_PRESERVED'}
 if($LASTEXITCODE -ne 0){Hold 'V32_DIAGNOSTIC_SYNTAX_8798_PRESERVED'}
 & $Node $V32Diagnostic --schema-only
 if($LASTEXITCODE -ne 0){Hold 'V32_LIVE_SCHEMA_NOT_SUPPORTED_8798_PRESERVED'}
+# V3.4: every selected PE tool must have a compatible actual live schema.
+# Read-only catalogue queries only, no staged file opened and no MCP call.
+& $Node --check $V34Diagnostic
+if($LASTEXITCODE -ne 0){Hold 'V34_DIAGNOSTIC_SYNTAX_8798_PRESERVED'}
+& $Node $V34Diagnostic --schema-only
+if($LASTEXITCODE -ne 0){Hold 'V34_LIVE_PE_SCHEMAS_NOT_SUPPORTED_8798_PRESERVED'}
 # Perform the entire offline V1+V2 qualification BEFORE stopping the old 8798.
 # A parsing/test failure must not tear down a working chat instance.
 $PreflightSources=@(
@@ -68,6 +75,7 @@ $PreflightSources=@(
  (Join-Path $Repo 'src\experimental\verified-file-v3-1.mjs'),
  (Join-Path $Repo 'src\experimental\verified-binary-layout-v3-2.mjs'),
  (Join-Path $Repo 'src\experimental\verified-pe-inspection-v3-4.mjs'),
+ (Join-Path $Repo 'scripts\Diagnose-Fun-Verified-PE-V34.mjs'),
  (Join-Path $Repo 'src\experimental\unified-task-chat.mjs'),
  (Join-Path $Repo 'src\experimental\unified-task-client.js'),
  (Join-Path $Repo 'scripts\Run-Fun-Unified-Chat8798.mjs')
