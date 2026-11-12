@@ -55,20 +55,31 @@ jobs:
         run: |
           $ErrorActionPreference='Stop'
           $source=Get-Content -LiteralPath 'Start-Fun-Industrial.ps1' -Raw
-          $launch=[regex]::Match($source,'(?m)^\s*(\$nodeArgs=.+)$')
-          if(-not $launch.Success){throw 'V43_RUNTIME_MISSING_STARTNODE_EXPRESSION'}
+          $tokens=$null;$parseErrors=$null
+          $ast=[Management.Automation.Language.Parser]::ParseInput($source,[ref]$tokens,[ref]$parseErrors)
+          if($parseErrors.Count){throw 'V43_RUNTIME_PARSE_HOLD'}
+          $argsFunction=$ast.Find({param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'NodeArguments'},$true)
+          if(-not $argsFunction){throw 'V43_RUNTIME_MISSING_NODE_ARGUMENTS_FUNCTION'}
+          Invoke-Expression $argsFunction.Extent.Text
           $script='C:\Program Files\Fun Industrial\sidecar.mjs'
           $mode='--serve'
-          Invoke-Expression $launch.Groups[1].Value
+          $nodeArgs=NodeArguments $script $mode
           if($nodeArgs -cne '"C:\Program Files\Fun Industrial\sidecar.mjs" --serve'){throw 'V43_RUNTIME_LAUNCH_ARGS_WITH_MODE_HOLD'}
           $mode=''
-          Invoke-Expression $launch.Groups[1].Value
+          $nodeArgs=NodeArguments $script $mode
           if($nodeArgs -cne '"C:\Program Files\Fun Industrial\sidecar.mjs"'){throw 'V43_RUNTIME_LAUNCH_ARGS_NO_MODE_HOLD'}
-          $preview=[regex]::Match($source,'(?m)^\s*(Write-Host \(.+FUN_PREFLIGHT_PORT_.+)$')
-          if(-not $preview.Success){throw 'V43_RUNTIME_MISSING_PREVIEW_EXPRESSION'}
+          if($source -notmatch '(?m)^\s*\$nodeArgs=NodeArguments \$script \$mode\s*
+){throw 'V43_RUNTIME_NODE_ARGUMENTS_NOT_USED'}
+          $preview=[regex]::Match($source,"(?m)^\s*(if\(\$Original\[\$port\]\)\{\$portState='LISTENING'\}else\{\$portState='MISSING'\})\s*$")
+          if(-not $preview.Success){throw 'V43_RUNTIME_MISSING_PREFLIGHT_ASSIGNMENT'}
+          if($source -notmatch '(?m)^\s*Write-Host \(''FUN_PREFLIGHT_PORT_''\+\$port\+''=''\+\$portState\)\s*
+){throw 'V43_RUNTIME_MISSING_PREFLIGHT_OUTPUT'}
           $port=8789
           $Original=@{8789=27756}
           Invoke-Expression $preview.Groups[1].Value
+          if($portState -cne 'LISTENING'){throw 'V43_RUNTIME_PREFLIGHT_PRESENT_HOLD'}
           $Original=@{}
           Invoke-Expression $preview.Groups[1].Value
+          if($portState -cne 'MISSING'){throw 'V43_RUNTIME_PREFLIGHT_MISSING_HOLD'}
+          if($source -match '\$\(\s*if\s*\('){throw 'V43_RUNTIME_UNSUPPORTED_SUBEXPRESSION_IF'}
           Write-Host 'V43_WINDOWS_POWERSHELL_RUNTIME_EXPRESSIONS=PASS'
