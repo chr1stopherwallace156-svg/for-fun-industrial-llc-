@@ -1,9 +1,9 @@
 # Fun Industrial V4.3 — One-Command Startup
 
 ## What this changes
-Single operator-invoked `Start-Fun-Industrial.ps1` checks/adopts already-running components, starts only missing fixed Fun Industrial services in dependency order, verifies real health, and prints one 8798 URL. It does **not** overwrite the deployed original dashboard source, reset NetBird, start or stop Elektron Ollama 11434, restore November backups, or ask for six separate approval phrases.
+Single operator-invoked `Start-Fun-Industrial.ps1` checks/adopts already-running components, starts only missing fixed Fun Industrial services in dependency order, verifies real health, and prints the 8798 Windows dashboard plus the existing 8443 private iPhone HTTPS voice gateway. The private gateway is started only after local services are healthy. It does **not** overwrite the deployed original dashboard source, reset NetBird, start or stop Elektron Ollama 11434, restore November backups, or ask for six separate approval phrases.
 
-Execution order: existing or fixed local Qwen 8088 → existing/compute-only recovery 8791 → existing or trusted original dashboard 8789 → compatibility sidecar 8796 → independent 229-tool REA MCP broker 8797 → unified chat 8798.
+Execution order: existing or fixed local Qwen 8088 → existing/compute-only recovery 8791 → existing or trusted original dashboard 8789 → compatibility sidecar 8796 → independent 229-tool REA MCP broker 8797 → unified chat 8798 → private NetBird HTTPS gateway 8443 (adopt existing verified process or launch missing).
 
 ## Fixes that make this possible
 - The compute process is validated as a Python owner with exact `networkx`/`quimb`/`pytorch-cpu` health identity; PID is not pinned across a worker reparent/restart.
@@ -22,13 +22,17 @@ Execution order: existing or fixed local Qwen 8088 → existing/compute-only rec
 - If an intermediate stage fails after previous stages start, there is **no automated rollback or retry**. The command reports `FUN_ONE_COMMAND_HOLD` and logs so an operator can inspect the partial state; subsequent qualified runs adopt existing healthy instances.
 - `-CheckOnly` is available for read-only source and port-owner checks, but operators are not required to run it before normal startup.
 - The code starts only when explicitly invoked; Windows-login autostart is not installed or silently changed.
+- The separate HTTPS gateway stays bound to the **existing private NetBird IP** `100.109.4.20:8443`, allows only the preauthorized iPhone peer `100.109.87.100`, keeps the private TLS certificate and password authentication, and reverse-proxies **the existing voice dashboard 8789**. It does **not** switch iPhone traffic to the unified 8798 dashboard.
+- The launcher adopts only a recognized Node gateway with matching trusted TLS certificate pin and confirmed loopback-source 403 denial. An unknown port owner, changed private IP, missing voice endpoint, missing NetBird interface, or invalid TLS attestation fails closed without replacing the running process.
+- The gateway must have been prepared with `Prepare-Fun-iPhone-HTTPS.ps1` beforehand. If no DPAPI credential is already enrolled, the existing launcher securely prompts once **per gateway start** for a 24+ character password; it does not silently store or change the password. Existing user-scoped encrypted autostart credentials can be reused if previously explicitly configured. No new scheduled task or credential storage is created.
+- A restarted gateway needs fresh iPhone Safari authentication. An already-running healthy gateway is preserved, including its current password. The system does not claim remote iPhone reachability until verified on the device.
 
 ## Remaining limitations
 Source/baseline is pinned to the November 12 observed original dashboard. The modified original 8789 source is not under the V4 repository's automatic update control. The original 8789 REA session may remain uninitialized; *legacy V3/V3.1/V3.2/V3.4 parent-specific workflows* may still require qualification before being called ready. V4.3 provides a verified separate 8797 broker, but it does not assert every legacy parent-dependent workflow is restored.
 
-Cross-platform CI is synthetic and does not prove the user's specific Windows PC has successfully started or executed a real tool. A live startup status and selected operator-approved workflows are needed to qualify full functionality. No claimed CPU/RAM savings from this change.
+Cross-platform CI is synthetic and does not prove the user's specific Windows PC has successfully started the newly integrated private HTTPS gateway or executed a real tool. A live startup status and selected operator-approved workflows are needed to qualify full functionality. No claimed CPU/RAM savings from this change.
 
 ## Usage
-After switching to the reviewed V4.3 GitHub branch, run `& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $HOME 'FunIndustrial-UnifiedChat-V1\Start-Fun-Industrial.ps1')` once. Repeat exactly the same command after subsequent PC restarts; it adopts existing healthy services. The separately shared one-line bootstrap can also perform a one-time `git fetch` + branch switch + startup in a single pasted PowerShell line.
+After switching to the reviewed V4.3 GitHub branch, run `& powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $HOME 'FunIndustrial-UnifiedChat-V1\Start-Fun-Industrial.ps1')` once. Repeat exactly the same command after subsequent PC restarts; it adopts existing healthy services and private HTTPS when ready. The separately shared one-line bootstrap can also perform a one-time `git fetch` + branch switch + startup in a single pasted PowerShell line.
 
 See `intelligence-checks/one-command-startup-v43-case.mjs` and `.github/workflows/fun-one-command-v43-ci.yml` for negative tests, static safety checks, and Windows PowerShell parsing.
