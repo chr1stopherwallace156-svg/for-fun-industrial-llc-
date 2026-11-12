@@ -22,7 +22,7 @@ function fixture(){
  let now=10000,proof=mockProof(),callCount=0;
  const tools=Array.from({length:229},(_,i)=>({
   name:i===0?'inspect_binary_layout':'rea_other_'+i,
-  description:'Static Rust executable inspection',
+  description:'Static binary layout inspection',
   inputSchema:i===0?{type:'object',required:['path'],
    properties:{path:{type:'string'}},additionalProperties:false}:
    {type:'object',properties:{},required:[]}
@@ -82,7 +82,7 @@ test('one separate confirmation executes exactly one named MCP tool with authori
  assert.equal(r.receipt.fileSha256Before,r.receipt.fileSha256After);
  assert.equal(r.receipt.fileIdentityVerified,true);
  assert.equal(r.receipt.evidenceEnvelopeVerified,true);
- assert.equal(r.receipt.rustLanguageVerified,false);
+ assert.equal(r.receipt.analysisContentAccuracyVerified,false);
  assert.equal(r.receipt.automaticRetries,0);
  assert.equal(f.callsCount(),1);
  assert.deepEqual(f.calls.at(-1),{
