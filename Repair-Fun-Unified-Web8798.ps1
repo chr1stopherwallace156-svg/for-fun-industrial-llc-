@@ -7,6 +7,7 @@ $ErrorActionPreference='Stop'
 $Repo=$PSScriptRoot
 $Runner=Join-Path $Repo 'scripts\Run-Fun-Unified-Chat8798.mjs'
 $Diagnostic=Join-Path $Repo 'scripts\Diagnose-Fun-Unified-Web8798.mjs'
+$AdaptiveDiagnostic=Join-Path $Repo 'scripts\Diagnose-Fun-Adaptive-V2.mjs'
 $Starter=Join-Path $Repo 'Start-Fun-Unified-Chat8798.ps1'
 $Node=(Get-Command node.exe -ErrorAction Stop).Source
 $Protected=@(8789,8796,8797,8088,8791)
@@ -22,7 +23,7 @@ if(-not $Apply){
  Write-Host 'FUN_WEB_REPAIR=INACTIVE. Explicit -Apply required.'
  exit 0
 }
-foreach($F in @($Runner,$Diagnostic,$Starter)){
+foreach($F in @($Runner,$Diagnostic,$AdaptiveDiagnostic,$Starter)){
  if(-not (Test-Path -LiteralPath $F -PathType Leaf)){Hold ('SOURCE_MISSING_'+$F)}
  if((Get-Item -LiteralPath $F).Attributes -band [IO.FileAttributes]::ReparsePoint){Hold ('SYMLINK_REFUSED_'+$F)}
 }
@@ -33,6 +34,12 @@ if($LASTEXITCODE -ne 0){Hold 'DIAGNOSTIC_SYNTAX'}
 if($LASTEXITCODE -ne 0){Hold 'RUNNER_SYNTAX'}
 & $Node $Diagnostic --check-example-org
 if($LASTEXITCODE -ne 0){Hold 'WEB_DIAGNOSTIC_FAILED_8798_PRESERVED'}
+# V2 must see exactly 229 registered REA and 19 registered local functions.
+# Planning is a read-only GET of existing catalogues; no MCP tools/calls.
+& $Node --check $AdaptiveDiagnostic
+if($LASTEXITCODE -ne 0){Hold 'ADAPTIVE_V2_SYNTAX_8798_PRESERVED'}
+& $Node $AdaptiveDiagnostic --plan 'Find tools to inspect a Rust binary'
+if($LASTEXITCODE -ne 0){Hold 'ADAPTIVE_V2_LIVE_PREFLIGHT_FAILED_8798_PRESERVED'}
 $Before=@{}
 foreach($Port in $Protected){
  $Before[$Port]=@(Listen $Port)
@@ -77,4 +84,4 @@ $New=Invoke-RestMethod 'http://127.0.0.1:8798/api/unified/status' -TimeoutSec 15
 if($New.version -ne 'fi-unified-task-chat-8798-v1' -or !$New.rea.ready -or !$New.local.ready -or !$New.ai.ready){Hold 'NEW_8798_HEALTH_HOLD'}
 Write-Host ('FUN_WEB_REPAIR=PASS OLD_8798_PID='+$OldPid+' NEW_8798_PID='+$NewPid)
 Write-Host 'ONLY_8798_RESTARTED=TRUE QWEN_8088=UNCHANGED REA_8797=UNCHANGED LOCAL_8796=UNCHANGED ORIGINAL_8789=UNCHANGED COMPUTE_8791=UNCHANGED'
-Write-Host 'NEXT=RUN_LIVE_WEBSITE_CHAT_READ_ONLY'
+Write-Host 'NEXT=RUN_LIVE_CAPABILITY_DISCOVERY_FROM_CHAT'
