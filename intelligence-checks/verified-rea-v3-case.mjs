@@ -167,6 +167,23 @@ test('MCP error and tool identity mismatch cannot be reported as verified succes
   assert.equal(v.status().completedExecutions,0);
  }
 });
+test('empty MCP result cannot be marked as verified, even if HTTP returned 200',async()=>{
+ const f=fixture(),v=f.app();
+ f.data.result={tool:'inspect_analysis_settings',result:{isError:false}};
+ await v.prepare({name:'inspect_analysis_settings',arguments:{}});
+ const result=await v.execute({authorizationToken:TOK,operatorConfirmed:true});
+ assert.equal(result.state,'result_hold_verify_manually');
+ assert.equal(result.executedActions,'unverified');
+ assert.equal(result.receipt.verifiedResultEnvelope,false);
+});
+test('new failed review invalidates an earlier still valid token before any tool call',async()=>{
+ const f=fixture(),v=f.app();
+ await v.prepare({name:'inspect_analysis_settings',arguments:{}});
+ await assert.rejects(v.prepare({name:'close_binary',arguments:{}}),/TOOL_NOT_IN_REVIEWED_READONLY_ALLOWLIST/);
+ assert.equal(v.status().preparationPending,false);
+ await assert.rejects(v.execute({authorizationToken:TOK,operatorConfirmed:true}),/NO_MATCHING_LIVE_PREPARATION/);
+ assert.equal(f.calls.filter(x=>x.url.endsWith('/call')).length,0);
+});
 test('V3 module never runs model inference or any local /run endpoints',async()=>{
  const f=fixture(),v=f.app();
  await v.prepare({name:'inspect_analysis_settings',arguments:{}});
