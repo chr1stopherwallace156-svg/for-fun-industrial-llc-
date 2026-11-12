@@ -1,10 +1,10 @@
 // FI_V32_SCHEMA_PREFLIGHT — zero MCP tool calls, files, writes or restarts.
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
-import {createVerifiedFileV32} from '../src/experimental/verified-binary-layout-v3-2.mjs';
+import {createVerifiedBinaryLayoutV32} from '../src/experimental/verified-binary-layout-v3-2.mjs';
 import {fixedJson} from '../src/experimental/unified-task-chat.mjs';
 export async function diagnoseV32({request=fixedJson,write=console.log}={}){
- const runner=createVerifiedFileV32({request});
+ const runner=createVerifiedBinaryLayoutV32({request});
  const p=await runner.preflight();
  if(p.state!=='schema_compatible_file_not_probed'||p.executionCount!==0)
   throw Error('V32_SCHEMA_PREFLIGHT_UNVERIFIED');
