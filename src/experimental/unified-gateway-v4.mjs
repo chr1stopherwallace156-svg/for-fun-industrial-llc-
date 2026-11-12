@@ -49,14 +49,19 @@ export function createUnifiedGatewayV4({read=fixedGatewayGetV4}={}){
     observed[name]=item.status==='fulfilled'&&object(item.value);
     response[name]=observed[name]?item.value:null;
    }
-   const parentReady=observed.parent&&response.parent.state==='ready';
-   const countReady=observed.catalogue&&
-    response.catalogue.rea_tool_count===229&&response.catalogue.local_tool_count===19;
+   const parentReady=observed.parent&&observed.catalogue;
+   const reaCount=response.catalogue?.rea_tool_count;
+   const localCount=response.catalogue?.local_tool_count;
    const localReady=observed.local&&response.local.sidecar===true&&
     response.local.reaExecutionGrants===0;
    const reaReady=observed.rea&&response.rea.liveMcpHealth==='ready'&&
     response.rea.realReaToolCount===229&&response.rea.busy===false;
-   const qwenReachable=observed.qwen;
+   const qwenReachable=observed.qwen&&['ok','ready'].includes(String(response.qwen?.status??''));
+   // The parent 8789 can be healthy while its old AI manager reports stopped
+   // because Qwen was started independently. Likewise the old parent MCP
+   // registry may be empty while 8797 validates all 229 live definitions.
+   const countReady=parentReady&&localCount===19&&
+    (reaCount===229||(reaCount===0&&reaReady));
    const computeReady=observed.compute&&VALID_HEALTH.has(
     String(response.compute.status??response.compute.state??'').toLowerCase());
    const entryReady=true; // This endpoint is served by the existing 8798 instance.
@@ -69,7 +74,7 @@ export function createUnifiedGatewayV4({read=fixedGatewayGetV4}={}){
     {id:'rea_mcp',port:8797,kind:'legacy_internal',ready:reaReady,
      expectedTools:229,source:'read_only_http_status'},
     {id:'qwen_llama_cpp',port:8088,kind:'isolated_worker',
-     ready:qwenReachable&&parentReady,source:'own_http_health_and_parent_ai_status'},
+     ready:qwenReachable,source:'direct_llama_cpp_health'},
     {id:'python_compute',port:8791,kind:'isolated_worker',
      ready:computeReady,source:'read_only_http_health'}
    ];
@@ -78,8 +83,9 @@ export function createUnifiedGatewayV4({read=fixedGatewayGetV4}={}){
     phase:'single_entrypoint_read_only_gateway',
     entrypoint:'http://127.0.0.1:8798/',
     state:services.every(x=>x.ready)&&countReady?'ready':'degraded',
-    services,registered:{rea:observed.catalogue?response.catalogue.rea_tool_count:null,
-     local:observed.catalogue?response.catalogue.local_tool_count:null,
+    services,registered:{rea:reaReady?229:reaCount??null,
+     local:localCount??null,
+     parentReaRegistered:reaCount??null,
      verifiedCounts:!!countReady},
     componentsStillSeparate:true,legacyPortsRetired:[],
     workerProcessMemorySavingsVerified:false,ramSavingsClaimed:false,
