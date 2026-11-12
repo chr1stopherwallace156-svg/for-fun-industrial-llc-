@@ -1,0 +1,42 @@
+name: Fun REA 8797 guarded refresh qualification
+on:
+  push:
+    branches:
+      - feature/fun-rea8797-guarded-refresh-20261111
+  pull_request:
+    paths:
+      - 'Repair-Fun-Rea229-Sidecar8797.ps1'
+      - 'intelligence-checks/rea8797-guarded-refresh-case.mjs'
+      - '.github/workflows/fun-rea8797-guarded-refresh-ci.yml'
+permissions:
+  contents: read
+jobs:
+  qualify:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.4'
+      - name: Node source and qualification tests (no live REA)
+        run: |
+          node --check intelligence-checks/rea8797-guarded-refresh-case.mjs
+          node --test intelligence-checks/rea8797-guarded-refresh-case.mjs intelligence-checks/rea229-full-case.mjs intelligence-checks/verified-binary-layout-v3-2-case.mjs intelligence-checks/verified-file-v3-1-case.mjs intelligence-checks/verified-rea-v3-case.mjs intelligence-checks/unified-task-chat-case.mjs intelligence-checks/adaptive-capability-v2-case.mjs
+      - name: Windows PowerShell syntax and inert default
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach($script in @('Repair-Fun-Rea229-Sidecar8797.ps1','Start-Fun-Rea229-Sidecar8797.ps1','Start-Fun-Unified-Chat8798.ps1','Repair-Fun-Unified-Web8798.ps1')){
+            $tokens=$null
+            $errors=$null
+            [Management.Automation.Language.Parser]::ParseFile((Resolve-Path $script).Path,[ref]$tokens,[ref]$errors) | Out-Null
+            if($errors.Count){$errors|Format-List|Out-String|Write-Host;throw ('REA8797_PS_PARSE_HOLD_'+$script)}
+          }
+          $result = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Repair-Fun-Rea229-Sidecar8797.ps1
+          if($LASTEXITCODE -ne 0 -or -not ($result -match 'REA8797_GUARDED=INACTIVE')){throw 'REA8797_DEFAULT_NOT_INERT'}
+          Write-Host 'REA8797_PS_PARSE_AND_INERT_DEFAULT=PASS'
