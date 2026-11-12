@@ -48,3 +48,27 @@ jobs:
             if($errors.Count){$errors|Format-List|Out-String|Write-Host;throw ('V43_PS_PARSE_HOLD_'+$p)}
           }
           Write-Host 'V43_WINDOWS_POWERSHELL_SYNTAX=PASS'
+
+      - name: Execute startup expression smoke test in Windows PowerShell 5.1
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $ErrorActionPreference='Stop'
+          $source=Get-Content -LiteralPath 'Start-Fun-Industrial.ps1' -Raw
+          $launch=[regex]::Match($source,'(?m)^\s*(\$nodeArgs=.+)$')
+          if(-not $launch.Success){throw 'V43_RUNTIME_MISSING_STARTNODE_EXPRESSION'}
+          $script='C:\Program Files\Fun Industrial\sidecar.mjs'
+          $mode='--serve'
+          Invoke-Expression $launch.Groups[1].Value
+          if($nodeArgs -cne '"C:\Program Files\Fun Industrial\sidecar.mjs" --serve'){throw 'V43_RUNTIME_LAUNCH_ARGS_WITH_MODE_HOLD'}
+          $mode=''
+          Invoke-Expression $launch.Groups[1].Value
+          if($nodeArgs -cne '"C:\Program Files\Fun Industrial\sidecar.mjs"'){throw 'V43_RUNTIME_LAUNCH_ARGS_NO_MODE_HOLD'}
+          $preview=[regex]::Match($source,'(?m)^\s*(Write-Host \(.+FUN_PREFLIGHT_PORT_.+)$')
+          if(-not $preview.Success){throw 'V43_RUNTIME_MISSING_PREVIEW_EXPRESSION'}
+          $port=8789
+          $Original=@{8789=27756}
+          Invoke-Expression $preview.Groups[1].Value
+          $Original=@{}
+          Invoke-Expression $preview.Groups[1].Value
+          Write-Host 'V43_WINDOWS_POWERSHELL_RUNTIME_EXPRESSIONS=PASS'
