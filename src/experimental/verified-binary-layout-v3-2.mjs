@@ -5,7 +5,7 @@
  * provider-side temporary artifacts. This component never launches the binary.
  */
 // FI_VERIFIED_BINARY_LAYOUT_V32 — exact, staged PE/ELF read-only layout examination.
-// Independent of the V3.2 Rust inspection pilot. Never accesses arbitrary filesystem paths,
+// Independent of the V3.1 Rust inspection pilot. Never accesses arbitrary filesystem paths,
 // creates files, starts providers, or invokes an MCP tool without a new approval.
 import os from 'node:os';
 import path from 'node:path';
