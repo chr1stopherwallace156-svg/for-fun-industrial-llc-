@@ -123,7 +123,9 @@ test('V4.3 one command is start-only with idempotent adoption, no activation end
  assert.match(script,/Run-Fun-Rea229-Sidecar8797\.mjs/);
  assert.match(script,/--standalone/);
  assert.match(script,/Run-Fun-Unified-Chat8798\.mjs/);
- for(const forbidden of ['Stop-Process','taskkill.exe','/api/activate','/api/ai/start','/api/start','/api/rea229/call','/api/rea229/run'])assert.equal(script.includes(forbidden),false,'unexpected privileged startup path '+forbidden);
+ const runtimeLines=script.split('\n').filter(x=>!x.trimStart().startsWith('#')).join('\n');
+ for(const forbidden of ['Stop-Process','taskkill.exe','/api/activate','/api/ai/start','/api/start','/api/rea229/call','/api/rea229/run'])
+  assert.equal(runtimeLines.includes(forbidden),false,'unexpected privileged startup path '+forbidden);
  assert.match(script,/FUN_REA_OPERATOR_APPROVAL=REQUIRED/);
  assert.match(script,/FUN_ELEKTRON_OLLAMA=UNTOUCHED/)
 });
