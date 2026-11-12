@@ -108,6 +108,8 @@ export class CatalogueSnapshotStore{
    const prior=await this.read();
    if(nowMs<prior.nextDueMs)return {state:'HOLD',reason:'REFRESH_NOT_DUE',nextDueMs:prior.nextDueMs};
    const diff=reconcileCatalogue(rows,prior.records,{maxEntries:this.#maxEntries});
+   if(prior.records.length>0&&diff.count*2<prior.records.length)
+    return {state:'HOLD',reason:'CATALOGUE_SUDDEN_SHRINK',previousCount:prior.records.length,currentCount:diff.count};
    const nextDueMs=nowMs+this.#refreshHours*3600000;
    if(!int(nextDueMs,0,Number.MAX_SAFE_INTEGER))throw Error('RAEM008_TIME_INVALID');
    const next={schema:SCHEMA,checkedAtMs:nowMs,nextDueMs,records:diff.pairs};
@@ -161,6 +163,8 @@ export async function readBoundedCatalogueResponse(response,{maxProcessRssMiB=12
  if(!Array.isArray(rows)||rows.length>maxEntries)return {state:'HOLD',reason:'PROVIDER_CATALOGUE_COUNT_INVALID'};
  try{reconcileCatalogue(rows,[],{maxEntries});}
  catch{return {state:'HOLD',reason:'PROVIDER_SCHEMA_INVALID'};}
+ if(process.memoryUsage().rss>maxProcessRssMiB*MiB||os.freemem()<minimumHostFreeMiB*MiB)
+  return {state:'HOLD',reason:'RESOURCE_PRESSURE'};
  return {state:'PASS',rows,receivedBytes:total};
 }
 export async function checkPublicCatalogue({
