@@ -10,10 +10,11 @@ const ORIGIN='http://127.0.0.1:8798';
 const CLIENT=new URL('../src/experimental/unified-task-client.js',import.meta.url);
 const CSP="default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'";
 const HTML='<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta name="color-scheme" content="dark"><title>Fun Industrial | Unified Task Chat</title><style>'+
-':root{color-scheme:dark}*{box-sizing:border-box}body{background:#0b1420;color:#eaf3fb;font:15px/1.6 system-ui,sans-serif;margin:0;padding:22px}main{max-width:860px;margin:auto;display:grid;gap:16px}header{border-bottom:1px solid #35506c;padding-bottom:12px}h1{font-size:24px;margin:0}h2{font-size:16px;margin:0}p{margin:.4em 0;color:#bacddd}.panel{border:1px solid #364e67;border-radius:14px;background:#152437;padding:18px}#history{min-height:220px;max-height:56vh;overflow:auto;display:grid;gap:10px}article{border:1px solid #304860;border-radius:10px;padding:12px;white-space:pre-wrap;overflow-wrap:anywhere}article.you{background:#203a51}article.assistant{background:#122d36}article.error{background:#39262a}small,.muted{color:#a5bfd5}textarea{width:100%;min-height:105px;background:#0b1926;color:white;padding:12px;border:1px solid #456178;border-radius:9px;font:16px system-ui}button{background:#9fe4e6;color:#101c29;border:none;border-radius:8px;padding:11px 15px;font:700 14px system-ui;cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}.actions{display:flex;gap:8px;flex-wrap:wrap}label{display:block;margin:8px 0}input[type=checkbox]{margin-right:8px}#action-review{display:none;border-top:1px solid #405870;margin-top:12px;padding-top:12px}#action-review.open{display:block}.status{font-size:13px;color:#b9d7e1}#event-log{max-height:140px;overflow:auto;font:12px monospace;white-space:pre-wrap;overflow-wrap:anywhere}button:focus-visible,textarea:focus-visible{outline:2px solid #f2db80;outline-offset:2px}'+
+':root{color-scheme:dark}*{box-sizing:border-box}body{background:#0b1420;color:#eaf3fb;font:15px/1.6 system-ui,sans-serif;margin:0;padding:22px}main{max-width:860px;margin:auto;display:grid;gap:16px}header{border-bottom:1px solid #35506c;padding-bottom:12px}h1{font-size:24px;margin:0}h2{font-size:16px;margin:0}p{margin:.4em 0;color:#bacddd}.panel{border:1px solid #364e67;border-radius:14px;background:#152437;padding:18px}#history{min-height:220px;max-height:56vh;overflow:auto;display:grid;gap:10px}article{border:1px solid #304860;border-radius:10px;padding:12px;white-space:pre-wrap;overflow-wrap:anywhere}article.you{background:#203a51}article.assistant{background:#122d36}article.error{background:#39262a}small,.muted{color:#a5bfd5}textarea{width:100%;min-height:105px;background:#0b1926;color:white;padding:12px;border:1px solid #456178;border-radius:9px;font:16px system-ui}button{background:#9fe4e6;color:#101c29;border:none;border-radius:8px;padding:11px 15px;font:700 14px system-ui;cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}.actions{display:flex;gap:8px;flex-wrap:wrap}label{display:block;margin:8px 0}input[type=checkbox]{margin-right:8px}select{color:#eaf3fb;background:#0b1926;border:1px solid #456178;border-radius:8px;padding:10px;max-width:100%}#v3-preview{white-space:pre-wrap;overflow-wrap:anywhere}#action-review{display:none;border-top:1px solid #405870;margin-top:12px;padding-top:12px}#action-review.open{display:block}.status{font-size:13px;color:#b9d7e1}#event-log{max-height:140px;overflow:auto;font:12px monospace;white-space:pre-wrap;overflow-wrap:anywhere}button:focus-visible,textarea:focus-visible{outline:2px solid #f2db80;outline-offset:2px}'+
 '</style></head><body><main><header><h1>Fun Industrial · Unified Task Chat</h1><p>One chat for public websites, game/app feasibility, REA session inspection, Qwen explanations and reviewed local compute actions.</p><div id="service-status" role="status" class="status">Checking existing services…</div></header>'+
 '<section class="panel"><h2>Conversation</h2><div id="history" aria-live="polite"><article class="assistant">Describe a website, app, game, engineering question, or local task. I’ll identify what can be checked and clearly report what actually ran.</article></div></section>'+
 '<section class="panel"><label for="task">Your request</label><textarea id="task" maxlength="2200" placeholder="Analyze https://example.org and summarize its static page text, or ask if Warzone can run on iPhone, or inspect REA MCP session status"></textarea><div class="actions"><button type="button" id="send">Send to Qwen</button></div>'+
+'<section class="panel" id="v3-panel"><h2>V3 · Verified exact REA inspection</h2><p>One allowlisted read-only MCP tool, exact empty arguments, live schema check, and a separate approval. This does not authorize other 229 tools.</p><label for="v3-choice">Exact inspected tool</label><select id="v3-choice"><option value="inspect_analysis_settings">inspect_analysis_settings</option><option value="binary_session">binary_session</option></select><div class="actions"><button id="v3-prepare" type="button">1. Prepare exact inspection</button><button id="v3-confirm" type="button" disabled>2. Confirm once and execute</button><button id="v3-cancel" type="button" disabled>Cancel preparation</button></div><div id="v3-preview" aria-live="polite" class="status">No V3 execution prepared.</div></section>'+
 '<div id="action-review"><p><strong>Tool execution requires a separate explicit decision.</strong> REA tools may change files, devices or processes; local tools may change compute state. Review the request before authorizing.</p><label><input type="checkbox" id="local-consent">I authorize this one local-tools session for the request above</label><button type="button" id="local-execute" disabled>Execute reviewed tools</button></div></section>'+
 '<section class="panel"><h2>Execution evidence</h2><div id="event-log"></div><p class="muted">Read-only tasks may run after you send. Local tools require a separate review. No background operation, automatic downloads, arbitrary shell, or DRM/anti-cheat bypass.</p></section><script src="/api/unified/client.js" defer></script></main></body></html>';
 function send(res,status,value,type='application/json; charset=utf-8'){
@@ -30,7 +31,9 @@ async function body(req){
  return b;
 }
 export function createUnifiedChatServer({app=createUnifiedTaskChat(),readClient=()=>readFile(CLIENT,'utf8')}={}){
- if(typeof app?.status!=='function'||typeof app?.chat!=='function'||typeof app?.executeLocal!=='function'||typeof app?.executeRea!=='function'||typeof app?.planCapabilities!=='function')
+ if(typeof app?.status!=='function'||typeof app?.chat!=='function'||typeof app?.executeLocal!=='function'||typeof app?.executeRea!=='function'||typeof app?.planCapabilities!=='function'||typeof app?.verifiedReaStatus!=='function'||
+    typeof app?.prepareVerifiedRea!=='function'||typeof app?.executeVerifiedRea!=='function'||
+    typeof app?.cancelVerifiedRea!=='function')
   throw Error('UNIFIED_APP_REQUIRED');
  return http.createServer(async(req,res)=>{
   try{
@@ -41,10 +44,23 @@ export function createUnifiedChatServer({app=createUnifiedTaskChat(),readClient=
    if(req.method==='GET'&&u.pathname==='/'&&!u.search)return send(res,200,HTML,'text/html; charset=utf-8');
    if(req.method==='GET'&&u.pathname==='/api/unified/client.js'&&!u.search)return send(res,200,await readClient(),'text/javascript; charset=utf-8');
    if(req.method==='GET'&&u.pathname==='/api/unified/status'&&!u.search)return send(res,200,await app.status());
-   if(req.method==='POST'&&['/api/unified/chat','/api/unified/capabilities/plan','/api/unified/local/execute','/api/unified/rea/execute'].includes(u.pathname)&&!u.search){
+   if(req.method==='GET'&&u.pathname==='/api/unified/v3/status'&&!u.search)return send(res,200,app.verifiedReaStatus());
+   if(req.method==='POST'&&['/api/unified/chat','/api/unified/capabilities/plan','/api/unified/local/execute','/api/unified/rea/execute','/api/unified/v3/prepare','/api/unified/v3/confirm','/api/unified/v3/cancel'].includes(u.pathname)&&!u.search){
     if(req.headers.origin!==ORIGIN||req.headers['x-fi-unified']!=='operator-click')
      return send(res,403,{error:'UNIFIED_CLICK_ORIGIN_REQUIRED'});
     const data=await body(req);
+    if(u.pathname==='/api/unified/v3/prepare'){
+     if(Object.keys(data).some(k=>!['name','arguments'].includes(k)))throw Error('V3_PREPARE_FIELDS_NOT_ALLOWED');
+     return send(res,200,await app.prepareVerifiedRea(data));
+    }
+    if(u.pathname==='/api/unified/v3/confirm'){
+     if(Object.keys(data).some(k=>!['authorizationToken','operatorConfirmed'].includes(k)))throw Error('V3_CONFIRM_FIELDS_NOT_ALLOWED');
+     return send(res,200,await app.executeVerifiedRea(data));
+    }
+    if(u.pathname==='/api/unified/v3/cancel'){
+     if(Object.keys(data).length)throw Error('V3_CANCEL_FIELDS_NOT_ALLOWED');
+     return send(res,200,app.cancelVerifiedRea());
+    }
     if(u.pathname==='/api/unified/capabilities/plan'){
      if(Object.keys(data).some(k=>k!=='prompt'))throw Error('PLAN_FIELDS_NOT_ALLOWED');
      return send(res,200,await app.planCapabilities(data));
