@@ -1,0 +1,22 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,mkdir,writeFile,rm,readFile,symlink} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {inspectCatalogueCheckpoint,validateCatalogueCheckpoint,describeCatalogueCheckpoint} from '../src/resource-aware/catalogue-checkpoint-report.mjs';
+const h=c=>c.repeat(64);
+const state=()=>({schema:'fun.raem.hibp.catalogue.v1',checkedAtMs:1000,nextDueMs:21601000,records:[[h('a'),h('b')],[h('c'),h('d')]]});
+async function fixture(t){const parent=await mkdtemp(join(tmpdir(),'raem010-'));t.after(()=>rm(parent,{recursive:true,force:true}));const root=join(parent,'checkpoint');await mkdir(root);return {parent,root,path:join(root,'hibp_catalogue_snapshot.json')};}
+test('read-only inspection returns MISSING and does not create a checkpoint file',async t=>{const {root,path}=await fixture(t);const r=await inspectCatalogueCheckpoint(root,{nowMs:2000});assert.equal(r.state,'MISSING');await assert.rejects(readFile(path),'ENOENT');});
+test('validated checkpoint reports due time without exposing hash pairs',async t=>{const {root,path}=await fixture(t);const content=JSON.stringify(state())+'\n';await writeFile(path,content);const r=await inspectCatalogueCheckpoint(root,{nowMs:2000});assert.equal(r.state,'PRESENT');assert.equal(r.baselineRecordCount,2);assert.equal(r.eligibleNow,false);assert.equal(r.remainingMs,21599000);assert.equal(r.checkpointSha256,createHash('sha256').update(content).digest('hex'));assert.equal(JSON.stringify(r).includes(h('a')),false);});
+test('due status becomes eligible exactly six hours after successful check',()=>{const r=describeCatalogueCheckpoint(validateCatalogueCheckpoint(state()),21601000);assert.equal(r.eligibleNow,true);assert.equal(r.remainingMs,0);});
+test('future-dated checkpoints are not eligible',()=>{const r=describeCatalogueCheckpoint(validateCatalogueCheckpoint(state()),500);assert.equal(r.eligibleNow,false);assert.equal(r.remainingMs,21600500);});
+test('bad schema is HOLD rather than trusting a malformed record',async t=>{const {root,path}=await fixture(t);await writeFile(path,JSON.stringify({...state(),schema:'wrong'}));const r=await inspectCatalogueCheckpoint(root);assert.equal(r.state,'HOLD');assert.equal(r.reason,'CHECKPOINT_INVALID');});
+test('mismatched six hour due time fails closed',()=>{assert.throws(()=>validateCatalogueCheckpoint({...state(),nextDueMs:21601001}),/CHECKPOINT_INVALID/);});
+test('duplicate name hashes and unsupported raw fields fail closed',()=>{const s=state();assert.throws(()=>validateCatalogueCheckpoint({...s,records:[s.records[0],s.records[0]]}),/CHECKPOINT_INVALID/);assert.throws(()=>validateCatalogueCheckpoint({...s,rawBreachRecords:[]}),/CHECKPOINT_INVALID/);});
+test('invalid JSON and invalid UTF8 hold with no file modification',async t=>{const {root,path}=await fixture(t);for(const content of [Buffer.from('{bad'),Buffer.from([0xff,0xfe])]){await writeFile(path,content);const r=await inspectCatalogueCheckpoint(root);assert.equal(r.reason,'CHECKPOINT_INVALID');assert.deepEqual(await readFile(path),content);}});
+test('oversized checkpoint returns HOLD without parsing',async t=>{const {root,path}=await fixture(t);await writeFile(path,Buffer.alloc(1024*1024+1));const r=await inspectCatalogueCheckpoint(root);assert.equal(r.reason,'CHECKPOINT_FILE_UNSAFE');});
+test('refuses symlink backed checkpoint file where supported',async t=>{const {root,path,parent}=await fixture(t);const target=join(parent,'target.json');await writeFile(target,JSON.stringify(state()));try{await symlink(target,path);}catch(e){if(['EPERM','EACCES'].includes(e.code))return t.skip('Symlinks not enabled');throw e;}const r=await inspectCatalogueCheckpoint(root);assert.equal(r.reason,'CHECKPOINT_FILE_UNSAFE');});
+test('rejects relative root and invalid timestamps',async()=>{await assert.rejects(inspectCatalogueCheckpoint('relative'),/INPUT_INVALID/);assert.throws(()=>describeCatalogueCheckpoint(validateCatalogueCheckpoint(state()),-1),/REPORT_INVALID/);});
+test('checkpoint is not erroneously deemed due if read before nextDueMs',async t=>{const {root,path}=await fixture(t);await writeFile(path,JSON.stringify(state()));const a=await inspectCatalogueCheckpoint(root,{nowMs:21600999});const b=await inspectCatalogueCheckpoint(root,{nowMs:21601000});assert.equal(a.eligibleNow,false);assert.equal(b.eligibleNow,true);});
