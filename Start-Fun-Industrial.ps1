@@ -43,6 +43,18 @@ function Existing([int]$port,[string]$name,[string]$cmdMarker){
  Write-Host "FUN_ADOPTED_PORT_$port=PID_$pidFound"
  return $true
 }
+function VerifyCompute(){
+ $id=Socket 8791
+ if(-not $id){Hold 'COMPUTE_LISTENER_MISSING'}
+ $proc=Get-CimInstance Win32_Process -Filter ('ProcessId='+$id) -ErrorAction Stop
+ if(-not $proc -or $proc.Name -ne 'python.exe'){Hold 'COMPUTE_OWNER_NOT_PYTHON'}
+ $health=Json 'http://127.0.0.1:8791/health'
+ if($health.state -ne 'running' -or $health.graph_engine -ne 'networkx' -or
+  $health.tensor_engine -ne 'quimb' -or $health.neural_engine -ne 'pytorch-cpu'){
+  Hold 'COMPUTE_IDENTITY_OR_ENGINE_MISMATCH'
+ }
+ return $id
+}
 function Await([int]$port,[scriptblock]$probe,[int]$limit=80){
  for($i=0;$i -lt $limit;$i++){
   Start-Sleep -Milliseconds 600
@@ -87,7 +99,7 @@ if($Original[11434]){
  if($owner.ProcessName -ne 'ollama'){Hold 'ELEKTRON_OLLAMA_IDENTITY_CHANGED'}
 }
 if($Original[8088]){[void](Existing 8088 'llama-server.exe' 'Qwen3-4B-Q4_K_M.gguf')}
-if($Original[8791]){[void](Existing 8791 'python.exe' 'uvicorn')}
+if($Original[8791]){Write-Host ('FUN_ADOPTED_PORT_8791=PID_'+(VerifyCompute))}
 if($Original[8789]){[void](Existing 8789 'node.exe' 'server.mjs')}
 if($Original[8796]){[void](Existing 8796 'node.exe' 'Run-Fun-Auto-Sidecar8796.mjs')}
 if($Original[8797]){[void](Existing 8797 'node.exe' 'Run-Fun-Rea229-Sidecar8797.mjs')}
@@ -117,6 +129,9 @@ if(-not $Original[8791]){
  if($LASTEXITCODE -ne 0){Hold '8791_COMPUTE_RECOVERY_FAILED_NO_RETRY'}
 }
 $p=Await 8791 { (Json 'http://127.0.0.1:8791/health').state -eq 'running' }
+$p=VerifyCompute
+# Uvicorn may migrate from a launcher PID to a Python child worker PID.
+# Health and identity, not a stale PID, are the durable compute assertions.
 # 3. Adopt existing 8789; launch original source without restoration if missing.
 if(-not $Original[8789]){
  File $Policy
@@ -170,9 +185,10 @@ $overview=Json 'http://127.0.0.1:8798/api/unified/v4/status'
 if($overview.state -ne 'ready' -or $final.ai.ready -ne $true -or
  $final.rea.count -ne 229 -or $final.local.count -ne 19 -or
  $final.embeddedLocalV42.reaExecutionGrants -ne 0){Hold 'FINAL_GATEWAY_VERIFICATION_FAILED'}
-foreach($port in @(11434,8088,8791,8789,8796,8797,8798)){
+foreach($port in @(11434,8088,8789,8796,8797,8798)){
  if($Original[$port] -and (Socket $port) -ne $Original[$port]){Hold ('PREEXISTING_PROCESS_CHANGED_'+$port)}
 }
+[void](VerifyCompute)
 Write-Host 'FUN_INDUSTRIAL_ONE_COMMAND=PASS'
 Write-Host 'FUN_DASHBOARD=http://127.0.0.1:8798/'
 Write-Host 'FUN_LOCAL_TOOLS=19 FUN_INDEPENDENT_REA_TOOLS=229'
