@@ -12,6 +12,7 @@ $V3Diagnostic=Join-Path $Repo 'scripts\Diagnose-Fun-Verified-V3.mjs'
 $V31Diagnostic=Join-Path $Repo 'scripts\Diagnose-Fun-Verified-File-V31.mjs'
 $V32Diagnostic=Join-Path $Repo 'scripts\Diagnose-Fun-Verified-Binary-V32.mjs'
 $V34Diagnostic=Join-Path $Repo 'scripts\Diagnose-Fun-Verified-PE-V34.mjs'
+$V4Diagnostic=Join-Path $Repo 'scripts\Diagnose-Fun-Unified-V4.mjs'
 $Starter=Join-Path $Repo 'Start-Fun-Unified-Chat8798.ps1'
 $Node=(Get-Command node.exe -ErrorAction Stop).Source
 $Protected=@(8789,8796,8797,8088,8791)
@@ -27,7 +28,7 @@ if(-not $Apply){
  Write-Host 'FUN_WEB_REPAIR=INACTIVE. Explicit -Apply required.'
  exit 0
 }
-foreach($F in @($Runner,$Diagnostic,$AdaptiveDiagnostic,$V3Diagnostic,$V31Diagnostic,$V32Diagnostic,$V34Diagnostic,$Starter)){
+foreach($F in @($Runner,$Diagnostic,$AdaptiveDiagnostic,$V3Diagnostic,$V31Diagnostic,$V32Diagnostic,$V34Diagnostic,$V4Diagnostic,$Starter)){
  if(-not (Test-Path -LiteralPath $F -PathType Leaf)){Hold ('SOURCE_MISSING_'+$F)}
  if((Get-Item -LiteralPath $F).Attributes -band [IO.FileAttributes]::ReparsePoint){Hold ('SYMLINK_REFUSED_'+$F)}
 }
@@ -67,6 +68,11 @@ if($LASTEXITCODE -ne 0){Hold 'V32_LIVE_SCHEMA_NOT_SUPPORTED_8798_PRESERVED'}
 if($LASTEXITCODE -ne 0){Hold 'V34_DIAGNOSTIC_SYNTAX_8798_PRESERVED'}
 & $Node $V34Diagnostic --schema-only
 if($LASTEXITCODE -ne 0){Hold 'V34_LIVE_PE_SCHEMAS_NOT_SUPPORTED_8798_PRESERVED'}
+# V4 gate: all internal services healthy under read-only fixed endpoint checks.
+& $Node --check $V4Diagnostic
+if($LASTEXITCODE -ne 0){Hold 'V4_DIAGNOSTIC_SYNTAX_8798_PRESERVED'}
+& $Node $V4Diagnostic --check-only
+if($LASTEXITCODE -ne 0){Hold 'V4_SERVICE_TOPOLOGY_NOT_READY_8798_PRESERVED'}
 # Perform the entire offline V1+V2 qualification BEFORE stopping the old 8798.
 # A parsing/test failure must not tear down a working chat instance.
 $PreflightSources=@(
@@ -75,6 +81,8 @@ $PreflightSources=@(
  (Join-Path $Repo 'src\experimental\verified-file-v3-1.mjs'),
  (Join-Path $Repo 'src\experimental\verified-binary-layout-v3-2.mjs'),
  (Join-Path $Repo 'src\experimental\verified-pe-inspection-v3-4.mjs'),
+ (Join-Path $Repo 'src\experimental\unified-gateway-v4.mjs'),
+ (Join-Path $Repo 'scripts\Diagnose-Fun-Unified-V4.mjs'),
  (Join-Path $Repo 'scripts\Diagnose-Fun-Verified-PE-V34.mjs'),
  (Join-Path $Repo 'src\experimental\unified-task-chat.mjs'),
  (Join-Path $Repo 'src\experimental\unified-task-client.js'),
@@ -87,7 +95,7 @@ foreach($Source in $PreflightSources){
 }
 Push-Location $Repo
 try{
- & $Node --test 'intelligence-checks\unified-task-chat-case.mjs' 'intelligence-checks\adaptive-capability-v2-case.mjs' 'intelligence-checks\verified-rea-v3-case.mjs' 'intelligence-checks\verified-file-v3-1-case.mjs' 'intelligence-checks\verified-binary-layout-v3-2-case.mjs' 'intelligence-checks\verified-pe-inspection-v3-4-case.mjs'
+ & $Node --test 'intelligence-checks\unified-task-chat-case.mjs' 'intelligence-checks\adaptive-capability-v2-case.mjs' 'intelligence-checks\verified-rea-v3-case.mjs' 'intelligence-checks\verified-file-v3-1-case.mjs' 'intelligence-checks\verified-binary-layout-v3-2-case.mjs' 'intelligence-checks\verified-pe-inspection-v3-4-case.mjs' 'intelligence-checks\unified-runtime-v4-case.mjs'
  if($LASTEXITCODE -ne 0){Hold 'ADAPTIVE_V2_OFFLINE_TESTS_FAILED_8798_PRESERVED'}
 }finally{Pop-Location}
 Write-Host 'ADAPTIVE_V2_PREFLIGHT=PASS EXACT_229_AND_19_CATALOGUES_VERIFIED NO_TOOL_EXECUTION=TRUE'
@@ -95,6 +103,7 @@ Write-Host 'V3_GUARDED_PREFLIGHT=PASS READONLY_TOOL_SCHEMA_VERIFIED MCP_CALLS=0'
 Write-Host 'V31_GUARDED_PREFLIGHT=PASS LIVE_PATH_SCHEMA_VERIFIED FILES_OPENED=0 MCP_CALLS=0'
 Write-Host 'V32_GUARDED_PREFLIGHT=PASS LIVE_LAYOUT_PATH_SCHEMA_VERIFIED FILES_OPENED=0 MCP_CALLS=0'
 Write-Host 'V34_OFFLINE_PREFLIGHT=PASS FIVE_PE_TOOLS_SCHEMA_BOUND NO_LIVE_MCP_CALLS=TRUE'
+Write-Host 'V4_GUARDED_PREFLIGHT=PASS SINGLE_ENTRYPOINT_WORKERS_UNCHANGED NO_TOOL_CALLS=TRUE'
 $Before=@{}
 foreach($Port in $Protected){
  $Before[$Port]=@(Listen $Port)
@@ -137,6 +146,9 @@ foreach($Port in $Protected){
 }
 $New=Invoke-RestMethod 'http://127.0.0.1:8798/api/unified/status' -TimeoutSec 15
 if($New.version -ne 'fi-unified-task-chat-8798-v1' -or !$New.rea.ready -or !$New.local.ready -or !$New.ai.ready -or !$New.verifiedPeV34.enabled){Hold 'NEW_8798_HEALTH_HOLD'}
+$V4=Invoke-RestMethod 'http://127.0.0.1:8798/api/unified/v4/status' -TimeoutSec 15
+if($V4.version -ne 'fi-unified-runtime-v4-stage1' -or $V4.state -ne 'ready' -or !$V4.registered.verifiedCounts){Hold 'V4_NEW_8798_NOT_READY'}
 Write-Host ('FUN_WEB_REPAIR=PASS OLD_8798_PID='+$OldPid+' NEW_8798_PID='+$NewPid)
 Write-Host 'ONLY_8798_RESTARTED=TRUE QWEN_8088=UNCHANGED REA_8797=UNCHANGED LOCAL_8796=UNCHANGED ORIGINAL_8789=UNCHANGED COMPUTE_8791=UNCHANGED'
-Write-Host 'NEXT=V32_USE_EXISTING_STAGED_PE_SAMPLE_PREPARE_REVIEW_THEN_CONFIRM_SEPARATELY'
+Write-Host 'V4_SINGLE_ENTRYPOINT=ACTIVE INTERNAL_SERVICE_PORTS_STILL_RUNNING=TRUE'
+Write-Host 'NEXT=STAGE2_EMBED_LOCAL_TOOL_ROUTING_WITHOUT_DROPPING_APPROVALS'
