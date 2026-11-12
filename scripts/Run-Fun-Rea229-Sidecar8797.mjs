@@ -111,8 +111,8 @@ export function classifyParentReadinessV43({status,registered,cognition,index,qw
    throw Error('REA229_PARENT_229_NAMES_INVALID');
   return names;
  }
- if(service.state!=='ready'&&registered.rea_tool_count===0&&!catalogue)
-  return null; // parent MCP is not initialized; no tool permissions granted
+ if(registered.rea_tool_count===0&&!catalogue&&['ready','stopped','disabled'].includes(service.state))
+  return null; // zero filtered parent grants is valid even if its MCP is ready
  throw Error('REA229_PARENT_STATUS_INCONSISTENT');
 }
 async function parentSnapshot(){
