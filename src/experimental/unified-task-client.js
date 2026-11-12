@@ -334,7 +334,7 @@ if(v34file&&v34choice&&v34prepare&&v34confirm&&v34cancel&&v34preview&&v34root){
  v34prepare.addEventListener('click',async()=>{
   if(busy||v34Token)return;
   const filePath=v34file.value.trim(),name=v34choice.value;
-  if(!/^[A-Za-z0-9][A-Za-z0-9._-]{0,180}\\.(exe|dll)$/i.test(filePath)){
+  if(!/^[A-Za-z0-9][A-Za-z0-9._-]{0,180}\.(exe|dll)$/i.test(filePath)){
    v34preview.textContent='Enter only a staged .exe or .dll basename.';return;
   }
   toggle(true);
