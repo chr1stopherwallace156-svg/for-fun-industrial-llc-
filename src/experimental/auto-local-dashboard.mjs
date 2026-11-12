@@ -9,8 +9,8 @@ const SYSTEM='You are Fun Industrial local AI. The human operator clicked Run AI
 const plain=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const filtered=x=>x?.reply===EMPTY_PROPOSAL&&(!Array.isArray(x.tool_calls)||x.tool_calls.length===0);
 async function fixedRequest(path,body=null,{timeoutMs=15000,fetchImpl=fetch}={}){
- const uri=path==='/__raw_llama__'?LLAMA:DASH+path;
- if(path!=='/__raw_llama__'&&!['/api/ai/status','/api/cognition/health','/api/cognition/catalogue/status','/api/ai/tools','/api/ai/chat','/api/ai/tool-call'].includes(path))
+ const uri=path==='/__raw_llama__'?LLAMA:path==='/__llama_health__'?'http://127.0.0.1:8088/health':DASH+path;
+ if(path!=='/__raw_llama__'&&path!=='/__llama_health__'&&!['/api/ai/status','/api/cognition/health','/api/cognition/catalogue/status','/api/ai/tools','/api/ai/chat','/api/ai/tool-call'].includes(path))
   throw Error('AUTO_DASH_UNEXPECTED_ROUTE');
  const response=await fetchImpl(uri,{method:body===null?'GET':'POST',
   headers:body===null?{}:{'content-type':'application/json'},
@@ -36,10 +36,10 @@ export function createAutoLocalDashboard({client=fixedRequest}={}){
   busy=true;
   try{
    const [ai,cognitive,index,toolsResponse]=await Promise.all([
-    client('/api/ai/status'),client('/api/cognition/health'),
+    client('/__llama_health__'),client('/api/cognition/health'),
     client('/api/cognition/catalogue/status'),client('/api/ai/tools')
    ]);
-   if(ai.state!=='ready')throw Error('AUTO_DASH_AI_NOT_READY');
+   if(!['ok','ready'].includes(ai.status))throw Error('AUTO_DASH_LLAMA_DIRECT_NOT_READY');
    if(cognitive.version!=='fi-cognitive-live-bridge-v1'||cognitive.reaExecutionGrants!==0)
     throw Error('AUTO_DASH_COGNITION_IDENTITY_HOLD');
    if(index.version!=='fi-capability-index-v1'||index.executionGrants!==0)
@@ -56,18 +56,18 @@ export function createAutoLocalDashboard({client=fixedRequest}={}){
    const result=await runAutoLocalExperiment({
     prompt,definitions:tools,maxRounds:rounds,maxTokens:384,
     chat:async body=>{
-     const forwarded=await client('/api/ai/chat',body,{timeoutMs:180000});
-     if(!filtered(forwarded))return forwarded;
+     // Parent compute AI status may say "stopped" when an independently
+     // healthy Qwen PID was adopted. Send structured local requests directly
+     // to the existing 8088 model; never POST to /ai/runtime/llama-cpp/start.
      const raw=await client('/__raw_llama__',{
       model:'local-model',messages:[{role:'system',content:SYSTEM},...body.messages],
       tools:body.tools,tool_choice:'auto',max_tokens:body.max_tokens,
       temperature:body.temperature,stream:false
      },{timeoutMs:180000});
      const message=raw?.choices?.[0]?.message;
-     if(!message||!Array.isArray(message.tool_calls)||message.tool_calls.length===0)
-      throw Error('AUTO_DASH_NO_STRUCTURED_TOOL_CALL');
+     if(!message)throw Error('AUTO_DASH_LLAMA_RESPONSE_INVALID');
      return {reply:typeof message.content==='string'?message.content:'',
-      tool_calls:message.tool_calls};
+      tool_calls:Array.isArray(message.tool_calls)?message.tool_calls:[]};
     },
     execute:payload=>client('/api/ai/tool-call',payload,{timeoutMs:180000})
    });
