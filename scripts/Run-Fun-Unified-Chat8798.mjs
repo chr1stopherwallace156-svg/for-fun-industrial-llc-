@@ -4,7 +4,8 @@ import http from 'node:http';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {readFile} from 'node:fs/promises';
-import {createUnifiedTaskChat} from '../src/experimental/unified-task-chat.mjs';
+import {createUnifiedTaskChat,fixedJson} from '../src/experimental/unified-task-chat.mjs';
+import {createEmbeddedLocalToolsV42} from '../src/experimental/embedded-local-tools-v4-2.mjs';
 import {createUnifiedGatewayV4} from '../src/experimental/unified-gateway-v4.mjs';
 export const HOST='127.0.0.1',PORT=8798;
 const ORIGIN='http://127.0.0.1:8798';
@@ -35,7 +36,7 @@ async function body(req){
  if(!b||typeof b!=='object'||Array.isArray(b))throw Error('JSON_OBJECT_REQUIRED');
  return b;
 }
-export function createUnifiedChatServer({app=createUnifiedTaskChat(),gateway=createUnifiedGatewayV4(),readClient=()=>readFile(CLIENT,'utf8')}={}){
+export function createUnifiedChatServer({app=createUnifiedTaskChat({embeddedLocal:createEmbeddedLocalToolsV42({read:fixedJson})}),gateway=createUnifiedGatewayV4(),readClient=()=>readFile(CLIENT,'utf8')}={}){
  if(typeof gateway?.status!=='function')throw Error('V4_GATEWAY_REQUIRED');
  if(typeof app?.status!=='function'||typeof app?.chat!=='function'||typeof app?.executeLocal!=='function'||typeof app?.executeRea!=='function'||typeof app?.planCapabilities!=='function'||typeof app?.verifiedReaStatus!=='function'||
     typeof app?.prepareVerifiedRea!=='function'||typeof app?.executeVerifiedRea!=='function'||
