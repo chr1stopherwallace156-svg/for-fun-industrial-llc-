@@ -65,6 +65,11 @@ function Await([int]$port,[scriptblock]$probe,[int]$limit=80){
  }
  Hold ('HEALTH_TIMEOUT_'+$port)
 }
+function NodeArguments([string]$script,[string]$mode){
+ $value='"'+$script+'"'
+ if($mode){$value+=' '+$mode}
+ return $value
+}
 function StartNode([int]$port,[string]$script,[string]$mode,[string]$cwd){
  File $script
  & $script:Node --check $script
@@ -72,7 +77,7 @@ function StartNode([int]$port,[string]$script,[string]$mode,[string]$cwd){
  if(Socket $port){Hold ('PORT_CLAIMED_BEFORE_START_'+$port)}
  $out=Join-Path $script:LogDir ($port.ToString()+'.stdout.log')
  $err=Join-Path $script:LogDir ($port.ToString()+'.stderr.log')
- $nodeArgs=('"'+$script+'"')+$(if($mode){' '+$mode}else{''})
+ $nodeArgs=NodeArguments $script $mode
  $child=Start-Process -FilePath $script:Node -ArgumentList $nodeArgs -WorkingDirectory $cwd -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
  $script:Owned[$port]=$child.Id
  Write-Host "FUN_START_REQUEST_PORT_$port=PID_$($child.Id)"
@@ -106,7 +111,8 @@ if($Original[8797]){[void](Existing 8797 'node.exe' 'Run-Fun-Rea229-Sidecar8797.
 if($Original[8798]){[void](Existing 8798 'node.exe' 'Run-Fun-Unified-Chat8798.mjs')}
 if($CheckOnly){
  foreach($port in @(8088,8791,8789,8796,8797,8798,11434)){
-  Write-Host ('FUN_PREFLIGHT_PORT_'+$port+'='+$(if($Original[$port]){'LISTENING'}else{'MISSING'}))
+  if($Original[$port]){$portState='LISTENING'}else{$portState='MISSING'}
+  Write-Host ('FUN_PREFLIGHT_PORT_'+$port+'='+$portState)
  }
  Write-Host 'FUN_ONE_COMMAND_CHECK_ONLY=PASS CHANGES=0 TOOL_CALLS=0'
  return
