@@ -74,8 +74,15 @@ export function createAutoLocalDashboard({client=fixedRequest}={}){
       temperature:body.temperature,stream:false
      },{timeoutMs:180000});
      const message=raw?.choices?.[0]?.message;
-     if(!message||!Array.isArray(message.tool_calls)||message.tool_calls.length===0)
-      throw Error('AUTO_DASH_NO_STRUCTURED_TOOL_CALL');
+     if(!message||(message.tool_calls!==undefined&&!Array.isArray(message.tool_calls)))
+      throw Error('AUTO_DASH_INVALID_MODEL_RESPONSE');
+     // A genuine model refusal/answer without a tool call is safe. Report no
+     // action instead of demanding an invented call or silently retrying.
+     if(!Array.isArray(message.tool_calls)||message.tool_calls.length===0){
+      if(typeof message.content!=='string'||!message.content.trim())
+       throw Error('AUTO_DASH_EMPTY_MODEL_RESPONSE');
+      return {reply:message.content,tool_calls:[]};
+     }
      return {reply:typeof message.content==='string'?message.content:'',
       tool_calls:message.tool_calls};
     },
