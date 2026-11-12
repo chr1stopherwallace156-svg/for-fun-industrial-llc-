@@ -30,7 +30,7 @@ function fixture(){
  };
  const request=(...args)=>reqImpl(...args);
  const app=()=>createVerifiedReaV3({request,clock:()=>now,tokenFactory:()=>TOK});
- return {app,calls,data,request,now:()=>now,tick:(n=1)=>{now+=n},
+ return {app,calls,data,request,direct:reqImpl,now:()=>now,tick:(n=1)=>{now+=n},
   override:fn=>{reqImpl=fn}};
 }
 test('V3 conservative allowlist and status cannot imply 229 tools are approved',()=>{
@@ -139,7 +139,7 @@ test('expired, canceled or replaced preparation cannot execute later',async()=>{
  await assert.rejects(v.execute({authorizationToken:TOK,operatorConfirmed:true}),/NO_MATCHING_LIVE_PREPARATION/);
 });
 test('transport failure after submission reports unknown, no replay, no success fabrication',async()=>{
- const f=fixture(),v=f.app(),delegate=f.request;
+ const f=fixture(),v=f.app(),delegate=f.direct;
  await v.prepare({name:'inspect_analysis_settings',arguments:{}});
  f.override(async (url,body)=>{
   if(url===REA+'/api/rea229/call')throw Error('ECONNRESET');
