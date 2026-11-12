@@ -5,6 +5,10 @@ on:
   pull_request:
     paths:
       - 'Start-Fun-Industrial.ps1'
+      - 'Start-Fun-Private-Gateway-V43.ps1'
+      - 'Start-Fun-iPhone-HTTPS.ps1'
+      - 'src/voice/gateway-port-state.ps1'
+      - 'src/voice/private-gateway-attest.mjs'
       - 'src/experimental/auto-local-dashboard.mjs'
       - 'src/experimental/unified-task-chat.mjs'
       - 'src/experimental/unified-gateway-v4.mjs'
@@ -36,13 +40,14 @@ jobs:
           node --check scripts/Run-Fun-Rea229-Sidecar8797.mjs
           node --check scripts/Run-Fun-Unified-Chat8798.mjs
           node --check intelligence-checks/one-command-startup-v43-case.mjs
+          node --check src/voice/private-gateway-attest.mjs
       - name: Run original and V4.3 synthetic regression suites
         run: node --test intelligence-checks/one-command-startup-v43-case.mjs intelligence-checks/embedded-local-v4-2-case.mjs intelligence-checks/auto-local-dashboard-case.mjs intelligence-checks/auto-local-tools-case.mjs intelligence-checks/auto-sidecar-case.mjs intelligence-checks/unified-runtime-v4-case.mjs intelligence-checks/verified-pe-inspection-v3-4-case.mjs intelligence-checks/verified-binary-layout-v3-2-case.mjs intelligence-checks/verified-file-v3-1-case.mjs intelligence-checks/verified-rea-v3-case.mjs intelligence-checks/rea229-full-case.mjs intelligence-checks/unified-task-chat-case.mjs intelligence-checks/adaptive-capability-v2-case.mjs
       - name: Parse all fixed launchers in Windows PowerShell
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          foreach($p in @('Start-Fun-Industrial.ps1','Start-Fun-Auto-Sidecar8796.ps1','Start-Fun-Rea229-Sidecar8797.ps1','Start-Fun-Unified-Chat8798.ps1')){
+          foreach($p in @('Start-Fun-Industrial.ps1','Start-Fun-Private-Gateway-V43.ps1','Start-Fun-iPhone-HTTPS.ps1','src/voice/gateway-port-state.ps1','Start-Fun-Auto-Sidecar8796.ps1','Start-Fun-Rea229-Sidecar8797.ps1','Start-Fun-Unified-Chat8798.ps1')){
             $tokens=$null;$errors=$null
             [Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p).Path,[ref]$tokens,[ref]$errors)|Out-Null
             if($errors.Count){$errors|Format-List|Out-String|Write-Host;throw ('V43_PS_PARSE_HOLD_'+$p)}
