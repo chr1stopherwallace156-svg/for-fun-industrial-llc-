@@ -39,6 +39,7 @@ export async function readLimitedPublicResponse(response,{maxProcessRssMiB=128,m
  const length=response.headers?.get?.('content-length');
  if(length!==null && ( !/^\d+$/.test(length)||Number(length)>MAX_RESPONSE_BYTES))return {state:'HOLD',reason:'PROVIDER_RESPONSE_TOO_LARGE'};
  if(!response.body||typeof response.body.getReader!=='function')return {state:'HOLD',reason:'PROVIDER_EMPTY_BODY'};
+ if(response.redirected===true)return {state:'HOLD',reason:'PROVIDER_REDIRECT_DENIED'};
  const reader=response.body.getReader();
  let total=0;const chunks=[];
  try{
@@ -52,7 +53,8 @@ export async function readLimitedPublicResponse(response,{maxProcessRssMiB=128,m
    if(total>MAX_RESPONSE_BYTES)return {state:'HOLD',reason:'PROVIDER_RESPONSE_TOO_LARGE'};
    chunks.push(Buffer.from(value));
   }
- }finally{await reader.cancel().catch(()=>{});}
+ }catch{return {state:'HOLD',reason:'PROVIDER_STREAM_FAILED'};}
+ finally{await reader.cancel().catch(()=>{});}
  let parsed;
  try{parsed=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Buffer.concat(chunks,total)));}
  catch{return {state:'HOLD',reason:'PROVIDER_JSON_INVALID'};}
