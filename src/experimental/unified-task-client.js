@@ -290,6 +290,10 @@ if(v32file&&v32prepare&&v32confirm&&v32cancel&&v32preview&&v32root){
     event('V3.2 RESULT HASH='+String(result.receipt.resultHash)+
       ' RECEIPT='+String(result.receipt.receiptHash));
    }
+   if(result.receipt?.providerErrorCode)event('V3.2 PROVIDER ERROR: '+
+     String(result.receipt.providerErrorCode)+' CLASS_HEURISTIC='+
+     String(result.receipt.providerDetailedCause)+' EVIDENCE_HASH='+
+     String(result.receipt.providerEvidenceHash||'unavailable'));
    if(result.preview)event('V3.2 UNTRUSTED OUTPUT: '+String(result.preview));
    v32preview.textContent='V3.2 '+String(result.state)+
      '\nCheck execution evidence. A correct envelope is not proof of provider side-effect absence or analysis accuracy.';
