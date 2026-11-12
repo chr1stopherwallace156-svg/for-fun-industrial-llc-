@@ -49,14 +49,21 @@ export function createUnifiedGatewayV4({read=fixedGatewayGetV4}={}){
     observed[name]=item.status==='fulfilled'&&object(item.value);
     response[name]=observed[name]?item.value:null;
    }
-   const parentReady=observed.parent&&response.parent.state==='ready';
-   const countReady=observed.catalogue&&
-    response.catalogue.rea_tool_count===229&&response.catalogue.local_tool_count===19;
+   // Parent HTTP is useful with its local 19 even when its private REA MCP
+   // session was never activated. Independent 8797 can qualify its own 229.
+   const parentReady=observed.parent&&
+    ['ready','stopped'].includes(response.parent.state)&&
+    observed.catalogue&&response.catalogue.local_tool_count===19;
+   const parentReaCount=observed.catalogue?response.catalogue.rea_tool_count:null;
+   const independentBrokerReady=observed.rea&&response.rea.liveMcpHealth==='ready'&&
+    response.rea.realReaToolCount===229;
+   const countReady=parentReady&&
+    (parentReaCount===229||(parentReaCount===0&&independentBrokerReady));
    const localReady=observed.local&&response.local.sidecar===true&&
     response.local.reaExecutionGrants===0;
    const reaReady=observed.rea&&response.rea.liveMcpHealth==='ready'&&
     response.rea.realReaToolCount===229&&response.rea.busy===false;
-   const qwenReachable=observed.qwen;
+   const qwenReachable=observed.qwen&&response.qwen.status==='ok';
    const computeReady=observed.compute&&VALID_HEALTH.has(
     String(response.compute.status??response.compute.state??'').toLowerCase());
    const entryReady=true; // This endpoint is served by the existing 8798 instance.
@@ -78,9 +85,11 @@ export function createUnifiedGatewayV4({read=fixedGatewayGetV4}={}){
     phase:'single_entrypoint_read_only_gateway',
     entrypoint:'http://127.0.0.1:8798/',
     state:services.every(x=>x.ready)&&countReady?'ready':'degraded',
-    services,registered:{rea:observed.catalogue?response.catalogue.rea_tool_count:null,
+    services,registered:{rea:independentBrokerReady?229:parentReaCount,
+     parentRea:parentReaCount,independentRea:independentBrokerReady?229:null,
      local:observed.catalogue?response.catalogue.local_tool_count:null,
      verifiedCounts:!!countReady},
+    parentMcpActivationRequiredForLegacyV3:parentReaCount!==229,
     componentsStillSeparate:true,legacyPortsRetired:[],
     workerProcessMemorySavingsVerified:false,ramSavingsClaimed:false,
     restartPerformed:false,toolExecutionsPerformed:0,approvalGrantsCreated:0,
