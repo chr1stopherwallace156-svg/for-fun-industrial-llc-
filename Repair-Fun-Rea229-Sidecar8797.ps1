@@ -105,6 +105,16 @@ while($Cursor -lt $Tree.Count){
   }
  }
 }
+# This REA adapter owns exactly one directly spawned MCP child. Refuse any
+# unexpected descendants or unknown command ownership: NEVER taskkill /T.
+if($Tree.Count -ne 2){Hold 'REA_CHILD_PROCESS_TREE_UNEXPECTED_MANUAL_REVIEW'}
+$McpPid=[int]$Tree[1]
+$Mcp=CurrentOwner $McpPid
+if(-not $Mcp -or [int]$Mcp.ParentProcessId -ne $OldPid -or
+ $Mcp.Name -notin @('node.exe','python.exe','pythonw.exe','rea.exe','rea-agents.exe') -or
+ [string]::IsNullOrWhiteSpace($Mcp.CommandLine) -or
+ $Mcp.CommandLine -notmatch '(?i)rea|mcp'){Hold 'MCP_CHILD_OWNERSHIP_UNVERIFIED'}
+$McpCreated=$Mcp.CreationDate
 # Re-evaluate the listener + process creation identity before any termination.
 $Again=@(Get-NetTCPConnection -LocalPort 8797 -State Listen -ErrorAction SilentlyContinue)
 $AgainOwner=CurrentOwner $OldPid
@@ -123,8 +133,19 @@ if($CheckOnly){
 Write-Host 'REA8797_GUARDED_APPLY=OPERATOR_APPROVED'
 $AgainStatus=Invoke-RestMethod 'http://127.0.0.1:8797/api/rea229/status' -TimeoutSec 12
 if($AgainStatus.busy -ne $false -or $AgainStatus.liveMcpHealth -ne 'ready'){Hold 'REA_BECAME_BUSY'}
-& taskkill.exe /PID $OldPid /T /F | Out-Null
-if($LASTEXITCODE -ne 0){Hold '8797_TERMINATION_NOT_CONFIRMED_MANUAL_REVIEW'}
+# Stop only exact owner PIDs after reconfirming their identities.
+# A partial failure is surfaced; never broaden to taskkill /T or kill by name.
+$ChildNow=CurrentOwner $McpPid
+$RootNow=CurrentOwner $OldPid
+$GuardListener=@(Get-NetTCPConnection -LocalPort 8797 -State Listen -ErrorAction SilentlyContinue)
+if(-not $ChildNow -or $ChildNow.CreationDate -ne $McpCreated -or
+ [int]$ChildNow.ParentProcessId -ne $OldPid -or
+ -not $RootNow -or $RootNow.CreationDate -ne $Created -or
+ $GuardListener.Count -ne 1 -or [int]$GuardListener[0].OwningProcess -ne $OldPid){
+ Hold 'PROCESS_IDENTITY_CHANGED_BEFORE_STOP'
+}
+Stop-Process -Id $McpPid -Force -ErrorAction Stop
+Stop-Process -Id $OldPid -Force -ErrorAction Stop
 $Freed=$false
 for($I=0;$I -lt 40;$I++){
  Start-Sleep -Milliseconds 200
