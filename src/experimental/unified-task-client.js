@@ -40,6 +40,9 @@ function toggle(state){
  if(v3prepare)v3prepare.disabled=state||!!v3Token;
  if(v3confirm)v3confirm.disabled=state||!v3Token;
  if(v3cancel)v3cancel.disabled=state||!v3Token;
+ if(v34prepare)v34prepare.disabled=state||!!v34Token;
+ if(v34confirm)v34confirm.disabled=state||!v34Token;
+ if(v34cancel)v34cancel.disabled=state||!v34Token;
 }
 function resetReview(){
  pending=null;pendingKind=null;approve.checked=false;review.classList.remove('open');toggle(busy);
@@ -303,6 +306,89 @@ if(v32file&&v32prepare&&v32confirm&&v32cancel&&v32preview&&v32root){
      '\nDo not retry automatically.';
    event('V3.2 OUTCOME HOLD '+String(error.message||error));
   }finally{clearV32();v32prepare.disabled=false;toggle(false)}
+ });
+}
+
+
+const v34file=el('v34-file'),v34choice=el('v34-choice'),
+ v34prepare=el('v34-prepare'),v34confirm=el('v34-confirm'),
+ v34cancel=el('v34-cancel'),v34preview=el('v34-preview'),v34root=el('v34-root');
+let v34Token=null;
+function clearV34(){
+ v34Token=null;
+ if(v34confirm)v34confirm.disabled=true;
+ if(v34cancel)v34cancel.disabled=true;
+ if(v34file)v34file.disabled=false;
+ if(v34choice)v34choice.disabled=false;
+}
+if(v34file&&v34choice&&v34prepare&&v34confirm&&v34cancel&&v34preview&&v34root){
+ api('/api/unified/v3.4/status').then(s=>{
+  v34root.textContent='Approved input directory: '+String(s.approvedDirectory);
+ }).catch(e=>{v34root.textContent='V3.4 status HOLD: '+String(e.message||e)});
+ const invalidate=()=>{if(v34Token){
+  v34preview.textContent='Review changed. Previous token must be canceled before another preparation.';
+  v34confirm.disabled=true;
+ }};
+ v34file.addEventListener('input',invalidate);
+ v34choice.addEventListener('change',invalidate);
+ v34prepare.addEventListener('click',async()=>{
+  if(busy||v34Token)return;
+  const filePath=v34file.value.trim(),name=v34choice.value;
+  if(!/^[A-Za-z0-9][A-Za-z0-9._-]{0,180}\\.(exe|dll)$/i.test(filePath)){
+   v34preview.textContent='Enter only a staged .exe or .dll basename.';return;
+  }
+  toggle(true);
+  try{
+   const prepared=await api('/api/unified/v3.4/prepare',{name,filePath});
+   if(prepared.state!=='awaiting_separate_operator_confirmation'||
+     prepared.preview?.name!==name||prepared.executionCount!==0)
+    throw Error('V34_PREPARATION_NOT_VERIFIED');
+   v34Token=prepared.token;
+   v34file.disabled=true;v34choice.disabled=true;
+   v34preview.textContent=[
+    'Review exact REA call:',JSON.stringify(prepared.preview.arguments),
+    'Tool: '+prepared.preview.name,
+    'SHA-256: '+prepared.preview.file.sha256,
+    'PE machine: 0x'+prepared.preview.file.machine.toString(16),
+    'PE sections: '+prepared.preview.file.sections,
+    'Canonical schema SHA-256: '+prepared.preview.schemaHash,
+    'Specific provider capability is still UNVERIFIED.',
+    'Separate approval authorizes one call, never retries.'
+   ].join('\n');
+  }catch(e){v34preview.textContent='V3.4 PREPARE HOLD: '+String(e.message||e);
+  }finally{toggle(false)}
+ });
+ v34cancel.addEventListener('click',async()=>{
+  if(busy||!v34Token)return;
+  toggle(true);
+  try{
+   const result=await api('/api/unified/v3.4/cancel',{});
+   event('V3.4 CANCEL='+String(result.state)+' MCP_CALLS=0');
+   v34preview.textContent='Canceled without any REA inspection.';
+  }catch(e){event('V3.4 CANCEL HOLD '+String(e.message||e));
+  }finally{clearV34();toggle(false)}
+ });
+ v34confirm.addEventListener('click',async()=>{
+  if(busy||!v34Token)return;
+  const token=v34Token;v34Token=null;toggle(true);
+  v34preview.textContent='One approved REA call submitted. No automatic retry.';
+  try{
+   const outcome=await api('/api/unified/v3.4/confirm',{
+    token,operatorConfirmed:true});
+   event('V3.4 STATE='+String(outcome.state)+' COUNT='+String(outcome.executionCount));
+   if(outcome.receipt){
+    event('V3.4 RECEIPT='+String(outcome.receipt.receiptHash)+
+     ' FILE_UNCHANGED='+String(outcome.receipt.fileIdentityVerified));
+    if(outcome.receipt.mcpError)event('V3.4 PROVIDER ERROR CATEGORY='+
+     String(outcome.receipt.mcpErrorClass));
+   }
+   if(outcome.preview)event('V3.4 BOUNDED OUTPUT='+String(outcome.preview));
+   v34preview.textContent='V3.4 '+String(outcome.state)+
+    '\nReview evidence log. A valid envelope is not independent proof of detailed analysis accuracy.';
+  }catch(e){
+   v34preview.textContent='V3.4 OUTCOME HOLD: '+String(e.message||e)+
+    '\nDo not automatically repeat.';
+  }finally{clearV34();toggle(false)}
  });
 }
 
