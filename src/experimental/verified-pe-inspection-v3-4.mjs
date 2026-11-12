@@ -83,8 +83,14 @@ export async function probeApprovedPeBinary(filePath,{root=rootDefault()}={}){
   machine=pe.readUInt16LE(4);
   sections=pe.readUInt16LE(6);
   optionalMagic=pe.readUInt16LE(24);
+  const optionalSize=pe.readUInt16LE(20);
   if(machine!==0x8664||sections<1||sections>96||optionalMagic!==0x20b)
    hold('NOT_X64_PE32_PLUS');
+  // PE32+ optional header carries at least 112 structural bytes; declared
+  // optional header plus all 40-byte section headers must fit in the file.
+  if(optionalSize<112||optionalSize>4096||
+     peOffset+24+optionalSize+40*sections>before.bytes)
+   hold('PE_HEADER_OR_SECTION_TABLE_TRUNCATED');
  }finally{await handle.close()}
  const after=await probeApprovedLayoutBinary(filePath,{root});
  if(before.path!==after.path||before.sha256!==after.sha256||
