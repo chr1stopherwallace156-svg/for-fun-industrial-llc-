@@ -1,0 +1,52 @@
+name: Fun Verified REA V3 qualification
+on:
+  push:
+    branches:
+      - feature/fun-verified-tool-execution-v3-20261111
+  pull_request:
+    paths:
+      - 'src/experimental/verified-rea-v3.mjs'
+      - 'src/experimental/unified-task-chat.mjs'
+      - 'src/experimental/unified-task-client.js'
+      - 'scripts/Run-Fun-Unified-Chat8798.mjs'
+      - 'scripts/Diagnose-Fun-Verified-V3.mjs'
+      - 'intelligence-checks/verified-rea-v3-case.mjs'
+      - 'Start-Fun-Unified-Chat8798.ps1'
+      - 'Repair-Fun-Unified-Web8798.ps1'
+      - '.github/workflows/fun-verified-rea-v3-ci.yml'
+permissions:
+  contents: read
+jobs:
+  verified:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: V3 JavaScript syntax
+        run: |
+          node --check src/experimental/verified-rea-v3.mjs
+          node --check src/experimental/unified-task-chat.mjs
+          node --check src/experimental/unified-task-client.js
+          node --check scripts/Run-Fun-Unified-Chat8798.mjs
+          node --check scripts/Diagnose-Fun-Verified-V3.mjs
+          node --check intelligence-checks/verified-rea-v3-case.mjs
+      - name: V1 plus V2 plus V3 offline regression
+        run: node --test intelligence-checks/unified-task-chat-case.mjs intelligence-checks/adaptive-capability-v2-case.mjs intelligence-checks/verified-rea-v3-case.mjs
+      - name: Windows startup and repair syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach($script in @('Start-Fun-Unified-Chat8798.ps1','Repair-Fun-Unified-Web8798.ps1')){
+            $tokens=$null
+            $errors=$null
+            [Management.Automation.Language.Parser]::ParseFile((Resolve-Path $script).Path,[ref]$tokens,[ref]$errors) | Out-Null
+            if($errors.Count){$errors | Format-List | Out-String | Write-Host; throw ('V3_PS_PARSE_HOLD_'+$script)}
+          }
+          Write-Host 'V3_PS_PARSE=PASS'
