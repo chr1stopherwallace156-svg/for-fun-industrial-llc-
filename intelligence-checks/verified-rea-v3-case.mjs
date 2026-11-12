@@ -17,7 +17,7 @@ function fixture(){
    name,description:'Potential inspection tool — metadata only',
    inputSchema:{type:'object',properties:{},required:[],additionalProperties:false}
   }))},
-  result:{tool:'inspect_analysis_settings',result:{
+  result:{result:{
    isError:false,structuredContent:{'javascript.analysis_timeout_ms':300000}
   }}
  };
@@ -25,7 +25,7 @@ function fixture(){
   calls.push({url,body});
   if(url===REA+'/api/rea229/status')return data.health;
   if(url===REA+'/api/rea229/tools?limit=229')return data.catalogue;
-  if(url===REA+'/api/rea229/call')return {...data.result,tool:body.name};
+  if(url===REA+'/api/rea229/call')return {...data.result,tool:data.result.tool??body.name};
   throw Error('UNEXPECTED_REQUEST_'+url);
  };
  const request=(...args)=>reqImpl(...args);
