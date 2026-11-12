@@ -4,6 +4,7 @@
 import {createAutoLocalDashboard} from './auto-local-dashboard.mjs';
 const LOCAL='http://127.0.0.1:8796/api/ai/auto-local/status';
 const PARENT='http://127.0.0.1:8789/api/ai/tools';
+const REA='http://127.0.0.1:8797/api/rea229/status';
 const obj=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 function hold(reason){throw Error('V42_EMBEDDED_LOCAL_'+reason)}
 export function createEmbeddedLocalToolsV42({
@@ -36,8 +37,15 @@ export function createEmbeddedLocalToolsV42({
    const [legacy,tools]=await Promise.all([read(LOCAL),read(PARENT)]);
    if(!obj(legacy)||legacy.sidecar!==true||legacy.busy!==false||
     legacy.reaExecutionGrants!==0)hold('LEGACY_8796_BUSY_OR_IDENTITY_DRIFT');
-   if(!obj(tools)||tools.local_tool_count!==19||tools.rea_tool_count!==229)
+   if(!obj(tools)||tools.local_tool_count!==19||![0,229].includes(tools.rea_tool_count))
     hold('ORIGINAL_LOCAL_CATALOGUE_DRIFT');
+   if(tools.rea_tool_count===0){
+    // Original 8789 MCP may be intentionally uninitialized. Independently
+    // verify actual REA 229 readiness; never interpret zero permissions as a grant.
+    const rea=await read(REA);
+    if(!obj(rea)||rea.liveMcpHealth!=='ready'||rea.realReaToolCount!==229||rea.busy!==false)
+     hold('INDEPENDENT_REA_229_NOT_READY');
+   }
    const output=await dashboard.run({prompt,rounds:2});
    if(!obj(output)||output.version!=='fi-auto-local-dashboard-v1'||
     output.reaExecutionGrants!==0||!Array.isArray(output.actions)||

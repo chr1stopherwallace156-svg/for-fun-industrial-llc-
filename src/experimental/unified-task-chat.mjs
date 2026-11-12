@@ -64,7 +64,7 @@ export async function fixedJson(url,body=null,{timeout=180000}={}){
  if(![PARENT+'/api/ai/tools',PARENT+'/api/ai/status',REA+'/api/rea229/status',REA+'/api/rea229/tools?limit=229',
   LOCAL+'/api/ai/auto-local/status',REA+'/api/rea229/call',
   REA+'/api/rea229/run',LOCAL+'/api/ai/auto-local/run',
-  LLAMA].includes(url))fail('OUTBOUND_ENDPOINT_NOT_ALLOWED');
+  LLAMA,'http://127.0.0.1:8088/health'].includes(url))fail('OUTBOUND_ENDPOINT_NOT_ALLOWED');
  const isPost=body!==null;
  const response=await fetch(url,{method:isPost?'POST':'GET',
   headers:isPost?{'content-type':'application/json',
@@ -135,10 +135,14 @@ export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWeb
   const l=local.status==='fulfilled'?local.value:null;
   const t=registry.status==='fulfilled'?registry.value:null;
   const a=ai.status==='fulfilled'?ai.value:null;
-  return {version:'fi-unified-task-chat-8798-v1',state:a?.state==='ready'&&r?.liveMcpHealth==='ready'&&l?.sidecar===true?'ready':'degraded',
+  // Prefer the original parent's API when initialized, but do not interpret
+  // its stopped Python-owned model as a failure of external Qwen on 8088.
+  let qwenReady=a?.state==='ready';
+  if(!qwenReady){try{const direct=await request('http://127.0.0.1:8088/health');qwenReady=direct?.status==='ok'}catch{}}
+  return {version:'fi-unified-task-chat-8798-v1',state:qwenReady&&r?.liveMcpHealth==='ready'&&l?.sidecar===true?'ready':'degraded',
    service:'independent_loopback',operatorStarted:true,background:false,
    autoReadOnly:true,localExecutionRequiresExplicitClick:true,
-   ai:{ready:a?.state==='ready',engine:'external_llama_cpp',port:8088},
+   ai:{ready:qwenReady,engine:'external_llama_cpp',port:8088},
    rea:{ready:r?.liveMcpHealth==='ready'&&r?.realReaToolCount===229,
     count:r?.realReaToolCount??0},
    local:{ready:l?.sidecar===true,count:t?.local_tool_count??0},

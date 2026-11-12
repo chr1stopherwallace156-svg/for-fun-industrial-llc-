@@ -1,0 +1,50 @@
+name: Fun Industrial V4.3 one-command startup qualification
+on:
+  push:
+    branches: [feature/fun-one-command-startup-v43-20261112]
+  pull_request:
+    paths:
+      - 'Start-Fun-Industrial-OneCommand.ps1'
+      - 'Start-Fun-Industrial.cmd'
+      - 'src/experimental/auto-local-dashboard.mjs'
+      - 'src/experimental/unified-task-chat.mjs'
+      - 'src/experimental/unified-gateway-v4.mjs'
+      - 'src/experimental/embedded-local-tools-v4-2.mjs'
+      - 'scripts/Run-Fun-Rea229-Sidecar8797.mjs'
+      - 'intelligence-checks/one-command-start-v43-case.mjs'
+      - '.github/workflows/fun-one-command-start-v43-ci.yml'
+permissions:
+  contents: read
+jobs:
+  qualify:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.4'
+      - name: Syntax gates
+        run: |
+          node --check src/experimental/auto-local-dashboard.mjs
+          node --check src/experimental/unified-task-chat.mjs
+          node --check src/experimental/unified-gateway-v4.mjs
+          node --check src/experimental/embedded-local-tools-v4-2.mjs
+          node --check scripts/Run-Fun-Rea229-Sidecar8797.mjs
+          node --check intelligence-checks/one-command-start-v43-case.mjs
+      - name: Offline integrations and security regressions
+        run: node --test intelligence-checks/one-command-start-v43-case.mjs intelligence-checks/embedded-local-v4-2-case.mjs intelligence-checks/auto-local-dashboard-case.mjs intelligence-checks/auto-local-tools-case.mjs intelligence-checks/auto-sidecar-case.mjs intelligence-checks/unified-runtime-v4-case.mjs intelligence-checks/verified-pe-inspection-v3-4-case.mjs intelligence-checks/verified-binary-layout-v3-2-case.mjs intelligence-checks/verified-file-v3-1-case.mjs intelligence-checks/verified-rea-v3-case.mjs intelligence-checks/rea229-full-case.mjs intelligence-checks/unified-task-chat-case.mjs intelligence-checks/adaptive-capability-v2-case.mjs
+      - name: Windows PowerShell syntax and inert check-only source
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach($p in @('Start-Fun-Industrial-OneCommand.ps1','Start-Fun-Unified-V4.ps1','Start-Fun-Unified-Chat8798.ps1','Repair-Fun-Unified-Web8798.ps1')){
+            $tokens=$null;$errors=$null
+            [Management.Automation.Language.Parser]::ParseFile((Resolve-Path $p).Path,[ref]$tokens,[ref]$errors)|Out-Null
+            if($errors.Count){$errors|Format-List|Out-String|Write-Host;throw ('FI_V43_PS_PARSE_HOLD_'+$p)}
+          }
+          Write-Host 'V43_WINDOWS_PS_PARSE=PASS'

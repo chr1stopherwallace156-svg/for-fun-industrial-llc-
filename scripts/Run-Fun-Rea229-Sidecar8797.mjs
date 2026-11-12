@@ -92,20 +92,48 @@ async function getParentJson(endpoint){
  if(!response.ok)throw Error('REA229_PARENT_HEALTH_HTTP_'+response.status+'_'+endpoint);
  return response.json();
 }
-async function parentSnapshot(){
- const [status,catalogue,registered,ai,cognition]=await Promise.all([
-  getParentJson('/api/status'),getParentJson('/api/rea/catalog'),
-  getParentJson('/api/ai/tools'),getParentJson('/api/ai/status'),
-  getParentJson('/api/cognition/health')
- ]);
- const rea=(status.services||[]).filter(item=>item.id==='rea');
- const items=Array.isArray(catalogue.tools)?catalogue.tools:[];
- if(rea.length!==1||rea[0].state!=='ready'||items.length!==229||
-  registered.local_tool_count!==19||registered.rea_tool_count!==229||
-  ai.state!=='ready'||cognition.version!=='fi-cognitive-live-bridge-v1')
-  throw Error('REA229_PARENT_229_READY_BASELINE_HOLD');
- return items.map(x=>x.name);
+// A registered parent MCP session is optional at startup. 8797 independently
+// initializes the *installed* REA stdio provider and qualifies exactly 229
+// unique schemas. The original dashboard's 19 local tools remain mandatory.
+export function classifyParentReadinessV43({status,registered,cognition,index,qwen,catalogue}={}){
+ const service=Array.isArray(status?.services)?status.services.find(x=>x?.id==='rea'):null;
+ if(!status||registered?.local_tool_count!==19||
+  !Array.isArray(registered.tools)||registered.tools.filter(x=>x?.function?.name?.startsWith('fi_')).length!==19||
+  cognition?.version!=='fi-cognitive-live-bridge-v1'||cognition?.reaExecutionGrants!==0||
+  index?.version!=='fi-capability-index-v1'||index?.localCount!==19||
+  index?.executionGrants!==0||qwen?.status!=='ok'||!service)
+  throw Error('REA229_PARENT_19_QWEN_OR_COGNITION_HOLD');
+ if(service.state==='ready'&&registered.rea_tool_count===229){
+  if(!Array.isArray(catalogue?.tools)||catalogue.tools.length!==229)
+   throw Error('REA229_PARENT_229_CATALOGUE_HOLD');
+  const names=catalogue.tools.map(x=>x?.name);
+  if(names.some(n=>typeof n!=='string'||!n)||new Set(names).size!==229)
+   throw Error('REA229_PARENT_229_NAMES_INVALID');
+  return names;
+ }
+ if(registered.rea_tool_count===0&&!catalogue&&['ready','stopped','disabled'].includes(service.state))
+  return null; // zero filtered parent grants is valid even if its MCP is ready
+ throw Error('REA229_PARENT_STATUS_INCONSISTENT');
 }
+async function parentSnapshot(){
+ const [status,registered,cognition,index,qwen]=await Promise.all([
+  getParentJson('/api/status'),getParentJson('/api/ai/tools'),
+  getParentJson('/api/cognition/health'),
+  getParentJson('/api/cognition/catalogue/status'),
+  (async()=>{
+   const r=await fetch('http://127.0.0.1:8088/health',
+    {method:'GET',redirect:'error',signal:AbortSignal.timeout(5000)});
+   if(!r.ok)throw Error('REA229_QWEN_DIRECT_NOT_READY');
+   return r.json();
+  })()
+ ]);
+ const svc=(status.services||[]).find(x=>x?.id==='rea');
+ // Do not treat a failure as an empty registered catalogue.
+ const catalogue=svc?.state==='ready'&&registered.rea_tool_count===229
+  ?await getParentJson('/api/rea/catalog'):null;
+ return classifyParentReadinessV43({status,registered,cognition,index,qwen,catalogue});
+}
+
 async function model(payload){
  const response=await fetch(LLAMA,{method:'POST',headers:{'content-type':'application/json'},
   body:JSON.stringify(payload),signal:AbortSignal.timeout(180000),redirect:'error'});
@@ -114,8 +142,8 @@ async function model(payload){
 }
 export async function activateRea229({expectedNames,envFile=path.join(PRIMARY,'.env'),
  infer=model,listen=true}={}){
- if(!Array.isArray(expectedNames)||expectedNames.length!==229)
-  throw Error('REA229_PARENT_NAMES_REQUIRED');
+ if(expectedNames!==null&&expectedNames!==undefined&&(!Array.isArray(expectedNames)||expectedNames.length!==229))
+  throw Error('REA229_PARENT_NAMES_INVALID');
  if(typeof process.loadEnvFile!=='function')throw Error('REA229_NODE_22_REQUIRED');
  process.loadEnvFile(envFile);
  const config=loadConfig({...process.env,APP_ROOT:PRIMARY});
@@ -129,7 +157,7 @@ export async function activateRea229({expectedNames,envFile=path.join(PRIMARY,'.
  const adapter=createReaAdapter({...config.rea,args:reaArgs});
  const runner=createFullReaRunner({adapter,infer});
  try{
-  await runner.initialize({expectedNames});
+  await runner.initialize({expectedNames:expectedNames??undefined});
   const server=createRea229Server({runner,adapter});
   if(listen){
    await new Promise((resolve,reject)=>{
@@ -152,7 +180,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
    const expectedNames=await parentSnapshot();
    active=await activateRea229({expectedNames});
    const confirm=await parentSnapshot();
-   if(JSON.stringify(expectedNames.slice().sort())!==JSON.stringify(confirm.slice().sort()))
+   if(JSON.stringify(expectedNames===null?null:expectedNames.slice().sort())!==JSON.stringify(confirm===null?null:confirm.slice().sort()))
     throw Error('REA229_PARENT_CATALOGUE_CHANGED_AFTER_INDEPENDENT_START');
    console.log('FUN_REA229_READY='+ORIGIN+' REAL_REA_TOOLS=229 LOCAL_8789=UNCHANGED AUTO_8796=UNCHANGED');
    let closing=false;

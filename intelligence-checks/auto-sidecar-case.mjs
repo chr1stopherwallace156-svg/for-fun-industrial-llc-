@@ -17,13 +17,13 @@ const call={type:'function',function:{name:'fi_graph_analyze',arguments:JSON.str
 test('ready REA 229 mixed catalogue still permits one local tool only, never an REA execution',async()=>{
  let executed=0,modelToolNames=[],reaCalls=0;
  const client=async(path,body)=>{
-  if(path==='/api/ai/status')return {state:'ready'};
+  if(path==='/__llama_health__')return {status:'ok'};
   if(path==='/api/cognition/health')return {version:'fi-cognitive-live-bridge-v1',reaExecutionGrants:0};
   if(path==='/api/cognition/catalogue/status')return {version:'fi-capability-index-v1',localCount:19,executionGrants:0};
   if(path==='/api/ai/tools')return {tools:[...defs,...rea],local_tool_count:19,rea_tool_count:229};
-  if(path==='/api/ai/chat'){
+  if(path==='/__raw_llama__'){
    modelToolNames=body.tools.map(x=>x.function.name);
-   return {reply:'Tool selected',tool_calls:[call]};
+   return {choices:[{message:{content:'Tool selected',tool_calls:[call]}}]};
   }
   if(path==='/api/ai/tool-call'){
    executed++;
