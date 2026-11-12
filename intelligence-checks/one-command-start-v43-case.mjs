@@ -25,7 +25,7 @@ test('one-command REA can independently initialize with exactly 19 local and zer
 test('REA parent identity drifts fail closed; no unknown catalogue can masquerade as absence',()=>{
  for(const bad of [
   x=>x.registered.local_tool_count=18,x=>x.registered.rea_tool_count=229,
-  x=>x.status.services=[{id:'rea',state:'ready'}],x=>x.cognition.reaExecutionGrants=1,
+  x=>x.status.services=[{id:'rea',state:'unknown'}],x=>x.cognition.reaExecutionGrants=1,
   x=>x.index.executionGrants=1,x=>x.qwen.status='stopped',
   x=>x.registered.tools.pop()
  ]){
