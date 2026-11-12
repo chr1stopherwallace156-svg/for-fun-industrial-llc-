@@ -244,6 +244,50 @@ test('unrelated upstream 422 is still uncertain, not a fabricated REA provider r
  assert.equal(out.executionCount,'unknown');
  assert.equal(out.receipt,undefined);
 });
+test('V3.3 real exact MCP isError creates negative receipt with bounded category and no replay',async()=>{
+ const f=fixture();
+ f.state.response={tool:'inspect_binary_layout',state:'provider_mcp_error_reported',
+  result:{isError:true,structuredContent:{errorEvidence:{
+   version:'fi-rea-mcp-error-evidence-v1',errorClass:'provider_unavailable',
+   errorClassHeuristic:true,diagnosticTextExposed:false,resultIsError:true,
+   analysisSucceeded:false,evidenceDigestSha256:'e'.repeat(64),
+   digestScope:'complete_json_utf8'}}},
+  mcpErrorEvidence:{version:'fi-rea-mcp-error-evidence-v1',
+   errorClass:'provider_unavailable',errorClassHeuristic:true,
+   diagnosticTextExposed:false,resultIsError:true,analysisSucceeded:false,
+   evidenceDigestSha256:'e'.repeat(64),digestScope:'complete_json_utf8'}};
+ const runner=f.engine();
+ const a=await runner.prepare({name:'inspect_binary_layout',filePath:'safe.exe'});
+ const out=await runner.confirm({token:a.token,operatorConfirmed:true});
+ assert.equal(out.state,'provider_mcp_error_reported');
+ assert.equal(out.executionCount,'unverified');
+ assert.equal(out.receipt.providerDetailedCause,'provider_unavailable');
+ assert.equal(out.receipt.providerEvidenceHash,'e'.repeat(64));
+ assert.equal(out.receipt.resultHash,null);
+ assert.equal(out.receipt.resultEnvelopeAvailable,true);
+ assert.equal(out.receipt.analysisContentAccuracyVerified,false);
+ assert.equal(out.receipt.automaticRetries,0);
+ assert.equal(out.receipt.fileIdentityVerified,true);
+ assert.equal(f.callsCount(),1);
+ await assert.rejects(runner.confirm({token:a.token,operatorConfirmed:true}),/PREPARATION_NOT_FOUND/);
+ assert.equal(f.callsCount(),1);
+});
+test('V3.3 untrusted MCP error evidence is not upgraded into a verified receipt',async()=>{
+ for(const altered of [{errorClass:'arbitrary tool command'},{evidenceDigestSha256:'not-a-hash'},
+  {diagnosticTextExposed:true},{resultIsError:false}]){
+  const f=fixture();
+  const info={version:'fi-rea-mcp-error-evidence-v1',
+   errorClass:'unclassified_mcp_error',diagnosticTextExposed:false,
+   analysisSucceeded:false,resultIsError:true,evidenceDigestSha256:'d'.repeat(64),
+   digestScope:'complete_json_utf8',...altered};
+  f.state.response={tool:'inspect_binary_layout',result:{isError:true},mcpErrorEvidence:info};
+  const run=f.engine();const a=await run.prepare({name:'inspect_binary_layout',filePath:'safe.exe'});
+  const out=await run.confirm({token:a.token,operatorConfirmed:true});
+  assert.equal(out.state,'result_hold_manual_review');
+  assert.equal(out.receipt.evidenceEnvelopeVerified,false);
+  assert.equal(f.callsCount(),1);
+ }
+});
 test('opaque transport failure is unknown and never retried',async()=>{
  const f=fixture(),v=createVerifiedBinaryLayoutV32({
   request:async(url,body)=>url===REA+'/api/rea229/call'?Promise.reject(Error('socket closed')):f.request(url,body),
