@@ -217,6 +217,92 @@ if(v31file&&v31prepare&&v31confirm&&v31cancel&&v31preview&&v31root){
  });
 }
 
+const v32file=el('v32-file'),v32prepare=el('v32-prepare'),
+ v32confirm=el('v32-confirm'),v32cancel=el('v32-cancel'),
+ v32preview=el('v32-preview'),v32root=el('v32-root');
+let v32Token=null;
+function clearV32(){
+ v32Token=null;
+ if(v32confirm)v32confirm.disabled=true;
+ if(v32cancel)v32cancel.disabled=true;
+ if(v32file)v32file.disabled=false;
+ if(v32preview)v32preview.textContent='No staged file prepared.';
+}
+if(v32file&&v32prepare&&v32confirm&&v32cancel&&v32preview&&v32root){
+ api('/api/unified/v3.2/status').then(s=>{
+  v32root.textContent='Approved input directory: '+String(s.approvedDirectory);
+ }).catch(e=>{v32root.textContent='V3.2 status unavailable: '+String(e.message||e)});
+ v32file.addEventListener('input',()=>{if(v32Token)clearV32()});
+ v32prepare.addEventListener('click',async()=>{
+  if(busy||v32Token)return;
+  const filename=v32file.value.trim();
+  if(!/^[A-Za-z0-9][A-Za-z0-9._-]{0,180}$/.test(filename)){
+   v32preview.textContent='Provide only a staged binary filename (no folders or paths).';return;
+  }
+  toggle(true);v32prepare.disabled=true;
+  try{
+   const result=await api('/api/unified/v3.2/prepare',{
+    name:'inspect_binary_layout',filePath:filename});
+   if(result.state!=='awaiting_separate_operator_confirmation'||
+     result.preview?.name!=='inspect_binary_layout'||
+     result.executionCount!==0)throw Error('PREPARATION_NOT_VERIFIED');
+   v32Token=result.token;
+   v32file.disabled=true;
+   v32preview.textContent=[
+    'Review EXACT static inspection:',
+    'Tool: '+result.preview.name,
+    'Arguments: '+JSON.stringify(result.preview.args),
+    'File SHA-256: '+result.preview.file.sha256,
+    'File bytes: '+result.preview.file.bytes,
+    'File format signature: '+result.preview.file.format,
+    'Schema SHA-256: '+result.preview.schemaHash,
+    'Specific provider readiness remains unproven.',
+    'Expires: '+new Date(result.expiresAtUnixMs).toLocaleTimeString(),
+    'Approve only if this is your authorized file.',
+    'There will be exactly ONE MCP call and no retry.'
+   ].join('\n');
+   v32confirm.disabled=false;v32cancel.disabled=false;
+   event('V3.2 PREPARED; NO MCP CALL. Tool=inspect_binary_layout sha256='+String(result.preview.file.sha256));
+   status.textContent='V3.2 awaiting separate explicit approval';
+  }catch(error){
+   clearV32();event('V3.2 PREPARE HOLD '+String(error.message||error));
+   v32preview.textContent='V3.2 HOLD: '+String(error.message||error);
+  }finally{toggle(false);v32prepare.disabled=!!v32Token||busy;}
+ });
+ v32cancel.addEventListener('click',async()=>{
+  if(busy||!v32Token)return;toggle(true);
+  try{const outcome=await api('/api/unified/v3.2/cancel',{});
+   event('V3.2 CANCELED '+String(outcome.state))}
+  catch(e){event('V3.2 CANCEL HOLD '+String(e.message||e))}
+  finally{clearV32();v32prepare.disabled=false;toggle(false)}
+ });
+ v32confirm.addEventListener('click',async()=>{
+  if(busy||!v32Token)return;
+  const token=v32Token;v32Token=null;toggle(true);
+  v32preview.textContent='One approved inspection submitted. Uncertain outcome will NOT be retried.';
+  try{
+   const result=await api('/api/unified/v3.2/confirm',{
+    token,operatorConfirmed:true});
+   event('V3.2 STATE='+String(result.state)+' MCP_CALLS='+String(result.executionCount));
+   if(result.receipt){
+    event('V3.2 FILE BEFORE='+String(result.receipt.fileSha256Before)+
+      ' AFTER='+String(result.receipt.fileSha256After));
+    event('V3.2 RESULT HASH='+String(result.receipt.resultHash)+
+      ' RECEIPT='+String(result.receipt.receiptHash));
+   }
+   if(result.preview)event('V3.2 UNTRUSTED OUTPUT: '+String(result.preview));
+   v32preview.textContent='V3.2 '+String(result.state)+
+     '\nCheck execution evidence. A correct envelope is not proof of provider side-effect absence or analysis accuracy.';
+   status.textContent='V3.2 '+String(result.state);
+  }catch(error){
+   v32preview.textContent='V3.2 HOLD/UNCERTAIN: '+String(error.message||error)+
+     '\nDo not retry automatically.';
+   event('V3.2 OUTCOME HOLD '+String(error.message||error));
+  }finally{clearV32();v32prepare.disabled=false;toggle(false)}
+ });
+}
+
+
 send.addEventListener('click',async()=>{
  if(busy)return;
  const prompt=task.value.trim();

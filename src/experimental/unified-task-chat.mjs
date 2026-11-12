@@ -7,6 +7,7 @@ import {correctMillisecondSeconds} from './unified-fact-guard.mjs';
 import {createAdaptivePlanner} from './adaptive-capability-v2.mjs';
 import {createVerifiedReaV3} from './verified-rea-v3.mjs';
 import {createVerifiedFileV31} from './verified-file-v3-1.mjs';
+import {createVerifiedBinaryLayoutV32} from './verified-binary-layout-v3-2.mjs';
 const BASE='http://127.0.0.1:8798';
 const REA='http://127.0.0.1:8797';
 const LOCAL='http://127.0.0.1:8796';
@@ -84,6 +85,7 @@ export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWeb
  const planner=createAdaptivePlanner({request});
  const verifiedRea=createVerifiedReaV3({request});
  const verifiedFile=createVerifiedFileV31({request});
+ const verifiedLayout=createVerifiedBinaryLayoutV32({request});
  async function infer(prompt,observation=null,context=[]){
   const result=await request(LLAMA,{model:'local-model',messages:[
    {role:'system',content:baseModelSystem},
@@ -140,8 +142,9 @@ export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWeb
    reaExplicitRunAvailable:r?.liveMcpHealth==='ready'&&r?.realReaToolCount===229,
    verifiedReaV3:verifiedRea.status(),
    verifiedFileV31:verifiedFile.status(),
+   verifiedLayoutV32:verifiedLayout.status(),
    completedSessions:completed,failedSessions:failed,busy,
-   capabilities:['qwen_chat','public_https_static_text','adaptive_live_capability_planning_v2','exact_verified_rea_v3_operator_approved','staged_file_schema_bound_v3_1','real_rea_readonly_session',
+   capabilities:['qwen_chat','public_https_static_text','adaptive_live_capability_planning_v2','exact_verified_rea_v3_operator_approved','staged_file_schema_bound_v3_1','staged_binary_layout_v3_2','real_rea_readonly_session',
      'explicit_click_rea_229_runner','explicit_click_local_registered_tools','task_classification'],
    notImplemented:['arbitrary_app_install','binary_upload','native_game_port',
      'browser_javascript_automation','arbitrary_shell']};
@@ -254,7 +257,12 @@ export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWeb
  async function prepareVerifiedFile(body){return verifiedFile.prepare(body)}
  async function confirmVerifiedFile(body){return verifiedFile.confirm(body)}
  function cancelVerifiedFile(){return verifiedFile.cancel()}
+ function verifiedLayoutStatus(){return verifiedLayout.status()}
+ async function prepareVerifiedLayout(body){return verifiedLayout.prepare(body)}
+ async function confirmVerifiedLayout(body){return verifiedLayout.confirm(body)}
+ function cancelVerifiedLayout(){return verifiedLayout.cancel()}
  return Object.freeze({status,chat,executeLocal,executeRea,planCapabilities,
   verifiedReaStatus,prepareVerifiedRea,executeVerifiedRea,cancelVerifiedRea,
-  verifiedFileStatus,prepareVerifiedFile,confirmVerifiedFile,cancelVerifiedFile});
+  verifiedFileStatus,prepareVerifiedFile,confirmVerifiedFile,cancelVerifiedFile,
+  verifiedLayoutStatus,prepareVerifiedLayout,confirmVerifiedLayout,cancelVerifiedLayout});
 }
