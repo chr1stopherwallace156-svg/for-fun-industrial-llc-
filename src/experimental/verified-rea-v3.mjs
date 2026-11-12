@@ -66,6 +66,9 @@ export function createVerifiedReaV3({request,clock=Date.now,tokenFactory=()=>ran
  }
  async function prepare({name,arguments:args}={}){
   if(busy)hold('BUSY');
+  // A new preparation attempt invalidates any earlier review, including
+  // when the new candidate fails validation.
+  pending=null;
   if(typeof name!=='string'||!SAFE_TOOLS.includes(name))hold('TOOL_NOT_IN_REVIEWED_READONLY_ALLOWLIST');
   verifyExactEmptyArgs(args);
   busy=true;
@@ -110,6 +113,9 @@ export function createVerifiedReaV3({request,clock=Date.now,tokenFactory=()=>ran
      state:'schema_changed_no_execution',executedActions:0,
      approvalGranted:true,tokenConsumed:true,requestSubmitted:false};
    }
+   if(clock()>item.validUntil){holds++;return {version:'fi-verified-rea-v3',
+    state:'expired_before_call_no_execution',executedActions:0,
+    approvalGranted:true,tokenConsumed:true,requestSubmitted:false}}
    // The original 8797 runner returns {tool,result}. Do not let a model
    // decide arguments; this request carries the exact operator-reviewed {}.
    let res;
@@ -124,7 +130,11 @@ export function createVerifiedReaV3({request,clock=Date.now,tokenFactory=()=>ran
      retryPolicy:'new_review_and_manual_check_required'};
    }
    const toolMatches=res?.tool===item.name;
-   const resultValid=object(res?.result)&&res.result.isError!==true;
+   // A successful HTTP request alone does not prove a tool produced evidence.
+   // Accept actual MCP structured data or a nonempty content array only.
+   const hasEvidence=object(res?.result?.structuredContent)||
+    (Array.isArray(res?.result?.content)&&res.result.content.length>0);
+   const resultValid=object(res?.result)&&res.result.isError!==true&&hasEvidence;
    const raw=object(res?.result)?res.result:null;
    const resultDigest=hash(raw);
    const receipt={
