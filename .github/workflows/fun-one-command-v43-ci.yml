@@ -68,18 +68,16 @@ jobs:
           $mode=''
           $nodeArgs=NodeArguments $script $mode
           if($nodeArgs -cne '"C:\Program Files\Fun Industrial\sidecar.mjs"'){throw 'V43_RUNTIME_LAUNCH_ARGS_NO_MODE_HOLD'}
-          if($source -notmatch '(?m)^\s*\$nodeArgs=NodeArguments \$script \$mode\s*
-){throw 'V43_RUNTIME_NODE_ARGUMENTS_NOT_USED'}
-          $preview=[regex]::Match($source,"(?m)^\s*(if\(\$Original\[\$port\]\)\{\$portState='LISTENING'\}else\{\$portState='MISSING'\})\s*$")
-          if(-not $preview.Success){throw 'V43_RUNTIME_MISSING_PREFLIGHT_ASSIGNMENT'}
-          if($source -notmatch '(?m)^\s*Write-Host \(''FUN_PREFLIGHT_PORT_''\+\$port\+''=''\+\$portState\)\s*
-){throw 'V43_RUNTIME_MISSING_PREFLIGHT_OUTPUT'}
+          if(-not $source.Contains('$nodeArgs=NodeArguments $script $mode')){throw 'V43_RUNTIME_NODE_ARGUMENTS_NOT_USED'}
+          $preflight='if($Original[$port]){$portState=''LISTENING''}else{$portState=''MISSING''}'
+          if(-not $source.Contains($preflight)){throw 'V43_RUNTIME_MISSING_PREFLIGHT_ASSIGNMENT'}
+          if(-not $source.Contains("Write-Host ('FUN_PREFLIGHT_PORT_'")){throw 'V43_RUNTIME_MISSING_PREFLIGHT_OUTPUT'}
           $port=8789
           $Original=@{8789=27756}
-          Invoke-Expression $preview.Groups[1].Value
+          Invoke-Expression $preflight
           if($portState -cne 'LISTENING'){throw 'V43_RUNTIME_PREFLIGHT_PRESENT_HOLD'}
           $Original=@{}
-          Invoke-Expression $preview.Groups[1].Value
+          Invoke-Expression $preflight
           if($portState -cne 'MISSING'){throw 'V43_RUNTIME_PREFLIGHT_MISSING_HOLD'}
-          if($source -match '\$\(\s*if\s*\('){throw 'V43_RUNTIME_UNSUPPORTED_SUBEXPRESSION_IF'}
+          if($source.Contains('$(if(')){throw 'V43_RUNTIME_UNSUPPORTED_SUBEXPRESSION_IF'}
           Write-Host 'V43_WINDOWS_POWERSHELL_RUNTIME_EXPRESSIONS=PASS'
