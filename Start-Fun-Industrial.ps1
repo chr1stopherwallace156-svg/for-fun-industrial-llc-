@@ -1,5 +1,6 @@
 # FUN_INDUSTRIAL_ONE_COMMAND_STARTUP_V43
 # Explicitly invoking this one file authorizes only starting fixed local services.
+# Starts the existing private HTTPS iPhone gateway after healthy local services.
 # Never invokes /api/activate, /api/start, /api/ai/start, any MCP tools,
 # model prompts, NetBird, source restoration, taskkill, or the Elektron process.
 # Separate operator authorization remains mandatory for actual tool execution.
@@ -8,6 +9,7 @@ $ErrorActionPreference='Stop'
 $Repo=$PSScriptRoot
 $Primary=Join-Path $HOME 'FunIndustrial-REA-MCP-Activation'
 $Source=Join-Path $Primary 'src\server.mjs'
+$GatewayHelper=Join-Path $Repo 'Start-Fun-Private-Gateway-V43.ps1'
 $ExpectedSourceSha='9C8667C1299102156968A79FD8CF524AC23EFAC25B7E924D369954EC638C6844'
 $QExe=Join-Path $HOME 'FunIndustrial\.runtime\llama.cpp\llama-server.exe'
 $QModel=Join-Path $HOME 'FunIndustrial\.runtime\models\Qwen3-4B-Q4_K_M.gguf'
@@ -91,7 +93,11 @@ foreach($file in @(
  (Join-Path $Repo 'scripts\Run-Fun-Unified-Chat8798.mjs'),
  (Join-Path $Repo 'src\experimental\embedded-local-tools-v4-2.mjs'),
  (Join-Path $Repo 'src\experimental\unified-task-chat.mjs'),
- (Join-Path $Repo 'Recover-Fun-Compute.ps1')
+ (Join-Path $Repo 'Recover-Fun-Compute.ps1'),
+ $GatewayHelper,
+ (Join-Path $Repo 'Start-Fun-iPhone-HTTPS.ps1'),
+ (Join-Path $Repo 'src\voice\gateway-port-state.ps1'),
+ (Join-Path $Repo 'src\voice\private-gateway-attest.mjs')
 )){File $file}
 if((Get-FileHash -LiteralPath $Source -Algorithm SHA256).Hash -cne $ExpectedSourceSha){
  Hold '8789_SOURCE_HASH_CHANGED_MANUAL_REVIEW_NO_RESTORE'
@@ -195,8 +201,14 @@ foreach($port in @(11434,8088,8789,8796,8797,8798)){
  if($Original[$port] -and (Socket $port) -ne $Original[$port]){Hold ('PREEXISTING_PROCESS_CHANGED_'+$port)}
 }
 [void](VerifyCompute)
+# 7. Adopt or start the already-prepared private NetBird HTTPS iPhone gateway.
+# Its own helper requires the exact iPhone peer, TLS/certificate pin, and
+# healthy voice-enabled original dashboard; never changes firewall or VPN.
+& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $GatewayHelper
+if($LASTEXITCODE -ne 0){Hold '8443_PRIVATE_HTTPS_START_OR_ATTEST_FAILED_NO_RETRY'}
 Write-Host 'FUN_INDUSTRIAL_ONE_COMMAND=PASS'
 Write-Host 'FUN_DASHBOARD=http://127.0.0.1:8798/'
+Write-Host 'FUN_PRIVATE_IPHONE_HTTPS=https://100.109.4.20:8443/ BACKEND=8789'
 Write-Host 'FUN_LOCAL_TOOLS=19 FUN_INDEPENDENT_REA_TOOLS=229'
 Write-Host ('FUN_LEGACY_PARENT_REA_INITIALIZED='+[bool]($tools.rea_tool_count -eq 229))
 Write-Host 'FUN_TOOL_EXECUTIONS_DURING_STARTUP=0 FUN_REA_OPERATOR_APPROVAL=REQUIRED'
