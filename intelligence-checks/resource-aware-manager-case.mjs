@@ -1,0 +1,17 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {ResourceAwareManager,evaluateAdmission,validateJob,validatePolicy} from '../src/resource-aware/raem.mjs';
+const job={id:'ail_public_monitor',minimumMiB:256,targetMiB:1024,maximumMiB:4096,refreshHours:6};
+const snap={totalMiB:16384,freeMiB:8000,cpuBusyPct:12};
+test('adaptive budget grants only requested memory when headroom is ample',()=>{const x=evaluateAdmission(snap,job);assert.equal(x.grantedMiB,1024);assert.equal(x.state,'GRANT');});
+test('bursts beyond 3GiB if requested and safe',()=>{const x=evaluateAdmission(snap,{...job,targetMiB:5120,maximumMiB:6144});assert.equal(x.grantedMiB,4723);});
+test('reduced budget grants between minimum and target',()=>{const x=evaluateAdmission({...snap,freeMiB:4000},job);assert.equal(x.reason,'REDUCED_BUDGET');assert.equal(x.grantedMiB,723);});
+test('low headroom is held, not overcommitted',()=>{const x=evaluateAdmission({...snap,freeMiB:3300},job);assert.equal(x.state,'HOLD');assert.equal(x.grantedMiB,0);});
+test('CPU pressure holds processing',()=>{assert.equal(evaluateAdmission({...snap,cpuBusyPct:90},job).reason,'CPU_PRESSURE');});
+test('invalid job, policy, and snapshots fail closed',()=>{assert.throws(()=>validateJob({...job,maximumMiB:-1}));assert.throws(()=>validatePolicy({executeShell:true}));assert.throws(()=>evaluateAdmission({...snap,freeMiB:20000},job));});
+test('cannot register duplicate job IDs',()=>{const m=new ResourceAwareManager();m.register(job);assert.throws(()=>m.register(job));});
+test('operator approval is required before any claim',()=>{const m=new ResourceAwareManager();m.register(job);assert.equal(m.claim(job.id,snap,{nowMs:0}).reason,'OPERATOR_APPROVAL_REQUIRED');assert.equal(m.status()[0].state,'queued');});
+test('plan is read-only and is not task execution',()=>{const m=new ResourceAwareManager();m.register(job);assert.equal(m.plan(snap,0)[0].state,'GRANT');assert.equal(m.status()[0].state,'queued');});
+test('claim reserves memory and enforces concurrency',()=>{const m=new ResourceAwareManager();m.register(job);m.register({...job,id:'other_monitor'});assert.equal(m.claim(job.id,snap,{operatorApproved:true,nowMs:0}).state,'GRANT');assert.equal(m.claim('other_monitor',snap,{operatorApproved:true,nowMs:0}).reason,'CONCURRENCY_LIMIT');});
+test('hourly refresh is based on successful completion, not constant polling',()=>{const m=new ResourceAwareManager();m.register(job);m.claim(job.id,snap,{operatorApproved:true,nowMs:0});assert.equal(m.complete(job.id,{nowMs:10000,success:true}),'NEXT_RUN_SCHEDULED');assert.deepEqual(m.plan(snap,10000),[]);assert.equal(m.plan(snap,10000+6*3600000)[0].state,'GRANT');});
+test('failed jobs do not retry until separately approved',()=>{const m=new ResourceAwareManager();m.register(job);m.claim(job.id,snap,{operatorApproved:true,nowMs:0});assert.equal(m.complete(job.id,{success:false,nowMs:500}),'FAILED_REVIEW_REQUIRED');assert.deepEqual(m.plan(snap,999999999),[]);assert.throws(()=>m.retryFailed(job.id));assert.equal(m.retryFailed(job.id,{operatorApproved:true,nowMs:500}),'QUEUED');});
+test('status returns bounded metadata',()=>{const m=new ResourceAwareManager();m.register(job);const result=m.status();assert.equal(result.length,1);assert.equal(result[0].refreshHours,6);});
