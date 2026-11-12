@@ -182,6 +182,68 @@ test('non-error response without evidence is a manual HOLD',async()=>{
  assert.equal(r.state,'result_hold_manual_review');
  assert.equal(r.receipt.evidenceEnvelopeVerified,false);
 });
+test('actual REA 422 MCP isError is reported as known provider rejection, not transport uncertainty',async()=>{
+ const f=fixture();let submitted=0,probed=0;
+ const probe=async()=>{probed++;return mockProof()};
+ const runner=createVerifiedBinaryLayoutV32({
+  request:async(url,body)=>{
+   if(url===REA+'/api/rea229/call'){
+    submitted++;
+    throw Error('UNIFIED_CHAT_UPSTREAM_422_REA229_MCP_TOOL_RETURNED_ERROR');
+   }
+   return f.request(url,body);
+  },probe,tokenFactory:()=>TOKEN,root:mockProof().root
+ });
+ const a=await runner.prepare({name:'inspect_binary_layout',filePath:'safe.exe'});
+ const out=await runner.confirm({token:a.token,operatorConfirmed:true});
+ assert.equal(out.state,'provider_mcp_error_reported');
+ assert.equal(out.executionCount,'unverified');
+ assert.equal(out.requestSubmitted,true);
+ assert.equal(out.receipt.providerErrorCode,'REA229_MCP_TOOL_RETURNED_ERROR');
+ assert.equal(out.receipt.resultEnvelopeAvailable,false);
+ assert.equal(out.receipt.resultHash,null);
+ assert.equal(out.receipt.fileIdentityVerified,true);
+ assert.equal(out.receipt.fileSha256Before,mockProof().sha256);
+ assert.equal(out.receipt.fileSha256After,mockProof().sha256);
+ assert.equal(out.receipt.automaticRetries,0);
+ assert.equal(out.receipt.receiptHash.length,64);
+ assert.equal(submitted,1);
+ assert.equal(probed,3); // prepare, preflight, post-rejection
+ await assert.rejects(runner.confirm({token:a.token,operatorConfirmed:true}),/PREPARATION_NOT_FOUND/);
+ assert.equal(submitted,1);
+});
+test('provider rejection receipt exposes modified file without claiming valid inspection',async()=>{
+ const f=fixture();let count=0;
+ const runner=createVerifiedBinaryLayoutV32({
+  request:async(url,body)=>url===REA+'/api/rea229/call'?
+   Promise.reject(Error('UNIFIED_CHAT_UPSTREAM_422_REA229_MCP_TOOL_RETURNED_ERROR')):
+   f.request(url,body),
+  probe:async()=>{
+   count++;
+   return count===3?{...mockProof(),sha256:'b'.repeat(64)}:mockProof();
+  },tokenFactory:()=>TOKEN,root:mockProof().root
+ });
+ const a=await runner.prepare({name:'inspect_binary_layout',filePath:'safe.exe'});
+ const out=await runner.confirm({token:a.token,operatorConfirmed:true});
+ assert.equal(out.state,'provider_mcp_error_reported');
+ assert.equal(out.receipt.fileIdentityVerified,false);
+ assert.equal(out.receipt.fileSha256After,'b'.repeat(64));
+ assert.equal(out.receipt.resultHash,null);
+});
+test('unrelated upstream 422 is still uncertain, not a fabricated REA provider rejection',async()=>{
+ const f=fixture();
+ const runner=createVerifiedBinaryLayoutV32({
+  request:async(url,body)=>url===REA+'/api/rea229/call'?
+   Promise.reject(Error('UNIFIED_CHAT_UPSTREAM_422_UNKNOWN_TOOL_ERROR')):
+   f.request(url,body),
+  probe:f.probe,tokenFactory:()=>TOKEN,root:mockProof().root
+ });
+ const a=await runner.prepare({name:'inspect_binary_layout',filePath:'safe.exe'});
+ const out=await runner.confirm({token:a.token,operatorConfirmed:true});
+ assert.equal(out.state,'outcome_unknown_do_not_retry');
+ assert.equal(out.executionCount,'unknown');
+ assert.equal(out.receipt,undefined);
+});
 test('opaque transport failure is unknown and never retried',async()=>{
  const f=fixture(),v=createVerifiedBinaryLayoutV32({
   request:async(url,body)=>url===REA+'/api/rea229/call'?Promise.reject(Error('socket closed')):f.request(url,body),
