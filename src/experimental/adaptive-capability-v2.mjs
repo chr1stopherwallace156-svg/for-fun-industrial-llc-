@@ -60,7 +60,6 @@ export function validateLiveRegistry({reaStatus,reaCatalogue,localRegistry,local
    }
   }
  }
- }
  return Object.freeze({records:Object.freeze(records),errors:Object.freeze(errors),
   reaCount:records.filter(x=>x.source==='rea').length,
   localCount:records.filter(x=>x.source==='local').length,
