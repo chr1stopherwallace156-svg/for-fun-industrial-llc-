@@ -1,0 +1,52 @@
+name: Fun REA MCP V3.3 error evidence qualification
+on:
+  push:
+    branches:
+      - feature/fun-rea-error-evidence-v33-20261111
+  pull_request:
+    paths:
+      - 'src/experimental/rea-error-evidence-v33.mjs'
+      - 'src/experimental/rea-full-229.mjs'
+      - 'src/experimental/rea229-client.js'
+      - 'src/experimental/verified-binary-layout-v3-2.mjs'
+      - 'src/experimental/unified-task-client.js'
+      - 'intelligence-checks/rea229-full-case.mjs'
+      - 'intelligence-checks/verified-binary-layout-v3-2-case.mjs'
+      - '.github/workflows/fun-rea-mcp-error-evidence-v33-ci.yml'
+permissions:
+  contents: read
+jobs:
+  qualify:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.4'
+      - name: Syntax checks
+        run: |
+          node --check src/experimental/rea-error-evidence-v33.mjs
+          node --check src/experimental/rea-full-229.mjs
+          node --check src/experimental/rea229-client.js
+          node --check src/experimental/verified-binary-layout-v3-2.mjs
+          node --check src/experimental/unified-task-client.js
+          node --check intelligence-checks/rea229-full-case.mjs
+          node --check intelligence-checks/verified-binary-layout-v3-2-case.mjs
+      - name: All relevant offline tests; synthetic MCP only
+        run: node --test intelligence-checks/rea229-full-case.mjs intelligence-checks/verified-binary-layout-v3-2-case.mjs intelligence-checks/verified-file-v3-1-case.mjs intelligence-checks/verified-rea-v3-case.mjs intelligence-checks/unified-task-chat-case.mjs intelligence-checks/adaptive-capability-v2-case.mjs
+      - name: Windows launch script PowerShell parsing
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach($script in @('Start-Fun-Rea229-Sidecar8797.ps1','Start-Fun-Unified-Chat8798.ps1','Repair-Fun-Unified-Web8798.ps1')){
+            $tokens=$null
+            $errors=$null
+            [Management.Automation.Language.Parser]::ParseFile((Resolve-Path $script).Path,[ref]$tokens,[ref]$errors) | Out-Null
+            if($errors.Count){$errors | Format-List | Out-String | Write-Host; throw ('V33_PS_PARSE_HOLD_'+$script)}
+          }
+          Write-Host 'V33_PS_PARSE=PASS'
