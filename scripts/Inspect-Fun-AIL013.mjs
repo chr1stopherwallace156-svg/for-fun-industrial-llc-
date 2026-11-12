@@ -5,7 +5,7 @@ import {chooseAdaptiveIncidentBudget} from '../src/resource-aware/adaptive-incid
 import {LocalAilSourceRegistry} from '../src/integrations/ail-source-registry.mjs';
 const args=process.argv.slice(2);
 const dry=args.length===0||(args.length===1&&args[0]==='--dry-run');
-const read=args.length===6&&args[0]==='--source-id'&&args[2]==='--file'&&args[4]==='--sha256';
+const read=args.length===7&&args[0]==='--source-id'&&args[2]==='--file'&&args[4]==='--sha256'&&args[6]==='--approved-readonly';
 if(!dry&&!read)throw Error('RAEM013_ARGS_INVALID');
 const host=await sampleHost({sampleDelayMs:150});
 const prior=evaluateAdmission(host,{id:'ail_metadata_local_source',minimumMiB:64,targetMiB:128,maximumMiB:128});
