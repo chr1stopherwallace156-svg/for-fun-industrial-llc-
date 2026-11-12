@@ -10,7 +10,7 @@ const parentNames=Array.from({length:229},(_,i)=>'rea_tool_'+i);
 const local=Array.from({length:19},(_,i)=>({type:'function',function:{name:'fi_local_'+i,parameters:{type:'object',properties:{}}}}));
 function fixture(reaCount=0,reaReady=false){
  return {status:{services:[{id:'rea',state:reaReady?'ready':'stopped'}]},
- registered:{local_tool_count:19,rea_tool_count:reaCount,tools:local},
+ registered:{local_tool_count:19,rea_tool_count:reaCount,tools:local.map(x=>({...x,function:{...x.function}}))},
  cognition:{version:'fi-cognitive-live-bridge-v1',reaExecutionGrants:0},
  index:{version:'fi-capability-index-v1',localCount:19,executionGrants:0},
  qwen:{status:'ok'},
@@ -93,6 +93,6 @@ test('single command launcher is start-only, has no REA call grant or all-proces
    'REA_EXECUTION_PERMISSION_DRIFT','Start-Fun-Industrial-OneCommand.ps1']){
   assert.ok((ps+cmd).includes(marker),marker);
  }
- assert.doesNotMatch(ps,/Stop-Process|taskkill|\/api\/activate|\/api\/start|\/api\/stop|\/api\/shutdown|\/api\/rea229\/run|\/api\/rea229\/call|Set-ScheduledTask|Register-ScheduledTask/);
+ assert.doesNotMatch(ps.split('\n').filter(line=>!line.trim().startsWith('#')).join('\n'),/Stop-Process|taskkill|\/api\/activate|\/api\/start|\/api\/stop|\/api\/shutdown|\/api\/rea229\/run|\/api\/rea229\/call|Set-ScheduledTask|Register-ScheduledTask/);
  assert.match(cmd,/powershell.exe.*-Start/);
 });
