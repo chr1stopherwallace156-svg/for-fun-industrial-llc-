@@ -135,7 +135,7 @@ export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWeb
    local:{ready:l?.sidecar===true,count:t?.local_tool_count??0},
    reaExplicitRunAvailable:r?.liveMcpHealth==='ready'&&r?.realReaToolCount===229,
    completedSessions:completed,failedSessions:failed,busy,
-   capabilities:['qwen_chat','public_https_static_text','real_rea_readonly_session',
+   capabilities:['qwen_chat','public_https_static_text','adaptive_live_capability_planning_v2','real_rea_readonly_session',
      'explicit_click_rea_229_runner','explicit_click_local_registered_tools','task_classification'],
    notImplemented:['arbitrary_app_install','binary_upload','native_game_port',
      'browser_javascript_automation','arbitrary_shell']};
@@ -149,6 +149,7 @@ export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWeb
    let observation=null,actions=[],answer;
    if(route.kind==='capability_plan'){
     const plan=await planner.plan(prompt);
+    completed++;
     observation={source:'live_capability_catalogues',type:'advisory_plan',
      totalRegistered:plan.catalogue.rea+plan.catalogue.local};
     answer={reply:plan.reply,tokens:0};
