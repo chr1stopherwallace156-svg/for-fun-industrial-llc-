@@ -4,13 +4,14 @@
 import {runAutoLocalExperiment,selectCurrentLocalTools} from './auto-local-tools.mjs';
 const DASH='http://127.0.0.1:8789';
 const LLAMA='http://127.0.0.1:8088/v1/chat/completions';
+const LLAMA_HEALTH='http://127.0.0.1:8088/health';
 const EMPTY_PROPOSAL='The model proposed a tool call. Review it before execution.';
 const SYSTEM='You are Fun Industrial local AI. The human operator clicked Run AI Tools Automatically for this one task, so you may use supplied local Fun Industrial functions without a separate confirmation for each call. When a supplied function is helpful, emit a structured OpenAI tool_calls response with JSON arguments. Never claim that a function ran before the software provides its result. Never request a tool that was not supplied.';
 const plain=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const filtered=x=>x?.reply===EMPTY_PROPOSAL&&(!Array.isArray(x.tool_calls)||x.tool_calls.length===0);
 async function fixedRequest(path,body=null,{timeoutMs=15000,fetchImpl=fetch}={}){
- const uri=path==='/__raw_llama__'?LLAMA:DASH+path;
- if(path!=='/__raw_llama__'&&!['/api/ai/status','/api/cognition/health','/api/cognition/catalogue/status','/api/ai/tools','/api/ai/chat','/api/ai/tool-call'].includes(path))
+ const uri=path==='/__raw_llama__'?LLAMA:path==='/__raw_llama_health__'?LLAMA_HEALTH:DASH+path;
+ if(path!=='/__raw_llama__'&&path!=='/__raw_llama_health__'&&!['/api/ai/status','/api/cognition/health','/api/cognition/catalogue/status','/api/ai/tools','/api/ai/chat','/api/ai/tool-call'].includes(path))
   throw Error('AUTO_DASH_UNEXPECTED_ROUTE');
  const response=await fetchImpl(uri,{method:body===null?'GET':'POST',
   headers:body===null?{}:{'content-type':'application/json'},
@@ -39,7 +40,14 @@ export function createAutoLocalDashboard({client=fixedRequest}={}){
     client('/api/ai/status'),client('/api/cognition/health'),
     client('/api/cognition/catalogue/status'),client('/api/ai/tools')
    ]);
-   if(ai.state!=='ready')throw Error('AUTO_DASH_AI_NOT_READY');
+   // The Python model manager may say stopped while a separately owned, healthy
+   // llama.cpp is already listening on 8088. Adopt it for this operator-started
+   // session, never start another model or claim the Python manager owns it.
+   const directLlama=ai.state!=='ready';
+   if(directLlama){
+    const modelHealth=await client('/__raw_llama_health__',null,{timeoutMs:4000});
+    if(modelHealth.status!=='ok')throw Error('AUTO_DASH_EXTERNAL_LLAMA_NOT_READY');
+   }
    if(cognitive.version!=='fi-cognitive-live-bridge-v1'||cognitive.reaExecutionGrants!==0)
     throw Error('AUTO_DASH_COGNITION_IDENTITY_HOLD');
    if(index.version!=='fi-capability-index-v1'||index.executionGrants!==0)
@@ -56,16 +64,25 @@ export function createAutoLocalDashboard({client=fixedRequest}={}){
    const result=await runAutoLocalExperiment({
     prompt,definitions:tools,maxRounds:rounds,maxTokens:384,
     chat:async body=>{
-     const forwarded=await client('/api/ai/chat',body,{timeoutMs:180000});
-     if(!filtered(forwarded))return forwarded;
+     if(!directLlama){
+      const forwarded=await client('/api/ai/chat',body,{timeoutMs:180000});
+      if(!filtered(forwarded))return forwarded;
+     }
      const raw=await client('/__raw_llama__',{
       model:'local-model',messages:[{role:'system',content:SYSTEM},...body.messages],
       tools:body.tools,tool_choice:'auto',max_tokens:body.max_tokens,
       temperature:body.temperature,stream:false
      },{timeoutMs:180000});
      const message=raw?.choices?.[0]?.message;
-     if(!message||!Array.isArray(message.tool_calls)||message.tool_calls.length===0)
-      throw Error('AUTO_DASH_NO_STRUCTURED_TOOL_CALL');
+     if(!message||(message.tool_calls!==undefined&&!Array.isArray(message.tool_calls)))
+      throw Error('AUTO_DASH_INVALID_MODEL_RESPONSE');
+     // A genuine model refusal/answer without a tool call is safe. Report no
+     // action instead of demanding an invented call or silently retrying.
+     if(!Array.isArray(message.tool_calls)||message.tool_calls.length===0){
+      if(typeof message.content!=='string'||!message.content.trim())
+       throw Error('AUTO_DASH_EMPTY_MODEL_RESPONSE');
+      return {reply:message.content,tool_calls:[]};
+     }
      return {reply:typeof message.content==='string'?message.content:'',
       tool_calls:message.tool_calls};
     },

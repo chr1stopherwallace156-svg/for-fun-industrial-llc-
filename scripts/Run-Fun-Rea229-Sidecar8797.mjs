@@ -114,8 +114,8 @@ async function model(payload){
 }
 export async function activateRea229({expectedNames,envFile=path.join(PRIMARY,'.env'),
  infer=model,listen=true}={}){
- if(!Array.isArray(expectedNames)||expectedNames.length!==229)
-  throw Error('REA229_PARENT_NAMES_REQUIRED');
+ if(expectedNames!==undefined&&(!Array.isArray(expectedNames)||expectedNames.length!==229))
+  throw Error('REA229_PARENT_NAMES_INVALID');
  if(typeof process.loadEnvFile!=='function')throw Error('REA229_NODE_22_REQUIRED');
  process.loadEnvFile(envFile);
  const config=loadConfig({...process.env,APP_ROOT:PRIMARY});
@@ -144,17 +144,22 @@ export async function activateRea229({expectedNames,envFile=path.join(PRIMARY,'.
  }
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
- if(process.argv.length!==3||process.argv[2]!=='--serve'){
+ if(process.argv.length!==3||!['--serve','--standalone'].includes(process.argv[2])){
   console.log('FUN_REA229=INACTIVE. Explicit --serve required. Existing Fun Industrial processes unchanged.');
  }else{
   let active=null;
   try{
-   const expectedNames=await parentSnapshot();
+   const independent=process.argv[2]==='--standalone';
+   // Standalone V4.3 bootstraps its own real 229-tool stdio MCP session;
+   // it does not infer catalogue existence from the stopped parent session.
+   const expectedNames=independent?undefined:await parentSnapshot();
    active=await activateRea229({expectedNames});
-   const confirm=await parentSnapshot();
-   if(JSON.stringify(expectedNames.slice().sort())!==JSON.stringify(confirm.slice().sort()))
-    throw Error('REA229_PARENT_CATALOGUE_CHANGED_AFTER_INDEPENDENT_START');
-   console.log('FUN_REA229_READY='+ORIGIN+' REAL_REA_TOOLS=229 LOCAL_8789=UNCHANGED AUTO_8796=UNCHANGED');
+   if(!independent){
+    const confirm=await parentSnapshot();
+    if(JSON.stringify(expectedNames.slice().sort())!==JSON.stringify(confirm.slice().sort()))
+     throw Error('REA229_PARENT_CATALOGUE_CHANGED_AFTER_INDEPENDENT_START');
+   }
+   console.log('FUN_REA229_READY='+ORIGIN+' REAL_REA_TOOLS=229 INDEPENDENT_BOOT='+independent+' LOCAL_8789=UNCHANGED AUTO_8796=UNCHANGED');
    let closing=false;
    const end=async()=>{
     if(closing)return;closing=true;
