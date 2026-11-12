@@ -14,6 +14,7 @@ const REA='http://127.0.0.1:8797';
 const LOCAL='http://127.0.0.1:8796';
 const PARENT='http://127.0.0.1:8789';
 const LLAMA='http://127.0.0.1:8088/v1/chat/completions';
+const LLAMA_HEALTH='http://127.0.0.1:8088/health';
 const obj=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const bounded=(x,n=5000)=>String(x??'').slice(0,n);
 const fail=(code)=>{throw Error('UNIFIED_CHAT_'+code)};
@@ -64,7 +65,7 @@ export async function fixedJson(url,body=null,{timeout=180000}={}){
  if(![PARENT+'/api/ai/tools',PARENT+'/api/ai/status',REA+'/api/rea229/status',REA+'/api/rea229/tools?limit=229',
   LOCAL+'/api/ai/auto-local/status',REA+'/api/rea229/call',
   REA+'/api/rea229/run',LOCAL+'/api/ai/auto-local/run',
-  LLAMA].includes(url))fail('OUTBOUND_ENDPOINT_NOT_ALLOWED');
+  LLAMA,LLAMA_HEALTH].includes(url))fail('OUTBOUND_ENDPOINT_NOT_ALLOWED');
  const isPost=body!==null;
  const response=await fetch(url,{method:isPost?'POST':'GET',
   headers:isPost?{'content-type':'application/json',
@@ -135,13 +136,24 @@ export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWeb
   const l=local.status==='fulfilled'?local.value:null;
   const t=registry.status==='fulfilled'?registry.value:null;
   const a=ai.status==='fulfilled'?ai.value:null;
-  return {version:'fi-unified-task-chat-8798-v1',state:a?.state==='ready'&&r?.liveMcpHealth==='ready'&&l?.sidecar===true?'ready':'degraded',
+  // Python may report its managed model stopped while an independent 8088
+  // llama.cpp is healthy. Observe it directly; do not claim Python ownership.
+  let directLlama=null;
+  if(a?.state!=='ready'){
+   try{directLlama=await request(LLAMA_HEALTH,null,{timeout:4000})}catch{}
+  }
+  const modelReady=a?.state==='ready'||directLlama?.status==='ok';
+  const reaReady=r?.liveMcpHealth==='ready'&&r?.realReaToolCount===229;
+  const localReady=l?.sidecar===true&&t?.local_tool_count===19;
+  return {version:'fi-unified-task-chat-8798-v1',state:modelReady&&reaReady&&localReady?'ready':'degraded',
    service:'independent_loopback',operatorStarted:true,background:false,
    autoReadOnly:true,localExecutionRequiresExplicitClick:true,
-   ai:{ready:a?.state==='ready',engine:'external_llama_cpp',port:8088},
-   rea:{ready:r?.liveMcpHealth==='ready'&&r?.realReaToolCount===229,
+   ai:{ready:modelReady,engine:'external_llama_cpp',port:8088,
+    ownership:a?.state==='ready'?'python_managed':'independent_observed'},
+   legacyParentReaInitialized:t?.rea_tool_count===229,
+   rea:{ready:reaReady,
     count:r?.realReaToolCount??0},
-   local:{ready:l?.sidecar===true,count:t?.local_tool_count??0},
+   local:{ready:localReady,count:t?.local_tool_count??0},
    reaExplicitRunAvailable:r?.liveMcpHealth==='ready'&&r?.realReaToolCount===229,
    verifiedReaV3:verifiedRea.status(),
    verifiedFileV31:verifiedFile.status(),
