@@ -4,6 +4,7 @@
 // Never starts/stops existing processes, runs shell, or grants background tasks.
 import {fetchPublicWebText,validatePublicHttps} from './unified-public-web.mjs';
 import {correctMillisecondSeconds} from './unified-fact-guard.mjs';
+import {createAdaptivePlanner} from './adaptive-capability-v2.mjs';
 const BASE='http://127.0.0.1:8798';
 const REA='http://127.0.0.1:8797';
 const LOCAL='http://127.0.0.1:8796';
@@ -24,6 +25,8 @@ export function validateChatContext(context){
 }
 export function routeUnifiedTask(prompt){
  if(typeof prompt!=='string'||prompt.trim().length<3||prompt.length>2200)fail('PROMPT_INVALID');
+ // V2 discovery requests route to live registries, not a guessed tool name.
+ // Keep explicit URLs on V1's already-verified web observation route.
  const link=prompt.match(/https?:\/\/[^\s<>"']+/i);
  if(link){
   const candidate=link[0].replace(/[.,;)]+$/,'');
@@ -31,6 +34,9 @@ export function routeUnifiedTask(prompt){
   const url=validatePublicHttps(candidate);
   return {kind:'public_website',url:url.href,execution:'read_only'};
  }
+ if(/\b(?:which|what|find|discover|identify|list|search|recommend|match)\b/i.test(prompt)&&
+     /\b(?:tools?|capabilit(?:y|ies)|functions?|mcp operations?|available operations?)\b/i.test(prompt))
+  return {kind:'capability_plan',execution:'read_only_discovery'};
  if(/\b(?:rea|mcp)\b/i.test(prompt)&&/\b(?:analysis settings|runtime settings|analysis setting)\b/i.test(prompt))
   return {kind:'rea_readonly',tool:'inspect_analysis_settings',execution:'read_only'};
  if(/\b(?:rea|mcp)\b/i.test(prompt)&&/\b(?:binary session|provider status|provider availability|session status|available providers)\b/i.test(prompt))
@@ -73,6 +79,7 @@ const baseModelSystem='You are Fun Industrial Qwen3, acting in one operator-init
 export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWebText}={}){
  if(typeof request!=='function'||typeof fetchWeb!=='function')fail('DEPENDENCIES_INVALID');
  let busy=false,completed=0,failed=0;
+ const planner=createAdaptivePlanner({request});
  async function infer(prompt,observation=null,context=[]){
   const result=await request(LLAMA,{model:'local-model',messages:[
    {role:'system',content:baseModelSystem},
@@ -128,7 +135,7 @@ export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWeb
    local:{ready:l?.sidecar===true,count:t?.local_tool_count??0},
    reaExplicitRunAvailable:r?.liveMcpHealth==='ready'&&r?.realReaToolCount===229,
    completedSessions:completed,failedSessions:failed,busy,
-   capabilities:['qwen_chat','public_https_static_text','real_rea_readonly_session',
+   capabilities:['qwen_chat','public_https_static_text','adaptive_live_capability_planning_v2','real_rea_readonly_session',
      'explicit_click_rea_229_runner','explicit_click_local_registered_tools','task_classification'],
    notImplemented:['arbitrary_app_install','binary_upload','native_game_port',
      'browser_javascript_automation','arbitrary_shell']};
@@ -140,6 +147,18 @@ export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWeb
   busy=true;
   try{
    let observation=null,actions=[],answer;
+   if(route.kind==='capability_plan'){
+    const plan=await planner.plan(prompt);
+    completed++;
+    observation={source:'live_capability_catalogues',type:'advisory_plan',
+     totalRegistered:plan.catalogue.rea+plan.catalogue.local};
+    answer={reply:plan.reply,tokens:0};
+    return {version:'fi-unified-task-chat-8798-v2',state:plan.discoveryErrors.length?
+      'capability_plan_partial':'capability_plan_ready',route:route.kind,
+     execution:'read_only_discovery',actions:[],reply:plan.reply,modelTokens:0,
+     source:'live_capability_catalogues',capabilityPlan:plan,
+     authorityGranted:false,toolsExecuted:0};
+   }
    if(route.kind==='public_website'){
     const web=await fetchWeb(route.url);
     observation={source:route.url,type:'public_static_page',
@@ -216,5 +235,10 @@ export function createUnifiedTaskChat({request=fixedJson,fetchWeb=fetchPublicWeb
     reply:bounded(response.reply,3600),originalState:bounded(response.state,120)};
   }finally{busy=false}
  }
- return Object.freeze({status,chat,executeLocal,executeRea});
+ async function planCapabilities({prompt}={}){
+  const plan=await planner.plan(prompt);
+  return {version:'fi-adaptive-capability-v2',...plan,
+   authorityGranted:false,actions:[],noExecution:true};
+ }
+ return Object.freeze({status,chat,executeLocal,executeRea,planCapabilities});
 }

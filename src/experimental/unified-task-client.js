@@ -43,6 +43,20 @@ function showActions(data){
   event(String(a.resultPreview||'').slice(0,5500));
  }
  if(!acts.length)event('No tool executed; route='+String(data.route||'?'));
+ if(data.capabilityPlan){
+  const p=data.capabilityPlan;
+  event('ADAPTIVE V2 — LIVE REGISTERED: REA='+String(p.catalogue?.rea)+
+   ' LOCAL='+String(p.catalogue?.local)+' EXECUTED=0');
+  for(const c of (Array.isArray(p.candidates)?p.candidates:[])){
+   event('CANDIDATE NOT EXECUTED: '+String(c.name)+' ['+String(c.source)+
+    '] required='+String(Array.isArray(c.requiredArguments)?c.requiredArguments.join(','):'UNKNOWN')+
+    ' providerVerified=false');
+  }
+  for(const h of (Array.isArray(p.prerequisites)?p.prerequisites:[]))
+   event('MISSING PREREQUISITE: '+String(h));
+  for(const h of (Array.isArray(p.discoveryErrors)?p.discoveryErrors:[]))
+   event('DISCOVERY HOLD: '+String(h));
+ }
  if(data.source)event('Observation source: '+String(data.source));
  if(data.modelTokens!==null&&data.modelTokens!==undefined)event('Qwen completion tokens: '+String(data.modelTokens));
 }

@@ -1,0 +1,50 @@
+name: Fun Adaptive Capability V2 qualification
+on:
+  push:
+    branches:
+      - feature/fun-adaptive-capability-v2-20261111
+  pull_request:
+    paths:
+      - 'src/experimental/adaptive-capability-v2.mjs'
+      - 'src/experimental/unified-task-chat.mjs'
+      - 'src/experimental/unified-task-client.js'
+      - 'scripts/Run-Fun-Unified-Chat8798.mjs'
+      - 'scripts/Diagnose-Fun-Adaptive-V2.mjs'
+      - 'intelligence-checks/adaptive-capability-v2-case.mjs'
+      - '.github/workflows/fun-adaptive-v2-ci.yml'
+permissions:
+  contents: read
+jobs:
+  adaptive:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Node syntax
+        run: |
+          node --check src/experimental/adaptive-capability-v2.mjs
+          node --check src/experimental/unified-task-chat.mjs
+          node --check src/experimental/unified-task-client.js
+          node --check scripts/Run-Fun-Unified-Chat8798.mjs
+          node --check scripts/Diagnose-Fun-Adaptive-V2.mjs
+          node --check intelligence-checks/adaptive-capability-v2-case.mjs
+      - name: Legacy V1 and V2 offline regression
+        run: node --test intelligence-checks/unified-task-chat-case.mjs intelligence-checks/adaptive-capability-v2-case.mjs
+      - name: Windows starter and repair parser
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach($script in @('Start-Fun-Unified-Chat8798.ps1','Repair-Fun-Unified-Web8798.ps1')){
+            $tokens=$null
+            $errors=$null
+            [Management.Automation.Language.Parser]::ParseFile((Resolve-Path $script).Path,[ref]$tokens,[ref]$errors) | Out-Null
+            if($errors.Count){$errors | Format-List | Out-String | Write-Host; throw ('ADAPTIVE_PS_PARSE_HOLD_'+$script)}
+          }
+          Write-Host 'ADAPTIVE_PS_PARSE=PASS'
