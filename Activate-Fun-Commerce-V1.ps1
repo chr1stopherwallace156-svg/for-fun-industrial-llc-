@@ -6,7 +6,7 @@ Set-StrictMode -Version Latest
 $Root=$PSScriptRoot
 $Branch='feature/fun-ml-unified-dashboard-v3-20261113'
 $Runner=Join-Path $Root 'scripts\Run-Fun-ML-Dashboard8802.mjs'
-$Prior='f6b88422296b1a35e1809574aac5275d9d732f38'
+$Prior='619309d8679ec775ba3fe4635be6fe0d007c2896'
 $Url='http://127.0.0.1:8802'
 $node=(Get-Command node.exe -ErrorAction Stop).Source
 function Hold([string]$why){throw ('FUN_COMMERCE_HOLD='+$why)}
@@ -24,12 +24,14 @@ function VerifyNewHub([int]$expectedPid=0){
  try{
   $c=Invoke-RestMethod ($Url+'/api/commerce/status') -TimeoutSec 8
   $d=Invoke-RestMethod ($Url+'/api/commerce/data') -TimeoutSec 8
+  $opportunity=Invoke-RestMethod ($Url+'/api/commerce/opportunities') -TimeoutSec 8
   $m=Invoke-RestMethod ($Url+'/api/ml/dashboard/status') -TimeoutSec 8
   $main=Invoke-WebRequest ($Url+'/') -UseBasicParsing -TimeoutSec 10
   $chat=Invoke-WebRequest ($Url+'/unified/') -UseBasicParsing -TimeoutSec 10
   $script=Invoke-WebRequest ($Url+'/api/commerce/widget.js') -UseBasicParsing -TimeoutSec 8
   return ($c.version -ceq 'fun-commerce-intelligence-v1' -and
-   $d.version -ceq 'fun-commerce-intelligence-v1' -and $m.state -ceq 'ready' -and
+   $d.version -ceq 'fun-commerce-intelligence-v1' -and $opportunity.version -ceq 'fun-commerce-opportunities-v1.1' -and
+   $opportunity.qualifies_as_verified_sales_opportunity -eq $false -and $opportunity.order_authority -eq $false -and $m.state -ceq 'ready' -and
    $main.Content -match 'fi-commerce-panel' -and $chat.Content -match 'fi-commerce-panel' -and
    $script.Content -match 'FUN_COMMERCE_WIDGET_V1')
  }catch{return $false}
@@ -128,6 +130,17 @@ try{
  Write-Host ('GOOGLE_TRENDS_LIVE_FETCH=HOLD DETAIL='+[string]$_.Exception.Message)
  Write-Host 'GOOGLE_TRENDS_RETRY=USE_DASHBOARD_REFRESH_BUTTON_NO_PROCESS_RESTART'
 }
+try{
+ $rank=Invoke-RestMethod ($Url+'/api/commerce/opportunities') -TimeoutSec 10
+ if($rank.version -cne 'fun-commerce-opportunities-v1.1' -or $rank.order_authority -ne $false -or
+    $rank.qualifies_as_verified_sales_opportunity -ne $false){Hold 'RESEARCH_QUEUE_ATTESTATION_FAILED'}
+ Write-Host ('FUN_COMMERCE_V1_1_RESEARCH_QUEUE=PASS STATE='+[string]$rank.state)
+ Write-Host ('FUN_COMMERCE_V1_1_CATALOG_MATCHES='+@($rank.matches).Count)
+ Write-Host ('FUN_COMMERCE_V1_1_PRODUCT_RESEARCH_LEADS='+@($rank.research_leads).Count)
+ foreach($lead in @($rank.research_leads)|Select-Object -First 5){
+  Write-Host ('PRODUCT_RESEARCH_LEAD='+[string]$lead.search_query+' | supplier cost NOT VERIFIED')
+ }
+}catch{throw ('RESEARCH_QUEUE_READONLY_HOLD='+[string]$_.Exception.Message)}
 Write-Host 'FUN_COMMERCE_CONTROL_CENTER=http://127.0.0.1:8802/'
 Write-Host 'FUN_COMMERCE_SHOPIFY=TOKEN_REQUIRED_FOR_PC_READ_ONLY_SYNC'
 Write-Host 'FUN_COMMERCE_EXTERNAL_ACTIONS=ONE_GOOGLE_RSS_READ_NO_PURCHASES'
