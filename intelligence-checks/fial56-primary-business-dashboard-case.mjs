@@ -23,7 +23,7 @@ function fetchLocal(server,path,{method='GET',body,origin,click,host='127.0.0.1:
  return new Promise((resolve,reject)=>{
   const headers={host};
   if(origin)headers.origin=origin;
-  if(click)headers['x-fi-business-click']='one-local-decision-analysis';
+  if(click)headers['x-fi-business-click']=typeof click==='string'?click:'one-local-decision-analysis';
   if(body!==undefined){headers['content-type']='application/json';headers['content-length']=Buffer.byteLength(body)}
   const req=http.request({hostname:'127.0.0.1',port:server.address().port,path,method,headers},res=>{
    const chunks=[];res.on('data',c=>chunks.push(c));
@@ -86,4 +86,37 @@ test('elevated business status or fabricated local decision fails closed',async(
    body,origin:'http://127.0.0.1:8802',click:true});
   assert.equal(req.status,422);
  },{businessPlan:()=>({version:'fial5.6-business-competence-v1',external_action_authorized:true})});
+});
+
+
+test('finance and writing checks require separate exact operator clicks and never send or act',async()=>{
+ await serve(async server=>{
+  const finance=JSON.stringify({metrics:{unit_price:100,unit_variable_cost:50,monthly_fixed_cost:1000}});
+  const writing=JSON.stringify({draft:'hello team, we we guarantee guaranteed funding'});
+  assert.equal((await fetchLocal(server,'/api/operator/competence/finance',{
+   method:'POST',body:finance})).status,403);
+  assert.equal((await fetchLocal(server,'/api/operator/competence/writing',{
+   method:'POST',body:writing,origin:'http://evil.invalid',click:true})).status,403);
+  const f=await fetchLocal(server,'/api/operator/competence/finance',{method:'POST',body:finance,
+   origin:'http://127.0.0.1:8802',click:false,headers:{'x-fi-business-click':'one-local-financial-calculation'}});
+  assert.equal(f.status,403);
+  const r=await fetchLocal(server,'/api/operator/competence/finance',{method:'POST',body:finance,
+   origin:'http://127.0.0.1:8802',click:'one-local-financial-calculation'});
+  assert.equal(r.status,200);
+  const result=JSON.parse(r.text);
+  assert.equal(result.calculations.unit_economics.monthly_break_even_units,20);
+  assert.equal(result.claim_verified,false);
+  assert.equal(result.model_invocations,0);
+  const w=await fetchLocal(server,'/api/operator/competence/writing',{method:'POST',body:writing,
+   origin:'http://127.0.0.1:8802',click:'one-local-writing-review'});
+  assert.equal(w.status,200);
+  const result2=JSON.parse(w.text);
+  assert.equal(result2.messages_sent,0);
+  assert.ok(result2.review.issues.some(x=>x.code==='DUPLICATE_WORD'));
+  assert.ok(result2.review.issues.some(x=>x.code==='UNVERIFIED_BUSINESS_CLAIM'));
+  const malformed=await fetchLocal(server,'/api/operator/competence/finance',{
+   method:'POST',body:JSON.stringify({metrics:{unit_price:'invented'}}),
+   origin:'http://127.0.0.1:8802',click:'one-local-financial-calculation'});
+  assert.equal(malformed.status,422);
+ });
 });
