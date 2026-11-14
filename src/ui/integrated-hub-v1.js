@@ -6,7 +6,7 @@ if(!shell||!commerce||!ml)return; // Preserve the original UI if integration is 
 const unified=location.pathname==='/unified/';
 const grounded=$('fi-fial53-grounded');
 const views=new Set(unified?['chat','tools']:['overview','commerce','ml','workspace']);
-const nativeTop=[...document.body.children].filter(el=>el!==shell&&el!==commerce&&el!==ml&&
+const nativeTop=[...document.body.children].filter(el=>el!==shell&&el!==commerce&&el!==ml&&el!==grounded&&
  !['SCRIPT','STYLE','LINK'].includes(el.tagName));
 const nativeMain=[...nativeTop].find(el=>el.tagName==='MAIN')||null;
 const togg=(el,hidden)=>{if(el)el.classList.toggle('fi-ui-hidden',hidden)};
