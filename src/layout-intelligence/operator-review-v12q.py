@@ -53,9 +53,10 @@ def run(a):
  if key in decided:raise ValueError("ALREADY_REVIEWED_HOLD")
  path.parent.mkdir(parents=True,exist_ok=True)
  lock=path.with_suffix(".lock")
- fd=None
+ fd=None;owned=False
  try:
   fd=os.open(lock,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+  owned=True
   os.close(fd);fd=None
   # Check again under exclusive lock to prevent concurrent decision overwrite.
   entries,decided,prev=read_log(path,queuehash,ids)
@@ -71,7 +72,7 @@ def run(a):
    "entryHash":e["entryHash"],"engineeringApproved":False,"journal":str(path)},indent=2))
  finally:
   if fd is not None:os.close(fd)
-  if lock.exists():lock.unlink()
+  if owned and lock.exists():lock.unlink()
 def main():
  p=argparse.ArgumentParser();p.add_argument("--folder",required=True,type=Path)
  sub=p.add_subparsers(dest="action",required=True)
