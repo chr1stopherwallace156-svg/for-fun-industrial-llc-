@@ -1,0 +1,46 @@
+name: Fun Industrial FIAL5 Whole System CI
+on:
+  push:
+    branches:
+      - feature/fial5-system-wide-core-20261114
+    paths:
+      - "src/fial/system-*"
+      - "src/fial/programs/system-coordination.fial"
+      - "scripts/Run-Fun-FIAL-System8804.mjs"
+      - "Start-Fun-FIAL-System-V5.ps1"
+      - "intelligence-checks/fial-system-v5-case.mjs"
+      - ".github/workflows/fial5-system-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fial5:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Check universal FIAL code syntax
+        shell: pwsh
+        run: |
+          node --check src/fial/system-compiler-v5.mjs
+          node --check src/fial/system-runtime-v5.mjs
+          node --check src/fial/system-widget-v5.js
+          node --check scripts/Run-Fun-FIAL-System8804.mjs
+          node --check intelligence-checks/fial-system-v5-case.mjs
+      - name: Exercise independent cross-system runtime tests
+        run: node --test intelligence-checks/fial-system-v5-case.mjs
+      - name: Verify guarded Windows launcher syntax
+        shell: pwsh
+        run: |
+          $tok=$null;$errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'Start-Fun-FIAL-System-V5.ps1'),[ref]$tok,[ref]$errors)|Out-Null
+          if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};throw 'FIAL5_POWERSHELL_SYNTAX_HOLD'}
+          $body=Get-Content 'Start-Fun-FIAL-System-V5.ps1' -Raw
+          foreach($mark in @('SOURCE','8804_UNEXPECTED_OWNER_NO_RESTART','PROTECTED_SERVICE_CHANGED_PORT_','FIAL5_SYSTEM_ACTIVATION=PASS')){
+            if(!$body.Contains($mark)){throw ('FIAL5_GUARD_MISSING_'+$mark)}
+          }
+          if($body -match 'Stop-Process|Restart-Service|Stop-Service|Set-NetFirewallRule'){throw 'FIAL5_UNEXPECTED_CONTROL_HOLD'}
+          Write-Host 'FIAL5_WINDOWS_ACTIVATION_GUARDS=PASS'
