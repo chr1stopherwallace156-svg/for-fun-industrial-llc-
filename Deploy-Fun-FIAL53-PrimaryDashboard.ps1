@@ -54,9 +54,9 @@ function Owner([int]$port){
 function GetJson([string]$path){
  return Invoke-RestMethod ($Url+$path) -TimeoutSec 12 -ErrorAction Stop
 }
-function ReadyNew([int]$pid){
+function ReadyNew([int]$expectedPid){
  $p=Owner 8802
- if([int]$p.ProcessId -ne $pid -or
+ if([int]$p.ProcessId -ne $expectedPid -or
   [string]$p.CommandLine -notmatch [regex]::Escape($Runner)){Hold 'NEW_8802_OWNER_DRIFT'}
  $status=GetJson '/api/fun/hub/status'
  $model=GetJson '/api/ml/dashboard/status'
@@ -197,16 +197,30 @@ try{
   if(@(Listeners 8802).Count -gt 0){Hold 'OLD_8802_DID_NOT_RELEASE_PORT'}
   $NewChild=StartNode $Runner $Root 'new-8802'
   $ready=$false
+  $lastReadyError='No 8802 readiness response observed'
   for($i=0;$i -lt 100;$i++){
    Start-Sleep -Milliseconds 250
    try{
     $listener=@(Listeners 8802)
-    if($listener.Count -ne 1 -or [int]$listener[0].OwningProcess -ne [int]$NewChild.Id){continue}
+    if($listener.Count -ne 1 -or [int]$listener[0].OwningProcess -ne [int]$NewChild.Id){
+     $lastReadyError='NEW_8802_LISTENER_NOT_OWNED_BY_EXPECTED_PID'
+     continue
+    }
     ReadyNew $NewChild.Id
     $ready=$true;break
-   }catch{}
+   }catch{
+    $lastReadyError=[string]$_.Exception.Message
+   }
   }
-  if(!$ready){Hold 'UPGRADED_8802_NOT_READY'}
+  if(!$ready){
+   Write-Warning ('FIAL53_LAST_READINESS_ERROR='+$lastReadyError)
+   $newErr=Join-Path $Log 'new-8802.stderr.log'
+   if(Test-Path -LiteralPath $newErr -PathType Leaf){
+    $lastLogs=@(Get-Content -LiteralPath $newErr -Tail 8 -ErrorAction SilentlyContinue)
+    foreach($line in $lastLogs){Write-Warning ('FIAL53_NEW_8802_STDERR='+[string]$line)}
+   }
+   Hold ('UPGRADED_8802_NOT_READY_LAST_ERROR='+$lastReadyError)
+  }
   Write-Host ('FIAL53_UPGRADED_PRIMARY_8802_PID='+$NewChild.Id)
  }else{
   ReadyNew $OriginalPid
