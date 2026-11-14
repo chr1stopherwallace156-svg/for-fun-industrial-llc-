@@ -128,7 +128,7 @@ try{
  Write-Host ('DASHBOARD_LOGS='+$logDir)
  Write-Host 'OTHER_SERVICES_UNTOUCHED=TRUE'
 }catch{
- $failure=String($_.Exception.Message)
+ $failure=[string]$_.Exception.Message
  if($newProcess -and !$newProcess.HasExited){Stop-Process -Id $newProcess.Id -ErrorAction SilentlyContinue}
  if($deployed){
   foreach($rel in $changed){
@@ -140,6 +140,7 @@ try{
  if($oldStopped){
   try{Start-Process -FilePath $node -ArgumentList @('src/server.mjs') -WorkingDirectory $Root -WindowStyle Hidden -RedirectStandardOutput (Join-Path $logDir 'rollback.out.log') -RedirectStandardError (Join-Path $logDir 'rollback.err.log') | Out-Null}catch{Write-Host ('ROLLBACK_RESTART_HOLD='+$_.Exception.Message)}
  }
+ Write-Host ('STAGE7932_ORIGINAL_ERROR='+$failure)
  Write-Host ('STAGE7932_ROLLBACK_OR_HOLD='+$failure)
  Write-Host ('DASHBOARD_LOGS='+$logDir)
  throw
