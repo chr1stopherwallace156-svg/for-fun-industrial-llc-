@@ -100,7 +100,9 @@ test("local Qwen provider stays exclusively on 127.0.0.1:8088 and fails closed o
   assert.equal(init.method,"POST");
   assert.equal(init.redirect,"error");
   assert.ok(init.body.includes("nursing facility residents"));
+  assert.equal(JSON.parse(init.body).model,"local-model");
   assert.equal(JSON.parse(init.body).stream,false);
+  assert.deepEqual(JSON.parse(init.body).chat_template_kwargs,{enable_thinking:false});
   assert.deepEqual(JSON.parse(init.body).response_format,{type:"json_object"});
   return modelResponse([{field:"purpose",quote:"nursing facility residents",
    interpretation:"Facility program relevance requires independent verification."}]);
@@ -185,4 +187,18 @@ test("model hallucination is recorded as rejected evidence, and offline mode nev
   assert.equal(offline.cases[0].accepted_quotes,0);
   assert.equal(offline.applications_submitted,0);
  }finally{await rm(dir,{recursive:true,force:true})}
+});
+
+test("Qwen recovery starts only the missing verified llama.cpp instance, preserves existing services and calls FIAL2",async()=>{
+ const script=await readFile(new URL("../Recover-Fun-Qwen8088-For-FIAL2.ps1",import.meta.url),"utf8");
+ assert.match(script,/Qwen3-4B-Q4_K_M\.gguf/);
+ assert.match(script,/llama-server\.exe/);
+ assert.match(script,/--host 127\.0\.0\.1 --port 8088 --threads 4 --ctx-size 4096 --n-gpu-layers 0 --jinja/);
+ assert.match(script,/QWEN_PROCESS_ALREADY_EXISTS_WITHOUT_EXPECTED_LISTENER/);
+ assert.match(script,/8088_UNTRUSTED_LISTENER/);
+ assert.match(script,/8088_LISTENER_PRESENT_BUT_UNHEALTHY_NO_RESTART/);
+ assert.match(script,/FUN_FIAL2_QWEN_RECOVERY=PASS/);
+ assert.match(script,/Start-Process -FilePath \$Llama/);
+ assert.match(script,/ProtectedPorts=@\(11434,8791,8789,8796,8797,8798,8801,8802,8443\)/);
+ assert.doesNotMatch(script,/Stop-Process|taskkill|Stop-Service|Stop-Computer|net stop|ollama serve|git reset|git clean/);
 });
