@@ -64,8 +64,12 @@ test("FIAL 2 cannot compile shell, network, approval bypass, arbitrary source or
  ]){
   assert.throws(()=>compileSemantic(source.replace(from,to)),FialSemanticSyntaxError,to);
  }
- assert.match(source,/^FIAL 2$/m);
- assert.throws(()=>compileSemantic(source.replace(/^FIAL 2$/m,"FIAL 3")),/EXPECTED_FIAL_2/);
+ assert.match(source,/^FIAL 2\r?$/m);
+ const changedVersion=source.replace(/^FIAL 2\r?$/m,"FIAL 3");
+ assert.notEqual(changedVersion,source,"version mutation must actually change the source");
+ assert.throws(()=>compileSemantic(changedVersion),/EXPECTED_FIAL_2/);
+ const windowsSource=source.replace(/\r?\n/g,"\r\n");
+ assert.throws(()=>compileSemantic(windowsSource.replace(/^FIAL 2\r?$/m,"FIAL 3")),/EXPECTED_FIAL_2/);
  assert.doesNotThrow(()=>compileSemantic(source.replace("# FIAL 2","# FIAL 3")));
  assert.throws(()=>compileSemantic(source+"\nEXEC SHELL"),FialSemanticSyntaxError);
  assert.throws(()=>compileSemantic("x".repeat(9000)),FialSemanticSyntaxError);
