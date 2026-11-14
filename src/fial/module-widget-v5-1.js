@@ -91,7 +91,9 @@
     body:JSON.stringify({approved:true,module:moduleSelect.value,
      operation:operationSelect.value,input:payload})});
    const data=await r.json();
-   result.textContent=(r.ok?"OPERATION RESULT\n":"OPERATION HOLD\n")+present(data);
+   const unsafeRepeat=["OUTCOME_UNKNOWN_DO_NOT_RETRY","HOLD_REVIEW_BEFORE_RETRY"].includes(data.state);
+   result.textContent=(unsafeRepeat?"DO NOT REPEAT THIS OPERATION WITHOUT REVIEW\n":
+    r.ok?"OPERATION RESULT\n":"OPERATION HOLD\n")+present(data);
   }catch(e){result.textContent="OPERATION HOLD: "+String(e.message||e)}
   finally{run.disabled=false;consent.checked=false}
  });
