@@ -5,7 +5,7 @@ export const EXEC_CLIENT=new URL('./executive-console-client-v1.js',import.meta.
 export const EXEC_PAGE=String.raw`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Fun Industrial · Executive Assistant</title>
 <style>:root{color-scheme:dark}body{margin:0;background:#0b1520;color:#e4f0fa;font:14px/1.5 system-ui}header{background:#142538;border-bottom:1px solid #344b61;padding:18px 26px}a{color:#a4eadf}main{max-width:1230px;margin:auto;padding:20px}h1{margin:0;font-size:23px}h2{font-size:17px;margin:0 0 8px}p{margin:8px 0}small,.muted{color:#adc0ce}.tag{border:1px solid #3b546c;border-radius:50px;font-size:12px;padding:3px 8px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.panel,.item{border:1px solid #31485c;background:#17283a;border-radius:11px;padding:17px;margin:11px 0}.item{background:#0f2131;margin:7px 0}.item strong{display:block}.head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.chip{display:inline-block;border-radius:20px;border:1px solid #466378;padding:2px 8px;margin-right:6px;color:#cce5f4;font-size:12px}button{background:#95e3db;color:#052921;border:0;padding:9px 13px;border-radius:8px;font-weight:700;cursor:pointer}button:disabled{opacity:.5}select{background:#0e1f2d;color:#e4f0fa;border:1px solid #53687a;padding:9px;border-radius:7px}.warn{color:#ffdc9c}pre{white-space:pre-wrap;overflow-wrap:anywhere}.list{max-height:850px;overflow:auto}@media(max-width:650px){main{padding:12px}header{padding:14px}}</style></head>
-<body><header><div class="head"><div><h1>Fun Industrial · Executive Assistant</h1><small>FIAL5.7 · Verified outcomes · Fun Industrial software · ELEKTRON operations</small></div>
+<body><header><div class="head"><div><h1>Fun Industrial · Executive Assistant</h1><small>FIAL5.8 · Regulatory and economic intelligence · Fun Industrial software · ELEKTRON operations</small></div>
 <nav><a href="/?view=overview">Overview</a> · <a href="/unified/?view=chat">Qwen Chat</a> · <a href="/unified/?view=tools">Tools &amp; Review</a></nav></div></header>
 <main><p>Work continues through Windows scheduling when the signed-in PC is online. This console reads saved evidence only; it does not send email, submit filings, spend, or operate tools.</p>
 <div id="fi-exec-state" role="status" class="panel">Reading the local mission ledger…</div>
@@ -14,6 +14,23 @@ export const EXEC_PAGE=String.raw`<!doctype html><html lang="en"><head><meta cha
 <section class="panel"><small>New or changed</small><h2 id="fi-exec-updates">—</h2></section>
 <section class="panel"><small>Awaiting review</small><h2 id="fi-exec-review">—</h2></section>
 <section class="panel"><small>Latest cycle (UTC)</small><h2 id="fi-exec-time">—</h2></section></div>
+<section class="panel" id="fi-regulatory-intelligence">
+<h2>Regulatory deadlines · Economic pressure · Institutional fleet intelligence</h2>
+<p>CARB heavy-duty and off-road rules, school district obligations, UC/CSU supplier monitoring, national labor and inflation indicators. Published milestones are not individualized compliance deadlines.</p>
+<p id="fi-regulatory-updated" role="status">Reading official source intelligence…</p>
+<div id="fi-regulatory-counts" class="grid"></div>
+<h3>Milestone timeline · source-linked published dates</h3>
+<div id="fi-regulatory-timeline" role="img" aria-label="Published regulatory milestones"></div>
+<h3>Regulatory and fleet milestones</h3>
+<div id="fi-regulatory-deadlines" class="list"></div>
+<h3>Official agency source checks · SHA-256 evidence</h3>
+<div id="fi-regulatory-sources" class="list"></div>
+<h3>Economic indicators · actual U.S. BLS data</h3>
+<div id="fi-regulatory-trends"></div>
+<h3>Education-sector research</h3>
+<div id="fi-regulatory-institutions"></div>
+<small>Unverified dates including 2037 are watch items only. University and school district asset applicability and live procurement opportunities require separate verified records; there is no automatic government filing or email send.</small>
+</section>
 <section class="panel" id="fi-outcome-panel"><h2>Verified business outcomes · Actual receipts</h2>
 <p>First result: City of Victorville license-status inquiry. Prepared automatically; a separate reviewed command is required to send. Gmail receipts, not checklist counts, determine measured progress.</p>
 <div id="fi-outcome-status" role="status">Reading verified outcome ledger…</div></section>
@@ -43,4 +60,4 @@ export const EXEC_PAGE=String.raw`<!doctype html><html lang="en"><head><meta cha
 <div class="head"><h2>Operations queue</h2><div><label for="fi-exec-filter">Workstream</label> <select id="fi-exec-filter"><option value="all">All</option></select> <button id="fi-exec-refresh" type="button">Refresh status</button></div></div>
 <section id="fi-exec-queue" class="list" aria-live="polite"><p>No saved work items yet.</p></section>
 <section class="panel"><h2>Submission and execution boundaries</h2><p class="warn">External actions are not implied by a drafted packet. Government filings, sending messages, payments, software changes, and REA tool calls require specific authorization and a verified destination.</p><small>Business profiles and work registers are stored in the local ExecutiveOperatorV1 directory. A missing official notice is shown as missing, never assumed complete.</small></section>
-</main><script src="/api/operator/client.js" defer></script><script src="/api/operator/real/client.js" defer></script><script src="/api/operator/competence/client.js" defer></script><script src="/api/operator/outcomes/client.js" defer></script></body></html>`;
+</main><script src="/api/operator/client.js" defer></script><script src="/api/operator/real/client.js" defer></script><script src="/api/operator/competence/client.js" defer></script><script src="/api/operator/outcomes/client.js" defer></script><script src="/api/operator/regulatory/client.js" defer></script></body></html>`;
