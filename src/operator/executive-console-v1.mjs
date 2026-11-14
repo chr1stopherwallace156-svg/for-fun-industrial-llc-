@@ -24,7 +24,17 @@ export const EXEC_PAGE=String.raw`<!doctype html><html lang="en"><head><meta cha
 <textarea id="fi-competence-question" maxlength="1000" style="box-sizing:border-box;width:100%;min-height:85px;background:#101e2d;color:#e4f0fa;border:1px solid #53687a;border-radius:8px;padding:11px;font:inherit" placeholder="Example: What evidence and financial controls do we need before expanding our fleet conversion services?"></textarea>
 <p><button id="fi-competence-analyze" type="button">Analyze locally</button></p>
 <div id="fi-competence-output" role="status" aria-live="polite"></div>
-<small>Methodology advice is not a verified eligibility determination, certification, sent email, filing, or legal advice.</small>
+<h3>Financial scenario calculator</h3>
+<p>Enter your own numbers as JSON (e.g. unit_price, unit_variable_cost, monthly_fixed_cost, cash_available, monthly_net_burn). Missing values remain unknown; examples are not company actuals.</p>
+<textarea id="fi-finance-input" maxlength="1600" spellcheck="false" style="box-sizing:border-box;width:100%;min-height:80px;background:#101e2d;color:#e4f0fa;border:1px solid #53687a;border-radius:8px;padding:11px;font:12px monospace" placeholder='{"unit_price":100,"unit_variable_cost":60,"monthly_fixed_cost":1200}'></textarea>
+<p><button type="button" id="fi-finance-calculate">Calculate scenario</button></p>
+<div id="fi-finance-result" role="status" aria-live="polite"></div>
+<h3>Professional writing review</h3>
+<p>Paste an email, proposal, memo or internal draft. The check is local and flags clarity or unsupported claims; it does not send anything.</p>
+<textarea id="fi-writing-input" maxlength="4000" style="box-sizing:border-box;width:100%;min-height:85px;background:#101e2d;color:#e4f0fa;border:1px solid #53687a;border-radius:8px;padding:11px;font:inherit"></textarea>
+<p><button type="button" id="fi-writing-check">Review writing</button></p>
+<div id="fi-writing-result" role="status" aria-live="polite"></div>
+<small>Methodology advice and heuristic writing checks are not verified eligibility, legal advice, certification, sent email or completed filing.</small>
 </section>
 <section class="panel"><h2>Connections and evidence</h2><div id="fi-exec-connections">No run data.</div></section>
 <div class="head"><h2>Operations queue</h2><div><label for="fi-exec-filter">Workstream</label> <select id="fi-exec-filter"><option value="all">All</option></select> <button id="fi-exec-refresh" type="button">Refresh status</button></div></div>
