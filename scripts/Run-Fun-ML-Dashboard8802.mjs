@@ -10,6 +10,8 @@ import {rankCommerceOpportunities} from '../src/commerce/opportunity-ranking-v1-
 import {buildTrendsFocus} from '../src/commerce/google-trends-focus-v1-2.mjs';
 import {SHELL,UI_CSS,UI_CLIENT} from '../src/ui/integrated-hub-shell-v1.mjs';
 import {readFial4DashboardStatus} from '../src/fial/dashboard-status-v4.mjs';
+import {createGroundedChat} from '../src/fial/grounded-chat-v5-2.mjs';
+import {GROUNDED_PANEL,GROUNDED_CLIENT,GROUNDED_VERSION} from '../src/fial/primary-grounded-ui-v5-3.mjs';
 
 export const HOST='127.0.0.1',PORT=8802,ORIGIN='http://127.0.0.1:8802';
 const MAX_PAGE=240000,MAX_PROXY=12*1024*1024;
@@ -25,7 +27,7 @@ export function integrateDashboardHtml(html,widget,{unified=false}={}){
     typeof widget!=='string'||widget.length<100||widget.length>20000||
     /<\/script/i.test(widget))throw Error('ML_HUB_HTML_INJECTION_INVALID');
   const insertion=PANEL+(unified?'<script src="/api/ml/dashboard/widget.js" defer></script>':'<script>'+widget+'</script>')+
-    COMMERCE_PANEL+'<script src="/api/commerce/widget.js" defer></script>'+FIAL4_PANEL+'<script src="/api/fial/v4/widget.js" defer></script>'+ 
+    COMMERCE_PANEL+'<script src="/api/commerce/widget.js" defer></script>'+FIAL4_PANEL+'<script src="/api/fial/v4/widget.js" defer></script>'+ (unified?GROUNDED_PANEL+'<script src="/api/fial/grounded/client.js" defer></script>':'')+ 
     '<script src="/api/ui/client.js" defer></script>';
   return html.replace(/<\/head>/i,'<link rel="stylesheet" href="/api/ui/style.css"></head>')
     .replace(/(<body[^>]*>)/i,'$1'+SHELL+NAV).replace(/<\/body>/i,insertion+'</body>');
@@ -94,13 +96,29 @@ function acceptedHost(req){
 function acceptedActionOrigin(req){
   return ['http://127.0.0.1:8802','http://localhost:8802'].includes(String(req.headers.origin||''));
 }
+async function groundedChatBody(req){
+  const parts=[];let size=0;
+  for await(const chunk of req){
+    size+=chunk.length;
+    if(size>2048)throw Error('FIAL53_CHAT_BODY_TOO_LARGE');
+    parts.push(chunk);
+  }
+  let value;
+  try{value=JSON.parse(Buffer.concat(parts).toString('utf8'))}
+  catch{throw Error('FIAL53_CHAT_JSON_REQUIRED')}
+  if(!value||typeof value!=='object'||Array.isArray(value)||
+    Object.keys(value).length!==1||typeof value.question!=='string'||
+    value.question.length<4||value.question.length>1200)
+    throw Error('FIAL53_CHAT_QUESTION_INVALID');
+  return value;
+}
 async function emptyCommerceBody(req){
   let length=0;const chunks=[];
   for await(const chunk of req){length+=chunk.length;if(length>64)throw Error('COMMERCE_REQUEST_TOO_LARGE');chunks.push(chunk)}
   const value=Buffer.concat(chunks).toString('utf8').trim();
   if(value!=='{}')throw Error('COMMERCE_EMPTY_JSON_REQUIRED');
 }
-export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=createCommerceIntelligence(),
+export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=createCommerceIntelligence(),grounded=createGroundedChat(),
  readPage=pageFrom,proxy=proxyTo,readWidget=()=>readFile(ML_WIDGET,'utf8'),
  readCommerceWidget=()=>readFile(COMMERCE_WIDGET,'utf8'),
  readUiClient=()=>readFile(UI_CLIENT,'utf8'),readUiStyle=()=>readFile(UI_CSS,'utf8')}={}){
@@ -125,6 +143,23 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         return send(res,200,await readUiClient(),'text/javascript; charset=utf-8');
       if(req.method==='GET'&&u.pathname==='/api/ml/dashboard/widget.js'){
         return send(res,200,await readWidget(),'text/javascript; charset=utf-8');
+      }
+      if(req.method==='GET'&&u.pathname==='/api/fial/grounded/status'){
+        const s=grounded.status();
+        return send(res,200,{version:GROUNDED_VERSION,model_interface:s.model_interface,
+          memory_interface:s.memory_interface,
+          state:s.state,busy:s.busy,
+          tool_executions:0,rea_executions:0,authority_added:false});
+      }
+      if(req.method==='GET'&&u.pathname==='/api/fial/grounded/client.js')
+        return send(res,200,await readFile(GROUNDED_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      if(req.method==='POST'&&u.pathname==='/api/fial/grounded/chat'){
+        if(!acceptedActionOrigin(req)||req.headers['x-fi-chat-click']!=='one-local-model-response'||
+          (req.headers['sec-fetch-site']&&!['same-origin','none'].includes(req.headers['sec-fetch-site'])))
+          return send(res,403,{error:'FIAL53_EXPLICIT_SAME_ORIGIN_CLICK_REQUIRED'});
+        if(req.headers['content-type']!=='application/json')
+          return send(res,415,{error:'FIAL53_JSON_REQUIRED'});
+        return send(res,200,await grounded.chat(await groundedChatBody(req)));
       }
       if(req.method==='GET'&&u.pathname==='/api/fial/v4/status')
         return send(res,200,await readFial4DashboardStatus());
@@ -174,6 +209,7 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         if(u.pathname.startsWith('/api/ml/'))return send(res,404,{error:'ML_HUB_ML_ROUTE_UNKNOWN'});
         if(u.pathname.startsWith('/api/commerce/'))return send(res,404,{error:'ML_HUB_COMMERCE_ROUTE_UNKNOWN'});
         if(u.pathname.startsWith('/api/ui/'))return send(res,404,{error:'ML_HUB_UI_ROUTE_UNKNOWN'});
+        if(u.pathname.startsWith('/api/fial/grounded/'))return send(res,404,{error:'FIAL53_GROUNDED_ROUTE_UNKNOWN'});
         return proxy(req,res,u.pathname.startsWith('/api/unified/')?8798:8789);
       }
       return send(res,404,{error:'ML_HUB_ROUTE_UNKNOWN'});
