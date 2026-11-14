@@ -10,7 +10,9 @@ $Test=Join-Path $Root 'intelligence-checks\fi-ml-hub-v3-case.mjs'
 $QwenTest=Join-Path $Root 'intelligence-checks\qwen-scikit-v2-case.mjs'
 $RecoveryTest=Join-Path $Root 'intelligence-checks\ml-hub-recovery-contract-v3-case.mjs'
 $CommerceTest=Join-Path $Root 'intelligence-checks\commerce-intelligence-v1-case.mjs'
+$OpportunityTest=Join-Path $Root 'intelligence-checks\commerce-opportunities-v1-1-case.mjs'
 $CommerceModule=Join-Path $Root 'src\commerce\trends-commerce-v1.mjs'
+$OpportunityModule=Join-Path $Root 'src\commerce\opportunity-ranking-v1-1.mjs'
 $CommerceWidget=Join-Path $Root 'src\commerce\trends-commerce-widget-v1.js'
 $URL='http://127.0.0.1:8802'
 function Hold([string]$reason){throw ('FUN_ML_DASHBOARD_HOLD='+$reason)}
@@ -21,7 +23,7 @@ function Snapshot([int]$p){
   return (@(Listener $p | ForEach-Object { "$($_.LocalAddress):$($_.OwningProcess)" } |
     Sort-Object)-join ';')
 }
-foreach($p in @($Runner,$Adapter,$Widget,$Test,$QwenTest,$RecoveryTest,$CommerceTest,$CommerceModule,$CommerceWidget)){
+foreach($p in @($Runner,$Adapter,$Widget,$Test,$QwenTest,$RecoveryTest,$CommerceTest,$OpportunityTest,$CommerceModule,$OpportunityModule,$CommerceWidget)){
   if(-not (Test-Path -LiteralPath $p -PathType Leaf)){Hold ('MISSING_SOURCE='+$p)}
   if((Get-Item -LiteralPath $p).Attributes -band [IO.FileAttributes]::ReparsePoint){Hold 'SYMLINK_REFUSED'}
 }
@@ -30,13 +32,13 @@ if($LASTEXITCODE -ne 0){Hold 'GIT_BRANCH_CHECK_FAILED'}
 $dirty=@(git.exe -C $Root status --porcelain=v1 --untracked-files=all)
 if($LASTEXITCODE -ne 0 -or $dirty.Count){Hold 'DIRTY_CHECKOUT'}
 $Node=(Get-Command node.exe -ErrorAction Stop).Source
-foreach($f in @($Runner,$Adapter,$Widget,$Test,$QwenTest,$RecoveryTest,$CommerceTest,$CommerceModule,$CommerceWidget)){
+foreach($f in @($Runner,$Adapter,$Widget,$Test,$QwenTest,$RecoveryTest,$CommerceTest,$OpportunityTest,$CommerceModule,$OpportunityModule,$CommerceWidget)){
   & $Node --check $f
   if($LASTEXITCODE -ne 0){Hold ('JS_SYNTAX_FAILED='+$f)}
 }
 Push-Location $Root
 try{
-  & $Node --test $Test $QwenTest $RecoveryTest $CommerceTest
+  & $Node --test $Test $QwenTest $RecoveryTest $CommerceTest $OpportunityTest
   if($LASTEXITCODE -ne 0){Hold 'OFFLINE_TESTS_FAILED'}
 }finally{Pop-Location}
 # Exact diagnostics: never classify an unhealthy existing listener as "missing".
