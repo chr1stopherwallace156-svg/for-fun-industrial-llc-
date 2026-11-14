@@ -1,10 +1,11 @@
 // FIAL5.4 Execution Audit: read-only measurement of actual local cycle,
 // ranked evidence and remaining unimplemented authorities. No simulated work,
 // model calls, automatic retries, remote APIs, or changes to source files.
-import {readFile,readdir,stat,lstat,realpath} from 'node:fs/promises';
+import {readFile,readdir,stat,lstat} from 'node:fs/promises';
 import {createReadStream} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {join,resolve,relative,isAbsolute,sep} from 'node:path';
+import {join,resolve,isAbsolute,sep} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {homedir} from 'node:os';
 export const VERSION='fial54-execution-audit-v1';
 const ROOT=()=>join(process.env.LOCALAPPDATA||join(homedir(),'AppData','Local'),'FunIndustrial','ExecutiveOperatorV1');
@@ -119,7 +120,7 @@ export async function collectAudit({root=ROOT(),grantRoot=GRANT(),now=new Date()
  return inspectCycle({state,receipt,grantReport:report,companyProfiles:profiles,
   sourceEvidence:evidence,packetsCount,now});
 }
-if(process.argv[1]&&import.meta.url===new URL('file://'+process.argv[1].replaceAll('\\','/')).href){
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  if(process.argv.length!==3||process.argv[2]!=='--json'){
   console.error('FIAL54_AUDIT_READ_ONLY_JSON_REQUIRED');process.exitCode=2;
  }else{
