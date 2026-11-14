@@ -16,8 +16,9 @@ test('WireViz venv installation verifies upstream primary wheel hash',()=>{
  assert.match(src,/wireviz==0\.4\.1/);
  assert.match(src,/5DFDFEC91E5D26E4F27F0F9D031672DA7FB3C133D127167D233F4742F01873A2/);
  assert.match(src,/Get-FileHash -LiteralPath \$wheel -Algorithm SHA256/);
- assert.match(src,/Join-Path \$stage 'venv'/);
- assert.match(src,/Move-Item -LiteralPath \$stage/);
+ assert.match(src,/Join-Path \$target 'venv'/);
+ assert.match(src,/New-Item -ItemType Directory -Path \$target/);
+ assert.doesNotMatch(src,/Move-Item -LiteralPath \$stage/);
 });
 test('no cross-project or process lifecycle commands',()=>{
  assert.doesNotMatch(src,/\b(?:Restart-Service|Stop-Service|Start-Service|Register-ScheduledTask|Stop-Process|Start-Process|Invoke-Expression|Remove-Item)\b/);
