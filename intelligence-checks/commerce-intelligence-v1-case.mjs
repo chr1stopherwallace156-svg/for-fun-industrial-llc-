@@ -53,7 +53,7 @@ test('Shopify stays unavailable until separately scoped local token is configure
  try{
   const api=createCommerceIntelligence({directory,fetchImpl:async()=>{requests++;throw Error('NO_EXTERNAL_CALL')}});
   const state=await api.status();assert.equal(state.shopify.configured,false);
-  await assert.rejects(()=>api.refreshShopify(),/SHOPIFY_LOCAL_TOKEN_NOT_CONFIGURED/);
+  await assert.rejects(()=>api.refreshShopify(),/SHOPIFY_LOCAL_CREDENTIALS_NOT_CONFIGURED/);
   assert.equal(requests,0);
  }finally{await rm(directory,{recursive:true,force:true})}
 });
@@ -118,4 +118,37 @@ test('hub commerce status/data are read-only and refresh is separately authorize
   assert.equal(commerce.counts().shopify,1);
   assert.equal((await request(server,'GET','/api/commerce/not-supported')).code,404);
  }finally{await new Promise(resolve=>server.close(resolve))}
+});
+
+test('Shopify client credentials exchange stays in memory and never enters saved snapshots',async()=>{
+ const directory=await tmp();let grants=0,graphql=0;
+ try{
+  const fetchImpl=async(url,options)=>{
+   if(url==='https://sample-store.myshopify.com/admin/oauth/access_token'){
+    grants++;
+    assert.equal(options.method,'POST');
+    assert.equal(options.headers['content-type'],'application/x-www-form-urlencoded');
+    const fields=new URLSearchParams(options.body);
+    assert.equal(fields.get('grant_type'),'client_credentials');
+    assert.equal(fields.get('client_id'),'test-client-id');
+    assert.equal(fields.get('client_secret'),'test-secret-not-real');
+    return new Response(JSON.stringify({access_token:'token-23456789',expires_in:86399}),{status:200});
+   }
+   graphql++;
+   assert.equal(options.headers['x-shopify-access-token'],'token-23456789');
+   const query=JSON.parse(options.body).query;
+   const data=query.includes('products(first')?{products:{edges:[sampleProduct],pageInfo:{hasNextPage:false}}}:
+    {orders:{edges:[],pageInfo:{hasNextPage:false}}};
+   return new Response(JSON.stringify({data}),{status:200});
+  };
+  const api=createCommerceIntelligence({directory,shopDomain:'sample-store.myshopify.com',
+   clientId:'test-client-id',clientSecret:'test-secret-not-real',fetchImpl});
+  assert.equal((await api.status()).shopify.auth_mode,'client_credentials');
+  await api.refreshShopify();
+  await api.refreshShopify();
+  assert.equal(grants,1);assert.equal(graphql,4);
+  const snapshot=await readFile(join(directory,'shopify.json'),'utf8');
+  assert.equal(snapshot.includes('test-secret-not-real'),false);
+  assert.equal(snapshot.includes('token-23456789'),false);
+ }finally{await rm(directory,{recursive:true,force:true})}
 });
