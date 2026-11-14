@@ -142,15 +142,41 @@ if($parent.version -cne 'fi-unified-task-chat-8798-v1' -or
  $ml.reaExecutionGrants -ne 0 -or
  $ml.externalActions -ne 0){Hold 'PRIMARY_DEPENDENCIES_NOT_READY_OR_IDENTITY_MISMATCH'}
 Write-Host 'FIAL53_8798_STATUS=READY FIAL53_8801_ML_STATUS=VERIFIED_REAL_SCHEMA'
+# Capture protected service identity before recovery or the controlled handoff.
+$Protected=@(11434,8088,8791,8789,8796,8797,8798,8801,8803,8804,8805,8806,8443)
+$Before=@{}
+foreach($p in $Protected){$Before[$p]=Snapshot $p}
+$initial=@(Listeners 8802)
+if($initial.Count -eq 0){
+ # A previous strict-mode failure could have left 8802 absent.
+ # Restore only the previously pinned working dashboard from the untouched checkout.
+ Write-Host 'FIAL53_MISSING_8802=RECOVERING_PINNED_ORIGINAL'
+ New-Item -ItemType Directory -Path $Log -Force | Out-Null
+ $recovery=StartNode $OldRunner $OldRoot 'recover-original-8802'
+ $recovered=$false
+ for($i=0;$i -lt 100;$i++){
+  Start-Sleep -Milliseconds 250
+  try{
+   $l=@(Listeners 8802)
+   if($l.Count -ne 1 -or $l[0].LocalAddress -cne '127.0.0.1' -or
+    [int]$l[0].OwningProcess -ne [int]$recovery.Id){continue}
+   $check=GetJson '/api/fun/hub/status'
+   if($check.version -ceq 'fi-ml-hub-v3' -and
+    $check.machineLearning.state -ceq 'ready'){$recovered=$true;break}
+  }catch{}
+ }
+ if(!$recovered){Hold ('PINNED_ORIGINAL_8802_RECOVERY_FAILED_LOGS='+$Log)}
+ CheckProtected
+ Write-Host ('FIAL53_PINNED_ORIGINAL_8802_RESTORED=PASS PID='+$recovery.Id)
+}elseif($initial.Count -ne 1 -or $initial[0].LocalAddress -cne '127.0.0.1'){
+ Hold '8802_UNEXPECTED_OWNER_OR_NON_LOOPBACK_LISTENER'
+}
 $oldStatus=GetJson '/api/fun/hub/status'
 $oldCommerce=GetJson '/api/commerce/status'
 $OldCommerceShopifyConfigured=$oldCommerce.shopify.configured -eq $true
 if($oldStatus.version -cne 'fi-ml-hub-v3' -or $oldStatus.machineLearning.state -cne 'ready'){
  Hold 'OLD_PRIMARY_DASHBOARD_UNVERIFIED'
 }
-$Protected=@(11434,8088,8791,8789,8796,8797,8798,8801,8803,8804,8805,8806,8443)
-$Before=@{}
-foreach($p in $Protected){$Before[$p]=Snapshot $p}
 $proc=Owner 8802
 $command=[string]$proc.CommandLine
 $runningNew=$command.IndexOf($Runner,[StringComparison]::OrdinalIgnoreCase) -ge 0
@@ -165,10 +191,10 @@ try{
   Stop-Process -Id $OriginalPid -ErrorAction Stop
   $OldStopped=$true
   for($i=0;$i -lt 80;$i++){
-   if(!(Listeners 8802).Count){break}
+   if(@(Listeners 8802).Count -eq 0){break}
    Start-Sleep -Milliseconds 250
   }
-  if((Listeners 8802).Count){Hold 'OLD_8802_DID_NOT_RELEASE_PORT'}
+  if(@(Listeners 8802).Count -gt 0){Hold 'OLD_8802_DID_NOT_RELEASE_PORT'}
   $NewChild=StartNode $Runner $Root 'new-8802'
   $ready=$false
   for($i=0;$i -lt 100;$i++){
@@ -221,7 +247,7 @@ try{
   }
   $released=$false
   for($i=0;$i -lt 80;$i++){
-   if(!(Listeners 8802).Count){$released=$true;break}
+   if(@(Listeners 8802).Count -eq 0){$released=$true;break}
    Start-Sleep -Milliseconds 250
   }
   if(!$released){Hold ('ROLLBACK_8802_PORT_OCCUPIED='+$why)}
