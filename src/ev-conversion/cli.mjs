@@ -36,7 +36,7 @@ function filesFor(id){
    duty_cycle_source:null,verified_by:null};
  return {
   "project.json":json({schema:"fun.ev.project.v1",project_id:id,owner:"Fun Industrial",
-   customer:"ELEKTRON INDUSTRIAL LLC",phase:"concept_only",engineering_approved:false,
+   customer:null,phase:"concept_only",engineering_approved:false,
    high_voltage_work_authorized:false,vehicle_data_verified:false,
    design_verification:"HOLD",production_released:false}),
   "vehicle-profile.json":json(vehicle),
@@ -63,7 +63,7 @@ function status(){
  });
  return {schema:"fun.ev.engineering.status.v1",state:"STAGED_ONLY",mode:"read_only",
    installed_and_qualified:false,external_executions:0,network_calls:0,
-   elektron_modified:false,tool_count:tools.length,tools:candidates};
+   tool_count:tools.length,tools:candidates};
 }
 function init(id){
  const {root,project}=projectPath(id);
