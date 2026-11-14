@@ -16,7 +16,7 @@ export function reviewBusinessWriting(text,{audience='business',verifiedClaims=[
   const line=lines[i];if(!line.trim())continue;
   if(line.length>240)issues.push({line:i+1,code:'EXCESSIVELY_LONG_LINE',suggestion:'Split this paragraph or sentence for readability.'});
   if(/ {3,}/.test(line))issues.push({line:i+1,code:'INCONSISTENT_SPACING',suggestion:'Use consistent spacing.'});
-  const repeated=/\b([a-z]{3,})\s+\1\b/gi;
+  const repeated=/\b([a-z]{2,})\s+\1\b/gi;
   if(repeated.test(line))issues.push({line:i+1,code:'DUPLICATE_WORD',suggestion:'Remove the duplicated word.'});
   for(const c of claims){
    c.pattern.lastIndex=0;
