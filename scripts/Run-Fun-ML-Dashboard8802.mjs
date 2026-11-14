@@ -160,6 +160,7 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         if(req.method==='POST'&&!acceptedActionOrigin(req))return send(res,403,{error:'ML_HUB_ORIGIN_REQUIRED'});
         if(u.pathname.startsWith('/api/ml/'))return send(res,404,{error:'ML_HUB_ML_ROUTE_UNKNOWN'});
         if(u.pathname.startsWith('/api/commerce/'))return send(res,404,{error:'ML_HUB_COMMERCE_ROUTE_UNKNOWN'});
+        if(u.pathname.startsWith('/api/ui/'))return send(res,404,{error:'ML_HUB_UI_ROUTE_UNKNOWN'});
         return proxy(req,res,u.pathname.startsWith('/api/unified/')?8798:8789);
       }
       return send(res,404,{error:'ML_HUB_ROUTE_UNKNOWN'});
