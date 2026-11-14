@@ -9,6 +9,7 @@ import {createReadStream} from 'node:fs';
 import {join,resolve,isAbsolute} from 'node:path';
 import {homedir} from 'node:os';
 import {runExecutiveCycle,ROOT as EXEC_ROOT,VERSION as PREVIOUS} from './executive-ops-v1.mjs';
+import {monitorOfficialSites} from './official-source-watch-v5-5.mjs';
 export const VERSION='fial5.5-real-business-operations-v1';
 export const ROOT=EXEC_ROOT;
 const hex=x=>createHash('sha256').update(x).digest('hex');
@@ -149,7 +150,7 @@ async function hashTrustedSource(file){
 function draftLicense(p){
  const c=p.company;
  return ['Subject: Request to verify business license file reference and renewal requirements','',
-  'To: City of Victorville Business License Division','',
+  'To: businesslicense@victorvilleca.gov (official City contact; verify before sending)','',
   'Hello Business License Division,','',
   'I am requesting confirmation of the record and any current requirements associated with the business information below.',
   'Legal business name: '+c.legal_name,'Contact: '+c.owner,
@@ -197,7 +198,7 @@ function draftProfile(p){
   'No Secretary of State status, license issuance or renewal date has been verified.',
   'Do not publicly commit this private profile or use it for legal certification.',''].join('\n')
 }
-export async function runRealOperationsCycle({root=ROOT(),sourceFile=null,now=new Date()}={}){
+export async function runRealOperationsCycle({root=ROOT(),sourceFile=null,now=new Date(),officialFetch=fetch}={}){
  await safeDir(root);
  const p=validateIdentity(await readJson(join(root,PROFILE)));
  const dir=join(root,'RealWorkV55');await safeDir(dir);
@@ -218,26 +219,31 @@ export async function runRealOperationsCycle({root=ROOT(),sourceFile=null,now=ne
   saved.push({id:item.id,kind:item.type,state:created?'LOCAL_ARTIFACT_CREATED':'ALREADY_PREPARED',
    sha256:hash,path,external_action:'NOT_PERFORMED'});
  }
+ const official=await monitorOfficialSites({
+  dir:join(root,'OfficialWatchV55'),now,fetcher:officialFetch
+ });
  const priorPath=join(dir,'last-real-cycle.json');
  let previous=null;try{previous=await readJson(priorPath)}catch(e){if(e.code!=='ENOENT')throw e}
  const sourceChange=cfg.status==='SOURCE_HASHED'&&cfg.sha256!==previous?.config_source?.sha256;
  const record={version:VERSION,software_name:'Fun Industrial',software_role:'software_workspace',
   business_entity:'ELEKTRON INDUSTRIAL LLC',company_identity_status:'OPERATOR_PROVIDED_NOT_OFFICIALLY_VERIFIED',
   when_utc:now.toISOString(),new_local_artifacts:saved.filter(x=>x.state==='LOCAL_ARTIFACT_CREATED').length,
-  artifacts:saved,config_source:cfg,config_changed_since_last_cycle:sourceChange,
-  actual_local_evidence_actions:saved.filter(x=>x.state==='LOCAL_ARTIFACT_CREATED').length+(cfg.status==='SOURCE_HASHED'?1:0),
+  artifacts:saved,official_sources:{changed:official.changed,fetched:official.fetched,
+    errors:official.errors,records:official.sources.map(x=>({id:x.id,state:x.state,changed:x.changed,sha256:x.sha256}))},
+  config_source:cfg,config_changed_since_last_cycle:sourceChange,
+  actual_local_evidence_actions:saved.filter(x=>x.state==='LOCAL_ARTIFACT_CREATED').length+(cfg.status==='SOURCE_HASHED'?1:0)+official.sources.filter(x=>x.state==='OFFICIAL_PAGE_CHANGED'||x.state==='OFFICIAL_PAGE_SEEN').filter(x=>x.checked_this_cycle).length,
   applied_configs:0,emails_sent:0,government_filings:0,payments:0,rea_executions:0,
   external_actions:'NONE',next_human_gate:'Verify official status, business-specific forms and Gmail OAuth for Elektron'};
  await atomic(priorPath,record);return record
 }
-export async function runUnifiedCycle({root=ROOT(),sourceFile=null,now=new Date()}={}){
+export async function runUnifiedCycle({root=ROOT(),sourceFile=null,now=new Date(),officialFetch=fetch}={}){
  await safeDir(root);validateIdentity(await readJson(join(root,PROFILE)));
  const register=await seedWorkRegister({root});
  const legacy=await runExecutiveCycle({root,now,readMailbox:null});
  if(legacy.version!==PREVIOUS||legacy.outbound_permissions.email_sent!==0||
   legacy.outbound_permissions.government_filings!==0||legacy.outbound_permissions.rea_runs!==0)
   fail('PREVIOUS_ENGINE_AUTHORITY_MISMATCH');
- const real=await runRealOperationsCycle({root,sourceFile,now});
+ const real=await runRealOperationsCycle({root,sourceFile,now,officialFetch});
  return {version:VERSION,state:'BOUNDED_LOCAL_EXECUTION_CONFIRMED',register,legacy:{
   items:legacy.active_items,new_items:legacy.new_or_changed,packets:legacy.local_packets_written.length},
   real,external_actions:'NONE'};
