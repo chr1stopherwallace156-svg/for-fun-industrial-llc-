@@ -32,7 +32,7 @@ function PortIdentity([int]$port){
 }
 SourceIdentity $Root $Branch
 SourceIdentity $OldRoot $OldBranch
-$originalHash=(& git.exe -C $OldRoot hash-object -- $OldScript|Out-String).Trim()
+$originalHash=(& git.exe -C $OldRoot hash-object --path=Run-Fun-Real-Operations-V5-5.ps1 -- $OldScript|Out-String).Trim()
 if($LASTEXITCODE -ne 0 -or $originalHash -cne $OldScriptBlob){Hold 'PREVIOUS_REAL_OPERATIONS_RUNNER_HASH_DRIFT'}
 $files=@(
  'src\competence\business-knowledge-v5-6.mjs',
