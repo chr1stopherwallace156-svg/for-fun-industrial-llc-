@@ -61,7 +61,7 @@ jobs:
             'EXECUTIVE_TASK_PRIVILEGE_HOLD',
             'PROTECTED_SERVICE_OWNER_CHANGED_PORT_',
             'Start-ScheduledTask -TaskName $TaskName',
-            "if($RunScheduledCycle)")){
+            'if($RunScheduledCycle)')){
             if(!$source.Contains($needle)){throw ('FIAL54_AUDIT_REQUIRED_CHECK_MISSING='+$needle)}
           }
           if($source -match '(?im)^\s*\$(home|pid|host|input|error|matches)\s*='
