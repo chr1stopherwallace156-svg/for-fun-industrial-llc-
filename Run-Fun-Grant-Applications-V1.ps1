@@ -15,7 +15,11 @@ New-Item -ItemType Directory -Path $Storage -Force|Out-Null
 $mutex=[System.Threading.Mutex]::new($false,'Local\FunIndustrial-GrantApplications-V1')
 $own=$false
 try{
- $own=$mutex.WaitOne(0)
+ try{$own=$mutex.WaitOne(0)}
+ catch [System.Threading.AbandonedMutexException]{
+  $own=$true
+  Write-Host 'FUN_GRANTS_WORKER=ABANDONED_LOCK_RECOVERED_AFTER_PREVIOUS_EXIT'
+ }
  if(!$own){Write-Host 'FUN_GRANTS_WORKER=ALREADY_RUNNING NO_DUPLICATE';return}
  $stamp=Get-Date -Format 'yyyyMMdd-HHmmss'
  $logdir=Join-Path $Storage 'logs'
