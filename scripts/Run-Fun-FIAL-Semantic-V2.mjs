@@ -36,6 +36,7 @@ if(process.argv.length!==3||!["--check","--once"].includes(mode)){
     console.log("FIAL2_SOURCE="+c.record_state+" MODEL="+c.model_status+
      " QUOTES="+c.accepted_quotes+" REJECTED="+c.rejected_quotes);
     console.log("FIAL2_DECISION="+c.decision+" ELIGIBILITY=UNKNOWN");
+    console.log("FIAL2_MODEL_ATTEMPTS="+(c.model_attempts??0)+" FINISH_REASON="+(c.model_finish_reason||"unknown"));
     if(c.model_error)console.log("FIAL2_LOCAL_MODEL_NOTE="+c.model_error);
     console.log("FIAL2_BRIEF="+c.brief);
    }
