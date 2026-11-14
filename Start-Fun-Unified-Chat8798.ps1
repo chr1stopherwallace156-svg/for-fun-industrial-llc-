@@ -13,6 +13,21 @@ function Listener([int]$P){
  return (@(Get-NetTCPConnection -State Listen -LocalPort $P -ErrorAction SilentlyContinue|
   ForEach-Object {"$($_.LocalAddress):$($_.OwningProcess)"}|Sort-Object)-join ';')
 }
+# The existing original dashboard can report AI stopped even when a separately
+# owned, healthy Qwen llama.cpp is already on 8088. Verify the exact listener
+# and model process without changing it or granting any new tool authority.
+function VerifiedIndependentQwen(){
+ try{
+  $sockets=@(Get-NetTCPConnection -State Listen -LocalPort 8088 -ErrorAction Stop)
+  if($sockets.Count -ne 1 -or $sockets[0].LocalAddress -cne '127.0.0.1'){return $false}
+  $proc=Get-CimInstance Win32_Process -Filter ('ProcessId='+[int]$sockets[0].OwningProcess) -ErrorAction Stop
+  if(-not $proc -or $proc.Name -cne 'llama-server.exe' -or
+    [string]::IsNullOrWhiteSpace([string]$proc.CommandLine) -or
+    $proc.CommandLine -notmatch 'Qwen3-4B-Q4_K_M\.gguf'){return $false}
+  $health=Invoke-RestMethod 'http://127.0.0.1:8088/health' -TimeoutSec 7 -ErrorAction Stop
+  return $health.status -ceq 'ok'
+ }catch{return $false}
+}
 if(Listener 8798){Hold 'PORT_8798_ALREADY_OWNED_NO_RESTART'}
 foreach($F in $Modules){
  if(-not (Test-Path -LiteralPath $F -PathType Leaf)){Hold ('SOURCE_MISSING_'+$F)}
@@ -32,7 +47,7 @@ $T=Invoke-RestMethod 'http://127.0.0.1:8789/api/ai/tools' -TimeoutSec 15
 $AI=Invoke-RestMethod 'http://127.0.0.1:8789/api/ai/status' -TimeoutSec 15
 if($R.liveMcpHealth -ne 'ready' -or [int]$R.realReaToolCount -ne 229){Hold 'REA229_NOT_READY'}
 if($L.sidecar -ne $true -or [int]$T.local_tool_count -ne 19){Hold 'LOCAL19_NOT_READY'}
-if($AI.state -ne 'ready'){Hold 'QWEN_LOCAL_MODEL_NOT_READY'}
+if($AI.state -ne 'ready' -and -not (VerifiedIndependentQwen)){Hold 'QWEN_LOCAL_MODEL_NOT_READY'}
 $LogDir=Join-Path $env:LOCALAPPDATA ('FunIndustrial\UnifiedChat8798\'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,6))
 New-Item -ItemType Directory -Path $LogDir -Force|Out-Null
 try{
@@ -60,7 +75,8 @@ try{
  $T2=Invoke-RestMethod 'http://127.0.0.1:8789/api/ai/tools' -TimeoutSec 15
  $AI2=Invoke-RestMethod 'http://127.0.0.1:8789/api/ai/status' -TimeoutSec 15
  if($R2.liveMcpHealth -ne 'ready' -or [int]$R2.realReaToolCount -ne 229 -or
-    $L2.sidecar -ne $true -or [int]$T2.local_tool_count -ne 19 -or $AI2.state -ne 'ready'){Hold 'ORIGINAL_SERVICES_CHANGED'}
+    $L2.sidecar -ne $true -or [int]$T2.local_tool_count -ne 19 -or
+   ($AI2.state -ne 'ready' -and -not (VerifiedIndependentQwen))){Hold 'ORIGINAL_SERVICES_CHANGED'}
  Write-Host ('FUN_UNIFIED_CHAT=PASS URL='+$Url+' PID='+$Child.Id)
  Write-Host 'QWEN_LLAMA_8088=PRESERVED REA_8797_229=PRESERVED LOCAL_8796_19=PRESERVED ORIGINAL_8789=PRESERVED COMPUTE_8791=PRESERVED'
  Write-Host 'V4_SINGLE_ENTRYPOINT_STAGE1=ACTIVE LEGACY_WORKERS_PRESERVED=TRUE NO_RETIREMENTS=TRUE'
