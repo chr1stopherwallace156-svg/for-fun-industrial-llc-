@@ -1,12 +1,12 @@
 # FUN_COMMERCE_INTELLIGENCE_V1_ACTIVATE: tests -> guarded 8802-only restart -> one operator-authorized Google RSS retrieval.
 # Preserves original 8789, Qwen, compute, 8796, 8797, 8798, 8801, 8443 and Elektron.
-[CmdletBinding()]param()
+[CmdletBinding()]param([switch]$SkipGoogleRefresh)
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $Root=$PSScriptRoot
 $Branch='feature/fun-ml-unified-dashboard-v3-20261113'
 $Runner=Join-Path $Root 'scripts\Run-Fun-ML-Dashboard8802.mjs'
-$Prior='619309d8679ec775ba3fe4635be6fe0d007c2896'
+$Prior='404752943e6d3dcbb164784ef9dc371d75ce8ecf'
 $Url='http://127.0.0.1:8802'
 $node=(Get-Command node.exe -ErrorAction Stop).Source
 function Hold([string]$why){throw ('FUN_COMMERCE_HOLD='+$why)}
@@ -29,10 +29,15 @@ function VerifyNewHub([int]$expectedPid=0){
   $main=Invoke-WebRequest ($Url+'/') -UseBasicParsing -TimeoutSec 10
   $chat=Invoke-WebRequest ($Url+'/unified/') -UseBasicParsing -TimeoutSec 10
   $script=Invoke-WebRequest ($Url+'/api/commerce/widget.js') -UseBasicParsing -TimeoutSec 8
+  $uiClient=Invoke-WebRequest ($Url+'/api/ui/client.js') -UseBasicParsing -TimeoutSec 8
+  $uiStyle=Invoke-WebRequest ($Url+'/api/ui/style.css') -UseBasicParsing -TimeoutSec 8
   return ($c.version -ceq 'fun-commerce-intelligence-v1' -and
    $d.version -ceq 'fun-commerce-intelligence-v1' -and $opportunity.version -ceq 'fun-commerce-opportunities-v1.1' -and
    $opportunity.qualifies_as_verified_sales_opportunity -eq $false -and $opportunity.order_authority -eq $false -and $m.state -ceq 'ready' -and
    $main.Content -match 'fi-commerce-panel' -and $chat.Content -match 'fi-commerce-panel' -and
+   $main.Content -match 'id="fi-ui-shell"' -and $chat.Content -match 'id="fi-ui-shell"' -and
+   $uiClient.Content -match 'FUN_INTEGRATED_CONTROL_CENTER_UI_V1' -and
+   $uiStyle.Content -match 'FUN_INTEGRATED_CONTROL_CENTER_UI_V1' -and
    $script.Content -match 'FUN_COMMERCE_WIDGET_V1')
  }catch{return $false}
 }
@@ -116,7 +121,10 @@ if(!$active){
   if($LASTEXITCODE -ne 0){Write-Warning ('OLD_WORKTREE_CLEANUP_HOLD='+$rollback)}
  }
 }
-# No automatic polling: this operator-initiated command performs exactly one Google RSS refresh.
+# An operator can upgrade UI without another external Google request.
+if($SkipGoogleRefresh){
+ Write-Host 'GOOGLE_TRENDS_FETCH=SKIPPED_UI_ONLY CACHED_EVIDENCE=PRESERVED'
+}else{
 try{
  $response=Invoke-RestMethod -Uri ($Url+'/api/commerce/trends/refresh') -Method POST -ContentType 'application/json' -Headers @{Origin=$Url;'x-fi-commerce'='operator-click'} -Body '{}' -TimeoutSec 26
  if($response.state -cne 'captured_unverified_search_interest' -or @($response.items).Count -lt 1){Hold 'GOOGLE_TRENDS_EMPTY_OR_UNVERIFIED'}
@@ -129,6 +137,7 @@ try{
 }catch{
  Write-Host ('GOOGLE_TRENDS_LIVE_FETCH=HOLD DETAIL='+[string]$_.Exception.Message)
  Write-Host 'GOOGLE_TRENDS_RETRY=USE_DASHBOARD_REFRESH_BUTTON_NO_PROCESS_RESTART'
+}
 }
 try{
  $rank=Invoke-RestMethod ($Url+'/api/commerce/opportunities') -TimeoutSec 10
