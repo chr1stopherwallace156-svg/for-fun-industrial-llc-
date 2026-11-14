@@ -62,7 +62,11 @@ test("language rejects arbitrary shell, Python, network, authority escalation, l
   assert.throws(()=>compileFial(program),FialSyntaxError,line);
  }
  assert.throws(()=>compileFial(original.replace("BUDGET 3","BUDGET 999")),FialSyntaxError);
- assert.throws(()=>compileFial(original.replace("FIAL 1","FIAL 2")),FialSyntaxError);
+ // The source begins with a comment mentioning "FIAL 1". Replace the actual
+ // version declaration, not that comment. A changed comment must remain legal.
+ assert.match(original,/^FIAL 1$/m);
+ assert.doesNotThrow(()=>compileFial(original.replace("# FIAL 1","# FIAL 2")));
+ assert.throws(()=>compileFial(original.replace(/^FIAL 1$/m,"FIAL 2")),/EXPECTED_FIAL_1/);
  assert.throws(()=>compileFial(original.replace("RULE \"stable-candidate\" WHEN always SCORE 10 ACTION REMEMBER\n","")),/DEFAULT_ALWAYS/);
  assert.throws(()=>compileFial(original+"RUN AGAIN"),FialSyntaxError);
  assert.throws(()=>compileFial("x".repeat(17000)),FialSyntaxError);
