@@ -151,8 +151,11 @@ function svgAudit(svg,spec){
 }
 function bomAudit(tsv,spec){
  const lines=tsv.trimEnd().split(/\r?\n/);
- if(lines[0]!=='Id\tDescription\tQty\tUnit\tDesignators'||lines.length<2||lines.length>8)hold('BOM_FORMAT');
- const found=new Set(),items=[];
+ if(lines[0]!=='Id\tDescription\tQty\tUnit\tDesignators'||lines.length<2||lines.length>16)hold('BOM_FORMAT');
+ const connectors=new Set(),conductorColors=new Set(),items=[];
+ const expectedColors=new Set(spec.cable.colors);
+ if(expectedColors.size!==spec.cable.colors.length)hold('BOM_AMBIGUOUS_CONDUCTOR_COLORS');
+ const gauge=String(spec.cable.gauge_mm2);
  for(const line of lines.slice(1)){
   const fields=line.split('\t');
   if(fields.length!==5)hold('BOM_COLS');
@@ -160,17 +163,29 @@ function bomAudit(tsv,spec){
   if(!/^[0-9]{1,2}$/.test(item)||!description.trim()||!/^\d+(?:\.\d+)?$/.test(qtyRaw))hold('BOM_ITEM');
   const qty=Number(qtyRaw),designators=designatorsRaw.split(/,\s*/).filter(Boolean);
   if(!Number.isFinite(qty)||qty<=0||designators.length<1)hold('BOM_QTY');
-  for(const d of designators){
-   if(!['X1','X2','W1'].includes(d)||found.has(d))hold('BOM_DESIGNATOR');
-   found.add(d);
-  }
   if(designators.includes('W1')){
-   if(designators.length!==1||unit!=='m'||Math.abs(qty-spec.cable.length_m)>0.00001)hold('BOM_CABLE_QUANTITY');
-  }else if(unit.trim()!==''||qty!==designators.length)hold('BOM_CONNECTOR_QUANTITY');
+   if(designators.length!==1||designators[0]!=='W1'||unit!=='m'||
+     Math.abs(qty-spec.cable.length_m)>0.00001)hold('BOM_CABLE_QUANTITY');
+   // Native WireViz emits one W1 row per conductor color, not one cable row.
+   // Validate exact color and gauge rather than allowing arbitrary repeated W1 rows.
+   const m=/^Wire,\s*([0-9]+(?:\.[0-9]+)?)\s*mm(?:²|\u00c2²|2),\s*([A-Z]{2})$/.exec(description.trim());
+   if(!m||Number(m[1])!==Number(gauge)||!expectedColors.has(m[2])||
+      conductorColors.has(m[2]))hold('BOM_CONDUCTOR_MISMATCH');
+   conductorColors.add(m[2]);
+  }else{
+   if(unit.trim()!==''||qty!==designators.length)hold('BOM_CONNECTOR_QUANTITY');
+   if(!/^Connector,\s*Bench test connector,\s*[0-9]+\s+pins$/.test(description.trim()))hold('BOM_CONNECTOR_DESCRIPTION');
+   if(Number(description.trim().match(/([0-9]+)\s+pins$/)[1])!==spec.x1_pinlabels.length)hold('BOM_CONNECTOR_PINS');
+   for(const d of designators){
+    if(!['X1','X2'].includes(d)||connectors.has(d))hold('BOM_DESIGNATOR');
+    connectors.add(d);
+   }
+  }
   items.push({designators,qty,unit});
  }
- for(const name of ['X1','X2','W1'])if(!found.has(name))hold('BOM_MISSING_COMPONENT');
- return {bom_rows_checked:items.length,designators_checked:found.size};
+ if(connectors.size!==2||!connectors.has('X1')||!connectors.has('X2'))hold('BOM_MISSING_COMPONENT');
+ if(conductorColors.size!==expectedColors.size)hold('BOM_MISSING_CONDUCTOR');
+ return {bom_rows_checked:items.length,designators_checked:connectors.size+1,conductor_colors_checked:conductorColors.size};
 }
 function main(args){
  if(args.length!==2||args[0]!=='audit'||!ID.test(args[1]||''))hold('USAGE');
