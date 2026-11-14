@@ -236,10 +236,10 @@ export async function runRealOperationsCycle({root=ROOT(),sourceFile=null,now=ne
   external_actions:'NONE',next_human_gate:'Verify official status, business-specific forms and Gmail OAuth for Elektron'};
  await atomic(priorPath,record);return record
 }
-export async function runUnifiedCycle({root=ROOT(),sourceFile=null,now=new Date(),officialFetch=fetch}={}){
+export async function runUnifiedCycle({root=ROOT(),grantRoot=undefined,sourceFile=null,now=new Date(),officialFetch=fetch}={}){
  await safeDir(root);validateIdentity(await readJson(join(root,PROFILE)));
  const register=await seedWorkRegister({root});
- const legacy=await runExecutiveCycle({root,now,readMailbox:null});
+ const legacy=await runExecutiveCycle({root,grantRoot,now,readMailbox:null});
  if(legacy.version!==PREVIOUS||legacy.outbound_permissions.email_sent!==0||
   legacy.outbound_permissions.government_filings!==0||legacy.outbound_permissions.rea_runs!==0)
   fail('PREVIOUS_ENGINE_AUTHORITY_MISMATCH');
