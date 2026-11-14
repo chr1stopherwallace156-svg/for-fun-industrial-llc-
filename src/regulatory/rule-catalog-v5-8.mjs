@@ -41,21 +41,21 @@ export const RULES=Object.freeze([
   applies_to:'California statewide climate policy',
   summary:'California law sets a statewide carbon-neutrality policy target no later than 2045.',
   caveat:'Not a universal individual vehicle retirement, business-license, procurement or conversion deadline.',
-  source:'https://ww2.arb.ca.gov/project-background-hvip-school-bus',
+  source:'https://ww2.arb.ca.gov/our-work/programs/school-buses/regulations-affecting-school-fleets',
   legal_status:'statewide_policy_goal',sectors:['schools','campus','public_fleets','trucking','public_transit'],priority:45},
  {id:'airport-shuttle-2028',domain:'airport_shuttle',name:'Airport shuttle phase-in',
   effective:'2028-01-01',date_type:'fleet_share_milestone',
   applies_to:'Covered California airport shuttle fleets under the Zero-Emission Airport Shuttle Regulation',
-  summary:'33% zero-emission fleet phase-in in 2028; a separate published schedule shows 100% in 2036.',
+  summary:'33% zero-emission covered shuttle fleet by the end of 2027, expressed in CARB schedule as 2028; 100% by the end of 2035, expressed as 2036.',
   caveat:'Verify which shuttles are covered and exemptions; this is not a university-wide or all-campuses mandate.',
-  source:'https://ww2.arb.ca.gov/zero-emission-regulation-deadline-schedules-truckstop',
+  source:'https://ww2.arb.ca.gov/zero-emission-airport-shuttle-regulation-summary',
   legal_status:'published_regulatory_guidance',sectors:['airport_shuttle'],priority:70},
  {id:'offroad-fleet-phaseout',domain:'off_road',name:'Off-road diesel engine tier phase-out',
   effective:null,date_type:'fleet_specific_schedule',
   applies_to:'Covered California off-road diesel and alternative diesel fleets, dependent on equipment size and category',
   summary:'CARB phases out older engine tiers over multiple years through 2036; individual fleet schedules vary.',
   caveat:'Do not invent a universal 2037 rule or infer engine-level due dates from a general brochure. Verify DOORS and actual equipment class.',
-  source:'https://ww2.arb.ca.gov/our-work/programs/truckstop-resources/road-zone',
+  source:'https://ww2.arb.ca.gov/new-california-requirements-road-and-road-heavy-duty-vehicles',
   legal_status:'fleet_specific_verification_required',sectors:['off_road','schools','campus','public_fleets','vendors'],priority:80},
  {id:'unknown-2037',domain:'watchlist',name:'2037 date mentioned for investigation',
   effective:null,date_type:'UNVERIFIED_REQUESTED_YEAR',
@@ -77,7 +77,7 @@ export const SOURCES=Object.freeze([
 ].map(x=>Object.freeze({...x,sectors:Object.freeze(x.sectors)})));
 export const BLS_SERIES=Object.freeze([
  {id:'CUUR0000SA0',label:'U.S. CPI-U (all items)',unit:'index',claim:'National consumer price level, not a truck-fleet cost quote'},
- {id:'WPUSOP3000',label:'U.S. PPI — stage of processing intermediate demand',unit:'index',claim:'Broad producer price context, not verified battery or conversion cost'}
+ {id:'LNS14000000',label:'U.S. unemployment rate',unit:'percent',claim:'National labor market context, not verified local hiring costs'}
 ]);
 function isoDate(x){return typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&Number.isFinite(Date.parse(x+'T00:00:00Z'))}
 export function dueWatch({now=new Date(),limit=16}={}){
