@@ -16,6 +16,9 @@ $before=@{}
 foreach($port in $ports){$before[$port]=Snap $port}
 $hub=Invoke-RestMethod -Uri 'http://127.0.0.1:8802/api/fun/hub/status' -TimeoutSec 10
 if($hub.version -cne 'fi-ml-hub-v3' -or $hub.machineLearning.state -cne 'ready'){throw 'ML_HUB_IDENTITY_OR_READINESS_HOLD'}
+$mainPage=Invoke-WebRequest -Uri 'http://127.0.0.1:8802/' -UseBasicParsing -TimeoutSec 15
+$chatPage=Invoke-WebRequest -Uri 'http://127.0.0.1:8802/unified/' -UseBasicParsing -TimeoutSec 15
+if($mainPage.StatusCode -ne 200 -or $mainPage.Content -notmatch 'fi-ml-panel' -or $chatPage.StatusCode -ne 200 -or $chatPage.Content -notmatch 'fi-ml-panel'){throw 'ML_DASHBOARD_RENDER_HOLD'}
 $unified=Invoke-RestMethod -Uri 'http://127.0.0.1:8798/api/unified/status' -TimeoutSec 12
 if($unified.version -cne 'fi-unified-task-chat-8798-v1' -or $unified.state -cne 'ready'){throw 'UNIFIED_QWEN_NOT_READY'}
 $modelFile=Join-Path $env:LOCALAPPDATA 'FunIndustrial\MLScikitLearnV1\sales_model_v1.json'
@@ -63,7 +66,7 @@ if(Test-Path -LiteralPath $modelFile){$modelAfter=(Get-FileHash -LiteralPath $mo
 if($modelBefore -cne $modelAfter){throw 'SALES_MODEL_FILE_CHANGED_HOLD'}
 if($result.modelState -cne 'ready' -or [string]::IsNullOrWhiteSpace([string]$result.explanation)){throw 'QWEN_EXPLANATION_NOT_READY_ML_RESULT_VALID'}
 foreach($port in $ports){if((Snap $port) -cne $before[$port]){throw ('SERVICE_LISTENER_CHANGED_PORT_'+$port)}}
-Write-Host 'LIVE_SCIKIT_LEARN_ISOLATION_FOREST=PASS'
+Write-Host 'INTEGRATED_PAGES_RENDER=PASS'\nWrite-Host 'LIVE_SCIKIT_LEARN_ISOLATION_FOREST=PASS'
 Write-Host 'ESTIMATED_PROFIT_VERIFIED=8/8'
 Write-Host ('ANOMALIES_FLAGGED='+@($rows|Where-Object {$_.unusual_pattern -eq $true}).Count)
 Write-Host ('SCIKIT_LEARN_VERSION='+[string]$result.verifiedML.version)
