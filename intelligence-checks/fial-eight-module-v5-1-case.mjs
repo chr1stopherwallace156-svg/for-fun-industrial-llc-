@@ -145,8 +145,10 @@ test("invalid/unauthorized module tasks and unsafe public/private URLs fail clos
  const a=adapters();
  await assert.rejects(a.runApproved({module:"rea",operation:"tools_call",input:{}}),
   /UNSUPPORTED_ADAPTER_OPERATION/);
- await assert.rejects(a.runApproved({module:"optimization",operation:"analyze",
-  input:{request:"Optimize inventory",problem:{}}}),/FIAL51_|OPT_AGENT_/);
+ const missing=await a.runApproved({module:"optimization",operation:"analyze",
+  input:{request:"Optimize inventory",problem:{}}});
+ assert.equal(missing.result.state,"needs_input");
+ assert.equal(missing.result.external_actions_executed,0);
  await assert.rejects(a.runApproved({module:"persistent_memory",operation:"recall",
   input:{query:""}}),/MEMORY_RECALL_INPUT_INVALID/);
  await assert.rejects(a.runApproved({module:"voice",operation:"validate_saved_wav",
