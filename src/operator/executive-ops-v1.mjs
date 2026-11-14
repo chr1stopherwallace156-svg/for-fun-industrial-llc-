@@ -145,7 +145,7 @@ function markdown(t,when){
   '- External completion requires verified recipient/portal, operator review, one-use authorization and receipt.',
   ''].join('\n');
 }
-export async function runExecutiveCycle({root=ROOT(),grantRoot=GRANT_ROOT(),now=new Date(),readMailbox=null}={}){
+export async function runExecutiveCycle({root=ROOT(),grantRoot=GRANT_ROOT(),now=new Date(),readMailbox=null,expectedGrantApplicant=null}={}){
  if(!Number.isFinite(now.getTime()))throw Error('EXEC_TIME_INVALID');
  const dir=await safeRoot(root);
  const policies=join(dir,'operator-policy-v1.json'),registry=join(dir,'work-register-v1.json');
@@ -165,8 +165,17 @@ export async function runExecutiveCycle({root=ROOT(),grantRoot=GRANT_ROOT(),now=
   JSON.stringify(policy.enabled_domains)!==JSON.stringify(KINDS))
   throw Error('EXEC_POLICY_NOT_AUTHORIZED');
  const register=await readOptional(registry);
- const report=await readOptional(join(grantRoot,'last-run.json'));
- const mission=await readOptional(join(grantRoot,'last-mission-v2.json'));
+ let report=await readOptional(join(grantRoot,'last-run.json'));
+ let mission=await readOptional(join(grantRoot,'last-mission-v2.json'));
+ let grantIssue=null;
+ if(expectedGrantApplicant){
+  const applicant=await readOptional(join(grantRoot,'business-profile.json'));
+  if(applicant?.business_name!==expectedGrantApplicant){
+   grantIssue='GRANT_APPLICANT_PROFILE_MISMATCH_OR_MISSING';
+   report=null;
+   mission=null;
+  }
+ }
  let inbox=[],mailState='not_connected',mailError=null;
  if(readMailbox){
   try{
@@ -178,7 +187,7 @@ export async function runExecutiveCycle({root=ROOT(),grantRoot=GRANT_ROOT(),now=
    if(mailState!=='connected_read_only')inbox=[];
   }catch(e){mailState='unavailable';mailError=clean(e?.message,160)}
  }
- let work,grantIssue=null;
+ let work;
  try{
   work=buildWork({grantReport:report,mission,inbox,today:now,workRegister:register,mailState});
  }catch(e){
