@@ -74,7 +74,7 @@ export function selectOpportunities(rows,{profile=DEFAULT_PROFILE,now=new Date()
   if(!/\b(?:active|open|accepting|posted)\b/.test(status)||
     /\b(?:closed|awarded|expired|archived|cancelled)\b/.test(status))continue;
   const applicant=norm(row.ApplicantType);
-  if(!/\b(?:business|small business|for profit|forprofit|private sector)\b/.test(applicant))continue;
+  if(!/\b(?:business|businesses|small business|small businesses|for profit|forprofit|for profit organizations|private sector)\b/.test(applicant))continue;
   const due=deadline(row.ApplicationDeadline,now);if(due.state==='expired')continue;
   openBusinessCount++;
   const corpus=norm([title,row.Categories,row.Purpose,row.Description].join(' '));
