@@ -3,6 +3,7 @@
 import {runUnifiedCycle,storeIdentity,readRealStatus,VERSION} from '../src/operator/real-operations-v5-5.mjs';
 import {ROOT} from '../src/operator/executive-ops-v1.mjs';
 import {join} from 'node:path';
+import {readElektronInboxHeaders,connectElektronGmail} from '../src/operator/elektron-gmail-v5-5.mjs';
 const action=process.argv[2];
 try{
  if(action==='--set-local-profile-stdin'){
