@@ -16,15 +16,26 @@ test('preflight reports independent 8789, 8798, 8801 health and refuses unhealth
  assert.match(source,/UNHEALTHY_LISTENER_MANUAL_REVIEW_NO_RESTART/);
  assert.match(source,/DEPENDENCY_MISSING_CHECK_ONLY/);
 });
-test('core recovery is opt-in through main launcher, starts only missing services and skips 8443 gateway',async()=>{
+test('original 8789 recovery remains guarded and cannot skip its pinned source hash',async()=>{
  const source=await clean(launcher);
  const core=await clean(startup);
- assert.match(source,/if\(\$null -eq \$parent -or \$null -eq \$chat\)/);
+ assert.match(source,/if\(\$null -eq \$parent\)/);
  assert.match(source,/-File \$startScript -SkipPrivateGateway/);
  assert.match(core,/param\(\[switch\]\$CheckOnly,\[switch\]\$SkipPrivateGateway\)/);
  assert.match(core,/if\(\$SkipPrivateGateway\)/);
+ assert.match(core,/8789_SOURCE_HASH_CHANGED_MANUAL_REVIEW_NO_RESTORE/);
  assert.match(source,/EXISTING_SERVICE_CHANGED_DURING_RECOVERY_PORT_/);
  assert.match(source,/if\(\$CheckOnly\)/);
+});
+test('missing 8798 with healthy 8789 uses dedicated launcher and never reloads 8789',async()=>{
+ const source=await clean(launcher);
+ assert.match(source,/elseif\(\$null -eq \$chat\)/);
+ assert.match(source,/Start-Fun-Unified-Chat8798\.ps1/);
+ assert.match(source,/START_ONLY_MISSING_8798_ORIGINAL_8789_PRESERVED/);
+ assert.match(source,/8798_DEPENDENCY_/);
+ assert.match(source,/8798_ORIGINAL_LOCAL_CATALOGUE_MISMATCH/);
+ assert.match(source,/-File \$startChat/);
+ assert.match(source,/8798_DEDICATED_RECOVERY_FAILED_NO_RETRY/);
 });
 test('missing 8801 uses previously verified V2 checkout, no silent script fetch or authority change',async()=>{
  const source=await clean(launcher);
