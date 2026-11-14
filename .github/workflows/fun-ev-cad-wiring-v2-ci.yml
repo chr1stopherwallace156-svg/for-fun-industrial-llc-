@@ -1,0 +1,33 @@
+name: Fun EV CAD Wiring V2 - offline
+on:
+  push:
+    branches:
+      - feature/fun-ev-cad-wiring-artifacts-v2-20261114
+    paths:
+      - 'src/ev-conversion/prototype-v2.mjs'
+      - 'test/ev-prototype-v2.test.mjs'
+      - '.github/workflows/fun-ev-cad-wiring-v2-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-prototype:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate Fun-only module syntax
+        run: |
+          node --check src/ev-conversion/prototype-v2.mjs
+          node --check src/ev-conversion/cli.mjs
+      - name: Run isolated Fun EV V1 and V2 offline tests
+        run: |
+          node --test test/ev-engineering-v1.test.mjs
+          node --test test/ev-prototype-v2.test.mjs
