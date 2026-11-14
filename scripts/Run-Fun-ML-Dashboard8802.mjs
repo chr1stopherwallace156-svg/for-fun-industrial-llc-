@@ -17,6 +17,8 @@ import {EXEC_PAGE,EXEC_CLIENT,EXEC_CONSOLE_VERSION} from '../src/operator/execut
 import {readRealStatus,VERSION as REAL_VERSION} from '../src/operator/real-operations-v5-5.mjs';
 import {readBusinessCompetenceStatus,OPERATOR_VERSION} from '../src/competence/business-operator-v5-6.mjs';
 import {planBusinessDecision} from '../src/competence/business-knowledge-v5-6.mjs';
+import {calculateFinancials} from '../src/competence/business-finance-v5-6.mjs';
+import {reviewBusinessWriting} from '../src/competence/business-writing-v5-6.mjs';
 const REAL_WIDGET=new URL('../src/operator/real-operations-widget-v5-5.js',import.meta.url);
 const BUSINESS_CLIENT=new URL('../src/competence/business-console-v5-6.js',import.meta.url);
 
@@ -134,6 +136,35 @@ async function parseBusinessQuestion(req){
   throw Error('FIAL56_QUESTION_SCHEMA_INVALID');
  return value.question;
 }
+async function parseCompetenceSupplement(req,mode){
+ const chunks=[];let size=0;
+ for await(const chunk of req){
+  size+=chunk.length;
+  if(size>5500)throw Error('FIAL56_SUPPLEMENT_BODY_TOO_LARGE');
+  chunks.push(chunk);
+ }
+ let obj;
+ try{obj=JSON.parse(Buffer.concat(chunks).toString('utf8'))}
+ catch{throw Error('FIAL56_SUPPLEMENT_JSON_REQUIRED')}
+ if(!obj||typeof obj!=='object'||Array.isArray(obj)||Object.keys(obj).length!==1)
+  throw Error('FIAL56_SUPPLEMENT_OBJECT_INVALID');
+ if(mode==='finance'){
+  const x=obj.metrics;
+  if(!x||typeof x!=='object'||Array.isArray(x)||Object.keys(x).length>9)
+   throw Error('FIAL56_METRICS_INVALID');
+  const allowed=new Set(['unit_price','unit_variable_cost','monthly_fixed_cost',
+   'cash_available','monthly_net_burn','revenue','cost_of_goods_sold',
+   'initial_investment','period_net_benefit']);
+  for(const [key,value] of Object.entries(x)){
+   if(!allowed.has(key)||typeof value!=='number'||!Number.isFinite(value)||
+    Math.abs(value)>1e12)throw Error('FIAL56_METRICS_INVALID');
+  }
+  return x;
+ }
+ if(mode==='writing'&&typeof obj.draft==='string'&&obj.draft.trim().length>0&&obj.draft.length<=4000)
+  return obj.draft;
+ throw Error('FIAL56_SUPPLEMENT_SCHEMA_INVALID');
+}
 async function emptyCommerceBody(req){
   let length=0;const chunks=[];
   for await(const chunk of req){length+=chunk.length;if(length>64)throw Error('COMMERCE_REQUEST_TOO_LARGE');chunks.push(chunk)}
@@ -191,6 +222,19 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
           throw Error('FIAL56_PLAN_AUTHORITY_INVALID');
         return send(res,200,{plan,model_invocations:0,tool_executions:0,
           memory_writes:0,government_filings:0,messages_sent:0});
+      }
+      if(req.method==='POST'&&['/api/operator/competence/finance','/api/operator/competence/writing'].includes(u.pathname)){
+        const finance=u.pathname.endsWith('/finance');
+        const click=finance?'one-local-financial-calculation':'one-local-writing-review';
+        if(!acceptedActionOrigin(req)||req.headers['x-fi-business-click']!==click||
+          (req.headers['sec-fetch-site']&&!['same-origin','none'].includes(req.headers['sec-fetch-site'])))
+          return send(res,403,{error:'FIAL56_LOCAL_EXPLICIT_CLICK_REQUIRED'});
+        if(req.headers['content-type']!=='application/json')
+          return send(res,415,{error:'FIAL56_JSON_CONTENT_TYPE_REQUIRED'});
+        if(finance)return send(res,200,{calculations:calculateFinancials(await parseCompetenceSupplement(req,'finance')),
+          claim_verified:false,model_invocations:0,external_actions:0});
+        return send(res,200,{review:reviewBusinessWriting(await parseCompetenceSupplement(req,'writing')),
+          claims_verified:false,messages_sent:0,model_invocations:0,external_actions:0});
       }
       if(req.method==='GET'&&u.pathname==='/api/operator/real/client.js'){
         return send(res,200,await readFile(REAL_WIDGET,'utf8'),'text/javascript; charset=utf-8');
