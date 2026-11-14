@@ -118,9 +118,12 @@ if($receipt.version -cne 'fial-semantic-engine-v0.2' -or
  Hold 'FIAL2_AUTHORITY_REPORT_INVALID'
 }
 Write-Host ('FUN_FIAL2_QWEN_CASES='+[int]$receipt.candidates_reviewed+' GROUNDED_QUOTES='+[int]$receipt.model_quotes_grounded)
-$unavailable=@($receipt.cases|Where-Object { $_.model_status -ceq 'MODEL_UNAVAILABLE_OR_UNVERIFIED' })
+$unavailable=@($receipt.cases|Where-Object {
+ $_.model_status -ceq 'MODEL_UNAVAILABLE_OR_UNVERIFIED' -or
+ $_.model_status -ceq 'MODEL_OUTPUT_UNVERIFIED'
+})
 if($unavailable.Count -gt 0){
- Write-Host ('FUN_FIAL2_SEMANTICS=MODEL_REQUEST_HOLD COUNT='+$unavailable.Count)
+ Write-Host ('FUN_FIAL2_SEMANTICS=MODEL_REQUEST_OR_JSON_HOLD COUNT='+$unavailable.Count)
 }elseif([int]$receipt.model_quotes_grounded -gt 0){
  Write-Host 'FUN_FIAL2_SEMANTICS=SOURCE_QUOTES_MATCHED_INTERPRETATION_UNVERIFIED'
 }else{
