@@ -30,7 +30,7 @@ export async function retrieveApprovedPage({url,operatorApproved=false,timeoutMs
   try{target=new URL(url)}catch{throw Error("URL_INVALID")}
   if(!["https:","http:"].includes(target.protocol)||target.username||target.password||target.hash||!target.hostname||!["","80","443"].includes(target.port))throw Error("URL_NOT_ALLOWED");
   if(net.isIP(target.hostname)||target.hostname.toLowerCase()==="localhost")throw Error("IP_OR_LOCALHOST_NOT_ALLOWED");
-  const records=await dns.lookup(target.hostname,{family:4,all:true,verbatim:true});
+  const records=await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error("DNS_TIMEOUT")),5000);dns.lookup(target.hostname,{family:4,all:true,verbatim:true}).then(x=>{clearTimeout(timer);resolve(x)},e=>{clearTimeout(timer);reject(e)})});
   if(!records.length||records.some(x=>!publicIPv4(x.address)))throw Error("NONPUBLIC_DNS_ADDRESS");
   const ip=records[0].address;
   const transport=target.protocol==="https:"?https:http;
@@ -45,6 +45,8 @@ export async function retrieveApprovedPage({url,operatorApproved=false,timeoutMs
       res.on("end",()=>resolve(Buffer.concat(chunks)));
       res.on("error",reject);
     });
+    const deadline=setTimeout(()=>req.destroy(Error("RETRIEVAL_DEADLINE_EXCEEDED")),timeoutMs);
+    req.on("close",()=>clearTimeout(deadline));
     req.on("timeout",()=>req.destroy(Error("RETRIEVAL_TIMEOUT")));
     req.on("error",reject);
   });
