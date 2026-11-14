@@ -383,6 +383,36 @@ finally{button.disabled=false}
 });
 })();
 </script>
+
+<!-- FI_APPROVED_SINGLE_SOURCE_COLLECTION_V1: no automatic retrieval -->
+<script>
+(()=>{
+const panel=document.getElementById("fiGroundedResearch");
+if(!panel)return;
+const action=document.createElement("button");
+action.type="button";action.id="fiApproveCollectSource";action.textContent="Approve & collect selected webpage";
+const feedback=document.createElement("p");feedback.id="fiCollectStatus";feedback.setAttribute("aria-live","polite");feedback.className="muted small";feedback.textContent="No webpage collection approved.";
+panel.append(action,feedback);
+action.addEventListener("click",async()=>{
+ const selected=document.getElementById("fiSelectedSourceUrl");
+ const url=selected?.dataset?.sourceUrl;
+ if(!url){feedback.textContent="Select a web search result first.";return}
+ if(!confirm("Approve exactly ONE retrieval of this URL? No redirects, crawling, or additional pages.\n\n"+url))return;
+ action.disabled=true;feedback.textContent="Retrieving the approved page and recording unverified evidence...";
+ try{
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),45000);
+  let response;
+  try{response=await fetch("/api/research/collect-source",{method:"POST",headers:{"content-type":"application/json","x-fi-source-approval":"operator-approved-single-page"},credentials:"same-origin",signal:controller.signal,body:JSON.stringify({approved:true,url,plan_id:"070b202f-1a78-41ae-aaec-7f8cc859417b",task_id:"OP1-DEMAND"})});}finally{clearTimeout(timeout)}
+  const result=await response.json();
+  if(!response.ok)throw Error(result.detail||result.error||"Collection failed");
+  if(!result.claim_id)throw Error("Claim ID missing from completed collection");
+  document.getElementById("fiGroundedClaim").value=result.claim_id;
+  feedback.textContent="One page collected. Claim "+result.claim_id+" is linked to saved source bytes; factual claims remain unverified. Enter a question and submit to Qwen.";
+ }catch(e){feedback.textContent="Collection hold: "+String(e.message||e).slice(0,500)}
+ finally{action.disabled=false}
+});
+})();
+</script>
 </body>
 </html>
 
