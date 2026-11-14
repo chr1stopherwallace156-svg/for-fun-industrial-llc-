@@ -29,6 +29,17 @@ jobs:
           foreach($required in @('FUN_COGNEE_RECALL=ENABLED_AUTOMATIC_READ_ONLY','FIAL51_MEMORY_ADAPTER=AVAILABLE_CONFIGURED','FUN_MEMORY_WRITES=DISABLED','AUTO_CHAT_RECALL_ENDPOINT_MISSING_NO_FILES_CHANGED','PROTECTED_SERVER_SOURCE_CHANGED','originalServerSHA','writesEnabled','automaticIngestion','src/intelligence/settings.json')){
             if(!$content.Contains($required)){throw ('COGNEE_ACTIVATION_GUARD_MISSING_'+$required)}
           }
+          if(!$content.Contains('param([switch]$AuthorizeReadOnlyTransition)')){throw 'COGNEE_READ_ONLY_TRANSITION_CONSENT_MISSING'}
+          $preflight=$content.IndexOf('$previousWriteFlags++')
+          $mutations=$content.IndexOf('New-Item -ItemType Directory -Path $Log')
+          if($preflight -lt 0 -or $mutations -lt 0 -or $preflight -ge $mutations){throw 'COGNEE_WRITE_TRANSITION_PREFLIGHT_NOT_BEFORE_MUTATIONS'}
+          if(!$content.Contains("if(!$AuthorizeReadOnlyTransition){Hold 'EXISTING_WRITE_AUTHORITY_REQUIRES_SEPARATE_REVIEW'}")){
+            throw 'COGNEE_PREEXISTING_WRITE_AUTHORITY_APPROVAL_MISSING'
+          }
+          if(!$content.Contains("if(!$AuthorizeReadOnlyTransition){Hold 'EXISTING_INGESTION_REQUIRES_SEPARATE_REVIEW'}")){
+            throw 'COGNEE_PREEXISTING_INGESTION_APPROVAL_MISSING'
+          }
+          if(!$content.Contains('FUN_MEMORY_READ_ONLY_TRANSITION=CONFIRMED')){throw 'COGNEE_TRANSITION_AUDIT_MISSING'}
           if($content -match 'Stop-Process|Restart-Service|Stop-Service|Set-NetFirewallRule|Invoke-Expression|Start-Process|pip install|git checkout|git reset'){throw 'COGNEE_ACTIVATION_UNEXPECTED_PROCESS_OR_SOURCE_MUTATION'}
           Write-Host 'COGNEE_ENABLEMENT_PS_SYNTAX_AND_BOUNDARIES=PASS'
       - name: Check existing bounded memory and automatic recall integration contracts
