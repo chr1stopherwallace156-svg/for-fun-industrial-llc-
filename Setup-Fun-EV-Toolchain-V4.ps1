@@ -55,9 +55,11 @@ foreach($pkg in $packages){
    '--accept-package-agreements','--accept-source-agreements','--disable-interactivity') 'PACKAGE_INSTALL'
 }
 # Create WireViz only in a new Fun Industrial venv; never use global pip or other runtimes.
-$stage=Join-Path $tools ('WireViz-staging-'+[guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Path $stage|Out-Null
-$venv=Join-Path $stage 'venv';$wheelDir=Join-Path $stage 'wheels'
+$target=Join-Path $tools 'WireViz'
+New-Item -ItemType Directory -Path $target -ErrorAction Stop | Out-Null
+# Python venv entry-point executables contain absolute interpreter paths.
+# Do not relocate venv after installation; create at final destination.
+$venv=Join-Path $target 'venv';$wheelDir=Join-Path $target 'wheels'
 New-Item -ItemType Directory -Path $wheelDir|Out-Null
 Checked $python @('-m','venv',$venv) 'VENV'
 $vpy=Join-Path $venv 'Scripts\python.exe'
@@ -71,8 +73,7 @@ Checked $vpy @('-m','pip','install','--only-binary=:all:','--no-input','--disabl
 $wv=Join-Path $venv 'Scripts\wireviz.exe'
 if(!(Test-Path -LiteralPath $wv -PathType Leaf)){throw 'FUN_EV_WIREVIZ_MISSING'}
 Checked $wv @('--version') 'WIREVIZ_VERSION'
-& $vpy -m pip freeze --disable-pip-version-check | Out-File -LiteralPath (Join-Path $stage 'dependencies-freeze.txt') -Encoding UTF8
+& $vpy -m pip freeze --disable-pip-version-check | Out-File -LiteralPath (Join-Path $target 'dependencies-freeze.txt') -Encoding UTF8
 if($LASTEXITCODE -ne 0){throw 'FUN_EV_DEPENDENCY_FREEZE_HOLD'}
-Move-Item -LiteralPath $stage -Destination (Join-Path $tools 'WireViz') -ErrorAction Stop
 Write-Output 'FUN_EV_V4_INSTALL=COMPLETED_NATIVE_QUALIFICATION_PENDING'
 Write-Output ('FUN_EV_V4_WIREVIZ='+ (Join-Path $tools 'WireViz\venv\Scripts\wireviz.exe'))
