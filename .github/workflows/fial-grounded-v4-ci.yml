@@ -1,0 +1,43 @@
+name: Fun Industrial FIAL 4 Offline Review CI
+on:
+  push:
+    branches:
+      - feature/fial4-grounded-evidence-20261114
+    paths:
+      - "src/fial/**"
+      - "scripts/Run-Fun-FIAL-Grounded-V4.mjs"
+      - "scripts/Run-Fun-ML-Dashboard8802.mjs"
+      - "intelligence-checks/fial-grounded-v4-case.mjs"
+      - "Run-Fun-FIAL-Grounded-V4.ps1"
+      - ".github/workflows/fial-grounded-v4-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fial4:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Check FIAL4 modules and integrated hub syntax
+        shell: pwsh
+        run: |
+          node --check src/fial/grounded-compiler-v4.mjs
+          node --check src/fial/grounded-review-v4.mjs
+          node --check src/fial/dashboard-status-v4.mjs
+          node --check src/fial/dashboard-widget-v4.js
+          node --check scripts/Run-Fun-FIAL-Grounded-V4.mjs
+          node --check scripts/Run-Fun-ML-Dashboard8802.mjs
+      - name: Independent synthetic offline FIAL4 cases
+        run: node --test intelligence-checks/fial-grounded-v4-case.mjs
+      - name: Verify compiler and Windows launcher syntax
+        shell: pwsh
+        run: |
+          node scripts/Run-Fun-FIAL-Grounded-V4.mjs --check
+          $tokens=$null;$errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'Run-Fun-FIAL-Grounded-V4.ps1'),[ref]$tokens,[ref]$errors)|Out-Null
+          if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};throw 'FIAL4_POWERSHELL_SYNTAX_HOLD'}
+          Write-Host 'FIAL4_WINDOWS_POWERSHELL_SYNTAX=PASS'
