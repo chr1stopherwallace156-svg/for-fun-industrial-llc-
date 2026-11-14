@@ -150,7 +150,7 @@ test('scheduler and runner integrate mission V2 within the existing single accou
 
 test('read-only mission status interface reports actual files and schedule, never restarts services',async()=>{
  const script=await readFile(new URL('../Show-Fun-Independent-Mission-V2.ps1',import.meta.url),'utf8');
- assert.match(script,/last-mission-v2\\.json/);
+ assert.match(script,/last-mission-v2\.json/);
  assert.match(script,/Get-ScheduledTaskInfo/);
  assert.match(script,/NEXT_SELF_CHOSEN_PRIORITY/);
  assert.match(script,/UNMATCHED_EVIDENCE/);
