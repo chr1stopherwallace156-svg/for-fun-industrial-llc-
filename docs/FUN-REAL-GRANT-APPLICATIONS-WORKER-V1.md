@@ -28,7 +28,7 @@ An exclusive named Windows mutex prevents simultaneous runs. A source failure wr
 - `business-profile.json`: editable company profile created on first run, with unknown legal/contact/financial fields explicitly **null**.
 - `evidence\grants-offered-<SHA-256>.csv`: captured original official CSV bytes. Re-running with identical content reuses the same digest-named file.
 - `last-run.json`: timestamp, source hash, total rows, open-business candidates, prioritized shortlist and actual output paths.
-- `drafts\<GrantID>\application-worksheet.rtf`: up to three editable Word-compatible preliminary worksheets containing the **real grant title, ID, agency, deadline, URL, published program description and requirements**, plus clearly labeled missing details. They are **not agency-issued application forms** and **not submitted**. A previously created worksheet is never overwritten on subsequent scans.
+- `drafts\<GrantID>\application-worksheet.rtf`: up to three editable Word-compatible preliminary worksheets containing the **real grant title, ID, agency, deadline, URL, published program description and requirements**, plus clearly labeled missing details. Published eligibility summaries are not the complete program requirements or form questions. They are **not agency-issued application forms** and **not submitted**. A previously created worksheet is never overwritten on subsequent scans.
 - `drafts\<GrantID>\source-record.json`: provenance for each prepared draft.
 - `logs\grants-<timestamp>.log`: one-run execution output.
 - `last-error.txt`: a recent scan failure message.
