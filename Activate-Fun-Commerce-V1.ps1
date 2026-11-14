@@ -1,12 +1,12 @@
 # FUN_COMMERCE_INTELLIGENCE_V1_ACTIVATE: tests -> guarded 8802-only restart -> one operator-authorized Google RSS retrieval.
 # Preserves original 8789, Qwen, compute, 8796, 8797, 8798, 8801, 8443 and Elektron.
-[CmdletBinding()]param([switch]$SkipGoogleRefresh)
+[CmdletBinding()]param([switch]$SkipGoogleRefresh,[switch]$RefreshCalifornia)
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $Root=$PSScriptRoot
 $Branch='feature/fun-ml-unified-dashboard-v3-20261113'
 $Runner=Join-Path $Root 'scripts\Run-Fun-ML-Dashboard8802.mjs'
-$Prior='404752943e6d3dcbb164784ef9dc371d75ce8ecf'
+$Prior='24ef0a6affa148f33d54208cbf369069be1be7ce'
 $Url='http://127.0.0.1:8802'
 $node=(Get-Command node.exe -ErrorAction Stop).Source
 function Hold([string]$why){throw ('FUN_COMMERCE_HOLD='+$why)}
@@ -25,6 +25,7 @@ function VerifyNewHub([int]$expectedPid=0){
   $c=Invoke-RestMethod ($Url+'/api/commerce/status') -TimeoutSec 8
   $d=Invoke-RestMethod ($Url+'/api/commerce/data') -TimeoutSec 8
   $opportunity=Invoke-RestMethod ($Url+'/api/commerce/opportunities') -TimeoutSec 8
+  $focus=Invoke-RestMethod ($Url+'/api/commerce/focus') -TimeoutSec 8
   $m=Invoke-RestMethod ($Url+'/api/ml/dashboard/status') -TimeoutSec 8
   $main=Invoke-WebRequest ($Url+'/') -UseBasicParsing -TimeoutSec 10
   $chat=Invoke-WebRequest ($Url+'/unified/') -UseBasicParsing -TimeoutSec 10
@@ -33,7 +34,9 @@ function VerifyNewHub([int]$expectedPid=0){
   $uiStyle=Invoke-WebRequest ($Url+'/api/ui/style.css') -UseBasicParsing -TimeoutSec 8
   return ($c.version -ceq 'fun-commerce-intelligence-v1' -and
    $d.version -ceq 'fun-commerce-intelligence-v1' -and $opportunity.version -ceq 'fun-commerce-opportunities-v1.1' -and
-   $opportunity.qualifies_as_verified_sales_opportunity -eq $false -and $opportunity.order_authority -eq $false -and $m.state -ceq 'ready' -and
+   $opportunity.qualifies_as_verified_sales_opportunity -eq $false -and $opportunity.order_authority -eq $false -and
+   $focus.version -ceq 'fun-google-trends-focus-v1.2' -and $focus.county_count -eq 58 -and
+   $focus.county_level_metrics_available -eq $false -and $m.state -ceq 'ready' -and
    $main.Content -match 'fi-commerce-panel' -and $chat.Content -match 'fi-commerce-panel' -and
    $main.Content -match 'id="fi-ui-shell"' -and $chat.Content -match 'id="fi-ui-shell"' -and
    $uiClient.Content -match 'FUN_INTEGRATED_CONTROL_CENTER_UI_V1' -and
@@ -139,6 +142,32 @@ try{
  Write-Host 'GOOGLE_TRENDS_RETRY=USE_DASHBOARD_REFRESH_BUTTON_NO_PROCESS_RESTART'
 }
 }
+if($RefreshCalifornia){
+ try{
+  $california=Invoke-RestMethod -Uri ($Url+'/api/commerce/california/refresh') -Method POST -ContentType 'application/json' -Headers @{Origin=$Url;'x-fi-commerce'='operator-click'} -Body '{}' -TimeoutSec 26
+  if($california.state -cne 'captured_california_statewide_search_interest' -or
+     $california.geographic_scope -cne 'US-CA' -or @($california.items).Count -lt 1){
+    Hold 'CALIFORNIA_SOURCE_RESPONSE_INVALID'
+  }
+  Write-Host ('GOOGLE_CALIFORNIA_RSS=PASS TOPICS='+@($california.items).Count+' GEO=US-CA')
+  Write-Host ('GOOGLE_CALIFORNIA_EVIDENCE_SHA256='+[string]$california.source_sha256)
+  Write-Host ('GOOGLE_CALIFORNIA_FETCHED_UTC='+[string]$california.fetched_utc)
+  Write-Host 'GOOGLE_CALIFORNIA_COUNTY_METRICS=NOT_AVAILABLE'
+ }catch{
+  Write-Host ('GOOGLE_CALIFORNIA_RSS=HOLD DETAIL='+[string]$_.Exception.Message)
+  Write-Host 'GOOGLE_CALIFORNIA_RETRY=USE_DASHBOARD_CALIFORNIA_REFRESH_BUTTON'
+ }
+}else{
+ Write-Host 'GOOGLE_CALIFORNIA_RSS=SKIPPED_OPERATOR_NOT_REQUESTED'
+}
+try{
+ $focus=Invoke-RestMethod ($Url+'/api/commerce/focus') -TimeoutSec 10
+ if($focus.version -cne 'fun-google-trends-focus-v1.2' -or $focus.county_count -ne 58 -or
+    $focus.county_level_metrics_available -ne $false){Hold 'CALIFORNIA_FOCUS_ATTESTATION_FAILED'}
+ Write-Host ('GOOGLE_COMMERCE_FILTER_V12=PASS INCLUDED='+[int]$focus.relevant_count+' EXCLUDED='+[int]$focus.excluded_count)
+ Write-Host ('GOOGLE_CA_STATEWIDE_SCOPE='+[string]$focus.markets.'US-CA'.state)
+ Write-Host 'GOOGLE_CA_COUNTY_DIRECTORY=58 METRICS=UNAVAILABLE'
+}catch{throw ('CALIFORNIA_FILTER_VERIFICATION_HOLD='+[string]$_.Exception.Message)}
 try{
  $rank=Invoke-RestMethod ($Url+'/api/commerce/opportunities') -TimeoutSec 10
  if($rank.version -cne 'fun-commerce-opportunities-v1.1' -or $rank.order_authority -ne $false -or
@@ -153,8 +182,12 @@ try{
 Write-Host 'FUN_INTEGRATED_UI_V1=PASS RESPONSIVE_NAV=OVERVIEW_COMMERCE_ML_CHAT_TOOLS_WORKSPACE'
 Write-Host 'FUN_COMMERCE_CONTROL_CENTER=http://127.0.0.1:8802/'
 Write-Host 'FUN_COMMERCE_SHOPIFY=TOKEN_REQUIRED_FOR_PC_READ_ONLY_SYNC'
-if($SkipGoogleRefresh){
+if($SkipGoogleRefresh -and -not $RefreshCalifornia){
  Write-Host 'FUN_COMMERCE_EXTERNAL_ACTIONS=NO_EXTERNAL_REFRESH_UI_ONLY'
+}elseif($SkipGoogleRefresh -and $RefreshCalifornia){
+ Write-Host 'FUN_COMMERCE_EXTERNAL_ACTIONS=ONE_CALIFORNIA_RSS_READ_NO_PURCHASES'
+}elseif(-not $SkipGoogleRefresh -and $RefreshCalifornia){
+ Write-Host 'FUN_COMMERCE_EXTERNAL_ACTIONS=US_AND_CALIFORNIA_RSS_READS_NO_PURCHASES'
 }else{
  Write-Host 'FUN_COMMERCE_EXTERNAL_ACTIONS=ONE_GOOGLE_RSS_READ_NO_PURCHASES'
 }
