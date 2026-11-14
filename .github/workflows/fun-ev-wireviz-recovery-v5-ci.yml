@@ -1,0 +1,31 @@
+name: Fun EV V5 - partial WireViz recovery source and read-only audit
+on:
+  push:
+    branches:
+      - feature/fun-ev-wireviz-recovery-v5-20261114
+    paths:
+      - 'Recover-Fun-EV-WireViz-V5.ps1'
+      - 'test/ev-wireviz-recovery-v5.test.mjs'
+      - '.github/workflows/fun-ev-wireviz-recovery-v5-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  guarded-native-audit:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Parse Windows PowerShell script
+        shell: powershell
+        run: |
+          $err = $null
+          $tok = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'Recover-Fun-EV-WireViz-V5.ps1'),[ref]$tok,[ref]$err)
+          if (@($err).Count -ne 0) { $err | Format-List; throw 'FUN_EV_RECOVERY_PARSE_HOLD' }
+      - name: Run recovery source tests and native Audit only, never Recover
+        shell: pwsh
+        run: node --test test/ev-wireviz-recovery-v5.test.mjs
