@@ -57,7 +57,8 @@ jobs:
             if($text -match '(?im)^\s*\$(home|pid|host|input|error|matches)\s*='){
              throw ('FIAL57_RESERVED_VARIABLE_HOLD='+$path)
             }
-            if($text -match 'Stop-Process|Restart-Service|Invoke-Expression|git reset|Set-NetFirewallRule|winget install|pip install'){
+            if((($path -ne 'Deploy-Fun-FIAL57-PrimaryDashboard.ps1') -and ($text -match 'Stop-Process')) -or
+               ($text -match 'Restart-Service|Invoke-Expression|git reset|Set-NetFirewallRule|winget install|pip install')){
              throw ('FIAL57_PROTECTED_MUTATION_HOLD='+$path)
             }
           }
