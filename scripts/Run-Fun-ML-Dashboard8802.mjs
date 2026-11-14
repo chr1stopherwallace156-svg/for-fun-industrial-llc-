@@ -16,11 +16,13 @@ import {readExecutiveStatus} from '../src/operator/executive-ops-v1.mjs';
 import {EXEC_PAGE,EXEC_CLIENT,EXEC_CONSOLE_VERSION} from '../src/operator/executive-console-v1.mjs';
 import {readRealStatus,VERSION as REAL_VERSION} from '../src/operator/real-operations-v5-5.mjs';
 import {readBusinessCompetenceStatus,OPERATOR_VERSION} from '../src/competence/business-operator-v5-6.mjs';
+import {readOutcomeStatus,VERSION as OUTCOME_VERSION} from '../src/outcomes/outcome-engine-v5-7.mjs';
 import {planBusinessDecision} from '../src/competence/business-knowledge-v5-6.mjs';
 import {calculateFinancials} from '../src/competence/business-finance-v5-6.mjs';
 import {reviewBusinessWriting} from '../src/competence/business-writing-v5-6.mjs';
 const REAL_WIDGET=new URL('../src/operator/real-operations-widget-v5-5.js',import.meta.url);
 const BUSINESS_CLIENT=new URL('../src/competence/business-console-v5-6.js',import.meta.url);
+const OUTCOME_CLIENT=new URL('../src/outcomes/outcome-console-v5-7.js',import.meta.url);
 
 export const HOST='127.0.0.1',PORT=8802,ORIGIN='http://127.0.0.1:8802';
 const MAX_PAGE=240000,MAX_PROXY=12*1024*1024;
@@ -176,6 +178,7 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
  readCommerceWidget=()=>readFile(COMMERCE_WIDGET,'utf8'),
  executiveStatus=readExecutiveStatus,realStatus=readRealStatus,
  businessStatus=readBusinessCompetenceStatus,businessPlan=planBusinessDecision,
+ outcomeStatus=readOutcomeStatus,
  readUiClient=()=>readFile(UI_CLIENT,'utf8'),readUiStyle=()=>readFile(UI_CSS,'utf8')}={}){
   return http.createServer(async(req,res)=>{
     try{
@@ -198,6 +201,20 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
       }
       if(req.method==='GET'&&u.pathname==='/api/operator/client.js'){
         return send(res,200,await readFile(EXEC_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      }
+      if(req.method==='GET'&&u.pathname==='/api/operator/outcomes/client.js'){
+        return send(res,200,await readFile(OUTCOME_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      }
+      if(req.method==='GET'&&u.pathname==='/api/operator/outcomes/status'){
+        const result=await outcomeStatus();
+        if(result.version!==OUTCOME_VERSION||
+          (result.state!=='NOT_ACTIVATED'&&(
+            result.external_form_submissions!==0||
+            result.verified_customer_revenue!==0||result.certified_license_status!==false||
+            !Number.isInteger(result.send_attempts)||result.send_attempts<0||result.send_attempts>1||
+            !['NO_CONFIRMED_EXTERNAL_OUTCOME','ONE_GMAIL_SEND_RECEIPT'].includes(result.progress_measure)
+          )))throw Error('FIAL57_OUTCOME_STATUS_UNVERIFIED');
+        return send(res,200,result);
       }
       if(req.method==='GET'&&u.pathname==='/api/operator/competence/client.js'){
         return send(res,200,await readFile(BUSINESS_CLIENT,'utf8'),'text/javascript; charset=utf-8');
