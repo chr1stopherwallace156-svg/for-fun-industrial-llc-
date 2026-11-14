@@ -22,5 +22,5 @@ test('WireViz venv installation verifies upstream primary wheel hash',()=>{
 });
 test('no cross-project or process lifecycle commands',()=>{
  assert.doesNotMatch(src,/\b(?:Restart-Service|Stop-Service|Start-Service|Register-ScheduledTask|Stop-Process|Start-Process|Invoke-Expression|Remove-Item)\b/);
- assert.doesNotMatch(src,/Elektron|Ollama|REA|127\.0\.0\.1/i);
+ assert.doesNotMatch(src,/Elektron|Ollama|\bREA\b|127\.0\.0\.1/i);
 });
