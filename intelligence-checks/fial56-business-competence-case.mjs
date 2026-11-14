@@ -104,7 +104,7 @@ test('optional Markdown and Vale adapter are bounded and do not rewrite source f
   assert.equal(doc.state,'LOCAL_MARKDOWN_READ');
   assert.match(doc.text,/Business correspondence/);
   const prior=await readFile(path,'utf8');
-  const vale=await runValeCheck(path,{executable:'vale-no-such-binary'});
+  const vale=await runValeCheck(path,{executable:'C:\\missingfial56\\vale.exe'});
   assert.match(vale.state,/^HOLD_VALE_/);
   assert.equal(await readFile(path,'utf8'),prior);
   await assert.rejects(inspectBusinessDocument('http://evil.invalid/sample.pdf'),/PATH_OR_EXTENSION_REFUSED/);
