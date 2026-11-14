@@ -66,6 +66,102 @@ jobs:
             if(!$install.Contains($s) -and $s -ne 'PROFILE_REJECTED'){throw ('FIAL55_GUARD_MISSING='+$s)}
           }
           Write-Host 'FIAL55_SCHEDULER_GUARDS=PASS'
+      - name: Execute actual Windows dashboard readiness with mocked real operator API
+        shell: pwsh
+        run: |
+          $filename=Join-Path $PWD 'Deploy-Fun-FIAL55-PrimaryDashboard.ps1'
+          $tokens=$null;$errors=$null
+          $tree=[Management.Automation.Language.Parser]::ParseFile($filename,[ref]$tokens,[ref]$errors)
+          if(@($errors).Count){throw 'FIAL55_DASHBOARD_DEPLOY_PARSE_HOLD'}
+          $functions=$tree.FindAll({param($node)
+            $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'ReadyNew'
+          },$true)
+          if(@($functions).Count -ne 1){throw 'FIAL55_DASHBOARD_READINESS_NOT_UNIQUE'}
+          $fixture=@'
+          Set-StrictMode -Version Latest
+          $Runner='C:\test\scripts\Run-Fun-ML-Dashboard8802.mjs'
+          $Url='http://127.0.0.1:8802'
+          $OldCommerceShopifyConfigured=$false
+          $ElevateReal=$false
+          function Hold([string]$message){throw ('MOCK_HOLD='+$message)}
+          function Owner([int]$port){
+            if($port -ne 8802){throw 'WRONG_PORT'}
+            return [pscustomobject]@{ProcessId=9988;CommandLine=('node.exe "'+$Runner+'" --serve')}
+          }
+          function GetJson([string]$path){
+            switch($path){
+              '/api/fun/hub/status' {return [pscustomobject]@{version='fi-ml-hub-v3'}}
+              '/api/ml/dashboard/status' {return [pscustomobject]@{state='ready'}}
+              '/api/fial/grounded/status' {return [pscustomobject]@{
+                version='fial5.3-primary-grounded-chat-v1';model_interface='fixed_local_qwen_8088'
+                memory_interface='fixed_readonly_cognee_8789';authority_added=$false;tool_executions=0}}
+              '/api/commerce/status' {return [pscustomobject]@{version='commerce';shopify=[pscustomobject]@{configured=$false}}}
+              '/api/unified/status' {return [pscustomobject]@{state='ready'}}
+              '/api/operator/status' {return [pscustomobject]@{
+                version='fial5.4-executive-operator-v1';console_version='fial5.4-executive-console-v1'
+                outbound_permissions=[pscustomobject]@{email_sent=0;government_filings=0;spent_usd=0;rea_runs=0}}}
+              '/api/operator/real/status' {return [pscustomobject]@{
+                version='fial5.5-real-business-operations-v1'
+                company_identity_status='OPERATOR_PROVIDED_NOT_OFFICIALLY_VERIFIED'
+                government_filings=$(if($ElevateReal){1}else{0});emails_sent=0;payments=0;rea_executions=0;applied_configs=0}}
+              default {throw ('UNKNOWN_GET_JSON='+$path)}
+            }
+          }
+          function Invoke-WebRequest {
+            param([string]$Uri,[switch]$UseBasicParsing,[int]$TimeoutSec)
+            if($Uri.EndsWith('/unified/?view=chat')){
+              return [pscustomobject]@{StatusCode=200;Content='id="fi-fial53-grounded" id="action-review" fi-ml-panel fi-commerce-panel'}
+            }
+            if($Uri.EndsWith('/api/fial/grounded/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='textContent x-fi-chat-click'}
+            }
+            if($Uri.EndsWith('/operations/')){
+              return [pscustomobject]@{StatusCode=200;Content='fi-exec-queue Executive Assistant fi-real-work'}
+            }
+            if($Uri.EndsWith('/api/operator/client.js') -or $Uri.EndsWith('/api/operator/real/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='textContent'}
+            }
+            if($Uri.EndsWith('/')){
+              return [pscustomobject]@{StatusCode=200;Content='fi-ui-shell'}
+            }
+            throw ('UNKNOWN_HTTP='+$Uri)
+          }
+          $originalHome=$HOME
+          ReadyNew 9988
+          if($HOME -cne $originalHome){throw 'FIAL55_READINESS_MUTATED_HOME'}
+          $ElevateReal=$true
+          $held=$false
+          try{ReadyNew 9988}catch{
+            if([string]$_.Exception.Message -match 'NEW_DASHBOARD_HEALTH_OR_POLICY_MISMATCH'){$held=$true}
+            else{throw}
+          }
+          if(!$held){throw 'FIAL55_DASHBOARD_ACCEPTED_UNAUTHORIZED_FILING'}
+          $held=$false
+          try{ReadyNew 9999}catch{
+            if([string]$_.Exception.Message -match 'NEW_8802_OWNER_DRIFT'){$held=$true}
+            else{throw}
+          }
+          if(!$held){throw 'FIAL55_DASHBOARD_ACCEPTED_WRONG_PID'}
+          Write-Host 'FIAL55_REAL_POWERSHELL_READINESS=PASS'
+          '@
+          & ([scriptblock]::Create($functions[0].Extent.Text+[Environment]::NewLine+$fixture))
+      - name: Protect only 8802 replacement with pinned FIAL5.4 rollback source
+        shell: pwsh
+        run: |
+          $s=Get-Content 'Deploy-Fun-FIAL55-PrimaryDashboard.ps1' -Raw
+          foreach($required in @('FIAL55_PRIMARY_DASHBOARD_CONSOLIDATION=PASS',
+             'FIAL55_ROLLBACK_OLD_PRIMARY_DASHBOARD=PASS',
+             'OLD_DASHBOARD_SOURCE_NOT_REVIEWED',
+             'PROTECTED_PROCESS_CHANGED_PORT_',
+             'REAL_OPERATIONS_SCHEDULE_NOT_VERIFIED',
+             'FIAL55_REAL_WORK_RECEIPT_MISSING')){
+            if(!$s.Contains($required)){throw ('FIAL55_ROLLBACK_GUARD_MISSING='+$required)}
+          }
+          if($s -match '(?im)^\s*\$(home|pid|host)\s*=' -or
+             $s -match '(?<!@)\(Listeners 8802\)\.Count'){
+            throw 'FIAL55_DEPLOY_STRICTMODE_REGRESSION'
+          }
+          Write-Host 'FIAL55_PINNED_ROLLBACK_GUARDS=PASS'
       - name: Prohibit public business contact details in repository code
         shell: pwsh
         run: |
