@@ -54,3 +54,14 @@ test("reject symlink-backed destination when host permits creating symlinks",(t)
   assert.match(r.stderr,/EV_UNSAFE_PATH_HOLD/);
  }finally{rmSync(root,{recursive:true,force:true});rmSync(other,{recursive:true,force:true})}
 });
+
+test("Fun-only project metadata and status contain no cross-project tracking",()=>{
+ const root=mkdtempSync(join(tmpdir(),"fun-ev-isolated-"));
+ try{
+  let r=run(root,"status");assert.equal(r.status,0);
+  assert.equal(Object.hasOwn(JSON.parse(r.stdout),"elektron_modified"),false);
+  r=run(root,"init","fun-ev-isolated");assert.equal(r.status,0,r.stderr);
+  const p=JSON.parse(readFileSync(join(root,"fun-ev-isolated","project.json"),"utf8"));
+  assert.equal(p.owner,"Fun Industrial");assert.equal(p.customer,null);
+ }finally{rmSync(root,{recursive:true,force:true})}
+});
