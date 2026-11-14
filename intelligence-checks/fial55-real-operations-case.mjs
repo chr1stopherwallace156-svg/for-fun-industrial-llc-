@@ -123,3 +123,33 @@ test('full bounded combined cycle reuses previous executive engine without claim
   const status=await readRealStatus({root:p.root});assert.equal(status.version,VERSION);
  }finally{await rm(p.parent,{recursive:true,force:true})}
 });
+
+
+test('old Fun Industrial LLC grants profile is held until genuine Elektron applicant profile is verified',async()=>{
+ const p=await roots();
+ try{
+  await storeIdentity(C,{root:p.root});await mkdir(p.grant,{recursive:true});
+  await writeFile(join(p.root,'work-register-v1.json'),JSON.stringify({
+   schema:'executive-operator-work-register-v1',items:[]}));
+  await writeFile(join(p.grant,'last-run.json'),JSON.stringify({
+   version:'fun-real-application-worker-v1',
+   state:'REAL_SOURCE_SCANNED_DRAFTS_PREPARED',source_sha256:'b'.repeat(64),
+   submitted_applications:0,top_candidates:[{
+    grant_id:'12345',title:'Example program for legitimate business applicants',deadline_date:'2026-12-30'
+   }]
+  }));
+  await writeFile(join(p.grant,'business-profile.json'),JSON.stringify({business_name:'FUN INDUSTRIAL LLC'}));
+  const a=await runUnifiedCycle({root:p.root,grantRoot:p.grant,now:NOW,officialFetch:fetchMock});
+  const aState=JSON.parse(await readFile(join(p.root,'state-v1.json'),'utf8'));
+  assert.equal(aState.grants.state,'source_held');
+  assert.equal(aState.grants.issue,'GRANT_APPLICANT_PROFILE_MISMATCH_OR_MISSING');
+  assert.equal(aState.items.filter(x=>x.source.startsWith('verified_local_grants_snapshot:')).length,0);
+  await writeFile(join(p.grant,'business-profile.json'),JSON.stringify({business_name:'ELEKTRON INDUSTRIAL LLC'}));
+  const b=await runUnifiedCycle({root:p.root,grantRoot:p.grant,now:new Date(+NOW+120000),officialFetch:fetchMock});
+  const bState=JSON.parse(await readFile(join(p.root,'state-v1.json'),'utf8'));
+  assert.equal(bState.grants.state,'verified_local_snapshot');
+  assert.ok(bState.items.some(x=>x.kind==='funding'&&x.company==='elektron'&&
+   x.title.includes('Example program')));
+  assert.equal(b.real.government_filings,0);
+ }finally{await rm(p.parent,{recursive:true,force:true})}
+});
