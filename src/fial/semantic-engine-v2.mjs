@@ -83,7 +83,7 @@ export async function extractWithLocalQwen({program,record,fields,fetchImpl=fetc
   const r=await fetchImpl(LOCAL_QWEN,{method:"POST",redirect:"error",
    headers:{"content-type":"application/json"},signal:controller.signal,
    body:JSON.stringify({model:"local",messages:promptFor(program,record,fields),
-    temperature:0,max_tokens:380,stream:false})});
+    temperature:0,max_tokens:380,stream:false,response_format:{type:"json_object"}})});
   const obj=await boundedJsonResponse(r,MAX_RESPONSE_BYTES);
   const content=obj?.choices?.[0]?.message?.content;
   if(typeof content!=="string"||content.length>12000)throw Error("FIAL2_QWEN_CONTENT_INVALID");
