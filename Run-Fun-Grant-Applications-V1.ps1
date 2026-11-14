@@ -12,7 +12,7 @@ if(!(Test-Path -LiteralPath $Worker -PathType Leaf)){Hold 'WORKER_SOURCE_MISSING
 if((Get-Item -LiteralPath $Worker).Attributes -band [IO.FileAttributes]::ReparsePoint){Hold 'WORKER_SYMLINK_REFUSED'}
 $node=(Get-Command node.exe -ErrorAction Stop).Source
 New-Item -ItemType Directory -Path $Storage -Force|Out-Null
-$mutex=New-Object System.Threading.Mutex($false,'Local\FunIndustrial-GrantApplications-V1')
+$mutex=[System.Threading.Mutex]::new($false,'Local\FunIndustrial-GrantApplications-V1')
 $own=$false
 try{
  $own=$mutex.WaitOne(0)
