@@ -34,5 +34,5 @@ try{
   console.log(JSON.stringify({version:VERSION,status:status.state||status.version,
     last_cycle:status.when_utc||null,artifacts:status.artifacts?.length||0,
     external_actions:status.external_actions||'NONE'},null,2));
- }else throw Error('ALLOWED_ARGS=--once|--status|--set-local-profile-stdin');
+ }else throw Error('ALLOWED_ARGS=--once|--status|--set-local-profile-stdin|--connect-elektron-gmail');
 }catch(e){console.error('FIAL55_HOLD='+String(e.message||e).slice(0,220));process.exitCode=1}
