@@ -50,6 +50,13 @@ jobs:
             'FIAL53_PRIMARY_DASHBOARD_CONSOLIDATION=PASS','FIAL53_TOOLS_AND_REA_APPROVAL_UI=PRESERVED')){
             if(!$source.Contains($required)){throw ('FIAL53_DEPLOY_GUARD_MISSING_'+$required)}
           }
+          if($source -match '\$ml\.state'){throw 'FIAL53_ML_WRONG_STATUS_FIELD'}
+          if(!$source.Contains("$ml.version -cne 'fun-qwen-scikit-v2'") -or
+             !$source.Contains('$ml.pythonInstalled -ne $true') -or
+             !$source.Contains('$ml.reaExecutionGrants -ne 0') -or
+             !$source.Contains('$ml.externalActions -ne 0')){
+            throw 'FIAL53_ML_ACTUAL_SCHEMA_GUARDS_MISSING'
+          }
           if($source -match 'Invoke-Expression|Set-NetFirewallRule|git reset|git checkout|pip install|/admin/shutdown'){
             throw 'FIAL53_UNEXPECTED_PROTECTED_MUTATION'
           }
