@@ -89,7 +89,7 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),readPage=pageFr
       if(typeof req.url!=='string'||!req.url.startsWith('/')||req.url.startsWith('//')||req.url.includes('\\'))
         return send(res,400,{error:'ML_HUB_REQUEST_TARGET_INVALID'});
       const u=new URL(req.url,ORIGIN);
-      if(u.search||u.pathname.includes('..'))return send(res,400,{error:'ML_HUB_INVALID_PATH'});
+      if(u.search.length>2048||u.pathname.includes('..'))return send(res,400,{error:'ML_HUB_INVALID_PATH'});
       if(req.method==='GET'&&['/','/unified/'].includes(u.pathname)){
         const unified=u.pathname==='/unified/';
         const source=await readPage(unified?8798:8789);
