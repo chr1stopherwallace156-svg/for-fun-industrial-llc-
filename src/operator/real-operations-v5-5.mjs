@@ -213,6 +213,27 @@ export async function runRealOperationsCycle({root=ROOT(),sourceFile=null,now=ne
   {id:'sos-entity-verification',type:'filing_preparation',target:OFFICIAL.bizfile,text:draftSos(p)}
  ];
  const saved=[];
+ // Propose the correct applicant profile but NEVER overwrite the active grants
+ // worker profile or reclassify legacy drafts prepared under a different entity.
+ const c=p.company;
+ const proposed={
+  schema:'fun-business-grants-profile-v1',business_name:c.legal_name,
+  business_type:'California LLC — operator provided; official registration unverified',
+  business_description:null,
+  registered_address:c.business_address+', '+c.city+', '+c.state+' '+c.zip,
+  contact_name:c.owner,contact_email:c.email,contact_phone:c.phone,
+  eligible_business_verified:false,good_standing_verified:false,
+  tax_identifier_verified:false,proposed_project:null,verified_project_budget:null,
+  verified_matching_funds:false,
+  keywords:['industrial','manufacturing','technology','clean transportation','energy','workforce']
+ };
+ const proposedBody=JSON.stringify(proposed,null,2)+'\n';
+ const proposedHash=hex(proposedBody);
+ const proposedFile=join(dir,'elektron-grant-applicant-proposal-'+proposedHash.slice(0,14)+'.json');
+ const proposalCreated=await fresh(proposedFile,proposedBody);
+ saved.push({id:'elektron-grant-applicant-proposal',kind:'grant_profile_proposal',
+  state:proposalCreated?'LOCAL_ARTIFACT_CREATED':'ALREADY_PREPARED',
+  sha256:proposedHash,path:proposedFile,external_action:'NOT_PERFORMED'});
  for(const item of entries){
   const hash=hex(item.text),path=join(dir,item.id+'-'+hash.slice(0,14)+'.md');
   const created=await fresh(path,item.text);
