@@ -103,7 +103,13 @@ test("local Qwen provider stays exclusively on 127.0.0.1:8088 and fails closed o
   assert.equal(JSON.parse(init.body).model,"local-model");
   assert.equal(JSON.parse(init.body).stream,false);
   assert.deepEqual(JSON.parse(init.body).chat_template_kwargs,{enable_thinking:false});
-  assert.deepEqual(JSON.parse(init.body).response_format,{type:"json_object"});
+  const request=JSON.parse(init.body);
+  assert.equal(request.response_format.type,"json_schema");
+  assert.equal(request.response_format.schema.properties.claims.maxItems,1);
+  assert.deepEqual(request.response_format.schema.properties.claims.items.properties.field.enum,
+   ["purpose"]);
+  assert.equal(request.max_tokens,420);
+  assert.equal(request.reasoning_effort,"none");
   return modelResponse([{field:"purpose",quote:"nursing facility residents",
    interpretation:"Facility program relevance requires independent verification."}]);
  };
@@ -201,4 +207,82 @@ test("Qwen recovery starts only the missing verified llama.cpp instance, preserv
  assert.match(script,/Start-Process -FilePath \$Llama/);
  assert.match(script,/ProtectedPorts=@\(11434,8791,8789,8796,8797,8798,8801,8802,8443\)/);
  assert.doesNotMatch(script,/Stop-Process|taskkill|Stop-Service|Stop-Computer|net stop|ollama serve|git reset|git clean/);
+});
+
+
+test("malformed initial JSON triggers exactly one bounded retry with a smaller prompt",async()=>{
+ const program=compileSemantic(source);
+ let attempts=0;
+ const records=[];
+ const fetchImpl=async(url,init)=>{
+  attempts++;
+  assert.equal(url,LOCAL_QWEN);
+  const body=JSON.parse(init.body);
+  records.push(body);
+  if(attempts===1){
+   assert.equal(body.response_format.type,"json_schema");
+   return new Response(JSON.stringify({choices:[{finish_reason:"stop",
+    message:{content:'{"claims":[{"field":"purpose","quote":"nursing facility residents"' }}]}),
+    {status:200,headers:{"content-type":"application/json"}});
+  }
+  assert.equal(body.response_format.type,"json_object");
+  return modelResponse([{field:"purpose",quote:"nursing facility residents",
+   interpretation:"This program appears nursing-related."}]);
+ };
+ const result=await extractWithLocalQwen({program,record:ROW,
+  fields:{purpose:ROW.Purpose,description:ROW.Description},fetchImpl});
+ assert.equal(attempts,2);
+ assert.equal(result.attempts,2);
+ assert.equal(result.status,"MODEL_SOURCE_QUOTES_MATCHED");
+ assert.equal(result.accepted.length,1);
+ assert.equal(records[0].max_tokens,420);
+ assert.equal(records[1].max_tokens,280);
+ assert.ok(records[1].messages[1].content.length<=records[0].messages[1].content.length);
+});
+test("truncated Qwen output is never accepted, triggers one retry then explicitly holds",async()=>{
+ const program=compileSemantic(source);
+ let calls=0;
+ const response=async()=>{
+  calls++;
+  return new Response(JSON.stringify({choices:[{finish_reason:"length",
+   message:{content:'{"claims":[]}'}}]}),{status:200});
+ };
+ const outcome=await extractWithLocalQwen({program,record:ROW,fields:{purpose:ROW.Purpose},fetchImpl:response});
+ assert.equal(calls,2);
+ assert.equal(outcome.attempts,2);
+ assert.equal(outcome.status,"MODEL_OUTPUT_UNVERIFIED");
+ assert.equal(outcome.accepted.length,0);
+ assert.equal(outcome.output_validated,false);
+ assert.equal(outcome.error,"FIAL2_MODEL_OUTPUT_TRUNCATED");
+});
+test("schema rejection returns to compatible JSON mode once, no model restart",async()=>{
+ const program=compileSemantic(source);
+ let calls=0;
+ const result=await extractWithLocalQwen({program,record:ROW,fields:{purpose:ROW.Purpose},
+  fetchImpl:async(url,init)=>{
+   calls++;
+   if(calls===1){
+    assert.equal(JSON.parse(init.body).response_format.type,"json_schema");
+    return new Response('{"error":"schema not supported"}',{status:422});
+   }
+   assert.equal(JSON.parse(init.body).response_format.type,"json_object");
+   return modelResponse([{field:"purpose",quote:"nursing facility residents",
+    interpretation:"Needs official checks."}]);
+  }});
+ assert.equal(calls,2);
+ assert.equal(result.status,"MODEL_SOURCE_QUOTES_MATCHED");
+ assert.equal(result.attempts,2);
+});
+test("malformed content on both attempts cannot be repaired by appending fabricated braces",async()=>{
+ const program=compileSemantic(source);
+ let calls=0;
+ const result=await extractWithLocalQwen({program,record:ROW,fields:{purpose:ROW.Purpose},
+  fetchImpl:async()=>{calls++;
+   return new Response(JSON.stringify({choices:[{message:{content:'{"claims":[{"field":"purpose"}]'}}]}),{status:200});
+  }});
+ assert.equal(calls,2);
+ assert.equal(result.status,"MODEL_OUTPUT_UNVERIFIED");
+ assert.equal(result.accepted.length,0);
+ assert.equal(result.rejected.length,0);
+ assert.equal(result.error,"FIAL2_MODEL_JSON_INVALID");
 });
