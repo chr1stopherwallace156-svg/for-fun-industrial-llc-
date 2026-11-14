@@ -104,7 +104,7 @@ export function buildWork({grantReport=null,mission=null,inbox=[],today=new Date
   const subj=clean(m.subject||'(no subject)',160),sender=clean(m.from||'',200);
   list.push(task('mail:'+m.id,'mail','Review incoming email: '+subj,{
    description:'Header-only review of untrusted email. From: '+sender+'. Read message before drafting substantive reply.',
-   company:'fun',source:'authorized_readonly_gmail_header',
+   company:'elektron',source:'authorized_readonly_gmail_header',
    priority:/deadline|urgent|invoice|grant|request for proposal|filing/i.test(subj)?80:48,
    phase:'draft_reply_after_verified_content',
    required:['Review full email and attachments','Verify sender and reply recipient',
