@@ -10,6 +10,7 @@ on:
       - "scripts/Run-Fun-ML-Dashboard8802.mjs"
       - "scripts/Run-Fun-Business-Competence-V5-6.mjs"
       - "Run-Fun-Business-Competence-V5-6.ps1"
+      - "Activate-Fun-Business-Competence-V5-6.ps1"
       - "Install-Fun-Business-Competence-V5-6.ps1"
       - "Deploy-Fun-FIAL56-PrimaryDashboard.ps1"
       - "intelligence-checks/fial56-*.mjs"
@@ -53,6 +54,7 @@ jobs:
         run: |
           foreach($path in @(
            'Run-Fun-Business-Competence-V5-6.ps1',
+           'Activate-Fun-Business-Competence-V5-6.ps1',
            'Install-Fun-Business-Competence-V5-6.ps1',
            'Deploy-Fun-FIAL56-PrimaryDashboard.ps1')){
             $tokens=$null;$errors=$null
@@ -75,6 +77,14 @@ jobs:
            'FIAL56_SCHEDULER_ROLLBACK=OLD_FIAL55_RESTORED',
            'FIAL56_NO_MODEL_STARTS_NO_EXTERNAL_ACTIONS=TRUE')){
             if(!$installer.Contains($expected)){throw ('FIAL56_SCHEDULER_GUARD_MISSING='+$expected)}
+          }
+          $activation=Get-Content 'Activate-Fun-Business-Competence-V5-6.ps1' -Raw
+          foreach($marker in @(
+            'FIAL56_PHASE_1=SCHEDULER_AND_LOCAL_COMPETENCE_PASS',
+            'FIAL56_PHASE_2=PRIMARY_8802_DASHBOARD_PASS',
+            'FIAL56_ALL_IN_ONE=PASS',
+            'FIAL56_ALL_IN_ONE_HOLD=')){
+            if(!$activation.Contains($marker)){throw ('FIAL56_ORCHESTRATOR_MARKER_MISSING='+$marker)}
           }
           Write-Host 'FIAL56_WINDOWS_POWERSHELL_PARSE_AND_SCHEDULER_GUARDS=PASS'
       - name: Validate pinned prior Windows runner SHA after checkout filters
