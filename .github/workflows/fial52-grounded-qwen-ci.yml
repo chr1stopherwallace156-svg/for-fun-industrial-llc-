@@ -1,0 +1,48 @@
+name: Fun Industrial FIAL5.2 Grounded Qwen CI
+on:
+  push:
+    branches:
+      - feature/fial5-2-qwen-grounded-replies-20261114
+    paths:
+      - "src/fial/grounded-chat-v5-2.mjs"
+      - "scripts/Run-Fun-QwenGrounded8806.mjs"
+      - "Start-Fun-Qwen-Grounded-V5-2.ps1"
+      - "intelligence-checks/fial-grounded-qwen-v5-2-case.mjs"
+      - ".github/workflows/fial52-grounded-qwen-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  grounded-chat:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Verify source syntax
+        shell: pwsh
+        run: |
+          node --check src/fial/grounded-chat-v5-2.mjs
+          node --check scripts/Run-Fun-QwenGrounded8806.mjs
+          node --check intelligence-checks/fial-grounded-qwen-v5-2-case.mjs
+      - name: Exercise Qwen grounded response and safety tests
+        run: node --test intelligence-checks/fial-grounded-qwen-v5-2-case.mjs
+      - name: Verify guarded one-command Windows activation
+        shell: pwsh
+        run: |
+          $tokens=$null;$errors=$null
+          $p=Join-Path $PWD 'Start-Fun-Qwen-Grounded-V5-2.ps1'
+          [System.Management.Automation.Language.Parser]::ParseFile($p,[ref]$tokens,[ref]$errors)|Out-Null
+          if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};throw 'FIAL52_POWERSHELL_PARSE_FAILED'}
+          $s=Get-Content $p -Raw
+          foreach($token in @('QWEN_GROUNDED_TESTS_FAILED','SOURCE_WORKTREE_DIRTY','8806_UNKNOWN_OWNER_NO_RESTART',
+           'PROTECTED_SERVICE_CHANGED_PORT_','MEMORY_WRITES=0 REA_EXECUTIONS=0 MODEL_STARTS=0',
+           'LIVE_GROUNDED_QWEN_ANSWER_NOT_VERIFIED_REVIEW_STATUS_NO_RETRY')){
+            if(!$s.Contains($token)){throw ('FIAL52_STARTUP_GUARD_MISSING_'+$token)}
+          }
+          if($s -match 'Stop-Process|Restart-Service|Stop-Service|Set-NetFirewallRule|Invoke-Expression|git reset|pip install'){
+           throw 'FIAL52_UNEXPECTED_MUTATION'
+          }
+          Write-Host 'FIAL52_WINDOWS_STARTUP_GUARDS=PASS'
