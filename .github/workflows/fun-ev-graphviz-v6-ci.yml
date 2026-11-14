@@ -1,0 +1,39 @@
+name: Fun EV Graphviz V6 - Windows Audit
+on:
+  push:
+    branches:
+      - feature/fun-ev-graphviz-native-v6-20261114
+    paths:
+      - 'Run-Fun-EV-Graphviz-V6.ps1'
+      - 'test/ev-graphviz-v6.test.mjs'
+      - '.github/workflows/fun-ev-graphviz-v6-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  graphviz-audit-contract:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Windows PowerShell syntax AST
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [void][Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'Run-Fun-EV-Graphviz-V6.ps1'),[ref]$tokens,[ref]$errors)
+          if (@($errors).Count) { $errors | Format-List; throw 'FUN_EV_V6_AST_HOLD' }
+      - name: Static and live native Audit tests, no install
+        shell: pwsh
+        run: node --test test/ev-graphviz-v6.test.mjs
+      - name: Confirm read-only report, no install
+        shell: powershell
+        run: |
+          $output=& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\Run-Fun-EV-Graphviz-V6.ps1 -Action Audit
+          if ($LASTEXITCODE -ne 0) { throw 'FUN_EV_V6_AUDIT_HOLD' }
+          $result = ($output -join [Environment]::NewLine) | ConvertFrom-Json
+          if ($result.installer_executed -ne $false -or $result.mode -ne 'READ_ONLY') { throw 'FUN_EV_V6_MODE_HOLD' }
+          'FUN_EV_GRAPHVIZ_AUDIT=PASS'
