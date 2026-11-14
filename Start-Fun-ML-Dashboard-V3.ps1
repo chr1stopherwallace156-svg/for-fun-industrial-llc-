@@ -82,6 +82,15 @@ if($null -eq $parent -or $null -eq $chat -or $null -eq $ml){
     $startChat=Join-Path $Root 'Start-Fun-Unified-Chat8798.ps1'
     if(-not(Test-Path -LiteralPath $startChat -PathType Leaf)){Hold '8798_DEDICATED_STARTER_MISSING'}
     if((Get-Item -LiteralPath $startChat).Attributes -band [IO.FileAttributes]::ReparsePoint){Hold '8798_DEDICATED_STARTER_SYMLINK_REFUSED'}
+    # The dependency helper brings up only missing 8796 and 8797 sidecars,
+    # independently of changed 8789 server.mjs. It refuses occupied unhealthy
+    # listeners and performs no REA tool calls or service restarts.
+    $dependencyHelper=Join-Path $Root 'Start-Fun-Local-Dependencies-V3.ps1'
+    if(-not(Test-Path -LiteralPath $dependencyHelper -PathType Leaf)){Hold 'LOCAL_DEPENDENCY_HELPER_MISSING'}
+    if((Get-Item -LiteralPath $dependencyHelper).Attributes -band [IO.FileAttributes]::ReparsePoint){Hold 'LOCAL_DEPENDENCY_HELPER_SYMLINK_REFUSED'}
+    Write-Host 'FUN_ML_RECOVERY=CHECK_8796_8797_AND_START_ONLY_MISSING_SIDECARS'
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $dependencyHelper
+    if($LASTEXITCODE -ne 0){Hold 'LOCAL_DEPENDENCY_RECOVERY_FAILED_NO_RETRY'}
     foreach($needed in @(8088,8791,8796,8797)){
       $listeners=@(Listener $needed)
       if($listeners.Count -ne 1 -or $listeners[0].LocalAddress -ne '127.0.0.1'){
