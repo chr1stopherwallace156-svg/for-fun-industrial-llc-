@@ -60,7 +60,7 @@ If a listener exists but its HTTP endpoint is unresponsive, the script refuses t
 
 To diagnose without starting new processes, run Start-Fun-ML-Dashboard-V3.ps1 -CheckOnly after updating the branch. That returns a named missing-service hold if necessary.
 
-Offline recovery contract tests validate the safety checks in source; they do not constitute a live Windows service-recovery test. The combined launcher runs 25 offline tests (the original 18 plus seven source-contract tests) before recovery or hub startup. Static checks do not prove a live Windows launch.
+Offline recovery contract tests validate the safety checks in source; they do not constitute a live Windows service-recovery test. The combined launcher runs 26 offline tests (the original 18 plus seven source-contract tests) before recovery or hub startup. Static checks do not prove a live Windows launch.
 
 The November 13 repair for `8789_SOURCE_HASH_CHANGED_MANUAL_REVIEW_NO_RESTORE` intentionally does **not** change the stored hash or bypass the hash check for launching the original 8789. It simply avoids launching 8789 when it is already HTTP-healthy and only 8798 is missing. The on-disk 8789 hash mismatch remains an independent review item before any future 8789 restart.
 
@@ -78,3 +78,7 @@ After both sidecars are healthy, the existing dedicated Start-Fun-Unified-Chat87
 No extra Termius commands should be needed for these *known missing sidecars*; rerun the same fast-forward-and-launch command. If any dependency has drifted, the launcher holds with a named error. The source-contract checks are not a substitute for Windows live verification.
 
 The dedicated 8798 launcher can adopt a separately running Qwen on port 8088 when the original dashboard's own AI-status endpoint says stopped. It checks the loopback listener, process name llama-server.exe, Qwen3-4B-Q4_K_M.gguf model marker, and the existing /health endpoint. It never starts a second model, changes CPU allocation, or stops the original processes.
+
+## Degraded-but-listening 8798 recovery
+
+An HTTP 200 response and correct version from `/api/unified/status` are not enough to declare 8798 healthy: it can remain in `state=degraded` with `local.ready=false` or `rea.ready=false` while 8796 or 8797 is missing. The launcher now checks 8798's `state`, `ai.ready`, `local.ready` and `rea.ready`. If a verified 8798 process exists but is degraded, the script invokes `Start-Fun-Local-Dependencies-V3.ps1` to launch *only missing* 8796/8797, and re-probes the **same** 8798 instance. It does not call `Start-Fun-Unified-Chat8798.ps1` for an existing 8798 listener. If recovery cannot restore readiness, it reports `8798_STILL_DEGRADED_AFTER_SIDECAR_RECOVERY_NO_RESTART` and does not launch 8802. The offline suite now includes a source-contract test for this path. Actual Windows service readiness must still be confirmed by running the launcher.
