@@ -1,0 +1,45 @@
+name: Fun Industrial FIAL5.1 Eight Module Integration CI
+on:
+  push:
+    branches:
+      - feature/fial5-1-eight-module-integration-20261114
+    paths:
+      - "src/fial/module-*.js"
+      - "src/fial/module-*.mjs"
+      - "scripts/Run-Fun-FIAL-Integrations8805.mjs"
+      - "intelligence-checks/fial-eight-module-v5-1-case.mjs"
+      - "Start-Fun-FIAL-Integrations-V5-1.ps1"
+      - ".github/workflows/fial5-1-module-integration-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fial-module-integration:
+    runs-on: windows-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Verify actual eight-module adapter code
+        shell: pwsh
+        run: |
+          node --check src/fial/module-adapters-v5-1.mjs
+          node --check src/fial/module-widget-v5-1.js
+          node --check scripts/Run-Fun-FIAL-Integrations8805.mjs
+          node --check intelligence-checks/fial-eight-module-v5-1-case.mjs
+      - name: Run independent module operation and HTTP permission cases
+        run: node --test intelligence-checks/fial-eight-module-v5-1-case.mjs
+      - name: Verify PowerShell startup safeguards
+        shell: pwsh
+        run: |
+          $tokens=$null;$errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'Start-Fun-FIAL-Integrations-V5-1.ps1'),[ref]$tokens,[ref]$errors)|Out-Null
+          if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};throw 'FIAL51_PS_PARSE_HOLD'}
+          $body=Get-Content 'Start-Fun-FIAL-Integrations-V5-1.ps1' -Raw
+          foreach($token in @('SOURCE_WORKTREE_DIRTY','FIAL5_CORE_INCOMPATIBLE_OR_OFFLINE','8805_OWNER_NOT_VERIFIED_NO_RESTART','PROTECTED_SERVICE_CHANGED_PORT_','FIAL51_WHOLE_SYSTEM_ACTIVATION=PASS')){
+            if(!$body.Contains($token)){throw ('FIAL51_GUARD_MISSING_'+$token)}
+          }
+          if($body -match 'Stop-Process|Restart-Service|Stop-Service|Set-NetFirewallRule|Invoke-Expression'){throw 'FIAL51_UNRELATED_CONTROL_HOLD'}
+          Write-Host 'FIAL51_WINDOWS_LAUNCHER=PASS'
