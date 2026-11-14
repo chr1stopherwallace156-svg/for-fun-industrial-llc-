@@ -68,12 +68,31 @@ if($null -eq $parent -or $null -eq $chat -or $null -eq $ml){
   $recoveryPorts=@(11434,8088,8791,8789,8796,8797,8798,8801,8443)
   $preRecovery=@{}
   foreach($p in $recoveryPorts){$preRecovery[$p]=Snapshot $p}
-  if($null -eq $parent -or $null -eq $chat){
+  if($null -eq $parent){
+    # Only use the full starter if the original dashboard is genuinely absent.
+    # Its pinned 8789 source hash check remains mandatory and unchanged.
     $startScript=Join-Path $Root 'Start-Fun-Industrial.ps1'
     if(-not(Test-Path -LiteralPath $startScript -PathType Leaf)){Hold 'GUARDED_STARTER_MISSING'}
-    Write-Host 'FUN_ML_RECOVERY=START_MISSING_FUN_CORE_NO_GATEWAY_CHANGES'
+    Write-Host 'FUN_ML_RECOVERY=ORIGINAL_8789_MISSING_FULL_GUARDED_START_NO_GATEWAY_CHANGES'
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $startScript -SkipPrivateGateway
     if($LASTEXITCODE -ne 0){Hold 'CORE_RECOVERY_FAILED_NO_RETRY'}
+  }elseif($null -eq $chat){
+    # A healthy original 8789 is adopted, not reloaded. The changed on-disk
+    # 8789 source is neither used nor trusted to create 8798.
+    $startChat=Join-Path $Root 'Start-Fun-Unified-Chat8798.ps1'
+    if(-not(Test-Path -LiteralPath $startChat -PathType Leaf)){Hold '8798_DEDICATED_STARTER_MISSING'}
+    if((Get-Item -LiteralPath $startChat).Attributes -band [IO.FileAttributes]::ReparsePoint){Hold '8798_DEDICATED_STARTER_SYMLINK_REFUSED'}
+    foreach($needed in @(8088,8791,8796,8797)){
+      $listeners=@(Listener $needed)
+      if($listeners.Count -ne 1 -or $listeners[0].LocalAddress -ne '127.0.0.1'){
+        Hold ('8798_DEPENDENCY_'+$needed+'_NOT_READY_NO_AUTOMATIC_RESTART')
+      }
+    }
+    $originalTools=Invoke-RestMethod 'http://127.0.0.1:8789/api/ai/tools' -TimeoutSec 10 -ErrorAction Stop
+    if([int]$originalTools.local_tool_count -ne 19){Hold '8798_ORIGINAL_LOCAL_CATALOGUE_MISMATCH'}
+    Write-Host 'FUN_ML_RECOVERY=START_ONLY_MISSING_8798_ORIGINAL_8789_PRESERVED'
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $startChat
+    if($LASTEXITCODE -ne 0){Hold '8798_DEDICATED_RECOVERY_FAILED_NO_RETRY'}
   }
   if($null -eq $ml){
     $v2=Join-Path $HOME 'FunIndustrial-QwenML-V2'
