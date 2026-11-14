@@ -9,6 +9,8 @@ on:
       - "src/ui/integrated-hub-v1.js"
       - "scripts/Run-Fun-ML-Dashboard8802.mjs"
       - "intelligence-checks/fial-primary-dashboard-chat-v5-3-case.mjs"
+      - "intelligence-checks/integrated-hub-ui-v1-case.mjs"
+      - "Deploy-Fun-FIAL53-PrimaryDashboard.ps1"
       - ".github/workflows/fial53-primary-dashboard-chat-ci.yml"
   workflow_dispatch:
 permissions:
@@ -33,3 +35,22 @@ jobs:
       - name: Focused integration and previous dashboard regression tests
         run: |
           node --test intelligence-checks/fial-primary-dashboard-chat-v5-3-case.mjs intelligence-checks/fi-ml-hub-v3-case.mjs intelligence-checks/integrated-hub-ui-v1-case.mjs intelligence-checks/fial-grounded-qwen-v5-2-case.mjs intelligence-checks/commerce-opportunities-v1-1-case.mjs intelligence-checks/google-trends-focus-v1-2-case.mjs
+      - name: Parse Windows 8802-only deploy and rollback controls
+        shell: pwsh
+        run: |
+          $file=Join-Path $PWD 'Deploy-Fun-FIAL53-PrimaryDashboard.ps1'
+          $tokens=$null;$errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$errors)|Out-Null
+          if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};throw 'FIAL53_DEPLOY_POWERSHELL_PARSE_FAILED'}
+          $source=Get-Content $file -Raw
+          foreach($required in @('OLD_DASHBOARD_SOURCE_NOT_REVIEWED','OLD_PRIMARY_DASHBOARD_UNVERIFIED',
+            'SOURCE_SYMLINK_REJECTED','PRIMARY_DASHBOARD_TESTS_FAILED_BEFORE_REPLACEMENT',
+            '8802_PROCESS_OWNER_UNKNOWN_NO_RESTART','PROTECTED_PROCESS_CHANGED_PORT_',
+            'FIAL53_ROLLBACK_OLD_PRIMARY_DASHBOARD=PASS','LIVE_PRIMARY_GROUNDED_QWEN_NOT_QUALIFIED',
+            'FIAL53_PRIMARY_DASHBOARD_CONSOLIDATION=PASS','FIAL53_TOOLS_AND_REA_APPROVAL_UI=PRESERVED')){
+            if(!$source.Contains($required)){throw ('FIAL53_DEPLOY_GUARD_MISSING_'+$required)}
+          }
+          if($source -match 'Invoke-Expression|Set-NetFirewallRule|git reset|git checkout|pip install|/admin/shutdown'){
+            throw 'FIAL53_UNEXPECTED_PROTECTED_MUTATION'
+          }
+          Write-Host 'FIAL53_DEPLOYMENT_PARSE_AND_GUARDS=PASS'
