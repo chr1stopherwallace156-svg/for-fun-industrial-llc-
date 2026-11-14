@@ -123,6 +123,10 @@ export async function executeFial({source,report,profile,directory,now=new Date(
  const storeStat=await lstat(store);
  if(!storeStat.isDirectory()||storeStat.isSymbolicLink())throw Error("FIAL_STORAGE_UNTRUSTED");
  const dbPath=join(store,"fial-memory-v1.sqlite");
+ try{
+  const info=await lstat(dbPath);
+  if(!info.isFile()||info.isSymbolicLink())throw Error("FIAL_SQLITE_PATH_UNTRUSTED");
+ }catch(e){if(e.code!=="ENOENT")throw e}
  const db=new DatabaseSync(dbPath);
  const programHash=SHA(Buffer.from(source,"utf8"));
  const decisions=[],prepared=[];
@@ -153,8 +157,6 @@ export async function executeFial({source,report,profile,directory,now=new Date(
     upsert.run(key,state.fp,act==="DEFER"?1:0,matched.name,act,clock.toISOString());
     insert.run(randomUUID(),key,witness.sha256,programHash,matched.name,act,reason,clock.toISOString());
    }
-   // Durable decisions commit even if every grant is deferred or held.
-   db.exec("COMMIT");
    for(const {g,key,state,matched,d} of selected){
     const filename=key+"-"+state.fp.slice(0,12)+".md";
     const path=join(store,"briefs",filename);
@@ -166,6 +168,8 @@ export async function executeFial({source,report,profile,directory,now=new Date(
     catch(e){if(e.code!=="EEXIST")throw e}
     prepared.push({grant_id:g.grant_id,path,new_file:created,rule:matched.name});
    }
+   // Commit the decision ledger only after requested local output writes succeed.
+   db.exec("COMMIT");
   }catch(error){try{db.exec("ROLLBACK")}catch{}throw error}
  }finally{db.close()}
  const receipt={runtime:FIAL_RUNTIME,bytecode:program.bytecode,
