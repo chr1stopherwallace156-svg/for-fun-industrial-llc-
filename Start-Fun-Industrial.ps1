@@ -11,6 +11,9 @@ $Primary=Join-Path $HOME 'FunIndustrial-REA-MCP-Activation'
 $Source=Join-Path $Primary 'src\server.mjs'
 $GatewayHelper=Join-Path $Repo 'Start-Fun-Private-Gateway-V43.ps1'
 $ExpectedSourceSha='9C8667C1299102156968A79FD8CF524AC23EFAC25B7E924D369954EC638C6844'
+# Explicitly reviewed newer 8789 source from the prior successful approved-source deployment.
+# This is an exact Git content-object pin, NOT a general allowance for changed sources.
+$ReviewedEvidenceSourceBlob='422d4f75e57dc6099f7c6b05f535843d8f08929f'
 $QExe=Join-Path $HOME 'FunIndustrial\.runtime\llama.cpp\llama-server.exe'
 $QModel=Join-Path $HOME 'FunIndustrial\.runtime\models\Qwen3-4B-Q4_K_M.gguf'
 $Policy=Join-Path $env:LOCALAPPDATA 'FunIndustrial\DashboardAutostart\retired-watchdog-20261110-231030-a18f213e\policy.retired.json'
@@ -99,8 +102,17 @@ foreach($file in @(
  (Join-Path $Repo 'src\voice\gateway-port-state.ps1'),
  (Join-Path $Repo 'src\voice\private-gateway-attest.mjs')
 )){File $file}
-if((Get-FileHash -LiteralPath $Source -Algorithm SHA256).Hash -cne $ExpectedSourceSha){
- Hold '8789_SOURCE_HASH_CHANGED_MANUAL_REVIEW_NO_RESTORE'
+$SourceSha=(Get-FileHash -LiteralPath $Source -Algorithm SHA256).Hash
+if($SourceSha -cne $ExpectedSourceSha){
+ # Permit only the exact source bytes already deployed and qualified in the
+ # approved November 13 GitHub source branch. Any other file remains a HOLD.
+ $SourceGitBlob=(& git.exe -C $Primary hash-object --no-filters -- $Source | Out-String).Trim()
+ if($LASTEXITCODE -ne 0 -or $SourceGitBlob -cne $ReviewedEvidenceSourceBlob){
+  Hold '8789_SOURCE_HASH_CHANGED_MANUAL_REVIEW_NO_RESTORE'
+ }
+ Write-Host 'FUN_8789_PINNED_SOURCE=APPROVED_EVIDENCE_DASHBOARD_GIT_OBJECT'
+}else{
+ Write-Host 'FUN_8789_PINNED_SOURCE=ORIGINAL_SHA256'
 }
 & $Node --check $Source
 if($LASTEXITCODE -ne 0){Hold '8789_SOURCE_SYNTAX_INVALID'}
