@@ -1,0 +1,10 @@
+# Fun Industrial Autonomous Language -- system-wide observation & evidence policy.
+# Grants are one adapter, not the definition of FIAL.
+FIAL 5
+MISSION "Coordinate grounded evidence and safe decisions across all Fun Industrial modules"
+SCOPE FUN_INDUSTRIAL
+OBSERVE REGISTERED_MODULES
+CHECK IDENTITY,HEALTH,EVIDENCE_HASH,CHANGE
+POLICY UNKNOWN_IS_HOLD
+AUTHORITY OBSERVE_AND_RECORD_ONLY
+END
