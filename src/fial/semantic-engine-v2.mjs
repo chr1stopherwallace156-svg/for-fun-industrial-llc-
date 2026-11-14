@@ -182,7 +182,7 @@ export async function runSemanticReview({source,report,profile,directory,fetchIm
   catch(e){if(e.code!=="EEXIST")throw e}
   cases.push({case_id:item.case_id,grant_id:item.grant_id,title:item.title,
    decision:item.decision.action,record_state:matched.status,
-   model_status:model.status,accepted_quotes:model.accepted.length,
+   model_status:model.status,model_error:model.error||null,accepted_quotes:model.accepted.length,
    rejected_quotes:model.rejected.length,brief:mdFile,evidence:jsonFile});
  }
  const dbPath=join(folder,"semantic-memory-v2.sqlite");
