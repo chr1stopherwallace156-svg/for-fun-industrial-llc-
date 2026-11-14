@@ -4,6 +4,7 @@ const $=id=>document.getElementById(id);
 const shell=$('fi-ui-shell'),commerce=$('fi-commerce-panel'),ml=$('fi-ml-panel');
 if(!shell||!commerce||!ml)return; // Preserve the original UI if integration is incomplete.
 const unified=location.pathname==='/unified/';
+const grounded=$('fi-fial53-grounded');
 const views=new Set(unified?['chat','tools']:['overview','commerce','ml','workspace']);
 const nativeTop=[...document.body.children].filter(el=>el!==shell&&el!==commerce&&el!==ml&&
  !['SCRIPT','STYLE','LINK'].includes(el.tagName));
@@ -26,12 +27,16 @@ function render(){
  $('fi-ui-title').textContent=copy[view][0];$('fi-ui-subtitle').textContent=copy[view][1];
  togg($('fi-ui-overview'),view!=='overview');
  togg(commerce,view!=='commerce');togg(ml,view!=='ml');
+ togg(grounded,view!=='chat');
  for(const el of nativeTop)togg(el,el.id==='fi-hub-nav'||!legacyVisible);
  for(const nav of shell.querySelectorAll('a[data-fi-view]')){
   if(nav.dataset.fiView===view)nav.setAttribute('aria-current','page');
   else nav.removeAttribute('aria-current');
  }
  if(unified&&nativeMain){
+  // Grounded Qwen is primary chat; the original 8798 tool-and-review panel
+  // stays mounted, unchanged, and remains available in Tools & Review.
+  togg(nativeMain,view==='chat');
   // The upstream 8798 page retains all event handlers and approval panels.
   const toolView=view==='tools',chatView=view==='chat';
   for(const id of ['v3-panel','v31-panel','v32-panel','v34-panel','v4-panel'])
