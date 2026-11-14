@@ -248,6 +248,63 @@ test("HTTP hub reports combined coverage; actions demand same-origin exact appro
   assert.equal((await request("/api/fial/modules/status",{host:"bad.example"})).status,403);
  }finally{await new Promise(r=>app.server.close(r))}
 });
+test("missing pre-action audit prevents any module operation and prevents false success",async()=>{
+ let executed=0;
+ const stub={inspectAll:async()=>({version:V51,count:8,modules:IDS.map(id=>({
+  id,integration:"REAL_MODULE_INTERFACE",state:"AVAILABLE_CONFIGURED"}))}),
+  runApproved:async()=>{executed++;return {version:V51,state:"completed",result:{ok:true}}}};
+ const app=createFial51Hub({adapters:stub,fetchImpl:fixtureFetch,
+  evidence:async r=>{if(r.state==="approved_intent_recorded")throw Error("TEST_LEDGER_FAILED")},
+  readWidget:async()=>""});
+ await new Promise(r=>app.server.listen(0,"127.0.0.1",r));
+ try{
+  const port=app.server.address().port;
+  const body=JSON.stringify({approved:true,module:"security",operation:"audit_own_source",input:{}});
+  const reply=await new Promise((resolve,reject)=>{
+   const req=http.request({hostname:"127.0.0.1",port,
+    path:"/api/fial/modules/operation",method:"POST",
+    headers:{host:"127.0.0.1:8805",origin:"http://127.0.0.1:8805",
+     "x-fi-fial-operator":"approved-exact-action",
+     "content-type":"application/json","content-length":Buffer.byteLength(body)}},res=>{
+      const p=[];res.on("data",b=>p.push(b));res.on("end",()=>resolve({
+       status:res.statusCode,body:JSON.parse(Buffer.concat(p).toString("utf8"))}))});
+   req.on("error",reject);req.end(body);
+  });
+  assert.equal(reply.status,503);
+  assert.equal(reply.body.state,"HOLD_NO_EXECUTION");
+  assert.equal(executed,0);
+ }finally{await new Promise(r=>app.server.close(r))}
+});
+test("post-operation audit failure reports outcome unknown with no-repeat instruction",async()=>{
+ let executed=0;
+ const stub={inspectAll:async()=>({version:V51,count:8,modules:IDS.map(id=>({
+  id,integration:"REAL_MODULE_INTERFACE",state:"AVAILABLE_CONFIGURED"}))}),
+  runApproved:async()=>{executed++;return {version:V51,state:"completed",result:{ok:true}}}};
+ const app=createFial51Hub({adapters:stub,fetchImpl:fixtureFetch,
+  evidence:async r=>{if(r.state==="completed")throw Error("POST_RESULT_LEDGER_FAILURE")},
+  readWidget:async()=>""});
+ await new Promise(r=>app.server.listen(0,"127.0.0.1",r));
+ try{
+  const port=app.server.address().port;
+  const body=JSON.stringify({approved:true,module:"workflows",operation:"advance",
+   input:{id:"aaaaaaaa-1111-4111-8111-bbbbbbbbbbbb"}});
+  const reply=await new Promise((resolve,reject)=>{
+   const req=http.request({hostname:"127.0.0.1",port,
+    path:"/api/fial/modules/operation",method:"POST",
+    headers:{host:"127.0.0.1:8805",origin:"http://127.0.0.1:8805",
+     "x-fi-fial-operator":"approved-exact-action",
+     "content-type":"application/json","content-length":Buffer.byteLength(body)}},res=>{
+      const p=[];res.on("data",b=>p.push(b));res.on("end",()=>resolve({
+       status:res.statusCode,body:JSON.parse(Buffer.concat(p).toString("utf8"))}))});
+   req.on("error",reject);req.end(body);
+  });
+  assert.equal(reply.status,202);
+  assert.equal(reply.body.state,"OUTCOME_UNKNOWN_DO_NOT_RETRY");
+  assert.equal(reply.body.automated_retry,false);
+  assert.equal(executed,1);
+ }finally{await new Promise(r=>app.server.close(r))}
+});
+
 test("the action metadata contains all eight modules and no REA automatic permissions",()=>{
  assert.equal(IDS.length,8);
  assert.ok(!Object.values(OPERATIONS).flat().includes("rea_execute"));
