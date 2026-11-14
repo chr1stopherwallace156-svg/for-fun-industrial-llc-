@@ -60,7 +60,7 @@ for(const a of shell.querySelectorAll('a[data-fi-view],a.fi-ui-feature')){
   if(!views.has(url.searchParams.get('view')))return;
   event.preventDefault();
   history.pushState(null,'',url.pathname+url.search);
-  render();window.scrollTo({top:0,behavior:'instant'});
+  render();window.scrollTo({top:0,behavior:'auto'});
  });
 }
 window.addEventListener('popstate',render);
