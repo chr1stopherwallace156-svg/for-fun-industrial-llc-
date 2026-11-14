@@ -6,7 +6,7 @@ body.fi-ui-ready a{color:#a6ddfa}
 body.fi-ui-ready button,body.fi-ui-ready input,body.fi-ui-ready select,body.fi-ui-ready textarea{font-family:inherit}
 body.fi-ui-ready button:focus-visible,body.fi-ui-ready a:focus-visible,body.fi-ui-ready select:focus-visible,body.fi-ui-ready textarea:focus-visible{outline:3px solid #f4d488!important;outline-offset:2px}
 body.fi-ui-ready [data-fi-ui-legacy="1"].fi-ui-hidden,body.fi-ui-ready .fi-ui-hidden{display:none!important}
-#fi-ui-shell{isolation:isolate;display:block;max-width:1280px;margin:0 auto 26px;color:var(--fi-ink)}
+#fi-ui-shell{isolation:isolate;display:none;max-width:1280px;margin:0 auto 26px;color:var(--fi-ink)}
 #fi-ui-shell .fi-ui-side{position:fixed;inset:0 auto 0 0;width:254px;padding:26px 16px 18px;background:linear-gradient(180deg,#101e30,#0c1827);border-right:1px solid #34475d;z-index:90;display:flex;flex-direction:column;gap:12px;overflow:auto}
 #fi-ui-shell .fi-ui-brand{display:flex;gap:12px;align-items:center;padding:0 8px 20px}
 #fi-ui-shell .fi-ui-logo{display:grid;place-items:center;flex:none;background:linear-gradient(145deg,#8ce9d9,#a5bffc);border-radius:14px;width:44px;height:44px;color:#091b24;font-size:16px;font-weight:900;letter-spacing:-.06em}
@@ -88,3 +88,5 @@ body.fi-ui-ready > main .panel{border-radius:14px}
  body.fi-ui-ready #fi-commerce-panel button{margin:5px 5px 5px 0!important}
 }
 @media(prefers-reduced-motion:reduce){#fi-ui-shell *{transition:none!important;scroll-behavior:auto!important}}
+
+body.fi-ui-ready #fi-ui-shell{display:block}
