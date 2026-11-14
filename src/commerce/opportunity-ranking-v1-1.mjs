@@ -65,8 +65,9 @@ export function rankCommerceOpportunities({trends,california,shopify,now=nowUtc(
  const matches=[],leads=[];
  for(const {item:t,scope,source} of trendItems){
   if(typeof t.query!=='string'||!t.query.trim()||t.query.length>200)continue;
-  if(!screenTrend(t.query).included)continue;
-  const category=types(t.query);
+  const screening=screenTrend(t.query);
+  if(!screening.included)continue;
+  const category=screening.categories;
   const candidates=[];
   const a=tokens(t.query);
   for(const p of products){
