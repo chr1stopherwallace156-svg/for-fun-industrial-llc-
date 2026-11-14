@@ -17,7 +17,7 @@ export const EXEC_PAGE=String.raw`<!doctype html><html lang="en"><head><meta cha
 <section class="panel"><h2>Actual business operations — evidence, not promises</h2><div id="fi-real-work" role="status">No verified FIAL5.5 cycle yet.</div></section>
 <section class="panel" id="fi-competence">
 <h2>Business Competence · Strategy, management, finance and professional writing</h2>
-<p>17 curated business methods with deterministic evidence and decision rules. Qwen Chat also uses them as bounded reference context. No new resident model.</p>
+<p>18 curated business methods with deterministic evidence and decision rules. Qwen Chat also uses them as bounded reference context. No new resident model.</p>
 <div id="fi-competence-state" role="status">Checking local competence cycles…</div>
 <div id="fi-competence-list" class="list"></div>
 <label for="fi-competence-question">Analyze a business question</label>
