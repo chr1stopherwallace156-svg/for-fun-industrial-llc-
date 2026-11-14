@@ -67,6 +67,12 @@ if($null -ne $existing){
 $confirmed=Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
 if($confirmed.State -eq 'Disabled'){Hold 'SCHEDULE_IS_DISABLED'}
 Write-Host 'FIAL54_SCHEDULE=ACTIVE_WHEN_WINDOWS_USER_LOGGED_ON'
+$previousGrantTask=Get-ScheduledTask -TaskName 'FunIndustrial-GrantApplications-V1' -ErrorAction SilentlyContinue
+if($null -eq $previousGrantTask){
+ Write-Warning 'FIAL54_EXISTING_GRANT_SCHEDULER=NOT_FOUND_NO_NEW_GRANT_WORKER_CREATED'
+}else{
+ Write-Host ('FIAL54_EXISTING_GRANT_SCHEDULER='+$previousGrantTask.State)
+}
 Write-Host 'FIAL54_PERSISTENT_OPERATIONS=ACTIVE ELEVEN_WORKSTREAMS'
 Write-Host 'FIAL54_GMAIL=READ_ONLY_IF_CONNECTED'
 Write-Host 'FIAL54_GRANTS=REUSES_PRIOR_GRANT_EVIDENCE_NO_DUPLICATE_WORKER'
