@@ -24,3 +24,11 @@ test('no cross-project or process lifecycle commands',()=>{
  assert.doesNotMatch(src,/\b(?:Restart-Service|Stop-Service|Start-Service|Register-ScheduledTask|Stop-Process|Start-Process|Invoke-Expression|Remove-Item)\b/);
  assert.doesNotMatch(src,/Elektron|Ollama|\bREA\b|127\.0\.0\.1/i);
 });
+
+test('all package catalog checks precede every install request',()=>{
+ const preflight=src.indexOf("Checked $winget.Source @('show'");
+ const install=src.indexOf("Checked $winget.Source @('install'");
+ assert.ok(preflight>=0&&install>preflight);
+ const section=src.slice(preflight,install);
+ assert.match(section,/foreach\(\$pkg in \$packages\)/);
+});
