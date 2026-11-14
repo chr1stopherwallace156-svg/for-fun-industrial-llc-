@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {register,importSource,attachArtifact} from '../src/vehicle-library/v9.mjs';
+import {buildEngineeringPackage} from '../src/vehicle-library/package-v11.mjs';
+test('package reports missing deliverables and never grants approval',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'fun-v11-'));try{register({root,vehicle:'F-450',id:'f450-a'});const p=buildEngineeringPackage({root,id:'f450-a'});assert.equal(p.manufacturingReady,false);assert.equal(p.coverage.length,6);assert.ok(p.holds.includes('MISSING_CAD'));}finally{fs.rmSync(root,{recursive:true,force:true});}});
+test('package verifies source and artifact hashes and detects tampering',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'fun-v11-'));try{register({root,vehicle:'F-450',id:'f450-a'});const input=path.join(root,'original.pdf'),cad=path.join(root,'model.step');fs.writeFileSync(input,'synthetic pdf');fs.writeFileSync(cad,'synthetic CAD');const s=importSource({root,vehicle:'F-450',id:'f450-a',file:input});const a=attachArtifact({root,vehicle:'F-450',id:'f450-a',kind:'CAD',file:cad,sourceIds:[s.id]});let p=buildEngineeringPackage({root,id:'f450-a'});assert.equal(p.records.length,2);assert.ok(p.records.every(x=>x.verifiedHash));fs.writeFileSync(path.join(root,'Ford','F-450','2026','CAD',a.storedName),'tampered');p=buildEngineeringPackage({root,id:'f450-a'});assert.ok(p.holds.some(x=>x.startsWith('ARTIFACT_HASH_MISMATCH')));}finally{fs.rmSync(root,{recursive:true,force:true});}});
+test('rejects unknown configuration and traversal IDs',()=>{const root=fs.mkdtempSync(path.join(os.tmpdir(),'fun-v11-'));try{assert.throws(()=>buildEngineeringPackage({root,id:'../bad'}),/INVALID_CONFIGURATION/);assert.throws(()=>buildEngineeringPackage({root,id:'not-found'}),/CONFIGURATION_NOT_FOUND/);}finally{fs.rmSync(root,{recursive:true,force:true});}});
