@@ -2,7 +2,7 @@
 // A persistent goal-driven operating worker. Acts on real California grant evidence.
 // Authority: read public source, prioritize, write local briefs. NEVER submit or spend.
 import {createHash,randomUUID} from 'node:crypto';
-import {mkdir,readFile,writeFile,rename,appendFile} from 'node:fs/promises';
+import {mkdir,readFile,writeFile,rename,appendFile,stat} from 'node:fs/promises';
 import {join} from 'node:path';
 export const VERSION='fun-industrial-mission-controller-v2';
 const H=x=>createHash('sha256').update(x).digest('hex');
@@ -216,6 +216,13 @@ export async function runMissionCycle({directory,report,now=new Date(),fetchImpl
  await atomic(stateFile,ledger);
  await atomic(join(directory,'last-mission-v2.json'),receipt);
  const journal=join(directory,'mission-actions.jsonl');
+ // Keep each active audit log bounded; previously sealed logs remain inspectable.
+ let journalBytes=0;
+ try{journalBytes=(await stat(journal)).size}catch(e){if(e.code!=='ENOENT')throw e}
+ if(journalBytes>1024*1024){
+  const archived=join(directory,'mission-actions-archive-'+new Date(now).toISOString().replace(/[:.]/g,'-')+'-'+randomUUID().slice(0,8)+'.jsonl');
+  await rename(journal,archived);
+ }
  await appendFile(journal,JSON.stringify({utc:receipt.cycle_utc,source_sha256:receipt.source_sha256,
   choices:plan.decisions.map(x=>({grant_id:x.grant_id,reason:x.reason,action:x.action,priority:x.priority})),
   executed:files.map(x=>({grant_id:x.grant_id,created:x.new_file})),
