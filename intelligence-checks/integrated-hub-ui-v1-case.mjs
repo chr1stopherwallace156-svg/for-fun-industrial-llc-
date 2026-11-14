@@ -108,3 +108,17 @@ test('the live HTTP adapter serves only immutable UI assets, without proxying or
   assert.equal((await request(server,'/api/ui/not-allowed')).status,404);
  }finally{await new Promise(resolve=>server.close(resolve))}
 });
+
+test('UI-only deployment checks assets and upgrades only 8802, with a known working fallback',async()=>{
+ const activation=await readFile(new URL('../Activate-Fun-Commerce-V1.ps1',import.meta.url),'utf8');
+ assert.match(activation,/param\(\[switch\]\$SkipGoogleRefresh\)/);
+ assert.match(activation,/404752943e6d3dcbb164784ef9dc371d75ce8ecf/);
+ assert.match(activation,/\/api\/ui\/client\.js/);
+ assert.match(activation,/\/api\/ui\/style\.css/);
+ assert.match(activation,/\$uiClient\.Content -match 'FUN_INTEGRATED_CONTROL_CENTER_UI_V1'/);
+ assert.match(activation,/\$uiStyle\.Content -match 'FUN_INTEGRATED_CONTROL_CENTER_UI_V1'/);
+ assert.match(activation,/GOOGLE_TRENDS_FETCH=SKIPPED_UI_ONLY CACHED_EVIDENCE=PRESERVED/);
+ assert.match(activation,/Stop-Process -Id \$oldPid/);
+ assert.match(activation,/\$protected=@\(11434,8088,8791,8789,8796,8797,8798,8801,8443\)/);
+ assert.match(activation,/FUN_INTEGRATED_UI_V1=PASS/);
+});
