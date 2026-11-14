@@ -7,6 +7,7 @@ import {readFile} from 'node:fs/promises';
 import {createMlDashboardBridge,ML_WIDGET,mlDashboardOriginAccepted,parseMlDashboardBody,validateDashboardMlPayload} from '../src/ml/dashboard-ml-proxy-v3.mjs';
 import {createCommerceIntelligence} from '../src/commerce/trends-commerce-v1.mjs';
 import {rankCommerceOpportunities} from '../src/commerce/opportunity-ranking-v1-1.mjs';
+import {SHELL,UI_CSS,UI_CLIENT} from '../src/ui/integrated-hub-shell-v1.mjs';
 
 export const HOST='127.0.0.1',PORT=8802,ORIGIN='http://127.0.0.1:8802';
 const MAX_PAGE=240000,MAX_PROXY=12*1024*1024;
@@ -20,8 +21,10 @@ export function integrateDashboardHtml(html,widget,{unified=false}={}){
     typeof widget!=='string'||widget.length<100||widget.length>20000||
     /<\/script/i.test(widget))throw Error('ML_HUB_HTML_INJECTION_INVALID');
   const insertion=PANEL+(unified?'<script src="/api/ml/dashboard/widget.js" defer></script>':'<script>'+widget+'</script>')+
-    COMMERCE_PANEL+'<script src="/api/commerce/widget.js" defer></script>';
-  return html.replace(/(<body[^>]*>)/i,'$1'+NAV).replace(/<\/body>/i,insertion+'</body>');
+    COMMERCE_PANEL+'<script src="/api/commerce/widget.js" defer></script>'+
+    '<script src="/api/ui/client.js" defer></script>';
+  return html.replace(/<\/head>/i,'<link rel="stylesheet" href="/api/ui/style.css"></head>')
+    .replace(/(<body[^>]*>)/i,'$1'+SHELL+NAV).replace(/<\/body>/i,insertion+'</body>');
 }
 function send(res,status,body,type='application/json; charset=utf-8',extra={}){
   const bytes=Buffer.isBuffer(body)?body:Buffer.from(typeof body==='string'?body:JSON.stringify(body));
@@ -95,7 +98,8 @@ async function emptyCommerceBody(req){
 }
 export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=createCommerceIntelligence(),
  readPage=pageFrom,proxy=proxyTo,readWidget=()=>readFile(ML_WIDGET,'utf8'),
- readCommerceWidget=()=>readFile(COMMERCE_WIDGET,'utf8')}={}){
+ readCommerceWidget=()=>readFile(COMMERCE_WIDGET,'utf8'),
+ readUiClient=()=>readFile(UI_CLIENT,'utf8'),readUiStyle=()=>readFile(UI_CSS,'utf8')}={}){
   return http.createServer(async(req,res)=>{
     try{
       if(!acceptedHost(req))return send(res,403,{error:'ML_HUB_HOST_DENIED'});
@@ -107,10 +111,14 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         const unified=u.pathname==='/unified/';
         const source=await readPage(unified?8798:8789);
         const html=integrateDashboardHtml(source,await readWidget(),{unified});
-        const csp=unified?"default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; img-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'":
-          "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'";
+        const csp=unified?"default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'":
+          "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'";
         return send(res,200,html,'text/html; charset=utf-8',{'content-security-policy':csp});
       }
+      if(req.method==='GET'&&u.pathname==='/api/ui/style.css')
+        return send(res,200,await readUiStyle(),'text/css; charset=utf-8');
+      if(req.method==='GET'&&u.pathname==='/api/ui/client.js')
+        return send(res,200,await readUiClient(),'text/javascript; charset=utf-8');
       if(req.method==='GET'&&u.pathname==='/api/ml/dashboard/widget.js'){
         return send(res,200,await readWidget(),'text/javascript; charset=utf-8');
       }
