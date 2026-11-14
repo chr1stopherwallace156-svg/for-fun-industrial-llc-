@@ -58,9 +58,11 @@ $chat=Probe 8798 '/api/unified/status'
 $ml=Probe 8801 '/api/ml/status'
 if($null -ne $parent -and $null -eq $parent.lifecycle){Hold '8789_STATUS_INVALID'}
 if($null -ne $chat -and $chat.version -ne 'fi-unified-task-chat-8798-v1'){Hold '8798_IDENTITY_INVALID'}
+$chatDegraded=($null -ne $chat -and ($chat.state -ne 'ready' -or $chat.ai.ready -ne $true -or $chat.local.ready -ne $true -or $chat.rea.ready -ne $true))
+if($chatDegraded){Write-Host 'FUN_ML_DEPENDENCY_8798=DEGRADED_CHECKING_MISSING_SIDECARS'}
 if($null -ne $ml -and ($ml.version -ne 'fun-qwen-scikit-v2' -or $ml.pythonInstalled -ne $true -or
   $ml.reaExecutionGrants -ne 0 -or $ml.externalActions -ne 0)){Hold '8801_ML_IDENTITY_INVALID'}
-if($null -eq $parent -or $null -eq $chat -or $null -eq $ml){
+if($null -eq $parent -or $null -eq $chat -or $chatDegraded -or $null -eq $ml){
   if($CheckOnly){
     Write-Host 'FUN_ML_DEPENDENCIES=INCOMPLETE CHECK_ONLY=TRUE NO_CHANGES=TRUE'
     Hold 'DEPENDENCY_MISSING_CHECK_ONLY'
@@ -76,7 +78,7 @@ if($null -eq $parent -or $null -eq $chat -or $null -eq $ml){
     Write-Host 'FUN_ML_RECOVERY=ORIGINAL_8789_MISSING_FULL_GUARDED_START_NO_GATEWAY_CHANGES'
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $startScript -SkipPrivateGateway
     if($LASTEXITCODE -ne 0){Hold 'CORE_RECOVERY_FAILED_NO_RETRY'}
-  }elseif($null -eq $chat){
+  }elseif($null -eq $chat -or $chatDegraded){
     # A healthy original 8789 is adopted, not reloaded. The changed on-disk
     # 8789 source is neither used nor trusted to create 8798.
     $startChat=Join-Path $Root 'Start-Fun-Unified-Chat8798.ps1'
@@ -100,8 +102,12 @@ if($null -eq $parent -or $null -eq $chat -or $null -eq $ml){
     $originalTools=Invoke-RestMethod 'http://127.0.0.1:8789/api/ai/tools' -TimeoutSec 10 -ErrorAction Stop
     if([int]$originalTools.local_tool_count -ne 19){Hold '8798_ORIGINAL_LOCAL_CATALOGUE_MISMATCH'}
     Write-Host 'FUN_ML_RECOVERY=START_ONLY_MISSING_8798_ORIGINAL_8789_PRESERVED'
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $startChat
-    if($LASTEXITCODE -ne 0){Hold '8798_DEDICATED_RECOVERY_FAILED_NO_RETRY'}
+    if($null -eq $chat){
+      & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $startChat
+      if($LASTEXITCODE -ne 0){Hold '8798_DEDICATED_RECOVERY_FAILED_NO_RETRY'}
+    }else{
+      Write-Host 'FUN_ML_RECOVERY=EXISTING_8798_DEGRADED_ADOPT_RECHECK_NO_RESTART'
+    }
   }
   if($null -eq $ml){
     $v2=Join-Path $HOME 'FunIndustrial-QwenML-V2'
@@ -132,6 +138,7 @@ if($null -eq $chat){Hold '8798_STILL_MISSING'}
 if($null -eq $ml){Hold '8801_STILL_MISSING'}
 if($null -eq $parent.lifecycle){Hold '8789_STATUS_INVALID'}
 if($chat.version -ne 'fi-unified-task-chat-8798-v1'){Hold '8798_IDENTITY_INVALID'}
+if($chat.state -ne 'ready' -or $chat.ai.ready -ne $true -or $chat.local.ready -ne $true -or $chat.rea.ready -ne $true){Hold '8798_STILL_DEGRADED_AFTER_SIDECAR_RECOVERY_NO_RESTART'}
 if($ml.version -ne 'fun-qwen-scikit-v2' -or $ml.pythonInstalled -ne $true -or
   $ml.reaExecutionGrants -ne 0 -or $ml.externalActions -ne 0){Hold '8801_ML_IDENTITY_INVALID'}
 $protected=@(11434,8088,8791,8789,8796,8797,8798,8801,8443)
