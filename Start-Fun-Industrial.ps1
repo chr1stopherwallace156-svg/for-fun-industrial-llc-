@@ -107,8 +107,16 @@ if($SourceSha -cne $ExpectedSourceSha){
  # Permit only the exact source bytes already deployed and qualified in the
  # approved November 13 GitHub source branch. Any other file remains a HOLD.
  $SourceGitBlob=(& git.exe -C $Primary hash-object --no-filters -- $Source | Out-String).Trim()
- if($LASTEXITCODE -ne 0 -or $SourceGitBlob -cne $ReviewedEvidenceSourceBlob){
-  Hold '8789_SOURCE_HASH_CHANGED_MANUAL_REVIEW_NO_RESTORE'
+ if($LASTEXITCODE -ne 0){Hold '8789_SOURCE_RAW_BLOB_HASH_FAILED'}
+ if($SourceGitBlob -cne $ReviewedEvidenceSourceBlob){
+  # Windows Git may checkout the same reviewed Git blob using CRLF.
+  # Apply only normal tracked-file Git EOL conversion; the resulting blob
+  # must still match the single reviewed object exactly.
+  $TrackedBlob=(& git.exe -C $Primary hash-object --path=src/server.mjs -- $Source | Out-String).Trim()
+  if($LASTEXITCODE -ne 0 -or $TrackedBlob -cne $ReviewedEvidenceSourceBlob){
+   Hold '8789_SOURCE_HASH_CHANGED_MANUAL_REVIEW_NO_RESTORE'
+  }
+  Write-Host 'FUN_8789_SOURCE_EOL=WINDOWS_WORKTREE_EQUIVALENT_VERIFIED'
  }
  Write-Host 'FUN_8789_PINNED_SOURCE=APPROVED_EVIDENCE_DASHBOARD_GIT_OBJECT'
 }else{
