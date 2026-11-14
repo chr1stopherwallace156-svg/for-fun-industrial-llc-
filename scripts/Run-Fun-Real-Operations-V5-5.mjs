@@ -5,10 +5,12 @@ import {ROOT} from '../src/operator/executive-ops-v1.mjs';
 import {join} from 'node:path';
 const action=process.argv[2];
 try{
- if(action==='--set-local-profile'){
-  if(process.argv.length!==4)throw Error('LOCAL_PROFILE_JSON_ARGUMENT_REQUIRED');
-  // Profile goes only to LOCALAPPDATA, never GitHub. No account tokens here.
-  const provided=JSON.parse(process.argv[3]);
+ if(action==='--set-local-profile-stdin'){
+  if(process.argv.length!==3)throw Error('LOCAL_PROFILE_STDIN_ONLY');
+  // Read private identity only from the local PowerShell stdin pipe, never argv or GitHub.
+  const chunks=[];let size=0;
+  for await(const chunk of process.stdin){size+=chunk.length;if(size>4096)throw Error('PROFILE_STDIN_TOO_LARGE');chunks.push(chunk)}
+  const provided=JSON.parse(Buffer.concat(chunks).toString('utf8'));
   const r=await storeIdentity(provided);
   console.log('FIAL55_PRIVATE_PROFILE='+r.state);
   console.log('FIAL55_PRIVATE_PROFILE_PATH='+r.path);
@@ -28,5 +30,5 @@ try{
   console.log(JSON.stringify({version:VERSION,status:status.state||status.version,
     last_cycle:status.when_utc||null,artifacts:status.artifacts?.length||0,
     external_actions:status.external_actions||'NONE'},null,2));
- }else throw Error('ALLOWED_ARGS=--once|--status|--set-local-profile');
+ }else throw Error('ALLOWED_ARGS=--once|--status|--set-local-profile-stdin');
 }catch(e){console.error('FIAL55_HOLD='+String(e.message||e).slice(0,220));process.exitCode=1}
