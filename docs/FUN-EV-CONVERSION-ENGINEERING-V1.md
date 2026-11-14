@@ -3,7 +3,7 @@
 Status: **source-staged; external tools NOT installed or qualified; no production or high-voltage authorization.**
 
 ## Purpose and isolation
-Serve ELEKTRON INDUSTRIAL LLC's gasoline/diesel-to-EV conversion engineering with a **separate Fun Industrial** project workspace. Do not change, install into, import from, restart, or modify Elektron's repositories, Ollama, QSM/QINN/ACI/RLR, System Continuity, Work, ChatWork or their running processes. This branch has no dashboard/REA/chat registration and opens no network ports.
+Create an independent **Fun Industrial-only** research and engineering workspace for vehicle electrification. Scope is restricted to Fun Industrial source, data, and separately approved tool installations. This branch has no dashboard/REA/chat registration, makes no cross-project runtime inquiries, and opens no network ports.
 
 ## What is actually delivered in V1
 - Structured, inspectable source catalog of 18 upstream CAD, wiring, vehicle data, simulation, parts, safety and manufacturing repositories. Listing is not installation or readiness.
@@ -37,6 +37,3 @@ Only `init` writes, to `%LOCALAPPDATA%\FunIndustrial\EVEngineering\Projects\<pro
 - Generate real CAD, wiring and powertrain artifacts from sourced configuration data and compare outputs to independent engineering calculations. Avoid autonomous installations, live CAN writes, or hidden subprocesses.
 - Add optional Fun Industrial dashboard panel after existing runtime tests; do not alter the running 8789/8798/8802 or HTTPS gateway without a distinct change review.
 - Require engineer-signoff before procurement, fabrication, energizing an HV system or vehicle release.
-
-## Elektron finish-line gate (separate company; no changes here)
-Preserve existing Elektron as-is. Resolve its outstanding Windows TaskScheduler owner/installation RED, restore dependable Work/ChatWork availability without disrupting Ollama, independently qualify release tests and evidence, then prove a complete offline restart/recovery procedure. No claims of readiness until machine-native checks and required legal/automotive approvals pass. Any Elektron remediation needs a separately scoped, explicit change request.
