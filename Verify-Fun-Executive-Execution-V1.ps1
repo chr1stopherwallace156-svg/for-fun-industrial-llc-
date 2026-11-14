@@ -107,7 +107,7 @@ if($RunScheduledCycle){
 }else{
  Write-Host 'FIAL54_ON_DEMAND_SCHEDULER_EXECUTION=NOT_REQUESTED'
 }
-& $NodeExecutable $AuditScript --json | Out-String | ForEach-Object {$auditText=$_}
+$auditText=(& $NodeExecutable $AuditScript --json | Out-String)
 if($LASTEXITCODE -ne 0){Hold 'LOCAL_EVIDENCE_AUDIT_FAILED'}
 try{$audit=$auditText|ConvertFrom-Json -ErrorAction Stop}
 catch{Hold 'LOCAL_EVIDENCE_AUDIT_JSON_INVALID'}
