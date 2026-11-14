@@ -118,6 +118,16 @@ if($SourceSha -cne $ExpectedSourceSha){
   }
   Write-Host 'FUN_8789_SOURCE_EOL=WINDOWS_WORKTREE_EQUIVALENT_VERIFIED'
  }
+ # Preserve the existing approved webpage-evidence and grounded-Qwen runtime
+ # after cold start; do not infer a database location from unrelated projects.
+ $EvidenceHome=Join-Path $HOME 'FunIndustrial-LangGraph-V1'
+ $EvidenceDb=Join-Path $EvidenceHome 'evidence-plans-v1.sqlite'
+ $EvidencePython=Join-Path $EvidenceHome '.venv\Scripts\python.exe'
+ File $EvidenceDb
+ File $EvidencePython
+ $env:FUN_EVIDENCE_DATABASE=$EvidenceDb
+ $env:FUN_COGNITION_PYTHON=$EvidencePython
+ Write-Host 'FUN_8789_EVIDENCE_RUNTIME=CONFIGURED_LOCAL_EXISTING_DB'
  Write-Host 'FUN_8789_PINNED_SOURCE=APPROVED_EVIDENCE_DASHBOARD_GIT_OBJECT'
 }else{
  Write-Host 'FUN_8789_PINNED_SOURCE=ORIGINAL_SHA256'
