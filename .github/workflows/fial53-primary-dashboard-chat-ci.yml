@@ -59,7 +59,7 @@ jobs:
           }
           # Windows StrictMode regression: no direct .Count on a function that
           # may emit zero pipeline objects. The old script failed after stopping 8802.
-          if($source -match '\(Listeners 8802\)\.Count'){
+          if($source -match '(?<!@)\(Listeners 8802\)\.Count'){
             throw 'FIAL53_STRICTMODE_EMPTY_LISTENER_REGRESSION'
           }
           foreach($marker in @('FIAL53_MISSING_8802=RECOVERING_PINNED_ORIGINAL',
