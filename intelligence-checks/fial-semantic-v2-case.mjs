@@ -46,7 +46,7 @@ test("FIAL 2 has a new restricted grammar with quote-grounding and explicit unkn
  const c=compileSemantic(source);
  assert.equal(c.version,"fial-semantic-bytecode-v0.2");
  assert.equal(c.budget,3);
- assert.deepEqual(c.fields,["applicant_type","purpose","geography","deadline","funding"]);
+ assert.deepEqual(c.fields,["applicant_type","purpose","description","geography","deadline","funding"]);
  assert.equal(c.grounding,"QUOTES");
  assert.equal(c.policy,"UNKNOWN_IS_HOLD");
  assert.equal(c.permissions.applicationSubmissions,false);
@@ -60,7 +60,7 @@ test("FIAL 2 cannot compile shell, network, approval bypass, arbitrary source or
   ["GROUND QUOTES","GROUND MODEL_GUESSES"],
   ["POLICY UNKNOWN_IS_HOLD","POLICY AUTO_SUBMIT"],
   ["BUDGET 3","BUDGET 99"],
-  ["UNDERSTAND applicant_type,purpose,geography,deadline,funding","UNDERSTAND execute,shell"]
+  ["UNDERSTAND applicant_type,purpose,description,geography,deadline,funding","UNDERSTAND execute,shell"]
  ]){
   assert.throws(()=>compileSemantic(source.replace(from,to)),FialSemanticSyntaxError,to);
  }
