@@ -10,7 +10,7 @@ import {auditInterpretation,runComprehensionAudit,FIAL3_ENGINE} from "../src/fia
 const source=await readFile(new URL("../src/fial/programs/grant-comprehension.fial",import.meta.url),"utf8");
 const sha=x=>createHash("sha256").update(x).digest("hex");
 const TIME=new Date("2026-11-14T20:00:00.000Z");
-const ROW={GrantID:"1647",Title:"Civil Money Penalty Reinvestment Grant",
+const ROW={GrantID:"1647",Status:"Active",GrantURL:"https://www.grants.ca.gov/grants/1647",Title:"Civil Money Penalty Reinvestment Grant",
  AgencyDept:"California Department of Public Health",
  ApplicantType:"Businesses",
  Purpose:"This grant allows applicants to apply for funding to implement programs for improving Skilled Nursing Facility residents' quality of life.",
