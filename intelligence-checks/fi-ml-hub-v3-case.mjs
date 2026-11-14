@@ -8,7 +8,7 @@ import {integrateDashboardHtml,createUnifiedMlHub,HOST,ORIGIN} from '../scripts/
 import {createMlDashboardBridge,validateDashboardMlPayload,mlDashboardOriginAccepted} from '../src/ml/dashboard-ml-proxy-v3.mjs';
 
 const source='<html><head></head><body><h1>Legacy dashboard</h1><script>window.example=true;</script></body></html>';
-const widget='(()=>{document.getElementById("fi-ml-panel").setAttribute("data-test","ok")})();';
+const widget='(()=>{document.getElementById("fi-ml-panel").setAttribute("data-test","ok")})();'+' '.repeat(80);
 const deals=()=>({deals:Array.from({length:8},(_,i)=>({
   id:'case'+i,cost:1+i,sale_price:9+i,shipping:1,fees:.5,return_allowance:.2
 }))});
@@ -91,8 +91,7 @@ test('same-origin explicit click required for ML execution',async()=>{
     const x=await req(server,'POST','/api/ml/dashboard/run',p,headers);
     assert.equal(x.status,200);assert.equal(f.counts().taskCalls,1);
     const bad=await req(server,'POST','/api/ml/dashboard/run',{...p,unexpected:true},headers);
-    // Fixture ML run skips validation, so this route must be protected by the bridge in production.
-    assert.equal(bad.status,200);
+    assert.equal(bad.status,422);
   }finally{await new Promise(r=>server.close(r))}
 });
 test('bridge validates ML results and never accepts unverified upstream computation',async()=>{
@@ -113,7 +112,7 @@ test('bridge validates ML results and never accepts unverified upstream computat
 test('forwards original dashboard POST only when user origin is same as dashboard',async()=>{
   const f=app();const server=await start(f.server);
   try{
-    const failed=await req(server,'POST','/api/ai/chat',{messages:[]},headers.host?{}:{});
+    const failed=await req(server,'POST','/api/ai/chat',{messages:[]});
     assert.equal(failed.status,403);
     const passed=await req(server,'POST','/api/ai/chat',{messages:[]},{
       'content-type':'application/json',origin:ORIGIN
@@ -125,7 +124,7 @@ test('forwards original dashboard POST only when user origin is same as dashboar
 test('rejects unsupported route and malformed host instead of proxying elsewhere',async()=>{
   const f=app();const server=await start(f.server);
   try{
-    assert.equal((await req(server,'GET','http://malicious.invalid/')).status,404);
+    assert.equal((await req(server,'GET','http://malicious.invalid/')).status,400);
     assert.equal((await req(server,'GET','/',null,{host:'evil.invalid'})).status,403);
     assert.equal((await req(server,'GET','/api/ml/private')).status,404);
     assert.equal(f.counts().taskCalls,0);
