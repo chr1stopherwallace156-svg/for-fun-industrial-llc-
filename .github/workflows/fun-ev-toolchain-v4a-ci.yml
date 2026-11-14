@@ -1,0 +1,40 @@
+name: Fun EV V4a - native Windows argv qualification
+on:
+  push:
+    branches:
+      - feature/fun-ev-toolchain-v4a-argument-forwarding-20261114
+    paths:
+      - 'Setup-Fun-EV-Toolchain-V4.ps1'
+      - 'test/ev-toolchain-v4.test.mjs'
+      - 'test/ev-toolchain-v4a.test.mjs'
+      - '.github/workflows/fun-ev-toolchain-v4a-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-argument-check:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Parse script with native Windows PowerShell AST
+        shell: powershell
+        run: |
+          $errors = $null
+          $tokens = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'Setup-Fun-EV-Toolchain-V4.ps1'),[ref]$tokens,[ref]$errors)
+          if (@($errors).Count -ne 0) { $errors | Format-List; throw 'FUN_EV_POWERSHELL_AST_HOLD' }
+      - name: Run source and native argument forwarding tests - never installer
+        shell: pwsh
+        run: node --test test/ev-toolchain-v4.test.mjs test/ev-toolchain-v4a.test.mjs
+      - name: Native read-only SelfTest receipt
+        shell: powershell
+        run: |
+          $out = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\Setup-Fun-EV-Toolchain-V4.ps1 -Action SelfTest
+          if ($LASTEXITCODE -ne 0) { throw 'FUN_EV_V4A_ARG_SELFTEST_HOLD' }
+          $record = ($out -join [Environment]::NewLine) | ConvertFrom-Json
+          if ($record.native_argument_forwarding -ne 'PASS' -or $record.installer_executed -ne $false) { throw 'FUN_EV_SELFTEST_RESPONSE_HOLD' }
+          'FUN_EV_NATIVE_ARGUMENTS=PASS'

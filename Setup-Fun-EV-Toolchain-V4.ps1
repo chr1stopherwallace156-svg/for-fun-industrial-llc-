@@ -1,6 +1,6 @@
 # Fun Industrial EV toolchain V4. No external program is installed unless -Action Install is explicitly selected.
 [CmdletBinding()]
-param([ValidateSet('Plan','Install')][string]$Action='Plan',[string]$Approval='')
+param([ValidateSet('Plan','SelfTest','Install')][string]$Action='Plan',[string]$Approval='')
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $packages=@(
@@ -24,12 +24,52 @@ function Find-Py312 {
  }
  return $null
 }
-function Checked([string]$Executable,[string[]]$Args,[string]$Stage){
- & $Executable @Args
- if($LASTEXITCODE -ne 0){throw ('FUN_EV_'+$Stage+'_HOLD_EXIT_'+$LASTEXITCODE)}
+function Checked([string]$Executable,[string[]]$ArgumentList,[string]$Stage){
+ # $args is an automatic PowerShell variable: never declare a function parameter named Args.
+ if([string]::IsNullOrWhiteSpace($Executable) -or @($ArgumentList).Count -eq 0){throw ('FUN_EV_'+$Stage+'_EMPTY_ARGUMENTS_HOLD')}
+ $out=@(& $Executable @ArgumentList 2>&1)
+ $code=$LASTEXITCODE
+ $result=($out | ForEach-Object {[string]$_}) -join [Environment]::NewLine
+ if($code -ne 0){throw ('FUN_EV_'+$Stage+'_EXIT_'+$code+':'+$result.Substring(0,[Math]::Min(300,$result.Length)))}
+ if($result -match '(?im)^\s*usage:\s*winget\b' -or
+    $result -match 'The following commands are available:' -or
+    $result -match '(?m)^Python 3\.\d+.*\bon win32\b' -or
+    $result -match '(?m)^>>>'){throw ('FUN_EV_'+$Stage+'_HELP_OR_REPL_HOLD')}
+ return $result
 }
 $winget=Get-Command winget.exe -ErrorAction SilentlyContinue
 $python=Find-Py312
+if($Action -eq 'SelfTest'){
+ # Safe real Windows CLI argument forwarding test, WITHOUT any installs or package changes.
+ $node=Get-Command node.exe -ErrorAction SilentlyContinue
+ if(-not $node){$node=Get-Command node -ErrorAction SilentlyContinue}
+ if(-not $node){throw 'FUN_EV_NODE_MISSING_FOR_SELFTEST'}
+ $argTest=Checked $node.Source @('-e','process.stdout.write(process.argv.slice(1).join(","))','fun-one','fun-two') 'NODE_ARGV'
+ if($argTest.Trim() -cne 'fun-one,fun-two'){throw 'FUN_EV_NODE_ARGV_NOT_FORWARDED'}
+ $pythonVerified=$false
+ if($python){
+  $pyArgTest=Checked $python @('-c','import sys; print(",".join(sys.argv[1:]))','fun-one','fun-two') 'PYTHON_ARGV'
+  if($pyArgTest.Trim() -cne 'fun-one,fun-two'){throw 'FUN_EV_PYTHON_ARGV_NOT_FORWARDED'}
+  $pythonVerified=$true
+ }
+ $wingetVerified=$false
+ if($winget){
+  $wingetVersion=Checked $winget.Source @('--version') 'WINGET_ARGV'
+  if($wingetVersion.Trim() -notmatch '^v\d+\.\d+\.\d+(?:\.\d+)?$'){throw 'FUN_EV_WINGET_ARGV_NOT_FORWARDED'}
+  $wingetVerified=$true
+ }
+ [pscustomobject]@{
+  schema='fun.ev.toolchain.argv-selftest.v4a';scope='FUN_INDUSTRIAL_ONLY';
+  mode='NO_INSTALL';native_argument_forwarding='PASS';
+  node_passed=$true;python_passed=$pythonVerified;winget_passed=$wingetVerified;
+  wireviz_target_exists=(Test-Path -LiteralPath (Join-Path $tools 'WireViz'));
+  wireviz_venv_python_exists=(Test-Path -LiteralPath (Join-Path $tools 'WireViz\venv\Scripts\python.exe') -PathType Leaf);
+  wireviz_entrypoint_exists=(Test-Path -LiteralPath (Join-Path $tools 'WireViz\venv\Scripts\wireviz.exe') -PathType Leaf);
+  wireviz_wheel_folder_exists=(Test-Path -LiteralPath (Join-Path $tools 'WireViz\wheels') -PathType Container);
+  installer_executed=$false
+ } | ConvertTo-Json -Depth 4
+ exit 0
+}
 if($Action -eq 'Plan'){
  [pscustomobject]@{
   schema='fun.ev.toolchain.plan.v4';scope='FUN_INDUSTRIAL_ONLY';mode='NO_INSTALL';
@@ -41,6 +81,12 @@ if($Action -eq 'Plan'){
  exit 0
 }
 if($Approval -cne 'INSTALL_FUN_EV_TOOLCHAIN'){throw 'FUN_EV_OPERATOR_APPROVAL_REQUIRED'}
+# Always repeat the live argument test at the start of Install. No fallback to an empty argv.
+$node=Get-Command node.exe -ErrorAction SilentlyContinue
+if(-not $node){$node=Get-Command node -ErrorAction SilentlyContinue}
+if(-not $node){throw 'FUN_EV_PREINSTALL_NODE_MISSING'}
+$proof=Checked $node.Source @('-e','process.stdout.write(process.argv.slice(1).join(","))','fun-one','fun-two') 'PREINSTALL_ARGV'
+if($proof.Trim() -cne 'fun-one,fun-two'){throw 'FUN_EV_PREINSTALL_ARGV_HOLD'}
 if(-not $winget){throw 'FUN_EV_WINGET_MISSING'}
 if(-not $python){throw 'FUN_EV_PYTHON312_MISSING'}
 if(Test-Path -LiteralPath (Join-Path $tools 'WireViz')){throw 'FUN_EV_WIREVIZ_TARGET_EXISTS_HOLD'}
@@ -50,7 +96,11 @@ if(!(Test-Path -LiteralPath $tools)){New-Item -ItemType Directory -Path $tools -
 if((Get-Item -LiteralPath $tools -Force).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'FUN_EV_TOOLS_REPARSE_HOLD'}
 # Preflight ALL exact package versions before any WinGet installation begins.
 foreach($pkg in $packages){
- Checked $winget.Source @('show','--id',$pkg.Id,'--exact','--version',$pkg.Version,'--source','winget') 'PACKAGE_CATALOG'
+ $catalog=Checked $winget.Source @('show','--id',$pkg.Id,'--exact','--version',$pkg.Version,'--source','winget') 'PACKAGE_CATALOG'
+ if($catalog -notmatch [regex]::Escape($pkg.Id) -or
+    $catalog -notmatch ('(?m)^\s*Version:\s*'+[regex]::Escape($pkg.Version)+'(?:\s|$)')){
+  throw ('FUN_EV_PACKAGE_CATALOG_MISMATCH_HOLD:'+ $pkg.Id)
+ }
 }
 foreach($pkg in $packages){
  Write-Output ('FUN_EV_INSTALL_PACKAGE='+$pkg.Id+' VERSION='+$pkg.Version)

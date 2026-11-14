@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const src=readFileSync('Setup-Fun-EV-Toolchain-V4.ps1','utf8');
 test('Plan is default; Install requires exact deliberate approval',()=>{
- assert.match(src,/\[ValidateSet\('Plan','Install'\)\]\[string\]\$Action='Plan'/);
+ assert.match(src,/\[ValidateSet\('Plan','SelfTest','Install'\)\]\[string\]\$Action='Plan'/);
  assert.match(src,/\$Action -eq 'Plan'/);
  assert.match(src,/\$Approval -cne 'INSTALL_FUN_EV_TOOLCHAIN'/);
 });
