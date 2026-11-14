@@ -73,3 +73,14 @@ test('sidecar recovery verifies parent, Qwen and compute without changing 8789 s
  assert.match(source,/if\(\$null -eq \$parent\)/);
  assert.match(core,/8789_SOURCE_HASH_CHANGED_MANUAL_REVIEW_NO_RESTORE/);
 });
+
+test('dedicated 8798 launcher only adopts exact healthy Qwen 8088 and does not start a duplicate',async()=>{
+ const source=await clean(new URL('../Start-Fun-Unified-Chat8798.ps1',import.meta.url));
+ assert.match(source,/function VerifiedIndependentQwen\(\)/);
+ assert.match(source,/llama-server\.exe/);
+ assert.match(source,/Qwen3-4B-Q4_K_M/);
+ assert.match(source,/127\.0\.0\.1:8088\/health/);
+ assert.match(source,/QWEN_LOCAL_MODEL_NOT_READY/);
+ assert.match(source,/VerifiedIndependentQwen\)\)\)\{Hold 'ORIGINAL_SERVICES_CHANGED'/);
+ assert.doesNotMatch(source,/Start-Fun-Industrial\.ps1/);
+});
