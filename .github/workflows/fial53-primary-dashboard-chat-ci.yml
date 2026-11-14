@@ -35,6 +35,67 @@ jobs:
       - name: Focused integration and previous dashboard regression tests
         run: |
           node --test intelligence-checks/fial-primary-dashboard-chat-v5-3-case.mjs intelligence-checks/fi-ml-hub-v3-case.mjs intelligence-checks/integrated-hub-ui-v1-case.mjs intelligence-checks/fial-grounded-qwen-v5-2-case.mjs intelligence-checks/commerce-opportunities-v1-1-case.mjs intelligence-checks/google-trends-focus-v1-2-case.mjs
+      - name: Exercise actual Windows ReadyNew function with mocked local status and HTML
+        shell: pwsh
+        run: |
+          $file=Join-Path $PWD 'Deploy-Fun-FIAL53-PrimaryDashboard.ps1'
+          $tokens=$null;$errors=$null
+          $ast=[System.Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$errors)
+          if($errors.Count){throw 'FIAL53_DEPLOY_POWERSHELL_PARSE_FAILED'}
+          $definition=$ast.FindAll({param($node)
+            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -ceq 'ReadyNew'
+          },$true)
+          if(@($definition).Count -ne 1){throw 'FIAL53_READINESS_FUNCTION_NOT_UNIQUE'}
+          $fixture=@'
+          Set-StrictMode -Version Latest
+          $Runner='C:\mock\scripts\Run-Fun-ML-Dashboard8802.mjs'
+          $Url='http://127.0.0.1:8802'
+          $OldCommerceShopifyConfigured=$false
+          function Hold([string]$why){throw ('FIAL53_TEST_HOLD='+$why)}
+          function Owner([int]$port) {
+            if($port -ne 8802){throw 'UNEXPECTED_PORT'}
+            return [pscustomobject]@{ProcessId=9090;Name='node.exe';CommandLine=('node.exe "'+$Runner+'" --serve')}
+          }
+          function GetJson([string]$path){
+            switch($path){
+              '/api/fun/hub/status' {return [pscustomobject]@{version='fi-ml-hub-v3'}}
+              '/api/ml/dashboard/status' {return [pscustomobject]@{state='ready'}}
+              '/api/fial/grounded/status' {return [pscustomobject]@{
+                version='fial5.3-primary-grounded-chat-v1'
+                model_interface='fixed_local_qwen_8088'
+                memory_interface='fixed_readonly_cognee_8789'
+                authority_added=$false;tool_executions=0}}
+              '/api/commerce/status' {return [pscustomobject]@{version='fun-commerce-intelligence-v1';shopify=[pscustomobject]@{configured=$false}}}
+              '/api/unified/status' {return [pscustomobject]@{state='ready'}}
+              default {throw ('UNEXPECTED_GET_PATH='+$path)}
+            }
+          }
+          function Invoke-WebRequest {
+            param([string]$Uri,[switch]$UseBasicParsing,[int]$TimeoutSec)
+            if($Uri.EndsWith('/unified/?view=chat')) {
+              return [pscustomobject]@{StatusCode=200;Content='id="fi-fial53-grounded" id="action-review" fi-ml-panel fi-commerce-panel'}
+            }
+            if($Uri.EndsWith('/api/fial/grounded/client.js')) {
+              return [pscustomobject]@{StatusCode=200;Content='x-fi-chat-click textContent'}
+            }
+            if($Uri.EndsWith('/')) {
+              return [pscustomobject]@{StatusCode=200;Content='fi-ui-shell'}
+            }
+            throw ('UNEXPECTED_HTML_REQUEST='+$Uri)
+          }
+          $homeBefore=$HOME
+          ReadyNew 9090
+          if($HOME -cne $homeBefore){throw 'FIAL53_HOME_AUTOMATIC_VARIABLE_MUTATED'}
+          $held=$false
+          try{ReadyNew 9091}catch{
+            if([string]$_.Exception.Message -match 'NEW_8802_OWNER_DRIFT'){$held=$true}
+            else{throw}
+          }
+          if(!$held){throw 'FIAL53_WRONG_PID_WAS_ACCEPTED'}
+          Write-Host 'FIAL53_REAL_POWERSHELL_READYNEW_MOCKED=PASS'
+          '@
+          & ([scriptblock]::Create($definition[0].Extent.Text + [Environment]::NewLine + $fixture))
       - name: Parse Windows 8802-only deploy and rollback controls
         shell: pwsh
         run: |
