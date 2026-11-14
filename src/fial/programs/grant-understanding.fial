@@ -2,7 +2,7 @@
 FIAL 2
 MISSION "Interpret grant requirements and flag missing proof before application preparation"
 SOURCE GRANTS
-UNDERSTAND applicant_type,purpose,geography,deadline,funding
+UNDERSTAND applicant_type,purpose,description,geography,deadline,funding
 MODEL LOCAL_QWEN
 GROUND QUOTES
 POLICY UNKNOWN_IS_HOLD
