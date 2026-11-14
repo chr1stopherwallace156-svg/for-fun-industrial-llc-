@@ -30,18 +30,20 @@ jobs:
           $files=@(
             'src/operator/real-operations-v5-5.mjs',
             'src/operator/official-source-watch-v5-5.mjs',
+            'src/operator/elektron-gmail-v5-5.mjs',
             'src/operator/real-operations-widget-v5-5.js',
             'src/operator/executive-ops-v1.mjs',
             'src/operator/executive-console-v1.mjs',
             'scripts/Run-Fun-Real-Operations-V5-5.mjs',
             'scripts/Run-Fun-ML-Dashboard8802.mjs',
             'intelligence-checks/fial55-real-operations-case.mjs',
-            'intelligence-checks/fial55-primary-dashboard-case.mjs'
+            'intelligence-checks/fial55-primary-dashboard-case.mjs',
+            'intelligence-checks/fial55-elektron-mail-case.mjs'
           )
           foreach($p in $files){node --check $p;if($LASTEXITCODE -ne 0){throw ('FIAL55_PARSE_HOLD='+$p)}}
       - name: Real business workflow and dashboard regressions
         run: |
-          node --test intelligence-checks/fial55-real-operations-case.mjs intelligence-checks/fial55-primary-dashboard-case.mjs intelligence-checks/fial54-executive-operator-v1-case.mjs intelligence-checks/fial54-primary-console-v1-case.mjs intelligence-checks/fial-primary-dashboard-chat-v5-3-case.mjs intelligence-checks/fi-ml-hub-v3-case.mjs intelligence-checks/integrated-hub-ui-v1-case.mjs
+          node --test intelligence-checks/fial55-real-operations-case.mjs intelligence-checks/fial55-primary-dashboard-case.mjs intelligence-checks/fial55-elektron-mail-case.mjs intelligence-checks/fial54-executive-operator-v1-case.mjs intelligence-checks/fial54-primary-console-v1-case.mjs intelligence-checks/fial-primary-dashboard-chat-v5-3-case.mjs intelligence-checks/fi-ml-hub-v3-case.mjs intelligence-checks/integrated-hub-ui-v1-case.mjs
       - name: Parse Windows schedule upgrade and verify no authority escalation
         shell: pwsh
         run: |
