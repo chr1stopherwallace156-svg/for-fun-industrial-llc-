@@ -55,6 +55,10 @@ test('worksheet is an actual editable RTF file payload, with source-specific con
  assert.match(content,/APPLICATION PREPARATION/);
  assert.match(content,/NOT THE OFFICIAL AGENCY APPLICATION/);
  assert.match(content,/CA-00[14]/);
+ assert.match(content,/PROGRAM PURPOSE FROM OFFICIAL DATASET/);
+ assert.match(content,/PROGRAM DESCRIPTION EXCERPT/);
+ assert.match(content,/ELIGIBLE APPLICANT TYPES AS PUBLISHED/);
+ assert.match(content,/ESTIMATED AWARD AS PUBLISHED/);
  assert.match(content,/MISSING/);
  assert.match(content,/NOT SIGNED. NOT SUBMITTED/);
  assert.doesNotMatch(content,/verified_legal_status.*true|tax_identifier.*[0-9]{9}/);
