@@ -1,12 +1,21 @@
 // One-process FIAL5.7 outcome CLI. Scheduled operations ONLY use --observe;
 // sending must use --send-approved-stdin from a distinct human command.
-import {open} from 'node:fs/promises';
+import {open,unlink} from 'node:fs/promises';
 import {join} from 'node:path';
 import {prepareOutcome,observeOutcome,markAttempt,recordGmailSend,
  authorizationPhrase,contentFingerprint,ROOT} from '../src/outcomes/outcome-engine-v5-7.mjs';
 import {readElektronInboxHeaders} from '../src/operator/elektron-gmail-v5-5.mjs';
 import {connectSendPermission,accessForElektronSend,sendApprovedInquiry} from '../src/outcomes/elektron-send-v5-7.mjs';
 let action=process.argv[2]||'';
+async function acquireExclusiveOutcomeLock(){
+ const file=join(ROOT(),'OutcomeV57','operator-cycle.lock');
+ let handle;
+ try{handle=await open(file,'wx',0o600)}
+ catch(e){if(e.code==='EEXIST')throw Error('FIAL57_OUTCOME_IN_USE_OR_STALE_LOCK');throw e}
+ await handle.writeFile('LOCKED_FOR_LOCAL_OPERATION\n');
+ await handle.sync();
+ return async()=>{await handle.close();await unlink(file)};
+}
 async function stdinApproval(){
  const chunks=[];let bytes=0;
  for await(const b of process.stdin){
@@ -32,7 +41,11 @@ try{
   console.log('FIAL57_APPROVAL_PHRASE='+authorizationPhrase(p.fingerprint));
   console.log('FIAL57_MAIL_SENT=0');
  }else if(action==='--observe'){
-  const result=await observeOutcome({readMailbox:readElektronInboxHeaders});
+  await prepareOutcome();
+  const release=await acquireExclusiveOutcomeLock();
+  let result;
+  try{result=await observeOutcome({readMailbox:readElektronInboxHeaders})}
+  finally{await release()}
   console.log('FIAL57_SCHEDULED_OUTCOME_OBSERVATION=PASS');
   console.log('FIAL57_OUTCOME_STATE='+result.state);
   console.log('FIAL57_MAILBOX='+result.mailbox_state);
@@ -61,22 +74,26 @@ try{
    throw Error('FIAL57_ALREADY_ATTEMPTED_NO_RETRY');
   // Preflight account and Google send permission before any irreversible send checkpoint.
   await accessForElektronSend();
-  // Persist a permanent lock against concurrent approval processes.
-  const file=join(ROOT(),'OutcomeV57','send-attempt-locked');
-  const handle=await open(file,'wx',0o600);
+  const release=await acquireExclusiveOutcomeLock();
   try{
-   await handle.writeFile('ONE_SEND_ATTEMPT_LOCK\\n');await handle.sync();
+   const current=await prepareOutcome();
+   if(current.fingerprint!==p.fingerprint||
+      current.record.state!=='DRAFT_AWAITING_REVIEW'||current.record.send_attempts!==0)
+      throw Error('FIAL57_SEND_APPROVAL_STALE_OR_ALREADY_USED');
+   // Leave permanent one-use marker if a send is attempted, even after crashes.
+   const file=join(ROOT(),'OutcomeV57','send-attempt-locked');
+   const handle=await open(file,'wx',0o600);
+   try{await handle.writeFile('ONE_SEND_ATTEMPT_LOCK\n');await handle.sync()}
+   finally{await handle.close()}
    await markAttempt({fingerprint:p.fingerprint});
-   // If network outcome is ambiguous, keep state SEND_ATTEMPT_STARTED.
-   // No automatic repeat; a human must reconcile Sent folder first.
-   const response=await sendApprovedInquiry(p.draft);
+   const response=await sendApprovedInquiry(current.draft);
    const updated=await recordGmailSend({fingerprint:p.fingerprint,response});
    console.log('FIAL57_ONE_EXPLICIT_SEND=GMAIL_API_ACCEPTED');
    console.log('FIAL57_GMAIL_MESSAGE_ID='+updated.send_id);
    console.log('FIAL57_OUTCOME_STATE='+updated.state);
-   console.log('FIAL57_RECIPIENT='+p.draft.to);
+   console.log('FIAL57_RECIPIENT='+current.draft.to);
    console.log('FIAL57_GOOGLE_RECEIPT_NOT_PROOF_OF_RECIPIENT_DELIVERY');
-  }finally{await handle.close()}
+  }finally{await release()}
  }else throw Error('FIAL57_ALLOWED=--prepare|--observe|--status|--connect-send|--send-approved-stdin');
 }catch(e){
  console.error('FIAL57_HOLD='+String(e.message||e).slice(0,180));
