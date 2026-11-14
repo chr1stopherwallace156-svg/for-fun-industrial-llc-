@@ -54,7 +54,8 @@ test('audit verifies V2 lineage, synthetic wire pins, BOM designators and SVG la
   const result=JSON.parse(r.stdout);
   assert.equal(result.state,'ARTIFACT_INTEGRITY_AND_STRUCTURAL_LABELS_PASS_ENGINEERING_HOLD');
   assert.equal(result.pinout_rows_checked,2);
-  assert.equal(result.bom_designators_checked,3);\n  assert.equal(result.conductor_colors_checked,2);
+  assert.equal(result.bom_designators_checked,3);
+  assert.equal(result.conductor_colors_checked,2);
   assert.equal(result.input_and_lineage_sha256_verified,true);
   assert.equal(result.electrical_continuity_measured,false);
   assert.equal(result.engineering_approved,false);
