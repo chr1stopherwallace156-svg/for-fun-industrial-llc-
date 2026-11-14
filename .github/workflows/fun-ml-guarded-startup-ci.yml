@@ -1,0 +1,36 @@
+name: Fun Industrial ML Hub Guarded Startup Tests
+on:
+  push:
+    branches:
+      - feature/fun-ml-unified-dashboard-v3-20261113
+    paths:
+      - "intelligence-checks/integrated-hub-ui-v1-case.mjs"
+      - "intelligence-checks/fi-ml-hub-v3-case.mjs"
+      - "intelligence-checks/qwen-scikit-v2-case.mjs"
+      - "intelligence-checks/ml-hub-recovery-contract-v3-case.mjs"
+      - "intelligence-checks/commerce-intelligence-v1-case.mjs"
+      - "intelligence-checks/commerce-opportunities-v1-1-case.mjs"
+      - "intelligence-checks/google-trends-focus-v1-2-case.mjs"
+      - ".github/workflows/fun-ml-guarded-startup-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-guarded-tests:
+    runs-on: windows-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Run exact ML Hub guarded startup offline suite
+        run: |
+          node --test intelligence-checks/fi-ml-hub-v3-case.mjs intelligence-checks/qwen-scikit-v2-case.mjs intelligence-checks/ml-hub-recovery-contract-v3-case.mjs intelligence-checks/commerce-intelligence-v1-case.mjs intelligence-checks/commerce-opportunities-v1-1-case.mjs intelligence-checks/google-trends-focus-v1-2-case.mjs intelligence-checks/integrated-hub-ui-v1-case.mjs
+      - name: Check startup script PowerShell syntax
+        shell: pwsh
+        run: |
+          $tok=$null;$err=$null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'Start-Fun-ML-Dashboard-V3.ps1'),[ref]$tok,[ref]$err)|Out-Null
+          if($err.Count){$err|ForEach-Object{Write-Error $_.Message};throw 'ML_HUB_STARTUP_PS_PARSE_HOLD'}
+          Write-Host 'ML_HUB_GUARDED_STARTUP_PS=PASS'
