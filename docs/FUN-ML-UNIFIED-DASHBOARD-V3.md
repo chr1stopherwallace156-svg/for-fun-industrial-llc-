@@ -44,3 +44,20 @@ Then open Safari at http://127.0.0.1:8802/ (with the SSH tunnel connected). The 
 - The hub forwards only existing dashboard API routes to fixed local ports; requests larger than 12 MiB are refused.
 - Original iPhone voice upload through the existing gateway is unchanged; larger uploads may need the original gateway.
 - It is not a Shopify live connector or continuously running e-commerce agent; those are separate development milestones.
+
+
+## V3 missing-service recovery (November 13, 2026)
+
+If the hub preflight previously reported REQUIRED_SERVICE_UNAVAILABLE, the repaired launcher now probes each existing endpoint independently. It prints one named outcome per port:
+
+- FUN_ML_DEPENDENCY_8789=HTTP_READY or MISSING
+- FUN_ML_DEPENDENCY_8798=HTTP_READY or MISSING
+- FUN_ML_DEPENDENCY_8801=HTTP_READY or MISSING
+
+When run normally, it invokes the existing guarded one-command Fun startup only if 8789 or 8798 is actually missing. That script is called with -SkipPrivateGateway, so the existing NetBird HTTPS gateway on 8443 is neither restarted nor replaced. If 8801 is missing, it checks the already-installed FunIndustrial-QwenML-V2 repository's Git origin, branch and clean working tree before invoking its guarded startup. It never automatically retries failed recovery.
+
+If a listener exists but its HTTP endpoint is unresponsive, the script refuses to restart it and reports PORT_<number>_UNHEALTHY_LISTENER_MANUAL_REVIEW_NO_RESTART. Valid identity checks and listener snapshots remain mandatory.
+
+To diagnose without starting new processes, run Start-Fun-ML-Dashboard-V3.ps1 -CheckOnly after updating the branch. That returns a named missing-service hold if necessary.
+
+Offline recovery contract tests validate the safety checks in source; they do not constitute a live Windows service-recovery test. The combined launcher will now run 21 offline tests (the original 18 plus three source-contract tests) before any recovery or hub startup.
