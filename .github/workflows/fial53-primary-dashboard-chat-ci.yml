@@ -50,6 +50,17 @@ jobs:
             'FIAL53_PRIMARY_DASHBOARD_CONSOLIDATION=PASS','FIAL53_TOOLS_AND_REA_APPROVAL_UI=PRESERVED')){
             if(!$source.Contains($required)){throw ('FIAL53_DEPLOY_GUARD_MISSING_'+$required)}
           }
+          if($source -match 'function\s+ReadyNew\(\[int\]\$pid\)'){
+            throw 'FIAL53_READONLY_POWERSHELL_PID_PARAM_REGRESSION'
+          }
+          if(!$source.Contains('function ReadyNew([int]$expectedPid)') -or
+             !$source.Contains('if([int]$p.ProcessId -ne $expectedPid -or')){
+            throw 'FIAL53_READY_NEW_EXPECTED_PID_PARAM_MISSING'
+          }
+          if(!$source.Contains('FIAL53_LAST_READINESS_ERROR=') -or
+             !$source.Contains('FIAL53_NEW_8802_STDERR=')){
+            throw 'FIAL53_READINESS_ERROR_OBSERVABILITY_MISSING'
+          }
           if($source -match '\$ml\.state'){throw 'FIAL53_ML_WRONG_STATUS_FIELD'}
           if(!$source.Contains("$ml.version -cne 'fun-qwen-scikit-v2'") -or
              !$source.Contains('$ml.pythonInstalled -ne $true') -or
