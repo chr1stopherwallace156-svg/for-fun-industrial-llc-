@@ -15,7 +15,10 @@ import {GROUNDED_PANEL,GROUNDED_CLIENT,GROUNDED_VERSION} from '../src/fial/prima
 import {readExecutiveStatus} from '../src/operator/executive-ops-v1.mjs';
 import {EXEC_PAGE,EXEC_CLIENT,EXEC_CONSOLE_VERSION} from '../src/operator/executive-console-v1.mjs';
 import {readRealStatus,VERSION as REAL_VERSION} from '../src/operator/real-operations-v5-5.mjs';
+import {readBusinessCompetenceStatus,OPERATOR_VERSION} from '../src/competence/business-operator-v5-6.mjs';
+import {planBusinessDecision} from '../src/competence/business-knowledge-v5-6.mjs';
 const REAL_WIDGET=new URL('../src/operator/real-operations-widget-v5-5.js',import.meta.url);
+const BUSINESS_CLIENT=new URL('../src/competence/business-console-v5-6.js',import.meta.url);
 
 export const HOST='127.0.0.1',PORT=8802,ORIGIN='http://127.0.0.1:8802';
 const MAX_PAGE=240000,MAX_PROXY=12*1024*1024;
@@ -116,6 +119,21 @@ async function groundedChatBody(req){
     throw Error('FIAL53_CHAT_QUESTION_INVALID');
   return value;
 }
+async function parseBusinessQuestion(req){
+ const parts=[];let size=0;
+ for await(const part of req){
+  size+=part.length;if(size>1600)throw Error('FIAL56_BODY_TOO_LARGE');
+  parts.push(part);
+ }
+ let value;
+ try{value=JSON.parse(Buffer.concat(parts).toString('utf8'))}
+ catch{throw Error('FIAL56_JSON_REQUIRED')}
+ if(!value||typeof value!=='object'||Array.isArray(value)||
+  Object.keys(value).length!==1||typeof value.question!=='string'||
+  value.question.trim().length<4||value.question.length>1000)
+  throw Error('FIAL56_QUESTION_SCHEMA_INVALID');
+ return value.question;
+}
 async function emptyCommerceBody(req){
   let length=0;const chunks=[];
   for await(const chunk of req){length+=chunk.length;if(length>64)throw Error('COMMERCE_REQUEST_TOO_LARGE');chunks.push(chunk)}
@@ -126,6 +144,7 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
  readPage=pageFrom,proxy=proxyTo,readWidget=()=>readFile(ML_WIDGET,'utf8'),
  readCommerceWidget=()=>readFile(COMMERCE_WIDGET,'utf8'),
  executiveStatus=readExecutiveStatus,realStatus=readRealStatus,
+ businessStatus=readBusinessCompetenceStatus,businessPlan=planBusinessDecision,
  readUiClient=()=>readFile(UI_CLIENT,'utf8'),readUiStyle=()=>readFile(UI_CSS,'utf8')}={}){
   return http.createServer(async(req,res)=>{
     try{
@@ -148,6 +167,30 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
       }
       if(req.method==='GET'&&u.pathname==='/api/operator/client.js'){
         return send(res,200,await readFile(EXEC_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      }
+      if(req.method==='GET'&&u.pathname==='/api/operator/competence/client.js'){
+        return send(res,200,await readFile(BUSINESS_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      }
+      if(req.method==='GET'&&u.pathname==='/api/operator/competence/status'){
+        const result=await businessStatus();
+        if(result.version!==OPERATOR_VERSION||!Array.isArray(result.tasks)||
+         Object.values(result.actions||{}).some(v=>v!==0))
+          throw Error('FIAL56_STATUS_AUTHORITY_OR_VERSION_INVALID');
+        return send(res,200,result);
+      }
+      if(req.method==='POST'&&u.pathname==='/api/operator/competence/analyze'){
+        if(!acceptedActionOrigin(req)||
+          req.headers['x-fi-business-click']!=='one-local-decision-analysis'||
+          (req.headers['sec-fetch-site']&&!['same-origin','none'].includes(req.headers['sec-fetch-site'])))
+          return send(res,403,{error:'FIAL56_LOCAL_EXPLICIT_CLICK_REQUIRED'});
+        if(req.headers['content-type']!=='application/json')
+          return send(res,415,{error:'FIAL56_JSON_CONTENT_TYPE_REQUIRED'});
+        const question=await parseBusinessQuestion(req);
+        const plan=businessPlan(question);
+        if(plan.version!=='fial5.6-business-competence-v1'||plan.external_action_authorized!==false)
+          throw Error('FIAL56_PLAN_AUTHORITY_INVALID');
+        return send(res,200,{plan,model_invocations:0,tool_executions:0,
+          memory_writes:0,government_filings:0,messages_sent:0});
       }
       if(req.method==='GET'&&u.pathname==='/api/operator/real/client.js'){
         return send(res,200,await readFile(REAL_WIDGET,'utf8'),'text/javascript; charset=utf-8');
