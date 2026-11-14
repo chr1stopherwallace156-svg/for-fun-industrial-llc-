@@ -79,7 +79,11 @@ export function createGroundedChat({fetchImpl=fetch,now=()=>new Date()}={}){
      memory=injectMemory(base,recalled);
      recallStatus=memory.state;
      if(memory.state==="included"){
-      passages=recalled.results.map(memoryPassage).filter(Boolean).slice(0,2);
+      // Derive fallback strictly from excerpts selected by injectMemory, never
+      // from an irrelevant recalled result or the raw graph-completion wrapper.
+      const enriched=memory.payload.messages.at(-1).content;
+      const matches=[...enriched.matchAll(/(?:^|\n)Excerpt \d+: ("(?:[^"\\]|\\.)*")/g)];
+      passages=matches.slice(0,2).map(m=>{try{return JSON.parse(m[1])}catch{return null}}).filter(x=>typeof x==="string"&&x);
      }
     }catch(e){
      recallStatus="unavailable_or_invalid";
@@ -90,6 +94,7 @@ export function createGroundedChat({fetchImpl=fetch,now=()=>new Date()}={}){
    const text=memory.payload.messages.at(-1).content;
    // Intentionally no tools or tool_choice in the Qwen API request.
    const payload={model:"local-model",stream:false,temperature:0.2,max_tokens:512,
+    chat_template_kwargs:{enable_thinking:false},reasoning_effort:"none",
     messages:[{role:"system",content:sys},{role:"user",content:text}]};
    let model;
    try{
