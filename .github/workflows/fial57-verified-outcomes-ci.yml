@@ -1,0 +1,113 @@
+name: Fun Industrial FIAL5.7 Verified Business Outcomes CI
+on:
+  push:
+    branches:
+      - feature/fial5-7-verifiable-business-outcomes-20261114
+    paths:
+      - 'src/outcomes/**'
+      - 'src/operator/executive-console-v1.mjs'
+      - 'scripts/Run-Fun-Outcome-V5-7.mjs'
+      - 'scripts/Run-Fun-ML-Dashboard8802.mjs'
+      - '*Fun*V5-7.ps1'
+      - 'intelligence-checks/fial57-*.mjs'
+      - '.github/workflows/fial57-verified-outcomes-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Syntax checks for outcome modules and existing hub
+        shell: pwsh
+        run: |
+          $files=@(
+           'src/outcomes/outcome-engine-v5-7.mjs',
+           'src/outcomes/elektron-send-v5-7.mjs',
+           'src/outcomes/outcome-console-v5-7.js',
+           'scripts/Run-Fun-Outcome-V5-7.mjs',
+           'scripts/Run-Fun-ML-Dashboard8802.mjs',
+           'src/operator/executive-console-v1.mjs',
+           'intelligence-checks/fial57-outcomes-case.mjs',
+           'intelligence-checks/fial57-dashboard-case.mjs')
+          foreach($path in $files){
+           node --check $path
+           if($LASTEXITCODE -ne 0){throw ('FIAL57_JAVASCRIPT_SYNTAX_HOLD='+$path)}
+          }
+      - name: Outcome and complete predecessor dashboard regressions
+        run: |
+          node --test intelligence-checks/fial57-outcomes-case.mjs intelligence-checks/fial57-dashboard-case.mjs intelligence-checks/fial56-business-competence-case.mjs intelligence-checks/fial56-primary-business-dashboard-case.mjs intelligence-checks/fial55-real-operations-case.mjs intelligence-checks/fial55-primary-dashboard-case.mjs intelligence-checks/fial55-elektron-mail-case.mjs intelligence-checks/fial54-executive-operator-v1-case.mjs intelligence-checks/fial54-primary-console-v1-case.mjs intelligence-checks/fial-primary-dashboard-chat-v5-3-case.mjs intelligence-checks/fial-grounded-qwen-v5-2-case.mjs intelligence-checks/fi-ml-hub-v3-case.mjs intelligence-checks/integrated-hub-ui-v1-case.mjs
+      - name: Parse PowerShell and keep existing task upgrade narrowly bounded
+        shell: pwsh
+        run: |
+          foreach($path in @(
+           'Run-Fun-Verified-Outcomes-V5-7.ps1',
+           'Install-Fun-Verified-Outcomes-V5-7.ps1',
+           'Deploy-Fun-FIAL57-PrimaryDashboard.ps1',
+           'Activate-Fun-Verified-Outcomes-V5-7.ps1')){
+            $tokens=$null;$errors=$null
+            [Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $path),[ref]$tokens,[ref]$errors)|Out-Null
+            if(@($errors).Count){$errors|ForEach-Object{Write-Error $_.Message};throw ('FIAL57_PS_PARSE_HOLD='+$path)}
+            $text=Get-Content $path -Raw
+            if($text -match '(?im)^\s*\$(home|pid|host|input|error|matches)\s*='){
+             throw ('FIAL57_RESERVED_VARIABLE_HOLD='+$path)
+            }
+            if($text -match 'Stop-Process|Restart-Service|Invoke-Expression|git reset|Set-NetFirewallRule|winget install|pip install'){
+             throw ('FIAL57_PROTECTED_MUTATION_HOLD='+$path)
+            }
+          }
+          $installer=Get-Content 'Install-Fun-Verified-Outcomes-V5-7.ps1' -Raw
+          foreach($guard in @('UNKNOWN_TASK_ACTION_WILL_NOT_REPLACE',
+           'FIAL57_FIRST_REAL_OBSERVATION=PASS',
+           'FIAL57_ROLLBACK_RESTORED_FIAL56=PASS',
+           'FIAL57_NO_AUTOMATIC_EMAIL_SENDING=TRUE',
+           'FIAL57_FOUR_DAILY_TRIGGERS=PRESERVED')){
+            if(!$installer.Contains($guard)){throw ('FIAL57_SCHEDULER_GUARD_MISSING='+$guard)}
+          }
+          $activate=Get-Content 'Activate-Fun-Verified-Outcomes-V5-7.ps1' -Raw
+          foreach($name in @('FIAL57_PHASE_1=LOCAL_SCHEDULER_AND_OUTCOME_LEDGER_PASS',
+           'FIAL57_PHASE_2=PRIMARY_DASHBOARD_AND_QWEN_PASS',
+           'FIAL57_ALL_IN_ONE=PASS')){
+            if(!$activate.Contains($name)){throw ('FIAL57_ORCHESTRATOR_INCOMPLETE='+$name)}
+          }
+          Write-Host 'FIAL57_WINDOWS_SCHEDULER_AND_ALL_IN_ONE_GUARDS=PASS'
+      - name: Verify old source blob pins and protected dashboard rollback markers
+        shell: pwsh
+        run: |
+          $runnerHash=(git hash-object --path=Run-Fun-Business-Competence-V5-6.ps1 -- Run-Fun-Business-Competence-V5-6.ps1 | Out-String).Trim()
+          $dashboardHash=(git hash-object --path=scripts/Run-Fun-ML-Dashboard8802.mjs -- scripts/Run-Fun-ML-Dashboard8802.mjs | Out-String).Trim()
+          if($runnerHash -cne '0a95e6d84f20a3e08a8af30575fe1ed61f4c8aa4'){
+           throw ('FIAL57_PRIOR_TASK_BLOB_MISMATCH='+$runnerHash)
+          }
+          # Dashboard source changes in this release; the pinned FIAL5.6 value is checked against
+          # its previous branch by the live deployment, not the modified current version.
+          $deployer=Get-Content 'Deploy-Fun-FIAL57-PrimaryDashboard.ps1' -Raw
+          foreach($guard in @('FIAL57_PRIMARY_DASHBOARD_CONSOLIDATION=PASS',
+           'FIAL57_ROLLBACK_OLD_PRIMARY_DASHBOARD=PASS',
+           'OLD_DASHBOARD_SOURCE_NOT_REVIEWED',
+           'OUTCOME_EVIDENCE_RECEIPT_MISSING',
+           'PROTECTED_PROCESS_CHANGED_PORT_')){
+            if(!$deployer.Contains($guard)){throw ('FIAL57_DASHBOARD_GUARD_MISSING='+$guard)}
+          }
+          Write-Host 'FIAL57_PINNED_PRIOR_AND_ROLLBACK_CONTRACT=PASS'
+      - name: No personal business profile or executable automatic sending in public code
+        shell: pwsh
+        run: |
+          $files=@('src/outcomes/outcome-engine-v5-7.mjs',
+            'src/outcomes/elektron-send-v5-7.mjs',
+            'scripts/Run-Fun-Outcome-V5-7.mjs',
+            'Run-Fun-Verified-Outcomes-V5-7.ps1')
+          $all=($files|ForEach-Object {Get-Content $_ -Raw}) -join ''
+          foreach($private in @('760-912-0784','B20260233096','13479 Abbot','elektronindustrial@gmail.com')){
+            if($all.Contains($private)){throw 'FIAL57_PRIVATE_PROFILE_LEAK_IN_PUBLIC_SOURCE'}
+          }
+          $scheduled=Get-Content 'Run-Fun-Verified-Outcomes-V5-7.ps1' -Raw
+          if($scheduled -match 'send-approved-stdin|connect-send|GmailSend|messages/send'){
+            throw 'FIAL57_SCHEDULED_WORKER_HAS_SEND_ENTRYPOINT'
+          }
+          Write-Host 'FIAL57_PRIVACY_AND_NO_AUTOSEND=PASS'
