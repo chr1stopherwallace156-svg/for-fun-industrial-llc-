@@ -133,7 +133,15 @@ if($mem.memoryAvailable -ne $true -or $mem.memoryWrites -ne $false -or
  $mem.mode -cne 'automatic_contextual_read_only'){Hold 'EXISTING_COGNEE_READ_ONLY_POLICY_HOLD'}
 $parent=Invoke-RestMethod 'http://127.0.0.1:8798/api/unified/status' -TimeoutSec 9 -ErrorAction Stop
 $ml=Invoke-RestMethod 'http://127.0.0.1:8801/api/ml/status' -TimeoutSec 9 -ErrorAction Stop
-if($parent.state -cne 'ready' -or $ml.state -cne 'ready'){Hold 'PRIMARY_DEPENDENCIES_NOT_READY'}
+# 8798 exposes a .state, but 8801 returns the independent ML status contract
+# without .state. Require identity + installed Python + unchanged authority instead.
+if($parent.version -cne 'fi-unified-task-chat-8798-v1' -or
+ $parent.state -cne 'ready' -or
+ $ml.version -cne 'fun-qwen-scikit-v2' -or
+ $ml.pythonInstalled -ne $true -or
+ $ml.reaExecutionGrants -ne 0 -or
+ $ml.externalActions -ne 0){Hold 'PRIMARY_DEPENDENCIES_NOT_READY_OR_IDENTITY_MISMATCH'}
+Write-Host 'FIAL53_8798_STATUS=READY FIAL53_8801_ML_STATUS=VERIFIED_REAL_SCHEMA'
 $oldStatus=GetJson '/api/fun/hub/status'
 $oldCommerce=GetJson '/api/commerce/status'
 $OldCommerceShopifyConfigured=$oldCommerce.shopify.configured -eq $true
