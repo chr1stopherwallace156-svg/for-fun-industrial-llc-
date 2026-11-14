@@ -1,0 +1,185 @@
+name: Fun Industrial FIAL5.6 Business Competence CI
+on:
+  push:
+    branches:
+      - feature/fial5-6-business-competence-one-step-20261114
+    paths:
+      - "src/competence/**"
+      - "src/fial/grounded-chat-v5-2.mjs"
+      - "src/operator/executive-console-v1.mjs"
+      - "scripts/Run-Fun-ML-Dashboard8802.mjs"
+      - "scripts/Run-Fun-Business-Competence-V5-6.mjs"
+      - "Run-Fun-Business-Competence-V5-6.ps1"
+      - "Install-Fun-Business-Competence-V5-6.ps1"
+      - "Deploy-Fun-FIAL56-PrimaryDashboard.ps1"
+      - "intelligence-checks/fial56-*.mjs"
+      - ".github/workflows/fial56-business-competence-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Parse new modules and existing Qwen and main dashboard
+        shell: pwsh
+        run: |
+          $files=@(
+            'src/competence/business-knowledge-v5-6.mjs',
+            'src/competence/business-finance-v5-6.mjs',
+            'src/competence/business-writing-v5-6.mjs',
+            'src/competence/business-workflow-v5-6.mjs',
+            'src/competence/business-operator-v5-6.mjs',
+            'src/competence/optional-document-tools-v5-6.mjs',
+            'src/competence/business-console-v5-6.js',
+            'src/fial/grounded-chat-v5-2.mjs',
+            'src/operator/executive-console-v1.mjs',
+            'scripts/Run-Fun-Business-Competence-V5-6.mjs',
+            'scripts/Run-Fun-ML-Dashboard8802.mjs',
+            'intelligence-checks/fial56-business-competence-case.mjs',
+            'intelligence-checks/fial56-primary-business-dashboard-case.mjs'
+          )
+          foreach($p in $files){node --check $p;if($LASTEXITCODE -ne 0){throw ('FIAL56_JS_SYNTAX_HOLD='+$p)}}
+      - name: Business, finance, writing and original dashboard regressions
+        run: |
+          node --test intelligence-checks/fial56-business-competence-case.mjs intelligence-checks/fial56-primary-business-dashboard-case.mjs intelligence-checks/fial55-real-operations-case.mjs intelligence-checks/fial55-primary-dashboard-case.mjs intelligence-checks/fial55-elektron-mail-case.mjs intelligence-checks/fial54-executive-operator-v1-case.mjs intelligence-checks/fial54-primary-console-v1-case.mjs intelligence-checks/fial-primary-dashboard-chat-v5-3-case.mjs intelligence-checks/fial-grounded-qwen-v5-2-case.mjs intelligence-checks/fi-ml-hub-v3-case.mjs intelligence-checks/integrated-hub-ui-v1-case.mjs
+      - name: Parse three Windows scripts and prevent reserved variable / unsafe process changes
+        shell: pwsh
+        run: |
+          foreach($path in @(
+           'Run-Fun-Business-Competence-V5-6.ps1',
+           'Install-Fun-Business-Competence-V5-6.ps1',
+           'Deploy-Fun-FIAL56-PrimaryDashboard.ps1')){
+            $tokens=$null;$errors=$null
+            [Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $path),[ref]$tokens,[ref]$errors)|Out-Null
+            if(@($errors).Count){$errors|ForEach-Object{Write-Error $_.Message};throw ('FIAL56_POWERSHELL_SYNTAX_HOLD='+$path)}
+            $source=Get-Content $path -Raw
+            if($source -match '(?im)^\s*\$(home|pid|host|input|error|matches)\s*='){
+             throw ('FIAL56_AUTOMATIC_VARIABLE_MUTATION='+$path)
+            }
+            if($source -match 'Invoke-Expression|git reset|Set-NetFirewallRule|Restart-Service|Stop-Service|pip install|winget install'){
+             throw ('FIAL56_UNREVIEWED_MUTATION='+$path)
+            }
+          }
+          $installer=Get-Content 'Install-Fun-Business-Competence-V5-6.ps1' -Raw
+          foreach($expected in @(
+           'FIRST_COMPETENCE_RECEIPT_INVALID',
+           'UNRECOGNIZED_TASK_ACTION_REFUSE_OVERWRITE',
+           'FIAL56_FIRST_REAL_CYCLE=PASS',
+           'FIAL56_FOUR_DAILY_TRIGGERS=PRESERVED',
+           'FIAL56_SCHEDULER_ROLLBACK=OLD_FIAL55_RESTORED',
+           'FIAL56_NO_MODEL_STARTS_NO_EXTERNAL_ACTIONS=TRUE')){
+            if(!$installer.Contains($expected)){throw ('FIAL56_SCHEDULER_GUARD_MISSING='+$expected)}
+          }
+          Write-Host 'FIAL56_WINDOWS_POWERSHELL_PARSE_AND_SCHEDULER_GUARDS=PASS'
+      - name: Exercise actual PowerShell dashboard readiness with mocked real statuses
+        shell: pwsh
+        run: |
+          $file=Join-Path $PWD 'Deploy-Fun-FIAL56-PrimaryDashboard.ps1'
+          $tokens=$null;$errors=$null
+          $ast=[Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$errors)
+          if(@($errors).Count){throw 'FIAL56_DEPLOY_PARSE_FAILED'}
+          $functions=$ast.FindAll({param($node)
+            $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'ReadyNew'
+          },$true)
+          if(@($functions).Count -ne 1){throw 'FIAL56_READY_NEW_MISSING'}
+          $fixture=@'
+          Set-StrictMode -Version Latest
+          $Runner='C:\test\scripts\Run-Fun-ML-Dashboard8802.mjs'
+          $Url='http://127.0.0.1:8802'
+          $OldCommerceShopifyConfigured=$false
+          $ElevateBusiness=$false
+          function Hold([string]$message){throw ('MOCK_HOLD='+$message)}
+          function Owner([int]$port){
+            if($port -ne 8802){throw 'WRONG_PORT'}
+            return [pscustomobject]@{ProcessId=9090;CommandLine=('node.exe "'+$Runner+'" --serve')}
+          }
+          function GetJson([string]$path){
+            switch($path){
+              '/api/fun/hub/status' {return [pscustomobject]@{version='fi-ml-hub-v3'}}
+              '/api/ml/dashboard/status' {return [pscustomobject]@{state='ready'}}
+              '/api/fial/grounded/status' {return [pscustomobject]@{
+                version='fial5.3-primary-grounded-chat-v1';model_interface='fixed_local_qwen_8088'
+                memory_interface='fixed_readonly_cognee_8789';authority_added=$false;tool_executions=0}}
+              '/api/commerce/status' {return [pscustomobject]@{version='commerce';shopify=[pscustomobject]@{configured=$false}}}
+              '/api/unified/status' {return [pscustomobject]@{state='ready'}}
+              '/api/operator/status' {return [pscustomobject]@{
+                version='fial5.4-executive-operator-v1';console_version='fial5.4-executive-console-v1'
+                outbound_permissions=[pscustomobject]@{email_sent=0;government_filings=0;spent_usd=0;rea_runs=0}}}
+              '/api/operator/real/status' {return [pscustomobject]@{
+                version='fial5.5-real-business-operations-v1'
+                company_identity_status='OPERATOR_PROVIDED_NOT_OFFICIALLY_VERIFIED'
+                government_filings=0;emails_sent=0;payments=0;rea_executions=0;applied_configs=0}}
+              '/api/operator/competence/status' {return [pscustomobject]@{
+                version='fial5.6-business-operator-v1'
+                state='EXECUTED_LOCAL_BUSINESS_COMPETENCE_CYCLE'
+                actions=[pscustomobject]@{mail_sent=$(if($ElevateBusiness){1}else{0});
+                 government_filings=0;rea_executions=0;code_mutations=0;model_invocations=0}}}
+              default {throw ('UNEXPECTED_READ='+$path)}
+            }
+          }
+          function Invoke-WebRequest {
+            param([string]$Uri,[switch]$UseBasicParsing,[int]$TimeoutSec)
+            if($Uri.EndsWith('/unified/?view=chat')){
+              return [pscustomobject]@{StatusCode=200;Content='id="fi-fial53-grounded" id="action-review" fi-ml-panel fi-commerce-panel'}
+            }
+            if($Uri.EndsWith('/api/fial/grounded/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='x-fi-chat-click textContent'}
+            }
+            if($Uri.EndsWith('/operations/')){
+              return [pscustomobject]@{StatusCode=200;Content='fi-exec-queue Executive Assistant fi-real-work fi-competence-question'}
+            }
+            if($Uri.EndsWith('/api/operator/client.js') -or $Uri.EndsWith('/api/operator/real/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='textContent'}
+            }
+            if($Uri.EndsWith('/api/operator/competence/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='textContent x-fi-business-click'}
+            }
+            if($Uri.EndsWith('/')){return [pscustomobject]@{StatusCode=200;Content='fi-ui-shell'}}
+            throw ('UNEXPECTED_HTML='+$Uri)
+          }
+          $homeBefore=$HOME
+          ReadyNew 9090
+          if($HOME -cne $homeBefore){throw 'FIAL56_HOME_CHANGED'}
+          $ElevateBusiness=$true
+          $held=$false
+          try{ReadyNew 9090}catch{
+            if([string]$_.Exception.Message -match 'NEW_DASHBOARD_HEALTH_OR_POLICY_MISMATCH'){$held=$true}
+            else{throw}
+          }
+          if(!$held){throw 'FIAL56_ELEVATED_ACTION_NOT_REJECTED'}
+          $held=$false
+          try{ReadyNew 9091}catch{
+            if([string]$_.Exception.Message -match 'NEW_8802_OWNER_DRIFT'){$held=$true}
+            else{throw}
+          }
+          if(!$held){throw 'FIAL56_WRONG_OWNER_NOT_REJECTED'}
+          Write-Host 'FIAL56_REAL_WINDOWS_READINESS_FUNCTION=PASS'
+          '@
+          & ([scriptblock]::Create($functions[0].Extent.Text+[Environment]::NewLine+$fixture))
+      - name: Check prior FIAL5.5 rollback, private identity and optional adapter restrictions
+        shell: pwsh
+        run: |
+          $src=Get-Content 'Deploy-Fun-FIAL56-PrimaryDashboard.ps1' -Raw
+          foreach($marker in @(
+            'FIAL56_ROLLBACK_OLD_PRIMARY_DASHBOARD=PASS',
+            'OLD_DASHBOARD_SOURCE_NOT_REVIEWED',
+            'BUSINESS_COMPETENCE_RECEIPT_MISSING',
+            'PROTECTED_PROCESS_CHANGED_PORT_',
+            'FIAL56_PRIMARY_DASHBOARD_CONSOLIDATION=PASS')){
+            if(!$src.Contains($marker)){throw ('FIAL56_DEPLOY_GUARD_MISSING='+$marker)}
+          }
+          if($src -match '(?<!@)\(Listeners 8802\)\.Count'){throw 'FIAL56_UNSAFE_LISTENER_COUNT'}
+          $text=(Get-ChildItem 'src/competence','scripts' -Recurse -File |
+            Where-Object {$_.Name -match 'Business-Competence|business-competence|business-knowledge|business-finance'}|
+            ForEach-Object{Get-Content $_.FullName -Raw}) -join ''
+          if($text.Contains('760-912-0784') -or $text.Contains('B20260233096') -or
+            $text.Contains('elektronindustrial@gmail.com')){
+            throw 'FIAL56_PRIVATE_BUSINESS_CONTACT_EXPOSED_IN_NEW_CODE'
+          }
+          Write-Host 'FIAL56_ROLLBACK_AND_PRIVACY_GUARDS=PASS'
