@@ -1,0 +1,27 @@
+name: Fun EV Toolchain V4 - source-only checks
+on:
+  push:
+    branches:
+      - feature/fun-ev-toolchain-installer-v4-20261114
+    paths:
+      - 'Setup-Fun-EV-Toolchain-V4.ps1'
+      - 'test/ev-toolchain-v4.test.mjs'
+      - '.github/workflows/fun-ev-toolchain-v4-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  guarded-install-source:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test V4 source guards only, never run installer
+        run: node --test test/ev-toolchain-v4.test.mjs
