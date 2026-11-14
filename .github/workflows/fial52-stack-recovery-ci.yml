@@ -1,0 +1,45 @@
+name: Fun Industrial FIAL5.2 Stack Recovery CI
+on:
+  push:
+    branches:
+      - feature/fial5-2-qwen-grounded-replies-20261114
+    paths:
+      - "Recover-Fun-FIAL-Stack-V5-2.ps1"
+      - ".github/workflows/fial52-stack-recovery-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  guarded-recovery:
+    runs-on: windows-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell recovery script and inspect boundary contracts
+        shell: pwsh
+        run: |
+          $file=Join-Path $PWD 'Recover-Fun-FIAL-Stack-V5-2.ps1'
+          $tokens=$null;$errors=$null
+          $ast=[System.Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$errors)
+          if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};throw 'FIAL52_STACK_PS_PARSE_FAILED'}
+          $code=Get-Content $file -Raw
+          foreach($mark in @('FIAL52_STACK_RECOVERY=PASS','FIAL52_EXISTING_QWEN_MEMORY_REA_ELEKTRON=UNTOUCHED',
+            'GUARDED_STARTER_FAILED_','DIRTY_CHECKOUT_','PROTECTED_PORT_CHANGED_',
+            'FIAL5','FIAL51','FIAL52')){
+            if(!$code.Contains($mark)){throw ('FIAL52_RECOVERY_BOUNDARY_MISSING_'+$mark)}
+          }
+          $ordered=@('Start-Fun-FIAL-System-V5.ps1','Start-Fun-FIAL-Integrations-V5-1.ps1',
+            'Start-Fun-Qwen-Grounded-V5-2.ps1')
+          $last=-1
+          foreach($name in $ordered){
+            $index=$code.IndexOf($name)
+            if($index -le $last){throw ('FIAL52_RECOVERY_ORDER_INVALID_'+$name)}
+            $last=$index
+          }
+          if($code -match 'Stop-Process|Restart-Service|Stop-Service|Invoke-Expression|git reset|git pull|Set-NetFirewallRule'){
+            throw 'FIAL52_RECOVERY_UNEXPECTED_MUTATION'
+          }
+          if($code -notmatch 'if\(\$step.Name -ceq ''FIAL52'' -and \$VerifyLive\)'){
+            throw 'FIAL52_LIVE_VERIFICATION_NOT_EXPLICIT'
+          }
+          Write-Host 'FIAL52_GUARDED_STACK_RECOVERY_CHECK=PASS'
