@@ -103,6 +103,8 @@ test('cold restart accepts only the pinned original or exact reviewed 8789 evide
  assert.match(core,/ReviewedEvidenceSourceBlob='422d4f75e57dc6099f7c6b05f535843d8f08929f'/);
  assert.match(core,/git\.exe -C \$Primary hash-object --no-filters -- \$Source/);
  assert.match(core,/\$SourceGitBlob -cne \$ReviewedEvidenceSourceBlob/);
+ assert.match(core,/hash-object --path=src\/server\.mjs -- \$Source/);
+ assert.match(core,/\$TrackedBlob -cne \$ReviewedEvidenceSourceBlob/);
  assert.match(core,/8789_SOURCE_HASH_CHANGED_MANUAL_REVIEW_NO_RESTORE/);
  assert.doesNotMatch(core,/Set-Content[^\n]*\$Source|Copy-Item[^\n]*\$Source/);
 });
