@@ -8,7 +8,7 @@ def line_groups(words,tolerance=4):
  for w in sorted(words,key=lambda x:(x["bbox"][1],x["bbox"][0],x["text"])):
   b=w["bbox"]
   if len(b)!=4 or any(type(v) not in (int,float) or not math.isfinite(v) for v in b):raise ValueError("INVALID_WORD_GEOMETRY")
-  if not groups or abs(b[1]-groups[-1][0][0]["bbox"][1])>tolerance or w["position"]!=groups[-1][0][0]["position"]:
+  if not groups or abs(b[1]-groups[-1][0]["bbox"][1])>tolerance or w["position"]!=groups[-1][0]["position"]:
    groups.append([w])
   else:groups[-1].append(w)
  result=[]
