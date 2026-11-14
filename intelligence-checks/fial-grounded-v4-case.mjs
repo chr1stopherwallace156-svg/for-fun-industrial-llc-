@@ -1,6 +1,6 @@
 import {test} from "node:test";
 import assert from "node:assert/strict";
-import {mkdtemp,mkdir,writeFile,readFile,rm} from "node:fs/promises";
+import {mkdtemp,mkdir,writeFile,readFile,rm,realpath} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {createHash} from "node:crypto";
@@ -25,7 +25,8 @@ const CASE="b".repeat(30);
 async function fixture(root,{interpretation=GOOD,accepted=true}={}){
  const evid=join(root,"evidence"),dir=join(root,"fial","semantic-v2","cases");
  await mkdir(evid,{recursive:true});await mkdir(dir,{recursive:true});
- const file=join(evid,"government.csv");await writeFile(file,csv);
+ const sourceFile=join(evid,"government.csv");await writeFile(sourceFile,csv);
+ const file=await realpath(sourceFile);
  const report={version:"fun-real-application-worker-v1",state:"REAL_SOURCE_SCANNED_DRAFTS_PREPARED",
   source_sha256:sha(Buffer.from(csv)),evidence_file:file,
   submitted_applications:0,approved_spending:0,
