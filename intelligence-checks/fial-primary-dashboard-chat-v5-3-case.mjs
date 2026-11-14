@@ -66,7 +66,7 @@ test('HTTP hub grounded status is read-only and chat requires same-origin click,
   assert.equal(JSON.parse(status.text).version,GROUNDED_VERSION);
   assert.equal(chatCalls,0);
   const client=await query(hub,'/api/fial/grounded/client.js');
-  assert.equal(client.status,200);assert.match(client.text,/Send/);
+  assert.equal(client.status,200);assert.match(client.text,/send.addEventListener/);
   const page=await query(hub,'/unified/?view=chat');
   assert.equal(page.status,200);
   assert.match(page.text,/fi-fial53-grounded/);
