@@ -72,13 +72,13 @@ function ReadyNew([int]$expectedPid){
   Hold 'NEW_DASHBOARD_HEALTH_OR_POLICY_MISMATCH'
  }
  $page=Invoke-WebRequest ($Url+'/unified/?view=chat') -UseBasicParsing -TimeoutSec 14
- $home=Invoke-WebRequest ($Url+'/') -UseBasicParsing -TimeoutSec 14
+ $homePage=Invoke-WebRequest ($Url+'/') -UseBasicParsing -TimeoutSec 14
  $script=Invoke-WebRequest ($Url+'/api/fial/grounded/client.js') -UseBasicParsing -TimeoutSec 14
- if($page.StatusCode -ne 200 -or $home.StatusCode -ne 200 -or
+ if($page.StatusCode -ne 200 -or $homePage.StatusCode -ne 200 -or
   $page.Content -notmatch 'id="fi-fial53-grounded"' -or
   $page.Content -notmatch 'id="action-review"' -or
   $page.Content -notmatch 'fi-ml-panel' -or $page.Content -notmatch 'fi-commerce-panel' -or
-  $home.Content -notmatch 'fi-ui-shell' -or
+  $homePage.Content -notmatch 'fi-ui-shell' -or
   $script.Content -notmatch 'x-fi-chat-click' -or $script.Content -match 'innerHTML'){
   Hold 'NEW_PRIMARY_DASHBOARD_UI_OR_LEGACY_CONTROLS_MISSING'
  }
