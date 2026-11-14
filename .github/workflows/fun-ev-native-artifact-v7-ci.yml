@@ -1,0 +1,30 @@
+name: Fun EV V7 - read-only native artifact audit
+on:
+  push:
+    branches:
+      - feature/fun-ev-native-artifact-audit-v7-20261114
+    paths:
+      - 'src/ev-conversion/native-artifact-audit-v7.mjs'
+      - 'test/ev-native-artifact-audit-v7.test.mjs'
+      - 'Run-Fun-EV-Native-Audit-V7.ps1'
+      - '.github/workflows/fun-ev-native-artifact-v7-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  artifact-structure:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check read-only verifier syntax
+        run: node --check src/ev-conversion/native-artifact-audit-v7.mjs
+      - name: Run positive and adversarial artifact fixture tests
+        run: node --test test/ev-native-artifact-audit-v7.test.mjs
