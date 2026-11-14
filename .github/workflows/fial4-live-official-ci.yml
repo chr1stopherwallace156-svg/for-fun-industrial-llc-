@@ -1,0 +1,45 @@
+name: Fun Industrial FIAL 4 Live Activation CI
+on:
+  push:
+    branches:
+      - feature/fial4-live-official-activation-20261114
+    paths:
+      - "src/fial/live-*.mjs"
+      - "src/fial/live-*.js"
+      - "scripts/Run-Fun-FIAL-Live-Dashboard8803.mjs"
+      - "Start-Fun-FIAL4-Live.ps1"
+      - "intelligence-checks/fial-live-official-v4-case.mjs"
+      - ".github/workflows/fial4-live-official-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fial4-live:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Verify live source and active dashboard code syntax
+        shell: pwsh
+        run: |
+          node --check src/fial/live-official-v4.mjs
+          node --check src/fial/live-widget-v4.js
+          node --check scripts/Run-Fun-FIAL-Live-Dashboard8803.mjs
+          node --check intelligence-checks/fial-live-official-v4-case.mjs
+      - name: Independent live source and dashboard contract tests
+        run: node --test intelligence-checks/fial-live-official-v4-case.mjs
+      - name: Verify Windows activation script parses
+        shell: pwsh
+        run: |
+          $tokens=$null;$errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'Start-Fun-FIAL4-Live.ps1'),[ref]$tokens,[ref]$errors)|Out-Null
+          if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};throw 'FIAL4_LIVE_POWERSHELL_SYNTAX_HOLD'}
+          $source=Get-Content 'Start-Fun-FIAL4-Live.ps1' -Raw
+          foreach($s in @('SOURCE_CHECKOUT_DIRTY','8803_OWNER_NOT_VERIFIED_NO_RESTART','PROTECTED_PORT_CHANGED_','FIAL4_LIVE_DASHBOARD=ACTIVE')){
+            if(!$source.Contains($s)){throw ('FIAL4_LIVE_PROTECTION_MISSING_'+$s)}
+          }
+          if($source -match 'Stop-Process|Restart-Service|Stop-Service|Set-NetFirewallRule'){throw 'FIAL4_LIVE_UNRELATED_MUTATION_HOLD'}
+          Write-Host 'FIAL4_LIVE_WINDOWS_LAUNCHER=PASS'
