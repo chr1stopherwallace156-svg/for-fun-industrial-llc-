@@ -19,7 +19,7 @@ foreach($file in @($Main,$Commerce,$Gateway)){
  if((Get-Item -LiteralPath $file).Attributes -band [IO.FileAttributes]::ReparsePoint){Hold ('SYMLINK_REFUSED='+$file)}
  $tokens=$null;$parseErrors=$null
  [void][System.Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$parseErrors)
- if(@($parseErrors).Count){Hold ('SCRIPT_SYNTAX_INVALID='+$file)}
+ if($null -ne $parseErrors -and @($parseErrors).Count -gt 0){Hold ('SCRIPT_SYNTAX_INVALID='+$file)}
 }
 Write-Host 'FUN_COLD_RECOVERY=START ORDER=CORE_THEN_ML_THEN_COMMERCE_THEN_GATEWAY'
 # This guarded existing launcher:
