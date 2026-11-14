@@ -4,7 +4,7 @@
 # Never invokes /api/activate, /api/start, /api/ai/start, any MCP tools,
 # model prompts, NetBird, source restoration, taskkill, or the Elektron process.
 # Separate operator authorization remains mandatory for actual tool execution.
-[CmdletBinding()]param([switch]$CheckOnly)
+[CmdletBinding()]param([switch]$CheckOnly,[switch]$SkipPrivateGateway)
 $ErrorActionPreference='Stop'
 $Repo=$PSScriptRoot
 $Primary=Join-Path $HOME 'FunIndustrial-REA-MCP-Activation'
@@ -204,11 +204,15 @@ foreach($port in @(11434,8088,8789,8796,8797,8798)){
 # 7. Adopt or start the already-prepared private NetBird HTTPS iPhone gateway.
 # Its own helper requires the exact iPhone peer, TLS/certificate pin, and
 # healthy voice-enabled original dashboard; never changes firewall or VPN.
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $GatewayHelper
-if($LASTEXITCODE -ne 0){Hold '8443_PRIVATE_HTTPS_START_OR_ATTEST_FAILED_NO_RETRY'}
+if($SkipPrivateGateway){
+ Write-Host 'FUN_PRIVATE_HTTPS=SKIPPED_EXISTING_GATEWAY_UNTOUCHED'
+}else{
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $GatewayHelper
+ if($LASTEXITCODE -ne 0){Hold '8443_PRIVATE_HTTPS_START_OR_ATTEST_FAILED_NO_RETRY'}
+}
 Write-Host 'FUN_INDUSTRIAL_ONE_COMMAND=PASS'
 Write-Host 'FUN_DASHBOARD=http://127.0.0.1:8798/'
-Write-Host 'FUN_PRIVATE_IPHONE_HTTPS=https://100.109.4.20:8443/ BACKEND=8789'
+if(-not $SkipPrivateGateway){Write-Host 'FUN_PRIVATE_IPHONE_HTTPS=https://100.109.4.20:8443/ BACKEND=8789'}
 Write-Host 'FUN_LOCAL_TOOLS=19 FUN_INDEPENDENT_REA_TOOLS=229'
 Write-Host ('FUN_LEGACY_PARENT_REA_INITIALIZED='+[bool]($tools.rea_tool_count -eq 229))
 Write-Host 'FUN_TOOL_EXECUTIONS_DURING_STARTUP=0 FUN_REA_OPERATOR_APPROVAL=REQUIRED'
