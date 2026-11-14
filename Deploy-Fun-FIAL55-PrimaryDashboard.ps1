@@ -142,13 +142,15 @@ foreach($file in @(
  'scripts\Run-Fun-Real-Operations-V5-5.mjs',
  'src\operator\real-operations-v5-5.mjs',
  'src\operator\official-source-watch-v5-5.mjs',
+ 'src\operator\elektron-gmail-v5-5.mjs',
  'src\operator\real-operations-widget-v5-5.js',
  'src\ui\integrated-hub-v1.js',
  'intelligence-checks\fial-primary-dashboard-chat-v5-3-case.mjs',
  'intelligence-checks\fial54-executive-operator-v1-case.mjs',
  'intelligence-checks\fial54-primary-console-v1-case.mjs',
  'intelligence-checks\fial55-real-operations-case.mjs',
- 'intelligence-checks\fial55-primary-dashboard-case.mjs')){
+ 'intelligence-checks\fial55-primary-dashboard-case.mjs',
+ 'intelligence-checks\fial55-elektron-mail-case.mjs')){
  $f=Join-Path $Root $file;Leaf $f
  & $Node --check $f
  if($LASTEXITCODE -ne 0){Hold ('NEW_SOURCE_SYNTAX_HOLD='+$file)}
@@ -156,6 +158,7 @@ foreach($file in @(
 $tests=@(
  'intelligence-checks\fial55-real-operations-case.mjs',
  'intelligence-checks\fial55-primary-dashboard-case.mjs',
+ 'intelligence-checks\fial55-elektron-mail-case.mjs',
  'intelligence-checks\fial54-executive-operator-v1-case.mjs',
  'intelligence-checks\fial54-primary-console-v1-case.mjs',
  'intelligence-checks\fial-primary-dashboard-chat-v5-3-case.mjs',
