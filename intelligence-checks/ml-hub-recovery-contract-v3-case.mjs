@@ -29,7 +29,7 @@ test('original 8789 recovery remains guarded and cannot skip its pinned source h
 });
 test('missing 8798 with healthy 8789 uses dedicated launcher and never reloads 8789',async()=>{
  const source=await clean(launcher);
- assert.match(source,/elseif\(\$null -eq \$chat\)/);
+ assert.match(source,/elseif\(\$null -eq \$chat -or \$chatDegraded\)/);
  assert.match(source,/Start-Fun-Unified-Chat8798\.ps1/);
  assert.match(source,/START_ONLY_MISSING_8798_ORIGINAL_8789_PRESERVED/);
  assert.match(source,/8798_DEPENDENCY_/);
@@ -83,4 +83,16 @@ test('dedicated 8798 launcher only adopts exact healthy Qwen 8088 and does not s
  assert.match(source,/QWEN_LOCAL_MODEL_NOT_READY/);
  assert.match(source,/VerifiedIndependentQwen\)\)\)\{Hold 'ORIGINAL_SERVICES_CHANGED'/);
  assert.doesNotMatch(source,/Start-Fun-Industrial\.ps1/);
+});
+
+test('degraded existing 8798 triggers sidecar recovery without restarting unified chat',async()=>{
+ const source=await clean(launcher);
+ assert.match(source,/\$chatDegraded=\(\$null -ne \$chat/);
+ assert.match(source,/\$chat\.state -ne 'ready'/);
+ assert.match(source,/\$chat\.local\.ready -ne \$true/);
+ assert.match(source,/\$chat\.rea\.ready -ne \$true/);
+ assert.match(source,/\$null -eq \$chat -or \$chatDegraded -or \$null -eq \$ml/);
+ assert.match(source,/if\(\$null -eq \$chat\)\{\s*& powershell\.exe -NoProfile -ExecutionPolicy Bypass -File \$startChat/);
+ assert.match(source,/EXISTING_8798_DEGRADED_ADOPT_RECHECK_NO_RESTART/);
+ assert.match(source,/8798_STILL_DEGRADED_AFTER_SIDECAR_RECOVERY_NO_RESTART/);
 });
