@@ -236,7 +236,7 @@ export async function runRealOperationsCycle({root=ROOT(),sourceFile=null,now=ne
   external_actions:'NONE',next_human_gate:'Verify official status, business-specific forms and Gmail OAuth for Elektron'};
  await atomic(priorPath,record);return record
 }
-export async function runUnifiedCycle({root=ROOT(),grantRoot=undefined,sourceFile=null,now=new Date(),officialFetch=fetch}={}){
+export async function runUnifiedCycle({root=ROOT(),grantRoot=undefined,sourceFile=null,now=new Date(),officialFetch=fetch,readMailbox=null}={}){
  await safeDir(root);validateIdentity(await readJson(join(root,PROFILE)));
  const register=await seedWorkRegister({root});
  const legacy=await runExecutiveCycle({root,grantRoot,now,readMailbox:null});
