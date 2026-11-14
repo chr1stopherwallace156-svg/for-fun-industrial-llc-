@@ -1,7 +1,7 @@
 // FIAL v0.2: compile a small declarative language for evidence-grounded semantic review.
 // This is an additive grammar. FIAL 1 compiler and scheduled workers are untouched.
 export const SEMANTIC_BYTECODE="fial-semantic-bytecode-v0.2";
-const ALLOWED=new Set(["applicant_type","purpose","geography","deadline","funding"]);
+const ALLOWED=new Set(["applicant_type","purpose","description","geography","deadline","funding"]);
 export class FialSemanticSyntaxError extends Error{
  constructor(line,msg){super("FIAL2_SYNTAX_LINE_"+line+": "+msg);this.name="FialSemanticSyntaxError";this.line=line}
 }
@@ -20,7 +20,7 @@ export function compileSemantic(source){
  const fields=/^UNDERSTAND ([a-z_,]+)$/.exec(body[3].value);
  if(!fields)fail(3,"UNDERSTAND_FIELDS_REQUIRED");
  const selected=fields[1].split(",");
- if(selected.length<2||selected.length>5||new Set(selected).size!==selected.length||
+ if(selected.length<2||selected.length>6||new Set(selected).size!==selected.length||
     selected.some(s=>!ALLOWED.has(s)))fail(3,"UNSUPPORTED_UNDERSTANDING_FIELDS");
  if(body[4].value!=="MODEL LOCAL_QWEN")fail(4,"ONLY_EXISTING_LOCAL_QWEN_ALLOWED");
  if(body[5].value!=="GROUND QUOTES")fail(5,"SOURCE_QUOTE_GROUNDING_REQUIRED");
