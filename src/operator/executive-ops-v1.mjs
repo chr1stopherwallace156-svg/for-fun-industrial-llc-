@@ -55,7 +55,9 @@ function task(id,kind,title,{description='',company='both',source='operator_goal
  if(!KINDS.includes(kind)||!['both','fun','elektron'].includes(company))throw Error('EXEC_TASK_KIND_INVALID');
  return {id:h(id).slice(0,22),kind,company,title:clean(title,180),
   description:clean(description,850),source:clean(source,130),
-  official_url:typeof url==='string'&&/^https:\/\/[a-z0-9.-]+\.ca\.gov(?:\/|$)/i.test(url)?url.slice(0,700):null,
+  official_url:typeof url==='string'&&(
+    /^https:\/\/(?:[a-z0-9.-]+\.ca\.gov|www\.victorvilleca\.gov|www\.grants\.gov)(?:\/|$)/i.test(url)
+    )?url.slice(0,700):null,
   due:typeof due==='string'&&/^\d{4}-\d\d-\d\d$/.test(due)?due:null,
   priority,phase,required:required.map(x=>clean(x,180)).slice(0,12),
   external_action_authorized:false,executed_externally:false};
