@@ -190,6 +190,7 @@ test("model hallucination is recorded as rejected evidence, and offline mode nev
    now:new Date(TIME.getTime()+60000),
    fetchImpl:async()=>{throw Error("LOCAL_MODEL_NOT_RUNNING")}});
   assert.equal(offline.cases[0].model_status,"MODEL_UNAVAILABLE_OR_UNVERIFIED");
+  assert.equal(offline.cases[0].decision,"HOLD_SEMANTIC_INTERPRETATION");
   assert.equal(offline.cases[0].accepted_quotes,0);
   assert.equal(offline.applications_submitted,0);
  }finally{await rm(dir,{recursive:true,force:true})}
@@ -285,4 +286,5 @@ test("malformed content on both attempts cannot be repaired by appending fabrica
  assert.equal(result.accepted.length,0);
  assert.equal(result.rejected.length,0);
  assert.equal(result.error,"FIAL2_MODEL_JSON_INVALID");
+ assert.equal(result.output_validated,false);
 });
