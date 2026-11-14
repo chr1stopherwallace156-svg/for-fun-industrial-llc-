@@ -30,13 +30,27 @@ test("explicit init yields unapproved workspace, verify; repeat refuses overwrit
  assert.match(r.stderr,/EV_PROJECT_EXISTS_HOLD/);
  }finally{rmSync(root,{recursive:true,force:true})}
 });
-test("reject traversal and symlink-backed destinations",()=>{
+test("reject invalid and traversing project names",()=>{
  const root=mkdtempSync(join(tmpdir(),"fun-ev-path-"));
+ try{
+  let r=run(root,"init","../bad");assert.notEqual(r.status,0);
+  r=run(root,"init","Not Valid");assert.notEqual(r.status,0);
+ }finally{rmSync(root,{recursive:true,force:true})}
+});
+test("reject symlink-backed destination when host permits creating symlinks",(t)=>{
+ const root=mkdtempSync(join(tmpdir(),"fun-ev-link-"));
  const other=mkdtempSync(join(tmpdir(),"fun-ev-other-"));
- try{let r=run(root,"init","../bad");assert.notEqual(r.status,0);
- r=run(root,"init","Not Valid");assert.notEqual(r.status,0);
- const link=join(root,"linked");symlinkSync(other,link,"dir");
- r=run(link,"init","test");assert.notEqual(r.status,0);
- assert.match(r.stderr,/EV_UNSAFE_PATH_HOLD/);
+ try{
+  const link=join(root,"linked");
+  try{symlinkSync(other,link,"dir")}
+  catch(err){
+   if(process.platform==="win32"&&["EPERM","EACCES","UNKNOWN"].includes(err.code)){
+    t.skip("Windows symlink privilege unavailable; no filesystem policy weakened");
+    return;
+   }
+   throw err;
+  }
+  const r=run(link,"init","test");assert.notEqual(r.status,0);
+  assert.match(r.stderr,/EV_UNSAFE_PATH_HOLD/);
  }finally{rmSync(root,{recursive:true,force:true});rmSync(other,{recursive:true,force:true})}
 });
