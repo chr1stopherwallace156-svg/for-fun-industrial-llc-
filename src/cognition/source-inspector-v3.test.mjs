@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import {inspectPolicyBoundSource} from "./source-inspector-v3.mjs";
+let networkCalls=0;
+await assert.rejects(()=>inspectPolicyBoundSource({url:"https://example.org/"}),/OPERATOR_APPROVAL_REQUIRED/);
+await assert.rejects(()=>inspectPolicyBoundSource({url:"https://example.org/",operatorApproved:true,dnsLookup:async()=>[{address:"127.0.0.1",family:4}]}),/SOURCE_NETWORK_NOT_ALLOWED/);
+await assert.rejects(()=>inspectPolicyBoundSource({url:"https://example.org/",operatorApproved:true,dnsLookup:async()=>[{address:"8.8.8.8",family:4},{address:"192.168.1.1",family:4}]}),/SOURCE_NETWORK_NOT_ALLOWED/);
+const transport=(_u,opts,callback)=>{networkCalls++;assert.equal(opts.servername,"example.org");opts.lookup("example.org",{},(_e,ip,family)=>{assert.equal(ip,"8.8.8.8");assert.equal(family,4)});const h={};return {on:(e,fn)=>{h[e]=fn;return this},end:()=>{const res={statusCode:200,headers:{"content-type":"text/plain"},on:(e,fn)=>{h["r_"+e]=fn},resume:()=>{},destroy:()=>{}};callback(res);h.r_data(Buffer.from("Synthetic evidence"));h.r_end()}}};
+const r=await inspectPolicyBoundSource({url:"https://example.org/",operatorApproved:true,dnsLookup:async()=>[{address:"8.8.8.8",family:4}],transport});
+assert.equal(r.state,"retrieved_unverified");
+assert.equal(r.validated_ip,"8.8.8.8");
+assert.equal(r.score_eligible,false);
+assert.equal(networkCalls,1);
+console.log("STAGE777_TESTS=7/7");
+console.log("POLICY_BOUND_INSPECTOR=PASS");
+console.log("SIMULATED_TRANSPORT_CALLS="+networkCalls);
+console.log("REAL_NETWORK_REQUESTS=0");

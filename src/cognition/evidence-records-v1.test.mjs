@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import {validateEvidence,persistEvidenceRecord} from "./evidence-records-v1.mjs";
+const base={plan_id:"070b202f-1a78-41ae-aaec-7f8cc859417b",task_id:"OP1-DEMAND",criterion:"demand",source_url:"https://example.org/source",title:"Operator test source",observation:"Synthetic test observation, not verified evidence",observed_utc:"2026-11-13T12:00:00Z"};
+assert.equal(validateEvidence(base).verification_status,"unverified_operator_submission");
+assert.throws(()=>validateEvidence({...base,source_url:"file:///secret"}));
+assert.throws(()=>validateEvidence({...base,score:11}));
+assert.throws(()=>validateEvidence({...base,criterion:"margin"}));
+assert.throws(()=>validateEvidence({...base,title:""}));
+assert.throws(()=>validateEvidence({...base,source_url:"https://user:pass@example.org"}));
+const saved=persistEvidenceRecord(base);
+assert.equal(saved.state,"persisted_unverified");
+assert.equal(saved.external_actions,0);
+assert.equal(saved.plan_id,base.plan_id);
+console.log("STAGE771_TESTS=8/8");
+console.log("EVIDENCE_RECORD_ID="+saved.record_id);
+console.log("EVIDENCE_STATUS="+saved.verification_status);
+console.log("STAGE771_FOUNDATION=PASS");

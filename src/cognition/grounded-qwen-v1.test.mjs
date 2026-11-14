@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import {validateCitations} from "./grounded-qwen-v1.mjs";
+const good=validateCitations("The passage says demand is unverified [source:abc-123].",["source:abc-123"]);
+assert.equal(good.state,"citation_identifiers_validated");
+assert.equal(good.factual_claim_verified,false);
+assert.deepEqual(good.citations,["source:abc-123"]);
+assert.throws(()=>validateCitations("No citation",["source:abc-123"]),/CITATION_REQUIRED/);
+assert.throws(()=>validateCitations("Unsupported [source:other]",["source:abc-123"]),/UNSUPPORTED_CITATION/);
+assert.throws(()=>validateCitations("Broken [source:abc-123",["source:abc-123"]),/CITATION_REQUIRED/);
+assert.throws(()=>validateCitations("",["source:abc-123"]),/ANSWER_INVALID/);
+console.log("STAGE792_TESTS=6/6");
+console.log("QWEN_CITATION_VALIDATOR=PASS");
+console.log("UNSUPPORTED_CITATIONS_REJECTED=TRUE");
+console.log("LIVE_QWEN_REQUESTS=0 DATABASE_WRITES=0 SERVICES_RESTARTED=0");

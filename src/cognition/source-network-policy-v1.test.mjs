@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import {isAllowedPublicIPv4,validateResolvedAddresses} from "./source-network-policy-v1.mjs";
+const blocked=["127.0.0.1","10.0.0.1","172.16.0.1","192.168.1.1","169.254.1.1","100.100.100.100","0.0.0.0","224.0.0.1","192.0.2.1","198.51.100.1","203.0.113.1","198.18.0.1","::1","fc00::1"];
+for(const ip of blocked)assert.equal(isAllowedPublicIPv4(ip),false,ip);
+assert.equal(isAllowedPublicIPv4("8.8.8.8"),true);
+assert.equal(isAllowedPublicIPv4("1.1.1.1"),true);
+assert.throws(()=>validateResolvedAddresses([]),/SOURCE_DNS_EMPTY/);
+assert.throws(()=>validateResolvedAddresses([{address:"8.8.8.8"},{address:"127.0.0.1"}]),/SOURCE_NETWORK_NOT_ALLOWED/);
+assert.deepEqual(validateResolvedAddresses([{address:"8.8.8.8"}]),["8.8.8.8"]);
+console.log("STAGE776_TESTS=19/19");
+console.log("SOURCE_NETWORK_POLICY=PASS");
+console.log("REAL_NETWORK_REQUESTS=0");

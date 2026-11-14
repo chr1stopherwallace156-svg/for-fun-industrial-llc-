@@ -1,0 +1,13 @@
+const PORT=Number(process.env.LLAMA_CPP_PORT||8088);
+const SYSTEM="Extract business-analysis information. Return ONLY JSON with keys opportunities,criteria,missing_evidence. Each opportunity has name and scores. Scores may contain demand,margin,feasibility,evidence ONLY when the user explicitly provides numeric values for those criteria. Never invent numbers or treat assumptions as verified evidence. Limit opportunities to 8. No tools or actions.";
+function clean(x){return String(x||"").trim().slice(0,120)}
+export async function extractBusinessAnalysis(question,{timeoutMs=45000}={}){
+if(typeof question!=="string"||!question.trim()||question.length>3000)throw Error("INVALID_ANALYSIS_QUESTION");
+const response=await fetch("http://127.0.0.1:"+PORT+"/v1/chat/completions",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({messages:[{role:"system",content:SYSTEM},{role:"user",content:question}],temperature:0,max_tokens:650,stream:false}),signal:AbortSignal.timeout(timeoutMs)});
+if(!response.ok)throw Error("EXTRACTION_HTTP_"+response.status);
+const raw=await response.json();const content=raw.choices?.[0]?.message?.content;if(typeof content!=="string")throw Error("EXTRACTION_EMPTY");
+let parsed;try{parsed=JSON.parse(content.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,""))}catch{throw Error("EXTRACTION_INVALID_JSON")}
+if(!parsed||!Array.isArray(parsed.opportunities))throw Error("EXTRACTION_INVALID_SCHEMA");
+const opportunities=parsed.opportunities.slice(0,8).filter(x=>x&&typeof x.name==="string").map(x=>({name:clean(x.name),scores:Object.fromEntries(Object.entries(x.scores&&typeof x.scores==="object"?x.scores:{}).filter(([k,v])=>["demand","margin","feasibility","evidence"].includes(k)&&Number.isInteger(v)&&v>=0&&v<=10))})).filter(x=>x.name);
+return {state:"extracted_unverified",opportunities,criteria:Array.isArray(parsed.criteria)?parsed.criteria.slice(0,8).map(clean):[],missing_evidence:Array.isArray(parsed.missing_evidence)?parsed.missing_evidence.slice(0,12).map(clean):[],external_actions:0};
+}

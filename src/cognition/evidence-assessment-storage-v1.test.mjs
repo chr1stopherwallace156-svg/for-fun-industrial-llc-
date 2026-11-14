@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import {assessPersistedTask} from "./evidence-assessment-storage-v1.mjs";
+const r=assessPersistedTask({plan_id:"070b202f-1a78-41ae-aaec-7f8cc859417b",task_id:"OP1-DEMAND"});
+assert.equal(r.state,"assessment_persisted");
+assert.equal(r.evidence_count>=1,true);
+assert.equal(r.score_eligible,false);
+assert.equal(r.external_actions,0);
+assert.equal(r.verification_status,"unverified_requires_source_inspection");
+assert.equal(r.assessment.task_id,"OP1-DEMAND");
+assert.equal(typeof r.assessment_sha256,"string");
+assert.throws(()=>assessPersistedTask({plan_id:"invalid",task_id:"OP1-DEMAND"}));
+console.log("STAGE773_TESTS=8/8");
+console.log("ASSESSMENT_ID="+r.assessment_id);
+console.log("EVIDENCE_COUNT="+r.evidence_count);
+console.log("ASSESSMENT_STATUS="+r.verification_status);
+console.log("STAGE773_PERSISTENT_ASSESSMENT=PASS");

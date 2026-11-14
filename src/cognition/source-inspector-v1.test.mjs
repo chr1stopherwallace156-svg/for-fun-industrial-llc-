@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import {validatePublicUrl,inspectSource} from "./source-inspector-v1.mjs";
+assert.throws(()=>validatePublicUrl("file:///etc/passwd"));
+assert.throws(()=>validatePublicUrl("http://127.0.0.1/"));
+assert.throws(()=>validatePublicUrl("http://localhost/"));
+assert.throws(()=>validatePublicUrl("https://user:pass@example.org/"));
+assert.equal(validatePublicUrl("https://example.org/a"),"https://example.org/a");
+await assert.rejects(()=>inspectSource({url:"https://example.org/"}),/OPERATOR_APPROVAL_REQUIRED/);
+const mock=async()=>new Response("Synthetic source content",{status:200,headers:{"content-type":"text/plain"}});
+const r=await inspectSource({url:"https://example.org/",operatorApproved:true,fetchImpl:mock,dnsLookup:async()=>[{address:"93.184.216.34",family:4}]});
+assert.equal(r.state,"retrieved_unverified");
+assert.equal(r.score_eligible,false);
+assert.equal(r.external_actions,1);
+assert.equal(r.bytes,24);
+await assert.rejects(()=>inspectSource({url:"https://example.org/",operatorApproved:true,fetchImpl:mock,dnsLookup:async()=>[{address:"127.0.0.1",family:4}]}),/SOURCE_NETWORK_NOT_ALLOWED/);
+console.log("STAGE774_TESTS=11/11");
+console.log("SOURCE_INSPECTOR=PASS");
+console.log("REAL_NETWORK_REQUESTS=0");

@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import {inspectPinnedSource} from "./source-inspector-v2.mjs";
+await assert.rejects(()=>inspectPinnedSource({url:"https://example.org/"}),/OPERATOR_APPROVAL_REQUIRED/);
+await assert.rejects(()=>inspectPinnedSource({url:"https://example.org/",operatorApproved:true,dnsLookup:async()=>[{address:"127.0.0.1",family:4}]}),/SOURCE_NETWORK_NOT_ALLOWED/);
+await assert.rejects(()=>inspectPinnedSource({url:"https://example.org/",operatorApproved:true,dnsLookup:async()=>[{address:"192.168.1.2",family:4}]}),/SOURCE_NETWORK_NOT_ALLOWED/);
+const transport=(_u,opts,callback)=>{assert.equal(opts.servername,"example.org");assert.equal(typeof opts.lookup,"function");opts.lookup("example.org",{},(err,ip,family)=>{assert.equal(ip,"93.184.216.34");assert.equal(family,4)});const handlers={};return {on:(event,fn)=>{handlers[event]=fn;return this},end:()=>{const res={statusCode:200,headers:{"content-type":"text/plain"},on:(event,fn)=>{handlers["res_"+event]=fn},resume:()=>{},destroy:()=>{}};callback(res);handlers.res_data(Buffer.from("Synthetic pinned response"));handlers.res_end()}}};
+const r=await inspectPinnedSource({url:"https://example.org/",operatorApproved:true,dnsLookup:async()=>[{address:"93.184.216.34",family:4}],transport});
+assert.equal(r.state,"retrieved_unverified");
+assert.equal(r.validated_ip,"93.184.216.34");
+assert.equal(r.score_eligible,false);
+assert.equal(r.external_actions,1);
+console.log("STAGE775_TESTS=7/7");
+console.log("PINNED_SOURCE_INSPECTOR=PASS");
+console.log("REAL_NETWORK_REQUESTS=0");
