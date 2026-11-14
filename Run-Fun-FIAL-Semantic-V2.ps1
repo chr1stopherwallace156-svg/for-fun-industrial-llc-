@@ -59,5 +59,16 @@ if($result.version -cne 'fial-semantic-engine-v0.2' -or
 }
 Write-Host 'FIAL2_REAL_SEMANTIC_TEST=PASS REPORT_VERIFIED'
 Write-Host ('FIAL2_ACCEPTED_SOURCE_QUOTES='+[int]$result.model_quotes_grounded)
+$failed=@($result.cases|Where-Object {
+ $_.model_status -ceq 'MODEL_OUTPUT_UNVERIFIED' -or
+ $_.model_status -ceq 'MODEL_UNAVAILABLE_OR_UNVERIFIED'
+})
+if($failed.Count -gt 0){
+ Write-Host ('FIAL2_SEMANTIC_GROUNDING=HOLD_MODEL_OUTPUT COUNT='+$failed.Count)
+}elseif([int]$result.model_quotes_grounded -gt 0){
+ Write-Host 'FIAL2_SEMANTIC_GROUNDING=SOURCE_QUOTE_MATCHED_INTERPRETATION_UNVERIFIED'
+}else{
+ Write-Host 'FIAL2_SEMANTIC_GROUNDING=HOLD_ZERO_SUPPORTED_QUOTES'
+}
 Write-Host ('FIAL2_REPORT='+$ResultPath)
 Write-Host 'FIAL2_SCHEDULE=NOT_CHANGED OTHER_SERVICES=NOT_RESTARTED'
