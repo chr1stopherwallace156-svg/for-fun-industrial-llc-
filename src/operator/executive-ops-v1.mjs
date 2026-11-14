@@ -116,7 +116,7 @@ export function buildWork({grantReport=null,mission=null,inbox=[],today=new Date
     !['fun','elektron','both'].includes(w.company))throw Error('EXEC_WORK_ITEM_INVALID');
    list.push(task('registered:'+w.id,w.kind,w.title,{
     description:w.description||'Operator-supplied work item',company:w.company,
-    source:'operator_verified_register',url:w.official_url,due:w.due,
+    source:'operator_registered_unverified',url:w.official_url,due:w.due,
     priority:Number.isInteger(w.priority)?Math.max(0,Math.min(w.priority,100)):60,
     phase:'prepare_local_packet',
     required:Array.isArray(w.required)?w.required.filter(x=>valid(x,180)).slice(0,12):[]}));
@@ -176,7 +176,15 @@ export async function runExecutiveCycle({root=ROOT(),grantRoot=GRANT_ROOT(),now=
    if(mailState!=='connected_read_only')inbox=[];
   }catch(e){mailState='unavailable';mailError=clean(e?.message,160)}
  }
- const work=buildWork({grantReport:report,mission,inbox,today:now,workRegister:register,mailState});
+ let work,grantIssue=null;
+ try{
+  work=buildWork({grantReport:report,mission,inbox,today:now,workRegister:register,mailState});
+ }catch(e){
+  // Never let a malformed or stale grants snapshot stop non-grant operational work.
+  // Preserve the exact source issue rather than using untrusted program records.
+  grantIssue=clean(e?.message,160);
+  work=buildWork({grantReport:null,mission:null,inbox,today:now,workRegister:register,mailState});
+ }
  const archive=join(dir,'packets');await mkdir(archive,{recursive:true});
  const prior=await readOptional(join(dir,'state-v1.json'));
  const before=prior?.items&&Array.isArray(prior.items)?new Map(prior.items.map(x=>[x.id,x])):new Map();
@@ -198,7 +206,8 @@ export async function runExecutiveCycle({root=ROOT(),grantRoot=GRANT_ROOT(),now=
  const state={version:VERSION,cycle_utc:now.toISOString(),system:'Fun Industrial Executive Operator',
   companies:BUSINESS.map(x=>({id:x.id,name:x.name})),
   domains:KINDS,mail_state:mailState,mail_error:mailError,
-  grants:{state:report?'verified_local_snapshot':'no_verified_local_snapshot',
+  grants:{state:grantIssue?'source_held':report?'verified_local_snapshot':'no_verified_local_snapshot',
+   issue:grantIssue,
    last_cycle_utc:report?.timestamp||null,
    source_sha256:report?.source_sha256||null,
    candidate_count:Array.isArray(report?.top_candidates)?report.top_candidates.length:0,
