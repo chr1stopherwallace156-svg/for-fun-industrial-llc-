@@ -94,6 +94,7 @@ test("local Qwen provider stays exclusively on 127.0.0.1:8088 and fails closed o
   assert.equal(init.redirect,"error");
   assert.ok(init.body.includes("nursing facility residents"));
   assert.equal(JSON.parse(init.body).stream,false);
+  assert.deepEqual(JSON.parse(init.body).response_format,{type:"json_object"});
   return modelResponse([{field:"purpose",quote:"nursing facility residents",
    interpretation:"Facility program relevance requires independent verification."}]);
  };
