@@ -1,0 +1,8 @@
+# FIAL 3 — audit existing FIAL 2 interpretations without new model inference.
+FIAL 3
+MISSION "Check whether semantic interpretations actually follow from verified source text"
+SOURCE GRANTS
+AUDIT SAVED_SEMANTIC_CASES
+VERIFY SOURCE_QUOTE,NUMBERS,CERTAINTY,POLARITY,LEXICAL_ALIGNMENT
+POLICY UNPROVEN_IS_HOLD
+END
