@@ -14,7 +14,7 @@ const hash=x=>createHash("sha256").update(x).digest("hex");
 const safe=x=>String(x??"").replace(/[\x00-\x1f\x7f]/g," ").trim();
 const max=(x,n)=>safe(x).slice(0,n);
 const SOURCE_FIELDS=Object.freeze({
- applicant_type:"ApplicantType",purpose:"Purpose",geography:"Geography",
+ applicant_type:"ApplicantType",purpose:"Purpose",description:"Description",geography:"Geography",
  deadline:"ApplicationDeadline",funding:"EstAmounts"
 });
 const MAX_REQUEST_BYTES=7500,MAX_RESPONSE_BYTES=35000;
