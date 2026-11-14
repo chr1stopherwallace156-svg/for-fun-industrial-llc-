@@ -48,9 +48,12 @@ $drive=[IO.DriveInfo]::new([IO.Path]::GetPathRoot($tools))
 if($drive.AvailableFreeSpace -lt 6GB){throw 'FUN_EV_FREE_SPACE_HOLD'}
 if(!(Test-Path -LiteralPath $tools)){New-Item -ItemType Directory -Path $tools -Force|Out-Null}
 if((Get-Item -LiteralPath $tools -Force).Attributes -band [IO.FileAttributes]::ReparsePoint){throw 'FUN_EV_TOOLS_REPARSE_HOLD'}
+# Preflight ALL exact package versions before any WinGet installation begins.
+foreach($pkg in $packages){
+ Checked $winget.Source @('show','--id',$pkg.Id,'--exact','--version',$pkg.Version,'--source','winget') 'PACKAGE_CATALOG'
+}
 foreach($pkg in $packages){
  Write-Output ('FUN_EV_INSTALL_PACKAGE='+$pkg.Id+' VERSION='+$pkg.Version)
- Checked $winget.Source @('show','--id',$pkg.Id,'--exact','--version',$pkg.Version,'--source','winget') 'PACKAGE_CATALOG'
  Checked $winget.Source @('install','--id',$pkg.Id,'--exact','--version',$pkg.Version,'--source','winget',
    '--accept-package-agreements','--accept-source-agreements','--disable-interactivity') 'PACKAGE_INSTALL'
 }
