@@ -15,11 +15,11 @@ const clean=(x,n=250)=>String(x??'').replace(/[\u0000-\u001f\u007f]/g,' ').trim(
 const valid=(x,max=500)=>typeof x==='string'&&x.length>0&&x.length<=max&&!/[\u0000-\u0008]/.test(x);
 const obj=x=>x!==null&&typeof x==='object'&&!Array.isArray(x);
 const BUSINESS=Object.freeze([
- {id:'fun',name:'FUN INDUSTRIAL LLC',verified_contact:null,verified_registered_address:null,verified_state_status:null},
+ {id:'fun',name:'Fun Industrial (software workspace)',verified_contact:null,verified_registered_address:null,verified_state_status:null},
  {id:'elektron',name:'ELEKTRON INDUSTRIAL LLC',verified_contact:null,verified_registered_address:null,verified_state_status:null}
 ]);
 const BASE_TASKS=Object.freeze([
- ['filings','Verify actual filing obligations and deadlines for each LLC','Needs jurisdiction, official filing notice, account authority and verified due date'],
+ ['filings','Verify actual ELEKTRON INDUSTRIAL LLC filing obligations and deadlines','Needs jurisdiction, official filing notice, account authority and verified due date'],
  ['configuration','Audit explicitly approved system configuration targets','Needs operator-provided paths, expected hashes and proposed changes'],
  ['mail','Review business mailbox and prepare replies','Gmail requires account-specific OAuth; no sending enabled'],
  ['projects','Review active deliverables and unblock next engineering/software milestone','Needs verified work register and owner-specific deliverables'],
@@ -80,8 +80,8 @@ export function buildWork({grantReport=null,mission=null,inbox=[],today=new Date
    const days=due?Math.floor((Date.parse(due+'T23:59:59Z')-today.getTime())/86400000):null;
    list.push(task('grant:'+g.grant_id+':'+grantReport.source_sha256,'funding',
     'Review application requirements: '+g.title,{
-    description:'CA grant-worker evidence; no eligibility determination or official submission.',
-    company:'fun',source:'verified_local_grants_snapshot:'+grantReport.source_sha256.slice(0,14),
+    description:'CA grants discovery evidence only; ELEKTRON eligibility has NOT been determined. No official submission.',
+    company:'elektron',source:'verified_local_grants_snapshot:'+grantReport.source_sha256.slice(0,14),
     url:g.application_url,due,priority:days!==null&&days<=14?95:65,phase:'prepare_application_evidence',
     required:['Full official program requirements','Verified business registration and eligibility',
       'Real project budget and matching funds','Exact agency questions and permitted submission method']}));
