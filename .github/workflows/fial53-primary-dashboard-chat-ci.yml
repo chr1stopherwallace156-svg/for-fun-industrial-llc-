@@ -57,6 +57,22 @@ jobs:
              !$source.Contains('$ml.externalActions -ne 0')){
             throw 'FIAL53_ML_ACTUAL_SCHEMA_GUARDS_MISSING'
           }
+          # Windows StrictMode regression: no direct .Count on a function that
+          # may emit zero pipeline objects. The old script failed after stopping 8802.
+          if($source -match '\(Listeners 8802\)\.Count'){
+            throw 'FIAL53_STRICTMODE_EMPTY_LISTENER_REGRESSION'
+          }
+          foreach($marker in @('FIAL53_MISSING_8802=RECOVERING_PINNED_ORIGINAL',
+            'FIAL53_PINNED_ORIGINAL_8802_RESTORED=PASS',
+            'PINNED_ORIGINAL_8802_RECOVERY_FAILED_LOGS',
+            'ROLLBACK_OLD_DASHBOARD_NOT_CONFIRMED',
+            'if(@(Listeners 8802).Count -eq 0)')){
+            if(!$source.Contains($marker)){throw ('FIAL53_MISSING_PORT_RESTORE_GUARD='+$marker)}
+          }
+          Set-StrictMode -Version Latest
+          function EmptyListener {return @()}
+          $none=@(EmptyListener)
+          if($none.Count -ne 0){throw 'FIAL53_EMPTY_LISTENER_COUNT_IS_NOT_ZERO'}
           if($source -match 'Invoke-Expression|Set-NetFirewallRule|git reset|git checkout|pip install|/admin/shutdown'){
             throw 'FIAL53_UNEXPECTED_PROTECTED_MUTATION'
           }
