@@ -1,0 +1,8 @@
+# FIAL 4 - review already saved government snapshot, without making new requests.
+FIAL 4
+MISSION "Recheck saved grants and flag unsupported interpretations against exact source fields"
+SOURCE VERIFIED_SNAPSHOT
+AUDIT SAVED_FIAL2_AND_FIAL3
+VERIFY SHA256,RECORD_IDENTITY,FIELD_QUOTES,CLAIM_CONSISTENCY,CONTRADICTIONS
+POLICY UNPROVEN_IS_HOLD
+END
