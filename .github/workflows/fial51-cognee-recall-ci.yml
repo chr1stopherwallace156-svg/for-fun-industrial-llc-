@@ -33,10 +33,10 @@ jobs:
           $preflight=$content.IndexOf('$previousWriteFlags++')
           $mutations=$content.IndexOf('New-Item -ItemType Directory -Path $Log')
           if($preflight -lt 0 -or $mutations -lt 0 -or $preflight -ge $mutations){throw 'COGNEE_WRITE_TRANSITION_PREFLIGHT_NOT_BEFORE_MUTATIONS'}
-          if(!$content.Contains("if(!$AuthorizeReadOnlyTransition){Hold 'EXISTING_WRITE_AUTHORITY_REQUIRES_SEPARATE_REVIEW'}")){
+          if(!$content.Contains('if(!$AuthorizeReadOnlyTransition){Hold ''EXISTING_WRITE_AUTHORITY_REQUIRES_SEPARATE_REVIEW''}')){
             throw 'COGNEE_PREEXISTING_WRITE_AUTHORITY_APPROVAL_MISSING'
           }
-          if(!$content.Contains("if(!$AuthorizeReadOnlyTransition){Hold 'EXISTING_INGESTION_REQUIRES_SEPARATE_REVIEW'}")){
+          if(!$content.Contains('if(!$AuthorizeReadOnlyTransition){Hold ''EXISTING_INGESTION_REQUIRES_SEPARATE_REVIEW''}')){
             throw 'COGNEE_PREEXISTING_INGESTION_APPROVAL_MISSING'
           }
           if(!$content.Contains('FUN_MEMORY_READ_ONLY_TRANSITION=CONFIRMED')){throw 'COGNEE_TRANSITION_AUDIT_MISSING'}
