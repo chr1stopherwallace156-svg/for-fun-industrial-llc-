@@ -60,6 +60,19 @@ If a listener exists but its HTTP endpoint is unresponsive, the script refuses t
 
 To diagnose without starting new processes, run Start-Fun-ML-Dashboard-V3.ps1 -CheckOnly after updating the branch. That returns a named missing-service hold if necessary.
 
-Offline recovery contract tests validate the safety checks in source; they do not constitute a live Windows service-recovery test. The combined launcher runs 22 offline tests (the original 18 plus four source-contract tests) before recovery or hub startup. Static checks do not prove a live Windows launch.
+Offline recovery contract tests validate the safety checks in source; they do not constitute a live Windows service-recovery test. The combined launcher runs 24 offline tests (the original 18 plus six source-contract tests) before recovery or hub startup. Static checks do not prove a live Windows launch.
 
 The November 13 repair for `8789_SOURCE_HASH_CHANGED_MANUAL_REVIEW_NO_RESTORE` intentionally does **not** change the stored hash or bypass the hash check for launching the original 8789. It simply avoids launching 8789 when it is already HTTP-healthy and only 8798 is missing. The on-disk 8789 hash mismatch remains an independent review item before any future 8789 restart.
+
+## Recovery for missing 8796 (after healthy 8789 and 8801), November 13, 2026
+
+Port 8796 is the independent read-only/auto-local sidecar. If it is absent while original dashboard 8789 is HTTP-ready, the V3 launcher now calls Start-Fun-Local-Dependencies-V3.ps1 in the same existing checkout. This independent helper checks:
+- Original 8789 local tool catalogue count = 19, without reading or replacing the running source
+- Existing 8088 Qwen and 8791 compute are healthy
+- 8796: if absent, starts only the verified Run-Fun-Auto-Sidecar8796.mjs on loopback
+- 8797: if absent, starts only Run-Fun-Rea229-Sidecar8797.mjs in its existing independent standalone mode
+- Existing listeners are preserved, REA 229 catalogue and zero REA execution grants are rechecked, and no actual REA MCP tools are executed
+
+After both sidecars are healthy, the existing dedicated Start-Fun-Unified-Chat8798.ps1 launches 8798; V3 then activates the integrated hub on 8802. It refuses occupied but unhealthy ports. The pinned original 8789 SHA256 check stays unchanged for future original-dashboard startup attempts.
+
+No extra Termius commands should be needed for these *known missing sidecars*; rerun the same fast-forward-and-launch command. If any dependency has drifted, the launcher holds with a named error. The source-contract checks are not a substitute for Windows live verification.
