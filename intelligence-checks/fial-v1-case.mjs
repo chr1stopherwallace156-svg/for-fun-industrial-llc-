@@ -67,7 +67,18 @@ test("language rejects arbitrary shell, Python, network, authority escalation, l
  assert.match(original,/^FIAL 1$/m);
  assert.doesNotThrow(()=>compileFial(original.replace("# FIAL 1","# FIAL 2")));
  assert.throws(()=>compileFial(original.replace(/^FIAL 1$/m,"FIAL 2")),/EXPECTED_FIAL_1/);
- assert.throws(()=>compileFial(original.replace("RULE \"stable-candidate\" WHEN always SCORE 10 ACTION REMEMBER\n","")),/DEFAULT_ALWAYS/);
+ // Derive the mutation from parsed bytecode, not newline-sensitive raw text.
+ // This stays correct with LF, CRLF and Git's Windows checkout conversion.
+ const validProgram=compileFial(original);
+ const noFallback=decompileFial({...validProgram,
+  instructions:validProgram.instructions.filter(x=>x.when!=="always")});
+ assert.equal(validProgram.instructions.filter(x=>x.when==="always").length,1);
+ assert.doesNotMatch(noFallback,/^RULE .* WHEN always /m);
+ assert.throws(()=>compileFial(noFallback),/REQUIRES_DEFAULT_ALWAYS_RULE/);
+ const withCRLF=original.replace(/\r?\n/g,"\r\n");
+ const normalizedCRLF=decompileFial({...compileFial(withCRLF),
+  instructions:compileFial(withCRLF).instructions.filter(x=>x.when!=="always")});
+ assert.throws(()=>compileFial(normalizedCRLF),/REQUIRES_DEFAULT_ALWAYS_RULE/);
  assert.throws(()=>compileFial(original+"RUN AGAIN"),FialSyntaxError);
  assert.throws(()=>compileFial("x".repeat(17000)),FialSyntaxError);
 });
