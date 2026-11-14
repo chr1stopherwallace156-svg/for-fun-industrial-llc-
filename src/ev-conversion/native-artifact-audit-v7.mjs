@@ -219,6 +219,7 @@ function main(args){
    input_and_lineage_sha256_verified:true,native_output_sha256_verified:true,
    pinout_rows_checked:n,svg_labels_checked:visual.svg_labels_checked,
    bom_rows_checked:bom.bom_rows_checked,bom_designators_checked:bom.designators_checked,
+   conductor_colors_checked:bom.conductor_colors_checked,
    electrical_continuity_measured:false,independent_visual_review:false,
    production_released:false,engineering_approved:false,high_voltage_work_authorized:false,
    files_written:0,external_tools_executed:0};
