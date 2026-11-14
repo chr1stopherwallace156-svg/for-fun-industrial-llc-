@@ -62,8 +62,8 @@ body.fi-ui-ready > main{max-width:1200px!important;margin:8px auto!important;wid
 body.fi-ui-ready > main .panel{border-radius:14px}
 @media (max-width:1180px){#fi-ui-shell .fi-ui-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:850px){
- body.fi-ui-ready{padding:139px 14px 48px!important}
- #fi-ui-shell .fi-ui-side{width:100%;height:122px;bottom:auto;padding:11px 14px 8px;gap:4px;border-right:0;border-bottom:1px solid #355268;box-shadow:0 7px 24px #0005}
+ body.fi-ui-ready{padding:calc(139px + env(safe-area-inset-top,0px)) 14px 48px!important}
+ #fi-ui-shell .fi-ui-side{width:100%;height:calc(122px + env(safe-area-inset-top,0px));bottom:auto;padding:calc(11px + env(safe-area-inset-top,0px)) 14px 8px;gap:4px;border-right:0;border-bottom:1px solid #355268;box-shadow:0 7px 24px #0005}
  #fi-ui-shell .fi-ui-brand{padding:0 2px 5px;gap:9px}
  #fi-ui-shell .fi-ui-logo{width:30px;height:30px;border-radius:9px;font-size:12px}
  #fi-ui-shell .fi-ui-brand strong{font-size:13px}
