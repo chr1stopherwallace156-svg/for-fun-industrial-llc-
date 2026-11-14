@@ -18,7 +18,7 @@ function Find-Py312 {
  }
  foreach($f in @((Join-Path $local 'Programs\Python\Python312\python.exe'),'C:\Python312\python.exe')){
   if(Test-Path -LiteralPath $f -PathType Leaf){
-   $v=(& $f -c 'import sys;print(str(sys.version_info.major)+"."+str(sys.version_info.minor))' 2>$null)
+   $v=(& $f -c 'import sys;print(sys.version_info.major,sys.version_info.minor,sep=chr(46))' 2>$null)
    if($LASTEXITCODE -eq 0 -and $v -eq '3.12'){return $f}
   }
  }
