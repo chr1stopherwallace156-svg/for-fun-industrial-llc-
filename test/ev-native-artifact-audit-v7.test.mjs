@@ -30,7 +30,7 @@ function fixture(fn){
    '<text x="10" y="75">SENSE</text><text x="200" y="75">SENSE</text>',
    '</svg>'
   ].join('\n');
-  const bom='Id\tDescription\tQty\tUnit\tDesignators\n1\tCable, 2 conductor\t0.5\tm\tW1\n2\tBench connector\t2\t\tX1, X2\n';
+  const bom='Id\tDescription\tQty\tUnit\tDesignators\n1\tConnector, Bench test connector, 2 pins\t2\t\tX1, X2\n2\tWire, 0.25 mm², BK\t0.5\tm\tW1\n3\tWire, 0.25 mm², RD\t0.5\tm\tW1\n';
   const write=(name,contents)=>writeFileSync(join(dest,name),contents);
   write('bench-harness.svg',svg);write('bench-harness.bom.tsv',bom);
   const v2manifest=readFileSync(join(base,'output','manifest.json'));
@@ -54,7 +54,7 @@ test('audit verifies V2 lineage, synthetic wire pins, BOM designators and SVG la
   const result=JSON.parse(r.stdout);
   assert.equal(result.state,'ARTIFACT_INTEGRITY_AND_STRUCTURAL_LABELS_PASS_ENGINEERING_HOLD');
   assert.equal(result.pinout_rows_checked,2);
-  assert.equal(result.bom_designators_checked,3);
+  assert.equal(result.bom_designators_checked,3);\n  assert.equal(result.conductor_colors_checked,2);
   assert.equal(result.input_and_lineage_sha256_verified,true);
   assert.equal(result.electrical_continuity_measured,false);
   assert.equal(result.engineering_approved,false);
@@ -81,7 +81,7 @@ test('rehashed SVG with missing pin label is still rejected semantically',()=>{
 });
 test('rehashed BOM with incorrect cable length is rejected semantically',()=>{
  fixture(x=>{
-  const bom=x.bom.replace('\t0.5\tm\tW1','\t0.7\tm\tW1');
+  const bom=x.bom.replace('RD\t0.5\tm\tW1','RD\t0.7\tm\tW1');
   x.write('bench-harness.bom.tsv',bom);
   x.manifest.files[1].sha256=sha(bom);x.manifest.files[1].size_bytes=Buffer.byteLength(bom);
   x.rewriteManifest();
@@ -121,5 +121,37 @@ test('path traversal and missing project fail closed without generating files',(
   assert.match(r.stderr,/USAGE_HOLD/);
   r=x.run(audit,'audit','missing');assert.notEqual(r.status,0);
   assert.match(r.stderr,/MISSING_DIRECTORY_HOLD/);
+ });
+});
+
+
+test('same W1 repeated for two distinct expected colors is allowed, but repeated BK fails',()=>{
+ fixture(x=>{
+  const bom=x.bom.replace('mm², RD','mm², BK');
+  x.write('bench-harness.bom.tsv',bom);
+  x.manifest.files[1].sha256=sha(bom);x.manifest.files[1].size_bytes=Buffer.byteLength(bom);
+  x.rewriteManifest();
+  const r=x.run(audit,'audit',x.id);assert.notEqual(r.status,0);
+  assert.match(r.stderr,/BOM_CONDUCTOR_MISMATCH_HOLD/);
+ });
+});
+test('rehashed native BOM missing RD conductor fails',()=>{
+ fixture(x=>{
+  const bom=x.bom.split('\n').filter(line=>!line.includes('mm², RD')).join('\n');
+  x.write('bench-harness.bom.tsv',bom);
+  x.manifest.files[1].sha256=sha(bom);x.manifest.files[1].size_bytes=Buffer.byteLength(bom);
+  x.rewriteManifest();
+  const r=x.run(audit,'audit',x.id);assert.notEqual(r.status,0);
+  assert.match(r.stderr,/BOM_MISSING_CONDUCTOR_HOLD/);
+ });
+});
+test('wrong conductor gauge is rejected despite rehashed native BOM',()=>{
+ fixture(x=>{
+  const bom=x.bom.replace('0.25 mm², BK','1.5 mm², BK');
+  x.write('bench-harness.bom.tsv',bom);
+  x.manifest.files[1].sha256=sha(bom);x.manifest.files[1].size_bytes=Buffer.byteLength(bom);
+  x.rewriteManifest();
+  const r=x.run(audit,'audit',x.id);assert.notEqual(r.status,0);
+  assert.match(r.stderr,/BOM_CONDUCTOR_MISMATCH_HOLD/);
  });
 });
