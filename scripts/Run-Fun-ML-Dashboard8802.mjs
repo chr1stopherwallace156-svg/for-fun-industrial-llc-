@@ -14,6 +14,8 @@ import {createGroundedChat} from '../src/fial/grounded-chat-v5-2.mjs';
 import {GROUNDED_PANEL,GROUNDED_CLIENT,GROUNDED_VERSION} from '../src/fial/primary-grounded-ui-v5-3.mjs';
 import {readExecutiveStatus} from '../src/operator/executive-ops-v1.mjs';
 import {EXEC_PAGE,EXEC_CLIENT,EXEC_CONSOLE_VERSION} from '../src/operator/executive-console-v1.mjs';
+import {readRealStatus,VERSION as REAL_VERSION} from '../src/operator/real-operations-v5-5.mjs';
+const REAL_WIDGET=new URL('../src/operator/real-operations-widget-v5-5.js',import.meta.url);
 
 export const HOST='127.0.0.1',PORT=8802,ORIGIN='http://127.0.0.1:8802';
 const MAX_PAGE=240000,MAX_PROXY=12*1024*1024;
@@ -123,7 +125,7 @@ async function emptyCommerceBody(req){
 export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=createCommerceIntelligence(),grounded=createGroundedChat(),
  readPage=pageFrom,proxy=proxyTo,readWidget=()=>readFile(ML_WIDGET,'utf8'),
  readCommerceWidget=()=>readFile(COMMERCE_WIDGET,'utf8'),
- executiveStatus=readExecutiveStatus,
+ executiveStatus=readExecutiveStatus,realStatus=readRealStatus,
  readUiClient=()=>readFile(UI_CLIENT,'utf8'),readUiStyle=()=>readFile(UI_CSS,'utf8')}={}){
   return http.createServer(async(req,res)=>{
     try{
@@ -146,6 +148,19 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
       }
       if(req.method==='GET'&&u.pathname==='/api/operator/client.js'){
         return send(res,200,await readFile(EXEC_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      }
+      if(req.method==='GET'&&u.pathname==='/api/operator/real/client.js'){
+        return send(res,200,await readFile(REAL_WIDGET,'utf8'),'text/javascript; charset=utf-8');
+      }
+      if(req.method==='GET'&&u.pathname==='/api/operator/real/status'){
+        const real=await realStatus();
+        if(real.version!==REAL_VERSION||
+          (real.state!=='NOT_ACTIVATED'&&
+           (real.emails_sent!==0||real.government_filings!==0||
+            real.payments!==0||real.rea_executions!==0||real.applied_configs!==0)))
+          throw Error('REAL_OPERATIONS_RECEIPT_INVALID');
+        return send(res,200,{...real,identity_display:'COMPANY_ONLY_NO_PRIVATE_CONTACTS',
+          email_send_authorized:false,legal_submission_authorized:false});
       }
       if(req.method==='GET'&&u.pathname==='/api/operator/status'){
         const result=await executiveStatus();
