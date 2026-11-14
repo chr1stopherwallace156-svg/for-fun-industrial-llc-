@@ -1,0 +1,10 @@
+# FIAL 2 — real source-grounded semantics, no authority to submit or spend.
+FIAL 2
+MISSION "Interpret grant requirements and flag missing proof before application preparation"
+SOURCE GRANTS
+UNDERSTAND applicant_type,purpose,geography,deadline,funding
+MODEL LOCAL_QWEN
+GROUND QUOTES
+POLICY UNKNOWN_IS_HOLD
+BUDGET 3
+END
