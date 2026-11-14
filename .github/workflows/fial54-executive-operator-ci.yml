@@ -1,0 +1,66 @@
+name: Fun Industrial FIAL5.4 Executive Operator CI
+on:
+  push:
+    branches:
+      - feature/fial5-4-executive-operator-v1-20261114
+    paths:
+      - "src/operator/**"
+      - "scripts/Run-Fun-Executive-Operator-V1.mjs"
+      - "scripts/Run-Fun-ML-Dashboard8802.mjs"
+      - "Run-Fun-Executive-Operator-V1.ps1"
+      - "Install-Fun-Executive-Operator-V1.ps1"
+      - "intelligence-checks/fial54-*.mjs"
+      - ".github/workflows/fial54-executive-operator-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qualification:
+    runs-on: windows-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Syntax check executive modules and primary hub
+        shell: pwsh
+        run: |
+          $files=@(
+            'src/operator/executive-ops-v1.mjs',
+            'src/operator/executive-mail-v1.mjs',
+            'src/operator/executive-console-v1.mjs',
+            'src/operator/executive-console-client-v1.js',
+            'scripts/Run-Fun-Executive-Operator-V1.mjs',
+            'scripts/Run-Fun-ML-Dashboard8802.mjs',
+            'intelligence-checks/fial54-executive-operator-v1-case.mjs',
+            'intelligence-checks/fial54-primary-console-v1-case.mjs'
+          )
+          foreach($file in $files){node --check $file;if($LASTEXITCODE -ne 0){throw ('FIAL54_JS_PARSE_HOLD_'+$file)}}
+      - name: Execute executive, old dashboard and mission regression suites
+        run: |
+          node --test intelligence-checks/fial54-executive-operator-v1-case.mjs intelligence-checks/fial54-primary-console-v1-case.mjs intelligence-checks/fial-primary-dashboard-chat-v5-3-case.mjs intelligence-checks/fial-grounded-qwen-v5-2-case.mjs intelligence-checks/fi-ml-hub-v3-case.mjs intelligence-checks/integrated-hub-ui-v1-case.mjs intelligence-checks/opportunity-worker-v1-case.mjs intelligence-checks/mission-controller-v2-case.mjs
+      - name: Parse PowerShell scheduler and audit permitted side effects
+        shell: pwsh
+        run: |
+          foreach($file in @('Install-Fun-Executive-Operator-V1.ps1','Run-Fun-Executive-Operator-V1.ps1')){
+            $tokens=$null;$errs=$null
+            $ast=[System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $file),[ref]$tokens,[ref]$errs)
+            if(@($errs).Count){$errs|ForEach-Object{Write-Error $_.Message};throw ('FIAL54_PS_PARSE_HOLD_'+$file)}
+            $source=Get-Content $file -Raw
+            if($source -match '(?im)^\s*\$(home|pid|host|input|error|matches|myinvocation)\s*='){
+              throw ('FIAL54_READONLY_POWERSHELL_VARIABLE_ASSIGNED_'+$file)
+            }
+            if($source -match 'Stop-Process|Restart-Service|Stop-Service|Invoke-Expression|Set-NetFirewallRule|git reset|pip install|Remove-Item'){
+              throw ('FIAL54_PROTECTED_MUTATION_FOUND_'+$file)
+            }
+          }
+          $install=Get-Content 'Install-Fun-Executive-Operator-V1.ps1' -Raw
+          foreach($required in @('FIAL54_OFFLINE_QUALIFICATION=PASS',
+            'FIAL54_FIRST_REAL_CYCLE=PASS','FIAL54_PERSISTENT_OPERATIONS=ACTIVE',
+            'FIAL54_NO_EMAIL_SEND_NO_GOVERNMENT_FILING_NO_SPENDING_NO_REA=CONFIRMED',
+            'EXISTING_TASK_IDENTITY_DIFFERS_REFUSE_REPLACE',
+            'New-ScheduledTaskPrincipal','-LogonType Interactive','-MultipleInstances IgnoreNew')){
+            if(!$install.Contains($required)){throw ('FIAL54_SCHEDULER_GUARD_MISSING_'+$required)}
+          }
+          Write-Host 'FIAL54_WINDOWS_SCHEDULER_POLICY_AND_PARSE=PASS'
