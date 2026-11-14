@@ -28,7 +28,7 @@ async function request(path,body){
  }finally{clearTimeout(timer)}
 }
 async function load(){
- const [status,data]=await Promise.all([request('/api/commerce/status'),request('/api/commerce/data')]);
+ const [status,data,report]=await Promise.all([request('/api/commerce/status'),request('/api/commerce/data'),request('/api/commerce/opportunities')]);
  shopButton.disabled=!status.shopify.configured||busy;
  contents.replaceChildren();
  const meta=document.createElement('p');meta.textContent='US Trending Now: '+(status.googleTrends.refreshed_utc||'not collected')+
@@ -49,6 +49,31 @@ async function load(){
   ' · '+x.matched_words.join(', '));
  if(data.shopify?.orders_note){const p=document.createElement('p');p.textContent=data.shopify.orders_note;contents.append(p)}
  if(data.shopify?.products_truncated||data.shopify?.orders_truncated){const p=document.createElement('p');p.textContent='Store result truncated; only the first authorized page is shown.';contents.append(p)}
+ const review=document.createElement('section');review.id='fi-commerce-opportunity-report';
+ review.style.cssText='border-top:1px solid #52718a;margin-top:16px;padding-top:8px';
+ contents.append(review);
+ const title=document.createElement('h3');title.textContent='V1.1 · evidence-backed product research queue';review.append(title);
+ const statusLine=document.createElement('p');
+ statusLine.textContent='Research state: '+String(report.state||'unavailable')+
+  ' · Google source: '+(report.source_status?.google?.sha256||'missing')+
+  ' · Google age: '+(report.source_status?.google?.age_hours??'unknown')+' hours';
+ review.append(statusLine);
+ const caution=document.createElement('p');
+ caution.textContent='Research priority is a fixed keyword-based heuristic, not a machine-learning prediction or proof of buyer demand. Supplier availability, landed cost and net profit are unverified.';
+ review.append(caution);
+ renderSection(review,'Shopify catalog ↔ trend title matches (research only)',report.matches||[],x=>
+  x.product_title+' ↔ '+x.search_query+' · title words: '+x.matched_terms.join(', ')+
+  ' · research priority '+x.research_priority+
+  (x.listed_price_min===null?' · price unavailable':' · listed price '+x.listed_price_min+' (currency not verified)')+
+  ' · missing: '+x.next_evidence_needed.join('; '));
+ renderSection(review,'Product-related trends without matched catalog products',report.research_leads||[],x=>
+  x.search_query+' · categories: '+x.category_hints.join(', ')+
+  (x.approx_traffic?' · approximate search traffic '+x.approx_traffic:'')+
+  ' · next: '+x.next_evidence_needed.join('; '));
+ const gaps=document.createElement('p');
+ gaps.textContent='Uncategorized searches: '+report.uncategorized_search_count+
+  ' · verified sales opportunities: NO · purchasing and publishing: DISABLED';
+ review.append(gaps);
  const tail=document.createElement('p');tail.textContent='Read-only snapshots. No purchases, listings, training, or automatic polling.';
  contents.append(tail);
  message('Cached commerce intelligence loaded · '+trends.length+' trending topics · '+products.length+' catalog products');
