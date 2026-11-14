@@ -233,7 +233,7 @@ export function createFial51Adapters({
     case "security":
      if(operation!=="audit_own_source"||Object.keys(input).length)
       throw Error("FIAL51_SECURITY_INPUT_INVALID");
-     result=await audit(repositoryRoot,{maxFiles:300});
+     result=await audit(join(repositoryRoot,"src"),{maxFiles:300});
      break;
     case "engineering_inspection":
      if(operation==="pe_preflight"){
