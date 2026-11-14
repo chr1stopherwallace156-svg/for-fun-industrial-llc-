@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,writeFileSync,existsSync,rmSync} from 'node:fs';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,existsSync,rmSync} from 'node:fs';
 import {resolve,join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {spawnSync} from 'node:child_process';
@@ -58,7 +58,13 @@ test('render rejects altered V2 input and invalid project IDs',()=>{
   const p=join(local,'FunIndustrial','EVEngineering','Prototypes');
   mkdirSync(p,{recursive:true});
   assert.equal(run(v2,['demo','bench-b']).status,0);
-  const r=run(native,['render','../bad','0'.repeat(64),'0'.repeat(64)]);
-  assert.notEqual(r.status,0);assert.match(r.stderr,/BAD_ID_HOLD/);
+  const bad=run(native,['render','../bad','0'.repeat(64),'0'.repeat(64)]);
+  assert.notEqual(bad.status,0);assert.match(bad.stderr,/BAD_ID_HOLD/);
+  const input=join(p,'bench-b','prototype.json');
+  const data=JSON.parse(readFileSync(input,'utf8'));data.plate.width_mm=125;
+  writeFileSync(input,JSON.stringify(data));
+  const r=run(native,['render','bench-b','0'.repeat(64),'0'.repeat(64)]);
+  assert.notEqual(r.status,0);assert.match(r.stderr,/V2_INPUT_CHANGED_HOLD/);
+  assert.equal(existsSync(join(p,'bench-b','native-wireviz-v3')),false);
  });
 });
