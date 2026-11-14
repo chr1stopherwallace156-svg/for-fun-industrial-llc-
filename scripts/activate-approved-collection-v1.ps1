@@ -13,6 +13,7 @@ $task='OP1-DEMAND'
 $database=Join-Path $env:USERPROFILE 'FunIndustrial-LangGraph-V1\evidence-plans-v1.sqlite'
 $python=Join-Path $env:USERPROFILE 'FunIndustrial-LangGraph-V1\.venv\Scripts\python.exe'
 $env:FUN_COGNITION_PYTHON=$python
+$env:FUN_TEST_LIVE_QWEN='1'
 $env:FUN_EVIDENCE_DATABASE=$database
 $node=(Get-Command node -ErrorAction Stop).Source
 $changed=@(
