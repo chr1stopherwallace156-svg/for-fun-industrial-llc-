@@ -52,6 +52,7 @@ export function importSource({root=libraryRoot(),vehicle,year=2026,id,file,sourc
   if(!['.pdf','.step','.stp','.dxf','.dwg','.txt','.json'].includes(ext)) fail('UNSUPPORTED_SOURCE_EXTENSION');
   const original=path.basename(file),info=fileHash(file);
   const target=path.join(vehicleDir(root,vehicle,year),'Sources',info.sha256+ext);
+  fs.mkdirSync(path.dirname(target),{recursive:true});
   if(!fs.existsSync(target)) fs.copyFileSync(file,target,fs.constants.COPYFILE_EXCL);
   if(fileHash(target).sha256!==info.sha256) fail('SOURCE_COPY_HASH_MISMATCH');
   const source={id:info.sha256,originalName:original,storedName:path.basename(target),sha256:info.sha256,bytes:info.bytes,sourceUrl,importedAt:new Date().toISOString(),verifiedContent:false};
@@ -69,6 +70,7 @@ export function attachArtifact({root=libraryRoot(),vehicle,year=2026,id,file,kin
   if(!sourceIds.every(s=>config.sourceIds.includes(s))) fail('UNKNOWN_SOURCE_REFERENCE');
   const info=fileHash(file),ext=path.extname(file).toLowerCase(),name=info.sha256+ext;
   const dest=path.join(vehicleDir(root,vehicle,year),kind,name);
+  fs.mkdirSync(path.dirname(dest),{recursive:true});
   if(!fs.existsSync(dest)) fs.copyFileSync(file,dest,fs.constants.COPYFILE_EXCL);
   if(fileHash(dest).sha256!==info.sha256) fail('ARTIFACT_COPY_HASH_MISMATCH');
   const artifact={id:info.sha256,kind,originalName:path.basename(file),storedName:name,sha256:info.sha256,sourceIds,engineeringApproved:false};
