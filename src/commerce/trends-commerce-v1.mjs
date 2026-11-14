@@ -75,7 +75,26 @@ export function matchProductsToTrends(products,trends){
  return results.slice(0,30);
 }
 export function createCommerceIntelligence({fetchImpl=fetch,directory=homeDir(),shopDomain=process.env.FUN_SHOPIFY_SHOP_DOMAIN||'',
- shopToken=process.env.FUN_SHOPIFY_ADMIN_TOKEN||''}={}){
+ shopToken=process.env.FUN_SHOPIFY_ADMIN_TOKEN||'',clientId=process.env.FUN_SHOPIFY_CLIENT_ID||'',
+ clientSecret=process.env.FUN_SHOPIFY_CLIENT_SECRET||''}={}){
+ let cachedToken=null,cachedUntil=0;
+ const authMode=shopToken?'admin_token':clientId&&clientSecret?'client_credentials':'not_configured';
+ const configured=domainValid(shopDomain)&&authMode!=='not_configured';
+ async function accessToken(){
+  if(shopToken)return shopToken;
+  if(cachedToken&&Date.now()<cachedUntil)return cachedToken;
+  if(!clientId||!clientSecret||clientId.length>256||clientSecret.length>512)throw Error('SHOPIFY_CLIENT_CREDENTIALS_INVALID');
+  const endpoint='https://'+shopDomain+'/admin/oauth/access_token';
+  const response=await fetchImpl(endpoint,{method:'POST',redirect:'error',headers:{'content-type':'application/x-www-form-urlencoded','accept':'application/json'},
+   body:new URLSearchParams({client_id:clientId,client_secret:clientSecret,grant_type:'client_credentials'}).toString(),signal:AbortSignal.timeout(16000)});
+  const raw=await bytesResponse(response,32768);
+  let grant;try{grant=JSON.parse(raw.toString('utf8'))}catch{throw Error('SHOPIFY_TOKEN_JSON_INVALID')}
+  if(typeof grant.access_token!=='string'||grant.access_token.length<10||grant.access_token.length>1024||
+   !Number.isInteger(grant.expires_in)||grant.expires_in<120)throw Error('SHOPIFY_TOKEN_RESPONSE_INVALID');
+  cachedToken=grant.access_token;
+  cachedUntil=Date.now()+Math.min(Math.max(grant.expires_in-60,60),86340)*1000;
+  return cachedToken;
+ }
  let active=false;
  async function data(){
   const [trends,store]=await Promise.all([loadSnapshot(directory,'trends'),loadSnapshot(directory,'shopify')]);
@@ -89,7 +108,7 @@ export function createCommerceIntelligence({fetchImpl=fetch,directory=homeDir(),
   const state=await data();
   return {version:VERSION,googleTrends:{source:GOOGLE_RSS,mode:'public_rss_not_alpha_api',
    refreshed_utc:state.trends?.fetched_utc||null,count:state.trends?.items?.length||0},
-   shopify:{configured:domainValid(shopDomain)&&Boolean(shopToken),domain:domainValid(shopDomain)?shopDomain:null,
+   shopify:{configured,auth_mode:authMode,domain:domainValid(shopDomain)?shopDomain:null,
     refreshed_utc:state.shopify?.fetched_utc||null,products:state.shopify?.products?.length||0,
     orders:state.shopify?.orders?.length||0},automaticPolling:false,externalActions:0,
    purchaseAuthority:false,trainingAuthority:false,busy:active};
@@ -108,12 +127,13 @@ export function createCommerceIntelligence({fetchImpl=fetch,directory=homeDir(),
  }
  async function refreshShopify(){
   if(active)throw Error('COMMERCE_BUSY');
-  if(!domainValid(shopDomain)||!shopToken)throw Error('SHOPIFY_LOCAL_TOKEN_NOT_CONFIGURED');
+  if(!configured)throw Error('SHOPIFY_LOCAL_CREDENTIALS_NOT_CONFIGURED');
   if(typeof shopToken!=='string'||shopToken.length>1024)throw Error('SHOPIFY_TOKEN_INVALID');
   active=true;
   try{
    const endpoint='https://'+shopDomain+'/admin/api/'+SHOP_API+'/graphql.json';
-   const productPayload=await jsonGraphql({url:endpoint,token:shopToken,query:PRODUCTS_QUERY,fetchImpl});
+   const token=await accessToken();
+   const productPayload=await jsonGraphql({url:endpoint,token,query:PRODUCTS_QUERY,fetchImpl});
    const nodes=productPayload.data?.products?.edges;
    if(!Array.isArray(nodes))throw Error('SHOPIFY_PRODUCTS_SCHEMA_INVALID');
    const products=nodes.map(({node})=>({id:safe(node.id,110),title:safe(node.title,280),handle:safe(node.handle,110),
@@ -123,7 +143,7 @@ export function createCommerceIntelligence({fetchImpl=fetch,directory=homeDir(),
     variants_truncated:node.variants?.pageInfo?.hasNextPage===true})).slice(0,50);
    let orders=[],orders_available=false,orders_note=null,ordersDigest=null,ordersMore=false;
    try{
-    const orderPayload=await jsonGraphql({url:endpoint,token:shopToken,query:ORDERS_QUERY,fetchImpl});
+    const orderPayload=await jsonGraphql({url:endpoint,token,query:ORDERS_QUERY,fetchImpl});
     const edges=orderPayload.data?.orders?.edges;
     if(!Array.isArray(edges))throw Error('SHOPIFY_ORDERS_SCHEMA_INVALID');
     orders=edges.slice(0,20).map(({node})=>({id:safe(node.id,110),name:safe(node.name,80),created_at:safe(node.createdAt,60),
