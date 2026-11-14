@@ -36,7 +36,7 @@ if($Action -eq 'Plan'){
   winget_available=([bool]$winget);python312_available=([bool]$python);python_path=$python;
   proposed_windows_packages=@($packages|ForEach-Object{$_.Id+'@'+$_.Version});
   wireviz='0.4.1';wireviz_wheel_sha256='5dfdfec91e5d26e4f27f0f9d031672da7fb3c133d127167d233f4742f01873a2';
-  tool_folder=$tools;system_wide_package_changes_possible=$true;external_tools_installed=$false
+  tool_folder=$tools;system_wide_package_changes_possible=$true;installer_executed=$false
  }|ConvertTo-Json -Depth 5
  exit 0
 }
