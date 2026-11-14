@@ -12,10 +12,12 @@ import {SHELL,UI_CSS,UI_CLIENT} from '../src/ui/integrated-hub-shell-v1.mjs';
 import {readFial4DashboardStatus} from '../src/fial/dashboard-status-v4.mjs';
 import {createGroundedChat} from '../src/fial/grounded-chat-v5-2.mjs';
 import {GROUNDED_PANEL,GROUNDED_CLIENT,GROUNDED_VERSION} from '../src/fial/primary-grounded-ui-v5-3.mjs';
+import {readExecutiveStatus} from '../src/operator/executive-ops-v1.mjs';
+import {EXEC_PAGE,EXEC_CLIENT,EXEC_CONSOLE_VERSION} from '../src/operator/executive-console-v1.mjs';
 
 export const HOST='127.0.0.1',PORT=8802,ORIGIN='http://127.0.0.1:8802';
 const MAX_PAGE=240000,MAX_PROXY=12*1024*1024;
-const NAV='<nav id="fi-hub-nav" style="position:relative;z-index:1;padding:12px 14px;margin:10px 0 16px;border:1px solid #52718a;border-radius:9px;background:#1b3445;color:white;font:14px system-ui"><strong>Fun Industrial Integrated Dashboard</strong> · <a style="color:#a6f4e8" href="/">Control Center</a> · <a style="color:#a6f4e8" href="/unified/">Unified Qwen Chat</a> · <a style="color:#a6f4e8" href="#fi-ml-panel">Machine Learning</a> <span style="display:block;font-size:12px;color:#c6d7e5">Current services remain on original ports; ML uses verified 8801 capability.</span></nav>';
+const NAV='<nav id="fi-hub-nav" style="position:relative;z-index:1;padding:12px 14px;margin:10px 0 16px;border:1px solid #52718a;border-radius:9px;background:#1b3445;color:white;font:14px system-ui"><strong>Fun Industrial Integrated Dashboard</strong> · <a style="color:#a6f4e8" href="/">Control Center</a> · <a style="color:#a6f4e8" href="/unified/">Unified Qwen Chat</a> · <a style="color:#a6f4e8" href="#fi-ml-panel">Machine Learning</a> · <a style="color:#a6f4e8" href="/operations/">Executive Assistant</a> <span style="display:block;font-size:12px;color:#c6d7e5">Current services remain on original ports; ML uses verified 8801 capability.</span></nav>';
 const DEALS=JSON.stringify({deals:Array.from({length:8},(_,i)=>({id:'demo'+i,cost:i+1,sale_price:i+9,shipping:1,fees:0.8,return_allowance:0.5}))});
 const PANEL='<section id="fi-ml-panel" style="box-sizing:border-box;margin:18px auto;padding:17px;max-width:1100px;background:#152a3a;border:1px solid #4e7087;border-radius:12px;color:#e6f4fc;font:14px/1.5 system-ui"><h2 style="font-size:19px;margin:0 0 6px">scikit-learn + Qwen · E-commerce intelligence</h2><p id="fi-ml-status">Checking local ML bridge…</p><p>Run deal analysis or sales predictions using supplied JSON. Example values are synthetic, not verified prices.</p><label for="fi-ml-prompt">ML task</label><input id="fi-ml-prompt" style="box-sizing:border-box;display:block;width:100%;padding:10px;margin:5px 0 10px;background:#0c1825;color:#fff;border:1px solid #537187;border-radius:7px" maxlength="1000" value="Analyze deals and rank estimated profit"><label for="fi-ml-data">Structured product or sales data</label><textarea id="fi-ml-data" spellcheck="false" style="box-sizing:border-box;display:block;width:100%;min-height:150px;margin:5px 0 8px;padding:10px;background:#0c1825;color:#fff;border:1px solid #537187;border-radius:7px;font:12px monospace">'+DEALS+'</textarea><label style="display:block;margin-bottom:8px"><input id="fi-ml-train-approve" type="checkbox"> Approve writing or replacing the local sales model (training only)</label><button id="fi-ml-run" style="padding:10px 12px;background:#a2e7e2;border:0;border-radius:7px;color:#09202c;font-weight:bold">Run verified ML task</button><pre id="fi-ml-result" style="white-space:pre-wrap;overflow-wrap:anywhere;padding:9px;background:#0c1825;margin-top:12px;max-height:440px;overflow:auto">No analysis run.</pre></section>';
 const FIAL4_WIDGET=new URL('../src/fial/dashboard-widget-v4.js',import.meta.url);
@@ -121,6 +123,7 @@ async function emptyCommerceBody(req){
 export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=createCommerceIntelligence(),grounded=createGroundedChat(),
  readPage=pageFrom,proxy=proxyTo,readWidget=()=>readFile(ML_WIDGET,'utf8'),
  readCommerceWidget=()=>readFile(COMMERCE_WIDGET,'utf8'),
+ executiveStatus=readExecutiveStatus,
  readUiClient=()=>readFile(UI_CLIENT,'utf8'),readUiStyle=()=>readFile(UI_CSS,'utf8')}={}){
   return http.createServer(async(req,res)=>{
     try{
@@ -136,6 +139,24 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         const csp=unified?"default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'":
           "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'";
         return send(res,200,html,'text/html; charset=utf-8',{'content-security-policy':csp});
+      }
+      if(req.method==='GET'&&u.pathname==='/operations/'){
+        return send(res,200,EXEC_PAGE,'text/html; charset=utf-8',
+          {'content-security-policy':"default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"});
+      }
+      if(req.method==='GET'&&u.pathname==='/api/operator/client.js'){
+        return send(res,200,await readFile(EXEC_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      }
+      if(req.method==='GET'&&u.pathname==='/api/operator/status'){
+        const result=await executiveStatus();
+        if(result.version!=='fial5.4-executive-operator-v1'||!Array.isArray(result.items)||
+          result.outbound_permissions?.email_sent!==0||result.outbound_permissions?.government_filings!==0)
+          throw Error('EXEC_OPERATOR_STATUS_UNVERIFIED');
+        return send(res,200,{...result,console_version:EXEC_CONSOLE_VERSION,
+          no_email_send:true,no_auto_filings:true,no_rea_grants:true});
+      }
+      if(u.pathname.startsWith('/api/operator/')||u.pathname==='/operations'){
+        return send(res,404,{error:'EXEC_OPERATOR_UNKNOWN_ROUTE_OR_METHOD'});
       }
       if(req.method==='GET'&&u.pathname==='/api/ui/style.css')
         return send(res,200,await readUiStyle(),'text/css; charset=utf-8');
