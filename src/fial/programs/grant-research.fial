@@ -1,0 +1,13 @@
+# FIAL 1 — executable autonomy policy for Fun Industrial's California grant research.
+# Every statement is defined by the FIAL compiler; this is NOT JavaScript or Python.
+FIAL 1
+MISSION "Investigate California business funding and prepare evidence-based drafts"
+SOURCE GRANTS
+BUDGET 3
+RULE "new-grant" WHEN new SCORE 98 ACTION BRIEF
+RULE "changed-grant" WHEN changed SCORE 95 ACTION BRIEF
+RULE "resume-deferred" WHEN deferred SCORE 90 ACTION BRIEF
+RULE "urgent-deadline" WHEN urgent SCORE 85 ACTION BRIEF
+RULE "missing-evidence" WHEN missing_evidence SCORE 70 ACTION HOLD
+RULE "stable-candidate" WHEN always SCORE 10 ACTION REMEMBER
+END
