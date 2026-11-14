@@ -111,7 +111,7 @@ test('the live HTTP adapter serves only immutable UI assets, without proxying or
 
 test('UI-only deployment checks assets and upgrades only 8802, with a known working fallback',async()=>{
  const activation=await readFile(new URL('../Activate-Fun-Commerce-V1.ps1',import.meta.url),'utf8');
- assert.match(activation,/param\(\[switch\]\$SkipGoogleRefresh\)/);
+ assert.match(activation,/param\(\[switch\]\$SkipGoogleRefresh,\[switch\]\$RefreshCalifornia\)/);
  assert.match(activation,/24ef0a6affa148f33d54208cbf369069be1be7ce/);
  assert.match(activation,/\/api\/ui\/client\.js/);
  assert.match(activation,/\/api\/ui\/style\.css/);
