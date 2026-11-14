@@ -46,3 +46,30 @@ test('missing 8801 uses previously verified V2 checkout, no silent script fetch 
  assert.match(source,/V2_ML_RECOVERY_FAILED_NO_RETRY/);
  assert.doesNotMatch(source,/Stop-Process|taskkill\.exe|Remove-Item|Invoke-Expression/);
 });
+
+test('missing local sidecars are recovered independently before dedicated 8798 startup',async()=>{
+ const source=await clean(launcher);
+ const helper=await clean(new URL('../Start-Fun-Local-Dependencies-V3.ps1',import.meta.url));
+ assert.match(source,/Start-Fun-Local-Dependencies-V3\.ps1/);
+ assert.match(source,/LOCAL_DEPENDENCY_RECOVERY_FAILED_NO_RETRY/);
+ assert.ok(source.indexOf('-File $dependencyHelper')<source.indexOf('-File $startChat'),
+   'local sidecars must be ready before 8798');
+ assert.match(helper,/if\(\$null -eq \$local\)\{SpawnMissing 8796/);
+ assert.match(helper,/if\(\$null -eq \$rea\)\{SpawnMissing 8797/);
+ assert.match(helper,/--standalone/);
+ assert.match(helper,/PORT_.+_EXISTS_BUT_UNHEALTHY_NO_RESTART/);
+ assert.match(helper,/PREEXISTING_LISTENER_CHANGED_/);
+ assert.doesNotMatch(helper,/Start-Fun-Industrial\.ps1|Stop-Process|taskkill\.exe|Set-Content|Invoke-Expression/);
+});
+test('sidecar recovery verifies parent, Qwen and compute without changing 8789 source guard',async()=>{
+ const source=await clean(launcher),helper=await clean(new URL('../Start-Fun-Local-Dependencies-V3.ps1',import.meta.url));
+ const core=await clean(startup);
+ assert.match(helper,/OnlyLoopback \$p/);
+ assert.match(helper,/PARENT_LOCAL_19_MISMATCH/);
+ assert.match(helper,/QWEN_NOT_READY/);
+ assert.match(helper,/COMPUTE_NOT_READY/);
+ assert.match(helper,/reaExecutionGrants -ne 0/);
+ assert.match(helper,/realReaToolCount -ne 229/);
+ assert.match(source,/if\(\$null -eq \$parent\)/);
+ assert.match(core,/8789_SOURCE_HASH_CHANGED_MANUAL_REVIEW_NO_RESTORE/);
+});
