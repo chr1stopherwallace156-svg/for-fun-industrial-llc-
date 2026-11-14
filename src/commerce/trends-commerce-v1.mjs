@@ -5,6 +5,7 @@ import {join} from 'node:path';
 import {homedir} from 'node:os';
 
 export const GOOGLE_RSS='https://trends.google.com/trending/rss?geo=US';
+export const GOOGLE_CALIFORNIA_RSS='https://trends.google.com/trending/rss?geo=US-CA';
 const VERSION='fun-commerce-intelligence-v1',SHOP_API='2026-10';
 const PRODUCTS_QUERY='query FunCommerceProducts { shop { name } products(first: 50, sortKey: UPDATED_AT, reverse: true) { edges { node { id title handle status updatedAt variants(first: 5) { edges { node { id sku price } } pageInfo { hasNextPage } } } } pageInfo { hasNextPage } } }';
 const ORDERS_QUERY='query FunCommerceOrders { orders(first: 20, sortKey: CREATED_AT, reverse: true) { edges { node { id name createdAt totalPriceSet { shopMoney { amount currencyCode } } } } pageInfo { hasNextPage } } }';
@@ -45,7 +46,7 @@ async function loadSnapshot(directory,name){
 async function persist(directory,name,data,raw=null){
  await mkdir(directory,{recursive:true});
  if(raw){
-  const filename='trending-us-'+sha(raw)+'.rss';
+  const filename=(name==='california-trends'?'trending-us-ca-':'trending-us-')+sha(raw)+'.rss';
   try{await writeFile(join(directory,filename),raw,{flag:'wx'})}catch(e){if(e.code!=='EEXIST')throw e}
  }
  const tmp=join(directory,'.'+name+'-'+randomUUID()+'.tmp');
@@ -97,8 +98,8 @@ export function createCommerceIntelligence({fetchImpl=fetch,directory=homeDir(),
  }
  let active=false;
  async function data(){
-  const [trends,store]=await Promise.all([loadSnapshot(directory,'trends'),loadSnapshot(directory,'shopify')]);
-  return {version:VERSION,mode:'manual_read_only',trends,shopify:store,
+  const [trends,california,store]=await Promise.all([loadSnapshot(directory,'trends'),loadSnapshot(directory,'california-trends'),loadSnapshot(directory,'shopify')]);
+  return {version:VERSION,mode:'manual_read_only',trends,california,shopify:store,
    matches:matchProductsToTrends(store?.products||[],trends?.items||[]),
    disclaimers:['Trending searches are not product demand or sales. Approximate traffic is a search-interest bucket.',
     'Selling prices do not establish net profit without verified supplier cost, shipping, fees and returns.',
@@ -108,6 +109,9 @@ export function createCommerceIntelligence({fetchImpl=fetch,directory=homeDir(),
   const state=await data();
   return {version:VERSION,googleTrends:{source:GOOGLE_RSS,mode:'public_rss_not_alpha_api',
    refreshed_utc:state.trends?.fetched_utc||null,count:state.trends?.items?.length||0},
+   californiaTrends:{source:GOOGLE_CALIFORNIA_RSS,mode:'public_rss_state_scope_attempt',
+    refreshed_utc:state.california?.fetched_utc||null,count:state.california?.items?.length||0,
+    verified:state.california?.source_url===GOOGLE_CALIFORNIA_RSS&&state.california?.source_type==='google_trending_now_rss'},
    shopify:{configured,auth_mode:authMode,domain:domainValid(shopDomain)?shopDomain:null,
     refreshed_utc:state.shopify?.fetched_utc||null,products:state.shopify?.products?.length||0,
     orders:state.shopify?.orders?.length||0},automaticPolling:false,externalActions:0,
@@ -123,6 +127,20 @@ export function createCommerceIntelligence({fetchImpl=fetch,directory=homeDir(),
     source_sha256:sha(raw),items,search_volume_is_exact:false,search_volume_is_sales:false};
    await persist(directory,'trends',record,raw);
    return {state:'captured_unverified_search_interest',...record};
+  }finally{active=false}
+ }
+ async function refreshCaliforniaTrends(){
+  if(active)throw Error('COMMERCE_BUSY');active=true;
+  try{
+   const response=await fetchImpl(GOOGLE_CALIFORNIA_RSS,{method:'GET',redirect:'error',
+    headers:{accept:'application/rss+xml,application/xml;q=0.9'},signal:AbortSignal.timeout(12000)});
+   const raw=await bytesResponse(response,250000),items=parseTrendingRss(raw.toString('utf8'));
+   const record={source_url:GOOGLE_CALIFORNIA_RSS,source_type:'google_trending_now_rss',
+    geographic_scope:'US-CA',county_level_metrics_available:false,
+    fetched_utc:new Date().toISOString(),source_sha256:sha(raw),items,
+    search_volume_is_exact:false,search_volume_is_sales:false};
+   await persist(directory,'california-trends',record,raw);
+   return {state:'captured_california_statewide_search_interest',...record};
   }finally{active=false}
  }
  async function refreshShopify(){
@@ -159,5 +177,5 @@ export function createCommerceIntelligence({fetchImpl=fetch,directory=homeDir(),
    return {state:'read_only_store_snapshot',...record};
   }finally{active=false}
  }
- return Object.freeze({status,data,refreshTrends,refreshShopify});
+ return Object.freeze({status,data,refreshTrends,refreshCaliforniaTrends,refreshShopify});
 }
