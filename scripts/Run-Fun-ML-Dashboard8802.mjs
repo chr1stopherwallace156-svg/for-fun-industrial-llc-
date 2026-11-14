@@ -9,12 +9,15 @@ import {createCommerceIntelligence} from '../src/commerce/trends-commerce-v1.mjs
 import {rankCommerceOpportunities} from '../src/commerce/opportunity-ranking-v1-1.mjs';
 import {buildTrendsFocus} from '../src/commerce/google-trends-focus-v1-2.mjs';
 import {SHELL,UI_CSS,UI_CLIENT} from '../src/ui/integrated-hub-shell-v1.mjs';
+import {readFial4DashboardStatus} from '../src/fial/dashboard-status-v4.mjs';
 
 export const HOST='127.0.0.1',PORT=8802,ORIGIN='http://127.0.0.1:8802';
 const MAX_PAGE=240000,MAX_PROXY=12*1024*1024;
 const NAV='<nav id="fi-hub-nav" style="position:relative;z-index:1;padding:12px 14px;margin:10px 0 16px;border:1px solid #52718a;border-radius:9px;background:#1b3445;color:white;font:14px system-ui"><strong>Fun Industrial Integrated Dashboard</strong> · <a style="color:#a6f4e8" href="/">Control Center</a> · <a style="color:#a6f4e8" href="/unified/">Unified Qwen Chat</a> · <a style="color:#a6f4e8" href="#fi-ml-panel">Machine Learning</a> <span style="display:block;font-size:12px;color:#c6d7e5">Current services remain on original ports; ML uses verified 8801 capability.</span></nav>';
 const DEALS=JSON.stringify({deals:Array.from({length:8},(_,i)=>({id:'demo'+i,cost:i+1,sale_price:i+9,shipping:1,fees:0.8,return_allowance:0.5}))});
 const PANEL='<section id="fi-ml-panel" style="box-sizing:border-box;margin:18px auto;padding:17px;max-width:1100px;background:#152a3a;border:1px solid #4e7087;border-radius:12px;color:#e6f4fc;font:14px/1.5 system-ui"><h2 style="font-size:19px;margin:0 0 6px">scikit-learn + Qwen · E-commerce intelligence</h2><p id="fi-ml-status">Checking local ML bridge…</p><p>Run deal analysis or sales predictions using supplied JSON. Example values are synthetic, not verified prices.</p><label for="fi-ml-prompt">ML task</label><input id="fi-ml-prompt" style="box-sizing:border-box;display:block;width:100%;padding:10px;margin:5px 0 10px;background:#0c1825;color:#fff;border:1px solid #537187;border-radius:7px" maxlength="1000" value="Analyze deals and rank estimated profit"><label for="fi-ml-data">Structured product or sales data</label><textarea id="fi-ml-data" spellcheck="false" style="box-sizing:border-box;display:block;width:100%;min-height:150px;margin:5px 0 8px;padding:10px;background:#0c1825;color:#fff;border:1px solid #537187;border-radius:7px;font:12px monospace">'+DEALS+'</textarea><label style="display:block;margin-bottom:8px"><input id="fi-ml-train-approve" type="checkbox"> Approve writing or replacing the local sales model (training only)</label><button id="fi-ml-run" style="padding:10px 12px;background:#a2e7e2;border:0;border-radius:7px;color:#09202c;font-weight:bold">Run verified ML task</button><pre id="fi-ml-result" style="white-space:pre-wrap;overflow-wrap:anywhere;padding:9px;background:#0c1825;margin-top:12px;max-height:440px;overflow:auto">No analysis run.</pre></section>';
+const FIAL4_WIDGET=new URL('../src/fial/dashboard-widget-v4.js',import.meta.url);
+const FIAL4_PANEL='<section id="fi-fial4-panel" style="box-sizing:border-box;margin:18px auto;padding:17px;max-width:1100px;background:#152a3a;border:1px solid #4e7087;border-radius:12px;color:#e6f4fc;font:14px/1.5 system-ui"><h2>FIAL 4 · Government grant evidence</h2><p>Read-only saved evidence review. No eligibility certification or live official source refresh.</p><pre id="fi-fial4-summary" style="white-space:pre-wrap;overflow-wrap:anywhere">Status not loaded.</pre></section>';
 const COMMERCE_WIDGET=new URL('../src/commerce/trends-commerce-widget-v1.js',import.meta.url);
 const COMMERCE_PANEL='<section id="fi-commerce-panel" aria-label="Commerce intelligence" style="box-sizing:border-box;margin:18px auto;padding:17px;max-width:1100px;background:#152a3a;border:1px solid #4e7087;border-radius:12px;color:#e6f4fc;font:14px/1.5 system-ui"><h2 style="font-size:19px">Commerce Intelligence · Google Trending Now + Shopify</h2><p style="color:#b9c9da">V1.1 research queue: real evidence only. Search popularity is not purchase demand or verified profit.</p><p id="fi-commerce-state" role="status">Checking cached commerce intelligence…</p><p>Read-only Google US trending topics and authorized Shopify store snapshots. Trending searches are not proven purchase demand.</p><button id="fi-commerce-refresh-trends" type="button" style="padding:10px 12px;margin-right:8px;background:#a2e7e2;border:0;border-radius:7px;color:#09202c;font-weight:bold">Refresh Google US trends</button><button id="fi-commerce-refresh-shopify" type="button" style="padding:10px 12px;background:#a2e7e2;border:0;border-radius:7px;color:#09202c;font-weight:bold">Sync Shopify (read-only)</button><div id="fi-commerce-content" style="white-space:normal;overflow-wrap:anywhere;max-height:700px;overflow:auto"></div></section>';
 export function integrateDashboardHtml(html,widget,{unified=false}={}){
@@ -22,7 +25,7 @@ export function integrateDashboardHtml(html,widget,{unified=false}={}){
     typeof widget!=='string'||widget.length<100||widget.length>20000||
     /<\/script/i.test(widget))throw Error('ML_HUB_HTML_INJECTION_INVALID');
   const insertion=PANEL+(unified?'<script src="/api/ml/dashboard/widget.js" defer></script>':'<script>'+widget+'</script>')+
-    COMMERCE_PANEL+'<script src="/api/commerce/widget.js" defer></script>'+
+    COMMERCE_PANEL+'<script src="/api/commerce/widget.js" defer></script>'+FIAL4_PANEL+'<script src="/api/fial/v4/widget.js" defer></script>'+ 
     '<script src="/api/ui/client.js" defer></script>';
   return html.replace(/<\/head>/i,'<link rel="stylesheet" href="/api/ui/style.css"></head>')
     .replace(/(<body[^>]*>)/i,'$1'+SHELL+NAV).replace(/<\/body>/i,insertion+'</body>');
@@ -123,6 +126,10 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
       if(req.method==='GET'&&u.pathname==='/api/ml/dashboard/widget.js'){
         return send(res,200,await readWidget(),'text/javascript; charset=utf-8');
       }
+      if(req.method==='GET'&&u.pathname==='/api/fial/v4/status')
+        return send(res,200,await readFial4DashboardStatus());
+      if(req.method==='GET'&&u.pathname==='/api/fial/v4/widget.js')
+        return send(res,200,await readFile(FIAL4_WIDGET,'utf8'),'text/javascript; charset=utf-8');
       if(req.method==='GET'&&u.pathname==='/api/ml/dashboard/status')
         return send(res,200,await ml.status());
       if(req.method==='POST'&&u.pathname==='/api/ml/dashboard/run'){
