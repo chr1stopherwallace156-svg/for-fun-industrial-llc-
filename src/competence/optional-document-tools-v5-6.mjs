@@ -22,7 +22,7 @@ async function check(file,extensions){
  return name;
 }
 export async function inspectBusinessDocument(file,{python='python.exe'}={}){
- const name=await check(file,['.pdf','.docx','.pptx','.xlsx','.html','.md']);
+ const name=await check(file,['.pdf','.docx','.pptx','.xlsx','.md']);
  if(name.toLowerCase().endsWith('.md')){
   const text=await readFile(name,'utf8');
   if(text.length>30000)throw Error('FIAL56_TEXT_EXTRACTION_BUDGET');
@@ -45,7 +45,7 @@ export async function inspectBusinessDocument(file,{python='python.exe'}={}){
  ].join('\n');
  try{
   const {stdout}=await run(python,['-c',source,name],{
-   windowsHide:true,timeout:90000,maxBuffer:100000,env:{...process.env,PYTHONNOUSERSITE:'1'}});
+   windowsHide:true,timeout:90000,maxBuffer:100000,env:{...process.env,PYTHONNOUSERSITE:'1',HF_HUB_OFFLINE:'1',TRANSFORMERS_OFFLINE:'1'}});
   if(!stdout.trim())throw Error('FIAL56_DOCUMENT_EMPTY');
   return {version:ADAPTER_VERSION,state:'DOCLING_EXTRACTED_LOCAL_DOCUMENT',text:stdout.slice(0,30000),
    source_name:name,source_is_untrusted:true,external_actions:0};
