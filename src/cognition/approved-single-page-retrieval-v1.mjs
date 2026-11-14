@@ -51,7 +51,7 @@ export async function retrieveApprovedPage({url,operatorApproved=false,timeoutMs
   if(!bytes.length)throw Error("EMPTY_SOURCE");
   const body=new TextDecoder("utf-8",{fatal:true}).decode(bytes);
   // Keep the passage byte-for-byte inside the saved response.
-  const safeBody=body.replace(/<script\\b[^>]*>[\\s\\S]*?<\\/script>/gi,"").replace(/<style\\b[^>]*>[\\s\\S]*?<\\/style>/gi,"");
+  const safeBody=body.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,"").replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,"");
   const candidates=safeBody.match(/>[^<>]{35,600}</g)||[];
   const passage=(candidates.map(s=>s.slice(1,-1).trim()).find(s=>s.length>=35&&Buffer.byteLength(s,"utf8")<=1000))||
     (target.pathname.endsWith(".txt")||!body.includes("<")?body.split(/\r?\n/).map(s=>s.trim()).find(s=>s.length>=35&&Buffer.byteLength(s,"utf8")<=1000):null);
