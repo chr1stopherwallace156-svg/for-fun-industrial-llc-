@@ -17,7 +17,7 @@ try{
   console.log('FIAL55_PRIVATE_PROFILE_PATH='+r.path);
  }else if(action==='--once'){
   if(process.argv.length!==3)throw Error('UNEXPECTED_EXTRA_ARGUMENT');
-  const r=await runUnifiedCycle({sourceFile:process.env.FIAL55_APPROVED_SOURCE_FILE||null});
+  const r=await runUnifiedCycle({sourceFile:process.env.FIAL55_APPROVED_SOURCE_FILE||null,readMailbox:readElektronInboxHeaders});
   console.log('FIAL55_LOCAL_OPERATIONS='+r.state);
   console.log('FIAL55_REGISTERED_TASKS_ADDED='+r.register.added);
   console.log('FIAL55_BASELINE_WORK_ITEMS='+r.legacy.items);
