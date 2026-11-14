@@ -239,7 +239,7 @@ export async function runRealOperationsCycle({root=ROOT(),sourceFile=null,now=ne
 export async function runUnifiedCycle({root=ROOT(),grantRoot=undefined,sourceFile=null,now=new Date(),officialFetch=fetch,readMailbox=null}={}){
  await safeDir(root);validateIdentity(await readJson(join(root,PROFILE)));
  const register=await seedWorkRegister({root});
- const legacy=await runExecutiveCycle({root,grantRoot,now,readMailbox});
+ const legacy=await runExecutiveCycle({root,grantRoot,now,readMailbox,expectedGrantApplicant:'ELEKTRON INDUSTRIAL LLC'});
  if(legacy.version!==PREVIOUS||legacy.outbound_permissions.email_sent!==0||
   legacy.outbound_permissions.government_filings!==0||legacy.outbound_permissions.rea_runs!==0)
   fail('PREVIOUS_ENGINE_AUTHORITY_MISMATCH');
