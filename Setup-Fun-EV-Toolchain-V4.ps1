@@ -18,7 +18,7 @@ function Find-Py312 {
  }
  foreach($f in @((Join-Path $local 'Programs\Python\Python312\python.exe'),'C:\Python312\python.exe')){
   if(Test-Path -LiteralPath $f -PathType Leaf){
-   $v=(& $f -c 'import sys;print(str(sys.version_info.major)+"."+str(sys.version_info.minor))' 2>$null)
+   $v=(& $f -c 'import sys;print(sys.version_info.major,sys.version_info.minor,sep=chr(46))' 2>$null)
    if($LASTEXITCODE -eq 0 -and $v -eq '3.12'){return $f}
   }
  }
@@ -44,11 +44,11 @@ if($Action -eq 'SelfTest'){
  $node=Get-Command node.exe -ErrorAction SilentlyContinue
  if(-not $node){$node=Get-Command node -ErrorAction SilentlyContinue}
  if(-not $node){throw 'FUN_EV_NODE_MISSING_FOR_SELFTEST'}
- $argTest=Checked $node.Source @('-e','process.stdout.write(process.argv.slice(1).join(","))','fun-one','fun-two') 'NODE_ARGV'
+ $argTest=Checked $node.Source @('-e','process.stdout.write(process.argv.slice(1).join(String.fromCharCode(44)))','fun-one','fun-two') 'NODE_ARGV'
  if($argTest.Trim() -cne 'fun-one,fun-two'){throw 'FUN_EV_NODE_ARGV_NOT_FORWARDED'}
  $pythonVerified=$false
  if($python){
-  $pyArgTest=Checked $python @('-c','import sys; print(",".join(sys.argv[1:]))','fun-one','fun-two') 'PYTHON_ARGV'
+  $pyArgTest=Checked $python @('-c','import sys; print(chr(44).join(sys.argv[1:]))','fun-one','fun-two') 'PYTHON_ARGV'
   if($pyArgTest.Trim() -cne 'fun-one,fun-two'){throw 'FUN_EV_PYTHON_ARGV_NOT_FORWARDED'}
   $pythonVerified=$true
  }
@@ -85,7 +85,7 @@ if($Approval -cne 'INSTALL_FUN_EV_TOOLCHAIN'){throw 'FUN_EV_OPERATOR_APPROVAL_RE
 $node=Get-Command node.exe -ErrorAction SilentlyContinue
 if(-not $node){$node=Get-Command node -ErrorAction SilentlyContinue}
 if(-not $node){throw 'FUN_EV_PREINSTALL_NODE_MISSING'}
-$proof=Checked $node.Source @('-e','process.stdout.write(process.argv.slice(1).join(","))','fun-one','fun-two') 'PREINSTALL_ARGV'
+$proof=Checked $node.Source @('-e','process.stdout.write(process.argv.slice(1).join(String.fromCharCode(44)))','fun-one','fun-two') 'PREINSTALL_ARGV'
 if($proof.Trim() -cne 'fun-one,fun-two'){throw 'FUN_EV_PREINSTALL_ARGV_HOLD'}
 if(-not $winget){throw 'FUN_EV_WINGET_MISSING'}
 if(-not $python){throw 'FUN_EV_PYTHON312_MISSING'}
