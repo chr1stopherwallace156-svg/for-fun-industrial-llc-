@@ -81,8 +81,23 @@ $profileJson=$fields|ConvertTo-Json -Compress
 $profileResult=($profileJson|& $NodeExe $Worker --set-local-profile-stdin |Out-String)
 if($LASTEXITCODE -ne 0){Hold 'PRIVATE_PROFILE_REJECTED_NO_SCHEDULE_CHANGE'}
 Write-Host ($profileResult.Trim())
+$firstStartedAt=[DateTimeOffset]::UtcNow
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $NewScript
 if($LASTEXITCODE -ne 0){Hold 'FIRST_LOCAL_WORK_CYCLE_FAILED_SCHEDULE_UNCHANGED'}
+$firstReceiptPath=Join-Path $Local 'RealWorkV55\last-real-cycle.json'
+if(!(Test-Path -LiteralPath $firstReceiptPath -PathType Leaf)){
+ Hold 'FIRST_LOCAL_WORK_RECEIPT_MISSING_SCHEDULE_UNCHANGED'
+}
+$firstReceipt=Get-Content -LiteralPath $firstReceiptPath -Raw|ConvertFrom-Json
+$firstTime=[DateTimeOffset]::Parse([string]$firstReceipt.when_utc)
+if($firstReceipt.version -cne 'fial5.5-real-business-operations-v1' -or
+ $firstReceipt.external_actions -cne 'NONE' -or
+ $firstReceipt.government_filings -ne 0 -or
+ $firstReceipt.emails_sent -ne 0 -or
+ $firstReceipt.rea_executions -ne 0 -or
+ $firstTime -lt $firstStartedAt.AddSeconds(-4)){
+ Hold 'FIRST_LOCAL_WORK_RECEIPT_INVALID_OR_STALE'
+}
 Write-Host 'FIAL55_FIRST_REAL_LOCAL_CYCLE=PASS'
 $newAction=New-ScheduledTaskAction -Execute $PSExe -Argument $newArgs -WorkingDirectory $Root
 $oldAction=New-ScheduledTaskAction -Execute $PSExe -Argument $oldArgs -WorkingDirectory $OldRoot
