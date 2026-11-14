@@ -1,0 +1,34 @@
+name: Fun EV Native V3 - offline qualification
+on:
+  push:
+    branches:
+      - feature/fun-ev-native-qualify-v3-20261114
+    paths:
+      - 'src/ev-conversion/**'
+      - 'test/ev-native-v3.test.mjs'
+      - '.github/workflows/fun-ev-native-v3-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-probe-contract:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check syntax
+        run: |
+          node --check src/ev-conversion/native-wireviz-v3.mjs
+          node --check src/ev-conversion/prototype-v2.mjs
+      - name: Test isolated V1, V2 and V3 sources
+        run: |
+          node --test test/ev-engineering-v1.test.mjs
+          node --test test/ev-prototype-v2.test.mjs
+          node --test test/ev-native-v3.test.mjs
