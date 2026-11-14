@@ -7,6 +7,7 @@ import {readFile} from 'node:fs/promises';
 import {createMlDashboardBridge,ML_WIDGET,mlDashboardOriginAccepted,parseMlDashboardBody,validateDashboardMlPayload} from '../src/ml/dashboard-ml-proxy-v3.mjs';
 import {createCommerceIntelligence} from '../src/commerce/trends-commerce-v1.mjs';
 import {rankCommerceOpportunities} from '../src/commerce/opportunity-ranking-v1-1.mjs';
+import {buildTrendsFocus} from '../src/commerce/google-trends-focus-v1-2.mjs';
 import {SHELL,UI_CSS,UI_CLIENT} from '../src/ui/integrated-hub-shell-v1.mjs';
 
 export const HOST='127.0.0.1',PORT=8802,ORIGIN='http://127.0.0.1:8802';
@@ -137,18 +138,23 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         return send(res,200,await commerce.status());
       if(req.method==='GET'&&u.pathname==='/api/commerce/data')
         return send(res,200,await commerce.data());
+      if(req.method==='GET'&&u.pathname==='/api/commerce/focus'){
+        const source=await commerce.data();
+        return send(res,200,buildTrendsFocus({us:source.trends,california:source.california}));
+      }
       if(req.method==='GET'&&u.pathname==='/api/commerce/opportunities'){
         const source=await commerce.data();
         return send(res,200,rankCommerceOpportunities({trends:source.trends,shopify:source.shopify}));
       }
-      if(req.method==='POST'&&['/api/commerce/trends/refresh','/api/commerce/shopify/refresh'].includes(u.pathname)){
+      if(req.method==='POST'&&['/api/commerce/trends/refresh','/api/commerce/california/refresh','/api/commerce/shopify/refresh'].includes(u.pathname)){
         if(!acceptedActionOrigin(req)||req.headers['x-fi-commerce']!=='operator-click')
           return send(res,403,{error:'COMMERCE_OPERATOR_CLICK_REQUIRED'});
         if(req.headers['content-type']!=='application/json')
           return send(res,415,{error:'COMMERCE_JSON_REQUIRED'});
         await emptyCommerceBody(req);
         const result=u.pathname==='/api/commerce/trends/refresh'?
-          await commerce.refreshTrends():await commerce.refreshShopify();
+          await commerce.refreshTrends():u.pathname==='/api/commerce/california/refresh'?
+          await commerce.refreshCaliforniaTrends():await commerce.refreshShopify();
         return send(res,200,result);
       }
       if(req.method==='GET'&&u.pathname==='/api/fun/hub/status'){
