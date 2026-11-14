@@ -54,10 +54,12 @@ If the hub preflight previously reported REQUIRED_SERVICE_UNAVAILABLE, the repai
 - FUN_ML_DEPENDENCY_8798=HTTP_READY or MISSING
 - FUN_ML_DEPENDENCY_8801=HTTP_READY or MISSING
 
-When run normally, it invokes the existing guarded one-command Fun startup only if 8789 or 8798 is actually missing. That script is called with -SkipPrivateGateway, so the existing NetBird HTTPS gateway on 8443 is neither restarted nor replaced. If 8801 is missing, it checks the already-installed FunIndustrial-QwenML-V2 repository's Git origin, branch and clean working tree before invoking its guarded startup. It never automatically retries failed recovery.
+When the original 8789 is absent, recovery uses the guarded full-system startup, including the mandatory pinned source SHA-256 check. When 8789 is healthy but 8798 alone is missing, the V3 launcher instead invokes Start-Fun-Unified-Chat8798.ps1 directly, after verifying healthy local prerequisites on ports 8088, 8791, 8796, 8797 and the original 19-tool catalogue. It does not read or restart the modified 8789 source. Both paths leave the NetBird HTTPS gateway on 8443 untouched. If 8801 is missing, it checks the already-installed FunIndustrial-QwenML-V2 repository's Git origin, branch and clean working tree before invoking its guarded startup. It never automatically retries failed recovery.
 
 If a listener exists but its HTTP endpoint is unresponsive, the script refuses to restart it and reports PORT_<number>_UNHEALTHY_LISTENER_MANUAL_REVIEW_NO_RESTART. Valid identity checks and listener snapshots remain mandatory.
 
 To diagnose without starting new processes, run Start-Fun-ML-Dashboard-V3.ps1 -CheckOnly after updating the branch. That returns a named missing-service hold if necessary.
 
-Offline recovery contract tests validate the safety checks in source; they do not constitute a live Windows service-recovery test. The combined launcher will now run 21 offline tests (the original 18 plus three source-contract tests) before any recovery or hub startup.
+Offline recovery contract tests validate the safety checks in source; they do not constitute a live Windows service-recovery test. The combined launcher runs 22 offline tests (the original 18 plus four source-contract tests) before recovery or hub startup. Static checks do not prove a live Windows launch.
+
+The November 13 repair for `8789_SOURCE_HASH_CHANGED_MANUAL_REVIEW_NO_RESTORE` intentionally does **not** change the stored hash or bypass the hash check for launching the original 8789. It simply avoids launching 8789 when it is already HTTP-healthy and only 8798 is missing. The on-disk 8789 hash mismatch remains an independent review item before any future 8789 restart.
