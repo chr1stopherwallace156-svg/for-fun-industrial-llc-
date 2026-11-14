@@ -1,0 +1,74 @@
+name: Fun Industrial FIAL5.4 Real Execution Audit CI
+on:
+  push:
+    branches:
+      - feature/fial54-execution-audit-v1-20261114
+    paths:
+      - "scripts/Audit-Fun-Executive-State.mjs"
+      - "Verify-Fun-Executive-Execution-V1.ps1"
+      - "intelligence-checks/fial54-execution-audit-v1-case.mjs"
+      - ".github/workflows/fial54-execution-audit-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit-validation:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Syntax of read-only audit
+        shell: pwsh
+        run: |
+          node --check scripts/Audit-Fun-Executive-State.mjs
+          node --check intelligence-checks/fial54-execution-audit-v1-case.mjs
+          $errors=$null;$tokens=$null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'Verify-Fun-Executive-Execution-V1.ps1'),
+            [ref]$tokens,[ref]$errors)|Out-Null
+          if(@($errors).Count){$errors|ForEach-Object{Write-Error $_.Message};throw 'FIAL54_AUDIT_POWERSHELL_PARSE_FAILED'}
+          Write-Host 'FIAL54_AUDIT_WINDOWS_PARSE=PASS'
+      - name: Real ledger provenance and expectation assessment tests
+        run: node --test intelligence-checks/fial54-execution-audit-v1-case.mjs intelligence-checks/fial54-executive-operator-v1-case.mjs
+      - name: Auditing empty host never creates state or claims success
+        shell: pwsh
+        run: |
+          $env:LOCALAPPDATA=Join-Path $env:RUNNER_TEMP 'FIAL54AuditNoState'
+          $lines=(& node scripts/Audit-Fun-Executive-State.mjs --json)
+          if($LASTEXITCODE -ne 0){throw 'FIAL54_AUDIT_CLI_FAILURE'}
+          $result=($lines|Out-String)|ConvertFrom-Json
+          if($result.ledger_status -cne 'HOLD_MISSING_STATE_OR_RECEIPT' -or
+             $result.expectation_met -ne $false){
+            throw 'FIAL54_FALSE_EXECUTION_CLAIM'
+          }
+          if(Test-Path $env:LOCALAPPDATA){throw 'FIAL54_AUDIT_CREATED_FILES'}
+          Write-Host 'FIAL54_AUDIT_EMPTY_HOST_HOLD=PASS'
+      - name: Audit only the exact existing task and bound local actions
+        shell: pwsh
+        run: |
+          $source=Get-Content 'Verify-Fun-Executive-Execution-V1.ps1' -Raw
+          foreach($needle in @(
+            'FunIndustrial-Executive-Operator-V1',
+            'FIAL54_SCHEDULE_IDENTITY=PASS',
+            'FIAL54_ON_DEMAND_SCHEDULER_EXECUTION=PASS_NEW_RECEIPT',
+            'FIAL54_FUTURE_CLOCK_TRIGGER=NOT_YET_PROVEN_BY_THIS_COMMAND',
+            'FIAL54_FULL_EXECUTIVE_ASSISTANT_EXPECTATION=NOT_YET_MET',
+            'EXECUTIVE_TASK_ACTION_IDENTITY_HOLD',
+            'EXECUTIVE_TASK_TRIGGER_TIMES_HOLD',
+            'EXECUTIVE_TASK_PRIVILEGE_HOLD',
+            'PROTECTED_SERVICE_OWNER_CHANGED_PORT_',
+            'Start-ScheduledTask -TaskName $TaskName',
+            "if($RunScheduledCycle)")){
+            if(!$source.Contains($needle)){throw ('FIAL54_AUDIT_REQUIRED_CHECK_MISSING='+$needle)}
+          }
+          if($source -match '(?im)^\s*\$(home|pid|host|input|error|matches)\s*='
+            -or $source -match 'Stop-Process|Restart-Service|Remove-Item|git reset|Invoke-Expression|Set-NetFirewallRule'){
+            throw 'FIAL54_AUDIT_PROTECTED_MUTATION_OR_AUTOMATIC_VARIABLE'
+          }
+          if($source -match '(?<!@)\(Get-NetTCPConnection[^\n]*\)\.Count'){
+            throw 'FIAL54_AUDIT_UNSAFE_EMPTY_PIPELINE_COUNT'
+          }
+          Write-Host 'FIAL54_AUDIT_SCHEDULE_BOUNDARY=PASS'
