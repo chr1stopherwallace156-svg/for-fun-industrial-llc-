@@ -58,9 +58,9 @@ $actions=@($task.Actions);$triggers=@($task.Triggers)
 $expectedExe=(Get-Command powershell.exe -ErrorAction Stop).Source
 $expectedArgs='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$Worker+'"'
 if($actions.Count -ne 1 -or
- [string]$actions[0].Execute -cne $expectedExe -or
+ [string]$actions[0].Execute -ne $expectedExe -or
  [string]$actions[0].Arguments -cne $expectedArgs -or
- [string]$actions[0].WorkingDirectory -cne $WorkerRoot){Hold 'EXECUTIVE_TASK_ACTION_IDENTITY_HOLD'}
+ [string]$actions[0].WorkingDirectory -ne $WorkerRoot){Hold 'EXECUTIVE_TASK_ACTION_IDENTITY_HOLD'}
 if($triggers.Count -ne 4){Hold 'EXECUTIVE_TASK_TRIGGER_COUNT_HOLD'}
 $triggerTimes=@($triggers|ForEach-Object {$_.StartBoundary.Substring(11,5)}|Sort-Object)
 if(($triggerTimes -join ',') -cne '01:00,07:00,13:00,19:00' -or
