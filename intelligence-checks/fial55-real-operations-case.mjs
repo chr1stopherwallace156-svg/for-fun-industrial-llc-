@@ -86,10 +86,15 @@ test('real operations generate local filing draft and SOS research without filin
   const a=await runRealOperationsCycle({root:p.root,now:NOW,officialFetch:fetchMock});
   assert.equal(a.version,VERSION);
   assert.equal(a.company_identity_status,'OPERATOR_PROVIDED_NOT_OFFICIALLY_VERIFIED');
-  assert.equal(a.new_local_artifacts,3);
+  assert.equal(a.new_local_artifacts,4);
   assert.equal(a.emails_sent,0);assert.equal(a.government_filings,0);
   assert.equal(a.applied_configs,0);assert.equal(a.payments,0);assert.equal(a.rea_executions,0);
   assert.equal(a.official_sources.fetched,SOURCES.length);
+  const grantProposal=a.artifacts.find(x=>x.id==='elektron-grant-applicant-proposal');
+  const proposal=JSON.parse(await readFile(grantProposal.path,'utf8'));
+  assert.equal(proposal.business_name,'ELEKTRON INDUSTRIAL LLC');
+  assert.equal(proposal.eligible_business_verified,false);
+  assert.equal(proposal.good_standing_verified,false);
   const draft=a.artifacts.find(x=>x.id==='victorville-license-check');
   assert.match(await readFile(draft.path,'utf8'),/LOCAL DRAFT ONLY/);
   assert.match(await readFile(draft.path,'utf8'),/businesslicense@victorvilleca.gov/);
