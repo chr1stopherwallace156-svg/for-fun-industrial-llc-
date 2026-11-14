@@ -21,7 +21,8 @@ if (Get-Command py.exe -ErrorAction SilentlyContinue) {
 } elseif (Get-Command python.exe -ErrorAction SilentlyContinue) {
   $Launcher = (Get-Command python.exe).Source
 } else { Hold 'PYTHON_312_NOT_FOUND' }
-& $Launcher @LauncherArgs -c 'import platform,sys; assert sys.version_info[:2] == (3,12) and platform.architecture()[0] == "64bit"'
+# Quote-free Python expression survives PowerShell native argument handling on Windows.
+& $Launcher @LauncherArgs -c 'import sys; assert sys.version_info[:2] == (3,12) and sys.maxsize > 2**32'
 if ($LASTEXITCODE -ne 0) { Hold 'REQUIRES_64BIT_PYTHON_312' }
 if ($CheckOnly) {
   if (-not (Test-Path -LiteralPath $Marker -PathType Leaf) -or -not (Test-Path -LiteralPath $Python -PathType Leaf)) { Hold 'NOT_INSTALLED' }
