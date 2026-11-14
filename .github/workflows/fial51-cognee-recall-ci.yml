@@ -1,0 +1,38 @@
+name: Fun Industrial Cognee Read-only Enablement CI
+on:
+  push:
+    branches:
+      - feature/fial5-1-eight-module-integration-20261114
+    paths:
+      - "Enable-Fun-FIAL51-Cognee-Recall.ps1"
+      - ".github/workflows/fial51-cognee-recall-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  activation-static-validation:
+    runs-on: windows-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Check static no-restart Cognee activation contract
+        shell: pwsh
+        run: |
+          $file=Join-Path $PWD 'Enable-Fun-FIAL51-Cognee-Recall.ps1'
+          $tokens=$null;$errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$errors)|Out-Null
+          if($errors.Count){$errors|ForEach-Object{Write-Error $_.Message};throw 'COGNEE_ACTIVATION_PS_PARSE_HOLD'}
+          $content=Get-Content $file -Raw
+          foreach($required in @('FUN_COGNEE_RECALL=ENABLED_AUTOMATIC_READ_ONLY','FIAL51_MEMORY_ADAPTER=AVAILABLE_CONFIGURED','FUN_MEMORY_WRITES=DISABLED','AUTO_CHAT_RECALL_ENDPOINT_MISSING_NO_FILES_CHANGED','PROTECTED_SERVER_SOURCE_CHANGED','originalServerSHA','writesEnabled','automaticIngestion','src/intelligence/settings.json')){
+            if(!$content.Contains($required)){throw ('COGNEE_ACTIVATION_GUARD_MISSING_'+$required)}
+          }
+          if($content -match 'Stop-Process|Restart-Service|Stop-Service|Set-NetFirewallRule|Invoke-Expression|Start-Process|pip install|git checkout|git reset'){throw 'COGNEE_ACTIVATION_UNEXPECTED_PROCESS_OR_SOURCE_MUTATION'}
+          Write-Host 'COGNEE_ENABLEMENT_PS_SYNTAX_AND_BOUNDARIES=PASS'
+      - name: Check existing bounded memory and automatic recall integration contracts
+        run: |
+          node --check src/intelligence/memory.mjs
+          node --check src/intelligence/automatic-memory.mjs
+          node --test intelligence-checks/automatic-memory-case.mjs
