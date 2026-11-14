@@ -4,7 +4,7 @@ import http from 'node:http';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
 import {readFile} from 'node:fs/promises';
-import {createMlDashboardBridge,ML_WIDGET,mlDashboardOriginAccepted,parseMlDashboardBody} from '../src/ml/dashboard-ml-proxy-v3.mjs';
+import {createMlDashboardBridge,ML_WIDGET,mlDashboardOriginAccepted,parseMlDashboardBody,validateDashboardMlPayload} from '../src/ml/dashboard-ml-proxy-v3.mjs';
 
 export const HOST='127.0.0.1',PORT=8802,ORIGIN='http://127.0.0.1:8802';
 const MAX_PAGE=240000,MAX_PROXY=12*1024*1024;
@@ -86,6 +86,8 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),readPage=pageFr
   return http.createServer(async(req,res)=>{
     try{
       if(!acceptedHost(req))return send(res,403,{error:'ML_HUB_HOST_DENIED'});
+      if(typeof req.url!=='string'||!req.url.startsWith('/')||req.url.startsWith('//')||req.url.includes('\\'))
+        return send(res,400,{error:'ML_HUB_REQUEST_TARGET_INVALID'});
       const u=new URL(req.url,ORIGIN);
       if(u.search||u.pathname.includes('..'))return send(res,400,{error:'ML_HUB_INVALID_PATH'});
       if(req.method==='GET'&&['/','/unified/'].includes(u.pathname)){
@@ -105,7 +107,7 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),readPage=pageFr
         if(!mlDashboardOriginAccepted(req,PORT))return send(res,403,{error:'ML_HUB_OPERATOR_ORIGIN_REQUIRED'});
         if(!String(req.headers['content-type']||'').startsWith('application/json'))
           return send(res,415,{error:'ML_HUB_JSON_REQUIRED'});
-        const body=await parseMlDashboardBody(req);
+        const body=validateDashboardMlPayload(await parseMlDashboardBody(req));
         return send(res,200,await ml.run(body));
       }
       if(req.method==='GET'&&u.pathname==='/api/fun/hub/status'){
