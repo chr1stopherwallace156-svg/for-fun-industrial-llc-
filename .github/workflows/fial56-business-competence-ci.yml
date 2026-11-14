@@ -77,6 +77,14 @@ jobs:
             if(!$installer.Contains($expected)){throw ('FIAL56_SCHEDULER_GUARD_MISSING='+$expected)}
           }
           Write-Host 'FIAL56_WINDOWS_POWERSHELL_PARSE_AND_SCHEDULER_GUARDS=PASS'
+      - name: Validate pinned prior Windows runner SHA after checkout filters
+        shell: pwsh
+        run: |
+          $observed=(git.exe hash-object --path=Run-Fun-Real-Operations-V5-5.ps1 -- Run-Fun-Real-Operations-V5-5.ps1 | Out-String).Trim()
+          if($LASTEXITCODE -ne 0 -or $observed -cne '243bbc241fb633a2fef07b8c3fe3a7371894b548'){
+            throw ('FIAL56_PREVIOUS_RUNNER_HASH_MISMATCH='+$observed)
+          }
+          Write-Host 'FIAL56_PINNED_FIAL55_WINDOWS_WORKTREE_HASH=PASS'
       - name: Exercise actual PowerShell dashboard readiness with mocked real statuses
         shell: pwsh
         run: |
