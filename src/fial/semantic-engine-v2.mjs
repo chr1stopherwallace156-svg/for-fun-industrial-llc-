@@ -149,6 +149,9 @@ export function semanticDecision(item){
  const {validation,model,profileGaps,markers}=item;
  if(validation.status!=="MATCHED_TO_SHA256_SNAPSHOT")
   return {action:"HOLD_UNVERIFIED_RECORD",eligibility:"UNKNOWN",reason:validation.status};
+ if(model.status==="MODEL_OUTPUT_UNVERIFIED"||model.status==="MODEL_UNAVAILABLE_OR_UNVERIFIED")
+  return {action:"HOLD_SEMANTIC_INTERPRETATION",eligibility:"UNKNOWN",
+   reason:"Local model response unavailable or invalid; no semantic understanding established"};
  if(profileGaps.length)
   return {action:"RESEARCH_AND_REQUEST_VERIFIED_PROFILE",eligibility:"UNKNOWN",
    reason:"Actual company evidence missing; model quotes cannot certify grant eligibility"};
