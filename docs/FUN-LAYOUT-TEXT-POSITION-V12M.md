@@ -1,0 +1,5 @@
+# V12M — Selective word-position evidence
+
+Targets deduplicated pages associated with V12L partial/low overlap or V12J missing text anchors. Reopens only selected, SHA256-verified original PDFs using isolated pdfplumber to extract word coordinates, with per-page caches keyed by source hash, page and engine version. Existing services are untouched. For each V12L table record on those pages, reports nearby words above, below or inside the table's bbox (horizontal overlap required, 90 PDF-point vertical window).
+
+This is a **geometric candidate detector**, not a caption/heading classifier. It does not assert semantic relationships, verify units, or approve engineering values. Page coordinate-system calibration and multi-line caption grouping remain future work. On a failed run, new per-page caches may remain; source evidence is not modified. V12M's output is immutable and repeatable, except cache hit/miss telemetry will differ between executions, so existing output conflicts if rerun. Run with `python src/layout-intelligence/text-position-v12m.py --root <vehicle year folder> --configuration F450-2021-REFERENCE`.
