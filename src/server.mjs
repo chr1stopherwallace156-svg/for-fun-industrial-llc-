@@ -68,6 +68,21 @@ const fiCapabilityIndex=createCapabilityIndex({
  reaCatalogue:()=>platform.reaCatalog()
 });
 const server=http.createServer(async(req,res)=>{try{
+ // FI_APPROVED_SINGLE_SOURCE_COLLECTION_V1: operator click is required per URL.
+ if(req.method==="POST"&&req.url==="/api/research/collect-source"){
+  if(!localRequest(req,res))return;
+  if(!await requireVpnGate(res))return;
+  if(req.headers["content-type"]!=="application/json"||req.headers["x-fi-source-approval"]!=="operator-approved-single-page"||req.headers["sec-fetch-site"]==="cross-site")return json(res,403,{error:"EXPLICIT_SINGLE_PAGE_APPROVAL_REQUIRED"});
+  const data=await readBody(req,5000);
+  if(!data||typeof data!=="object"||Array.isArray(data)||Object.keys(data).sort().join(",")!=="approved,plan_id,task_id,url"||data.approved!==true)return json(res,400,{error:"COLLECTION_REQUEST_INVALID"});
+  const database=process.env.FUN_EVIDENCE_DATABASE,python=process.env.FUN_COGNITION_PYTHON;
+  if(!database||!python)return json(res,503,{error:"EVIDENCE_RUNTIME_NOT_CONFIGURED"});
+  try{
+   const {collectApprovedSource}=await import("./cognition/approved-collection-bridge-v1.mjs");
+   const result=await collectApprovedSource({database,python,plan_id:data.plan_id,task_id:data.task_id,url:data.url,operatorApproved:true});
+   return json(res,200,result);
+  }catch(e){return json(res,422,{error:"COLLECTION_HOLD",detail:String(e.message||e).slice(0,450)});}
+ }
  // FI_GROUNDED_RESEARCH_ROUTE_V1
  if(req.method==="POST"&&req.url==="/api/research/grounded-answer"){
   if(!localRequest(req,res))return;
