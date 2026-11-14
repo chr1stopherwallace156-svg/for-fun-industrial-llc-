@@ -3,6 +3,7 @@
 // models, edits protected files or silently invents tool-call proposals.
 import {injectMemory,shouldRecall,memoryPassage} from "../intelligence/automatic-memory.mjs";
 import {businessContextForQwen} from "../competence/business-knowledge-v5-6.mjs";
+import {regulatoryContextForQwen} from "../regulatory/regulatory-qwen-v5-8.mjs";
 
 export const GROUNDED_CHAT_VERSION="fial5.2-grounded-chat-v1";
 export const COGNEE="http://127.0.0.1:8789/api/intelligence/memory/recall";
@@ -94,10 +95,13 @@ export function createGroundedChat({fetchImpl=fetch,now=()=>new Date()}={}){
    }
    const text=memory.payload.messages.at(-1).content;
    const context=businessContextForQwen(q);
+   // Optional local evidence-context only; no network fetch or extra model call.
+   let regulatoryContext='';
+   try{regulatoryContext=await regulatoryContextForQwen(q)}catch{/* unrelated guidance still works */}
    // Intentionally no tools or tool_choice in the Qwen API request.
    const payload={model:"local-model",stream:false,temperature:0.2,max_tokens:512,
     chat_template_kwargs:{enable_thinking:false},reasoning_effort:"none",
-    messages:[{role:"system",content:context?sys+"\n"+context:sys},{role:"user",content:text}]};
+    messages:[{role:"system",content:[sys,context,regulatoryContext].filter(Boolean).join("\n")},{role:"user",content:text}]};
    let model;
    try{
     model=await boundedJson(QWEN,{body:payload,timeoutMs:180000},fetchImpl);
