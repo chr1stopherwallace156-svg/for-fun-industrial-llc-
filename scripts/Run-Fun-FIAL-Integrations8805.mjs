@@ -2,6 +2,7 @@
 // Aggregates existing 8804 FIAL5 telemetry and eight real local module APIs.
 // Strict separate operator approval on each bounded action. No autonomous tool calls.
 import http from "node:http";
+import {createHash} from "node:crypto";
 import {readFile} from "node:fs/promises";
 import {fileURLToPath} from "node:url";
 import {resolve} from "node:path";
@@ -181,13 +182,47 @@ export function createFial51Hub({adapters=createFial51Adapters(),
      !Object.hasOwn(body,"input")||Object.keys(body).some(x=>!
      ["approved","module","operation","input"].includes(x)))
      throw Error("FIAL51_EXACT_OPERATOR_APPROVAL_REQUIRED");
-    // Separate from automatic observation. One bounded operation per POST.
-    const receipt=await adapters.runApproved({module:body.module,
-     operation:body.operation,input:body.input});
-    await evidence(receipt);
+    // Record a pre-action intent without persisting the supplied raw input.
+    // A missing audit ledger must never silently authorize module execution.
+    const request_sha256=createHash("sha256")
+     .update(JSON.stringify(body.input)).digest("hex");
+    try{
+     await evidence({version:V51,state:"approved_intent_recorded",
+      module:body.module,operation:body.operation,
+      result:{request_sha256,operator_click:true}});
+    }catch{
+     return send(res,503,{version:V51,state:"HOLD_NO_EXECUTION",
+      reason:"FIAL51_INTENT_AUDIT_UNAVAILABLE"});
+    }
+    let receipt;
+    try{
+     receipt=await adapters.runApproved({module:body.module,
+      operation:body.operation,input:body.input});
+    }catch(e){
+     const message=clean(e.message||e);
+     try{
+      await evidence({version:V51,state:"operation_hold",
+       module:body.module,operation:body.operation,
+       result:{reason:message,automated_retry:false}});
+     }catch{}
+     // A local subprocess/solver may have begun before a failure; never auto-retry.
+     return send(res,409,{version:V51,state:"HOLD_REVIEW_BEFORE_RETRY",
+      module:body.module,operation:body.operation,reason:message,
+      operation_may_have_started:true,automated_retry:false});
+    }
+    try{await evidence(receipt)}
+    catch{
+     return send(res,202,{version:V51,state:"OUTCOME_UNKNOWN_DO_NOT_RETRY",
+      module:body.module,operation:body.operation,
+      reason:"FIAL51_RESULT_AUDIT_FAILED_AFTER_OPERATION",
+      automated_retry:false});
+    }
     const payload=JSON.stringify(receipt);
     if(Buffer.byteLength(payload)>180000)
-     throw Error("FIAL51_RESULT_TOO_LARGE_FOR_UI");
+     return send(res,200,{version:V51,state:"COMPLETED_RESULT_TOO_LARGE_FOR_UI",
+      module:body.module,operation:body.operation,
+      result_sha256:createHash("sha256").update(payload).digest("hex"),
+      automated_retry:false});
     return send(res,200,receipt);
    }
    if(u.pathname.startsWith("/api/fial/modules/"))
