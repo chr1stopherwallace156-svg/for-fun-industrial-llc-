@@ -8,6 +8,7 @@ on:
       - "scripts/Run-Fun-Executive-Operator-V1.mjs"
       - "scripts/Run-Fun-ML-Dashboard8802.mjs"
       - "Run-Fun-Executive-Operator-V1.ps1"
+      - "Deploy-Fun-FIAL54-PrimaryDashboard.ps1"
       - "Install-Fun-Executive-Operator-V1.ps1"
       - "intelligence-checks/fial54-*.mjs"
       - ".github/workflows/fial54-executive-operator-ci.yml"
@@ -40,6 +41,108 @@ jobs:
       - name: Execute executive, old dashboard and mission regression suites
         run: |
           node --test intelligence-checks/fial54-executive-operator-v1-case.mjs intelligence-checks/fial54-primary-console-v1-case.mjs intelligence-checks/fial-primary-dashboard-chat-v5-3-case.mjs intelligence-checks/fial-grounded-qwen-v5-2-case.mjs intelligence-checks/fi-ml-hub-v3-case.mjs intelligence-checks/integrated-hub-ui-v1-case.mjs intelligence-checks/opportunity-worker-v1-case.mjs intelligence-checks/mission-controller-v2-case.mjs
+      - name: Exercise real Windows ReadyNew function with mocked services
+        shell: pwsh
+        run: |
+          $file=Join-Path $PWD 'Deploy-Fun-FIAL54-PrimaryDashboard.ps1'
+          $tokens=$null;$errors=$null
+          $ast=[System.Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$errors)
+          if(@($errors).Count){throw 'FIAL54_DEPLOY_POWERSHELL_PARSE_FAILED'}
+          $matches=$ast.FindAll({param($node)
+            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -ceq 'ReadyNew'
+          },$true)
+          if(@($matches).Count -ne 1){throw 'FIAL54_READY_NEW_MISSING_OR_DUPLICATE'}
+          $fixture=@'
+          Set-StrictMode -Version Latest
+          $Runner='C:\test\scripts\Run-Fun-ML-Dashboard8802.mjs'
+          $Url='http://127.0.0.1:8802'
+          $OldCommerceShopifyConfigured=$false
+          $badExecutive=$false
+          function Hold([string]$reason){throw ('FIAL54_MOCK_HOLD='+$reason)}
+          function Owner([int]$port){
+            if($port -ne 8802){throw 'UNEXPECTED_PORT'}
+            return [pscustomobject]@{ProcessId=9090;CommandLine=('node.exe "'+$Runner+'" --serve')}
+          }
+          function GetJson([string]$path){
+            switch($path){
+              '/api/fun/hub/status' {return [pscustomobject]@{version='fi-ml-hub-v3'}}
+              '/api/ml/dashboard/status' {return [pscustomobject]@{state='ready'}}
+              '/api/fial/grounded/status' {return [pscustomobject]@{
+                version='fial5.3-primary-grounded-chat-v1';model_interface='fixed_local_qwen_8088'
+                memory_interface='fixed_readonly_cognee_8789';authority_added=$false;tool_executions=0}}
+              '/api/commerce/status' {return [pscustomobject]@{version='fun-commerce-intelligence-v1';shopify=[pscustomobject]@{configured=$false}}}
+              '/api/unified/status' {return [pscustomobject]@{state='ready'}}
+              '/api/operator/status' {return [pscustomobject]@{version='fial5.4-executive-operator-v1'
+                console_version='fial5.4-executive-console-v1';outbound_permissions=[pscustomobject]@{
+                  email_sent=$(if($badExecutive){1}else{0});government_filings=0;spent_usd=0;rea_runs=0}}}
+              default {throw ('UNEXPECTED_READ_PATH='+$path)}
+            }
+          }
+          function Invoke-WebRequest {
+            param([string]$Uri,[switch]$UseBasicParsing,[int]$TimeoutSec)
+            if($Uri.EndsWith('/unified/?view=chat')){
+              return [pscustomobject]@{StatusCode=200;Content='id="fi-fial53-grounded" id="action-review" fi-ml-panel fi-commerce-panel'}
+            }
+            if($Uri.EndsWith('/api/fial/grounded/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='textContent x-fi-chat-click'}
+            }
+            if($Uri.EndsWith('/operations/')){
+              return [pscustomobject]@{StatusCode=200;Content='fi-exec-queue Executive Assistant'}
+            }
+            if($Uri.EndsWith('/api/operator/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='textContent'}
+            }
+            if($Uri.EndsWith('/')){
+              return [pscustomobject]@{StatusCode=200;Content='fi-ui-shell'}
+            }
+            throw ('UNEXPECTED_PAGE='+$Uri)
+          }
+          $homeBefore=$HOME
+          ReadyNew 9090
+          if($HOME -cne $homeBefore){throw 'FIAL54_HOME_AUTOMATIC_VARIABLE_CHANGED'}
+          $badExecutive=$true
+          $refused=$false
+          try{ReadyNew 9090}catch{
+            if([string]$_.Exception.Message -match 'NEW_DASHBOARD_HEALTH_OR_POLICY_MISMATCH'){$refused=$true}
+            else{throw}
+          }
+          if(!$refused){throw 'FIAL54_ELEVATED_PERMISSIONS_NOT_REJECTED'}
+          $refused=$false
+          try{ReadyNew 9091}catch{
+            if([string]$_.Exception.Message -match 'NEW_8802_OWNER_DRIFT'){$refused=$true}
+            else{throw}
+          }
+          if(!$refused){throw 'FIAL54_WRONG_PROCESS_OWNER_ACCEPTED'}
+          Write-Host 'FIAL54_REAL_WINDOWS_READINESS_FUNCTION=PASS'
+          '@
+          & ([scriptblock]::Create($matches[0].Extent.Text + [Environment]::NewLine + $fixture))
+      - name: Parse guarded 8802 deployment and rollback contract
+        shell: pwsh
+        run: |
+          $file=Join-Path $PWD 'Deploy-Fun-FIAL54-PrimaryDashboard.ps1'
+          $tokens=$null;$errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$errors)|Out-Null
+          if(@($errors).Count){throw 'FIAL54_DEPLOY_PARSE_FAILURE'}
+          $src=Get-Content $file -Raw
+          foreach($label in @('FIAL54_PRIMARY_DASHBOARD_CONSOLIDATION=PASS',
+            'FIAL54_ROLLBACK_OLD_PRIMARY_DASHBOARD=PASS','OLD_DASHBOARD_SOURCE_NOT_REVIEWED',
+            'EXECUTIVE_SCHEDULE_NOT_ACTIVE','EXECUTIVE_FIRST_REAL_CYCLE_MISSING',
+            'PROTECTED_PROCESS_CHANGED_PORT_','LIVE_PRIMARY_GROUNDED_QWEN_NOT_QUALIFIED',
+            'FIAL54_NEW_8802_STDERR=')){
+            if(!$src.Contains($label)){throw ('FIAL54_DEPLOY_GUARD_MISSING_'+$label)}
+          }
+          if($src -match 'function\s+ReadyNew\(\[int\]\$(pid|home|host)\)'){
+            throw 'FIAL54_RESERVED_POWERSHELL_PARAMETER'
+          }
+          if($src -match '(?im)^\s*\$(home|pid|host)\s*='){
+            throw 'FIAL54_RESERVED_POWERSHELL_VARIABLE'
+          }
+          if($src -match '(?<!@)\(Listeners 8802\)\.Count'){
+            throw 'FIAL54_UNSAFE_LISTENER_COUNT'
+          }
+          Write-Host 'FIAL54_8802_ROLLBACK_GUARDS=PASS'
+
       - name: Parse PowerShell scheduler and audit permitted side effects
         shell: pwsh
         run: |
