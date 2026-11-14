@@ -1,0 +1,80 @@
+name: Fun Industrial FIAL5.5 Real Business Operations CI
+on:
+  push:
+    branches:
+      - feature/fial5-5-real-business-operations-20261114
+    paths:
+      - 'src/operator/**'
+      - 'scripts/Run-Fun-Real-Operations-V5-5.mjs'
+      - 'scripts/Run-Fun-ML-Dashboard8802.mjs'
+      - 'Run-Fun-Real-Operations-V5-5.ps1'
+      - 'Install-Fun-Real-Operations-V5-5.ps1'
+      - 'Deploy-Fun-FIAL55-PrimaryDashboard.ps1'
+      - 'intelligence-checks/fial55-*.mjs'
+      - '.github/workflows/fial55-real-business-operations-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Parse all new modules on Windows
+        shell: pwsh
+        run: |
+          $files=@(
+            'src/operator/real-operations-v5-5.mjs',
+            'src/operator/official-source-watch-v5-5.mjs',
+            'src/operator/real-operations-widget-v5-5.js',
+            'src/operator/executive-ops-v1.mjs',
+            'src/operator/executive-console-v1.mjs',
+            'scripts/Run-Fun-Real-Operations-V5-5.mjs',
+            'scripts/Run-Fun-ML-Dashboard8802.mjs',
+            'intelligence-checks/fial55-real-operations-case.mjs',
+            'intelligence-checks/fial55-primary-dashboard-case.mjs'
+          )
+          foreach($p in $files){node --check $p;if($LASTEXITCODE -ne 0){throw ('FIAL55_PARSE_HOLD='+$p)}}
+      - name: Real business workflow and dashboard regressions
+        run: |
+          node --test intelligence-checks/fial55-real-operations-case.mjs intelligence-checks/fial55-primary-dashboard-case.mjs intelligence-checks/fial54-executive-operator-v1-case.mjs intelligence-checks/fial54-primary-console-v1-case.mjs intelligence-checks/fial-primary-dashboard-chat-v5-3-case.mjs intelligence-checks/fi-ml-hub-v3-case.mjs intelligence-checks/integrated-hub-ui-v1-case.mjs
+      - name: Parse Windows schedule upgrade and verify no authority escalation
+        shell: pwsh
+        run: |
+          foreach($p in @('Run-Fun-Real-Operations-V5-5.ps1','Install-Fun-Real-Operations-V5-5.ps1')){
+            $tokens=$null;$errors=$null
+            [Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $p),[ref]$tokens,[ref]$errors)|Out-Null
+            if(@($errors).Count){$errors|ForEach-Object{Write-Error $_.Message};throw ('FIAL55_PS_SYNTAX_HOLD='+$p)}
+            $src=Get-Content $p -Raw
+            if($src -match '(?im)^\s*\$(home|pid|host|input|error|matches)\s*='){throw ('FIAL55_RESERVED_AUTOMATIC_VARIABLE='+$p)}
+            if($src -match 'Stop-Process|Restart-Service|Start-Service|Remove-Item|Invoke-Expression|git reset|Set-NetFirewallRule'){
+              throw ('FIAL55_PROTECTED_ACTION='+$p)
+            }
+          }
+          $install=Get-Content 'Install-Fun-Real-Operations-V5-5.ps1' -Raw
+          foreach($s in @('EXISTING_FIAL54_TASK_IDENTITY_DRIFT_REFUSE_CHANGE',
+            'Export-ScheduledTask','PROFILE_REJECTED','FIAL55_FIRST_REAL_LOCAL_CYCLE=PASS',
+            'FIAL55_TASK_ROLLBACK','FIAL55_EXISTING_SCHEDULE=UPGRADED_IN_PLACE_NO_SECOND_TASK',
+            'FIAL55_EMAIL_OAUTH=NOT_GRANTED_NO_MAIL_SENT',
+            'FIAL55_GOVERNMENT_FILINGS=NONE')){
+            if(!$install.Contains($s) -and $s -ne 'PROFILE_REJECTED'){throw ('FIAL55_GUARD_MISSING='+$s)}
+          }
+          Write-Host 'FIAL55_SCHEDULER_GUARDS=PASS'
+      - name: Prohibit public business contact details in repository code
+        shell: pwsh
+        run: |
+          $files=@('src/operator/real-operations-v5-5.mjs',
+            'src/operator/official-source-watch-v5-5.mjs',
+            'scripts/Run-Fun-Real-Operations-V5-5.mjs',
+            'Run-Fun-Real-Operations-V5-5.ps1',
+            'Install-Fun-Real-Operations-V5-5.ps1')
+          $content=($files|ForEach-Object{Get-Content $_ -Raw}) -join ''
+          if($content.Contains('760-912-0784') -or $content.Contains('13479 abbot') -or
+             $content.Contains('B20260233096') -or $content.Contains('elektronindustrial@gmail.com')){
+            throw 'FIAL55_PRIVATE_BUSINESS_DETAILS_FOUND_IN_PUBLIC_SOURCE'
+          }
+          Write-Host 'FIAL55_NO_PRIVATE_PROFILE_IN_GITHUB=PASS'
