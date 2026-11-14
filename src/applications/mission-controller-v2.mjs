@@ -60,6 +60,9 @@ export function chooseWork(report,prior={},profile={},mission=DEFAULT_MISSION,no
  const choices=[],old=prior?.entries&&typeof prior.entries==='object'?prior.entries:{};
  for(const grant of Array.isArray(report.top_candidates)?report.top_candidates.slice(0,12):[]){
   if(!grant||typeof grant.grant_id!=='string'||typeof grant.title!=='string')continue;
+  // Reject malformed agency identifiers instead of treating corrupt CSV fields
+  // as valid submissions or filesystem identities.
+  if(!/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(grant.grant_id))continue;
   // Use fixed-size hashes instead of untrusted grant IDs for local file names.
   const key=H(grant.grant_id+'\n'+grant.agency).slice(0,22);
   const fingerprint=H(JSON.stringify([grant.title,grant.agency,grant.deadline_date,grant.status,
@@ -67,8 +70,10 @@ export function chooseWork(report,prior={},profile={},mission=DEFAULT_MISSION,no
   const before=old[key],remaining=until(grant.deadline_date,new Date(now));
   if(remaining!==null&&remaining<0)continue;
   const newGrant=!before,changed=!!before&&before.fingerprint!==fingerprint;
+  const deferred=before?.brief_pending===true;
   const urgent=remaining!==null&&remaining<=14;
   const reason=newGrant?'NEW_ELIGIBLE_BUSINESS_RESEARCH_LEAD':changed?'PUBLISHED_GRANT_RECORD_UPDATED':
+    deferred?'COMPLETE_PREVIOUSLY_DEFERRED_RESEARCH':
     urgent?'DEADLINE_APPROACHING':'NO_CHANGE_MONITOR';
   const link=official(grant.application_url);
   choices.push({key,fingerprint,grant_id:clean(grant.grant_id,150),
@@ -83,7 +88,7 @@ export function chooseWork(report,prior={},profile={},mission=DEFAULT_MISSION,no
  }
  choices.sort((a,b)=>b.priority-a.priority||String(a.deadline||'9999').localeCompare(String(b.deadline||'9999')));
  const briefs=choices.filter(x=>x.action==='PREPARE_LOCAL_RESEARCH_BRIEF').slice(0,mission.max_briefs_per_cycle);
- const detail=mission.max_official_pages_per_cycle?choices.find(x=>x.official_link&&
+ const detail=mission.max_official_pages_per_cycle?briefs.find(x=>x.official_link&&
   (!x._last_detail||new Date(now).getTime()-Date.parse(x._last_detail)>=86400000)):null;
  return {version:VERSION,decided_utc:new Date(now).toISOString(),
   goal:mission.goal,source_sha256:report.source_sha256,
@@ -175,10 +180,15 @@ export async function runMissionCycle({directory,report,now=new Date(),fetchImpl
   }catch(e){pageReadError=String(e.message||e).slice(0,200)}
  }
  const entry={...previous.entries},files=[];
+ const prepared=new Set(plan.local_briefs_to_write);
  for(const d of plan.decisions){
   const old=entry[d.key]||{};
   entry[d.key]={...old,fingerprint:d.fingerprint,last_seen_utc:new Date(now).toISOString(),
-   last_detail_checked:detail&&d.key===plan.official_page_to_research?.key?detail.when:old.last_detail_checked||null};
+   brief_pending:d.action==='PREPARE_LOCAL_RESEARCH_BRIEF'&&!prepared.has(d.key),
+   // Record the attempt even if the official site refuses access; don't retry
+   // the same unresponsive page four times daily.
+   last_detail_checked:d.key===plan.official_page_to_research?.key?new Date(now).toISOString():
+    old.last_detail_checked||null};
   if(!plan.local_briefs_to_write.includes(d.key))continue;
   const path=join(briefsDir,d.key+'-'+d.fingerprint.slice(0,12)+'.md');
   let written=false;
@@ -195,7 +205,8 @@ export async function runMissionCycle({directory,report,now=new Date(),fetchImpl
  const receipt={version:VERSION,cycle_utc:new Date(now).toISOString(),goal:policy.goal,
   source_sha256:report.source_sha256,decisions_made:plan.decisions.length,
   new_local_briefs:files.filter(x=>x.new_file).length,processed_briefs:files.length,
-  official_pages_read:pageReads,official_page_error:pageReadError,
+  official_pages_read:pageReads,official_page_attempts:plan.official_page_to_research?1:0,
+  official_page_error:pageReadError,
   actions:files,next_priority:plan.decisions[0]?{
    grant_id:plan.decisions[0].grant_id,title:plan.decisions[0].title,
    reason:plan.decisions[0].reason,deadline:plan.decisions[0].deadline}:null,
@@ -208,6 +219,7 @@ export async function runMissionCycle({directory,report,now=new Date(),fetchImpl
  await appendFile(journal,JSON.stringify({utc:receipt.cycle_utc,source_sha256:receipt.source_sha256,
   choices:plan.decisions.map(x=>({grant_id:x.grant_id,reason:x.reason,action:x.action,priority:x.priority})),
   executed:files.map(x=>({grant_id:x.grant_id,created:x.new_file})),
-  official_pages_read:pageReads,applications_submitted:0})+'\n');
+  official_pages_read:pageReads,official_pages_attempted:plan.official_page_to_research?1:0,
+  applications_submitted:0})+'\n');
  return receipt;
 }
