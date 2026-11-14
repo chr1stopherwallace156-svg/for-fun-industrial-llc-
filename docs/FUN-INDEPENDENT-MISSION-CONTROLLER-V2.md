@@ -47,6 +47,9 @@ No new scheduler required. The previously installed `FunIndustrial-GrantApplicat
 
 Because Task Scheduler uses an Interactive logon in this pilot, it requires the Windows user to be logged in, computer powered and online. It is **not true 24/7 uptime** when the PC is sleeping, offline, or signed out.
 
+## See actual self-directed behavior at any time
+The read-only `Show-Fun-Independent-Mission-V2.ps1` command prints last real scan, selected grant, actual created briefs, recorded public page reads, upcoming Windows Task Scheduler event and whether the last scheduled task succeeded. This does not restart any process or query an external API.
+
 ## Live qualification
 Run the repository-verified one-command activation, then inspect:
 
