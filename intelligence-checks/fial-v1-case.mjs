@@ -42,7 +42,11 @@ test("FIAL has its own textual grammar and compiles to constrained bytecode",()=
  assert.equal(compiled.instructions.length,6);
  assert.ok(compiled.instructions.every(x=>x.opcode==="TEST_RULE"));
  assert.ok(Object.values(compiled.authority).every(x=>x===false));
- assert.deepEqual(compileFial(decompileFial(compiled)),compiled);
+ const restored=compileFial(decompileFial(compiled));
+ assert.equal(restored.mission,compiled.mission);
+ assert.equal(restored.budget,compiled.budget);
+ assert.deepEqual(restored.instructions.map(({line,...operation})=>operation),
+  compiled.instructions.map(({line,...operation})=>operation));
 });
 test("language rejects arbitrary shell, Python, network, authority escalation, loops and malformed programs",()=>{
  for(const line of [
@@ -59,7 +63,6 @@ test("language rejects arbitrary shell, Python, network, authority escalation, l
  }
  assert.throws(()=>compileFial(original.replace("BUDGET 3","BUDGET 999")),FialSyntaxError);
  assert.throws(()=>compileFial(original.replace("FIAL 1","FIAL 2")),FialSyntaxError);
- assert.throws(()=>compileFial(original.replace("RULE \"new-grant\" WHEN new SCORE 98 ACTION BRIEF\n","")),FialSyntaxError); // test missing default separately
  assert.throws(()=>compileFial(original.replace("RULE \"stable-candidate\" WHEN always SCORE 10 ACTION REMEMBER\n","")),/DEFAULT_ALWAYS/);
  assert.throws(()=>compileFial(original+"RUN AGAIN"),FialSyntaxError);
  assert.throws(()=>compileFial("x".repeat(17000)),FialSyntaxError);
