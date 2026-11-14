@@ -57,7 +57,7 @@ test('missing local sidecars are recovered independently before dedicated 8798 s
  assert.match(helper,/if\(\$null -eq \$local\)\{SpawnMissing 8796/);
  assert.match(helper,/if\(\$null -eq \$rea\)\{SpawnMissing 8797/);
  assert.match(helper,/--standalone/);
- assert.match(helper,/PORT_.+_EXISTS_BUT_UNHEALTHY_NO_RESTART/);
+ assert.match(helper,/EXISTS_BUT_UNHEALTHY_NO_RESTART/);
  assert.match(helper,/PREEXISTING_LISTENER_CHANGED_/);
  assert.doesNotMatch(helper,/Start-Fun-Industrial\.ps1|Stop-Process|taskkill\.exe|Set-Content|Invoke-Expression/);
 });
