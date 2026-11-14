@@ -1,7 +1,8 @@
 // FUN_COMMERCE_OPPORTUNITIES_V1_1
 // Deterministic, read-only review queue from locally captured Google Trends RSS
 // and separately authorized Shopify catalog. Never a sales/demand forecast.
-import {GOOGLE_RSS} from './trends-commerce-v1.mjs';
+import {GOOGLE_RSS,GOOGLE_CALIFORNIA_RSS} from './trends-commerce-v1.mjs';
+import {screenTrend} from './google-trends-focus-v1-2.mjs';
 
 const TOKEN_STOP=new Set(['and','the','for','new','best','sale','deals','with','from',
  'shop','store','online','near','buy','price','reviews','review','2025','2026','2027',
@@ -52,15 +53,19 @@ function productPrice(p){
  return amounts.length?Math.min(...amounts):null;
 }
 const freshness=(source)=>source.present&&source.age_hours!==null&&source.age_hours<=48;
-export function rankCommerceOpportunities({trends,shopify,now=nowUtc()}={}){
+export function rankCommerceOpportunities({trends,california,shopify,now=nowUtc()}={}){
  if(!Number.isFinite(Date.parse(now)))throw Error('OPPORTUNITY_TIMESTAMP_INVALID');
  const captured=sourceSnapshot(trends,GOOGLE_RSS,now);
+ const caCaptured=sourceSnapshot(california,GOOGLE_CALIFORNIA_RSS,now);
  const catalog=shopSnapshot(shopify,now);
- const trendItems=captured.present&&Array.isArray(trends.items)?trends.items.slice(0,25):[];
+ const usItems=captured.present&&Array.isArray(trends.items)?trends.items.slice(0,25).map(item=>({item,scope:'US',source:captured})):[];
+ const caItems=caCaptured.present&&Array.isArray(california.items)?california.items.slice(0,25).map(item=>({item,scope:'US-CA',source:caCaptured})):[];
+ const trendItems=[...caItems,...usItems];
  const products=catalog.present&&Array.isArray(shopify.products)?shopify.products.slice(0,50):[];
  const matches=[],leads=[];
- for(const t of trendItems){
+ for(const {item:t,scope,source} of trendItems){
   if(typeof t.query!=='string'||!t.query.trim()||t.query.length>200)continue;
+  if(!screenTrend(t.query).included)continue;
   const category=types(t.query);
   const candidates=[];
   const a=tokens(t.query);
@@ -71,10 +76,10 @@ export function rankCommerceOpportunities({trends,shopify,now=nowUtc()}={}){
    const amount=productPrice(p);
    candidates.push({kind:'catalog_title_overlap',product_id:p.id,product_title:p.title,
     product_status:p.status||null,listed_price_min:amount,price_currency:'shop_currency_not_yet_verified',
-    search_query:t.query,approx_traffic:t.approx_traffic||null,search_lower_bound:approxFloor(t.approx_traffic),
+    search_query:t.query,search_scope:scope,approx_traffic:t.approx_traffic||null,search_lower_bound:approxFloor(t.approx_traffic),
     matched_terms:overlap.slice(0,8),catalog_source_sha256:catalog.sha256,
-    search_source_sha256:captured.sha256,
-    source_fetched_utc:{google:captured.fetched_utc,shopify:catalog.fetched_utc},
+    search_source_sha256:source.sha256,
+    source_fetched_utc:{google:source.fetched_utc,shopify:catalog.fetched_utc},
     research_priority:Math.min(80,45+Math.min(4,overlap.length)*9),
     priority_is_heuristic:true,real_market_demand_verified:false,supplier_availability_verified:false,
     supplier_cost_verified:false,net_profit_estimated:false,
@@ -82,10 +87,10 @@ export function rankCommerceOpportunities({trends,shopify,now=nowUtc()}={}){
       'transaction fees and returns','independent demand validation']});
   }
   if(candidates.length)matches.push(...candidates);
-  else if(category.length)leads.push({kind:'product_interest_research_lead',search_query:t.query,
+  else if(category.length)leads.push({kind:'product_interest_research_lead',search_query:t.query,search_scope:scope,
    category_hints:category.slice(0,3),approx_traffic:t.approx_traffic||null,
-   search_lower_bound:approxFloor(t.approx_traffic),search_source_sha256:captured.sha256,
-   search_fetched_utc:captured.fetched_utc,research_priority:20,
+   search_lower_bound:approxFloor(t.approx_traffic),search_source_sha256:source.sha256,
+   search_fetched_utc:source.fetched_utc,research_priority:20,
    priority_is_heuristic:true,real_market_demand_verified:false,
    available_supplier_product_verified:false,net_profit_estimated:false,
    next_evidence_needed:['identify a legitimate product and authorized supplier',
@@ -96,17 +101,19 @@ export function rankCommerceOpportunities({trends,shopify,now=nowUtc()}={}){
  sorted(matches);sorted(leads);
  const enough=freshness(captured);
  const report={
-  version:'fun-commerce-opportunities-v1.1',state:!captured.present?'awaiting_google_source':
-   !enough?'source_stale_review_only':matches.length?'catalog_matches_need_supplier_and_demand_checks':
+  version:'fun-commerce-opportunities-v1.1',state:!captured.present&&!caCaptured.present?'awaiting_google_source':
+   !enough&&!(caCaptured.present&&caCaptured.age_hours!==null&&caCaptured.age_hours<=48)?'source_stale_review_only':matches.length?'catalog_matches_need_supplier_and_demand_checks':
    leads.length?'product_interest_leads_need_supplier_checks':'no_commercial_evidence_matched',
-  generated_utc:now,source_status:{google:captured,shopify:catalog},
+  generated_utc:now,source_status:{google:captured,california:caCaptured,shopify:catalog},
   trend_count:trendItems.length,shopify_product_count:products.length,
   matches:matches.slice(0,20),research_leads:leads.slice(0,12),
-  uncategorized_search_count:trendItems.length-new Set(matches.map(x=>x.search_query).concat(leads.map(x=>x.search_query))).size,
+  uncategorized_search_count:Math.max(0,trendItems.length-new Set(matches.map(x=>x.search_scope+':'+x.search_query).concat(leads.map(x=>x.search_scope+':'+x.search_query))).size),
   total_matches:matches.length,total_research_leads:leads.length,
   qualifies_as_verified_sales_opportunity:false,order_authority:false,
   explanatory_notes:[
    'Priority is a transparent keyword-overlap review heuristic, NOT a trained prediction or proven market demand.',
+   'Only explicit commercial search topics pass V1.2 filtering; news, people-only searches and sports are ignored.',
+   'US-CA statewide search interest does not measure individual California county demand.',
    'Approximate Google search-traffic buckets are NOT exact search counts, purchase orders or conversion rates.',
    'A Shopify listed price is not a wholesale cost or verified gross/net profit.',
    'Without real supplier cost, shipping, fees, returns and independent demand evidence, do not calculate profit or instruct purchases.',
