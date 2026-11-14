@@ -6,25 +6,22 @@ import {createHash} from "node:crypto";
 
 // Single operator-approved request. No redirects, cookies, proxies, crawling or retries.
 // DNS is resolved before the request and the vetted IPv4 address is pinned to the socket.
-const forbidden = [
-  [0,8],[10,8],[100,10],[127,8],[169,16],[172,12],[192,24],
-  [198,15],[203,24],[224,4],[240,4]
-];
 function publicIPv4(ip) {
   if(net.isIP(ip)!==4)return false;
-  const n=ip.split(".").map(Number);
-  if(n.some(x=>!Number.isInteger(x)||x<0||x>255))return false;
-  const v=(((n[0]*16777216)+(n[1]<<16)+(n[2]<<8)+n[3])>>>0);
-  return !forbidden.some(([prefix,bits])=>bits===8?(v>>>24)===prefix:bits===10?(v>>>22)===(prefix>>>2):bits===12?(v>>>20)===(prefix>>>4):bits===15?(v>>>17)===(prefix>>>7):bits===16?(v>>>16)===prefix:bits===24?(v>>>8)===prefix:bits===4?(v>>>28)===(prefix>>>4):false)
-    && !(n[0]===192&&n[1]===168)
-    && !(n[0]===192&&n[1]===0)
-    && !(n[0]===192&&n[1]===88)
-    && !(n[0]===198&&n[1]===18)
-    && !(n[0]===198&&n[1]===19)
-    && !(n[0]===198&&n[1]===51)
-    && !(n[0]===198&&n[1]===52)
-    && !(n[0]===203&&n[1]===0)
-    && !(n[0]===255);
+  const [a,b,c,d]=ip.split(".").map(Number);
+  if([a,b,c,d].some(n=>!Number.isInteger(n)||n<0||n>255))return false;
+  if(a===0||a===10||a===127||a>=224)return false;
+  if(a===100&&b>=64&&b<=127)return false;
+  if(a===169&&b===254)return false;
+  if(a===172&&b>=16&&b<=31)return false;
+  if(a===192&&(b===168||b===0||b===88))return false;
+  if(a===198&&(b===18||b===19||b===51||b===52))return false;
+  if(a===203&&b===0&&c===113)return false;
+  if(a===192&&b===0&&c===2)return false;
+  if(a===198&&b===51&&c===100)return false;
+  if(a===192&&b===0&&c===0)return false;
+  if(a===192&&b===0&&c===0&&d===0)return false;
+  return true;
 }
 export async function retrieveApprovedPage({url,operatorApproved=false,timeoutMs=10000,maxBytes=262144}) {
   if(operatorApproved!==true)throw Error("OPERATOR_APPROVAL_REQUIRED");
