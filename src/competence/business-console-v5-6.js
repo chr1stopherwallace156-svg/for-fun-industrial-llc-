@@ -57,6 +57,55 @@
   }catch(e){result.replaceChildren();add(result,'Analysis HOLD',String(e.message||e).slice(0,180))}
   finally{button.disabled=false}
  }
+ const finance=$('fi-finance-input'),financeButton=$('fi-finance-calculate'),financeResult=$('fi-finance-result');
+ const writing=$('fi-writing-input'),writingButton=$('fi-writing-check'),writingResult=$('fi-writing-result');
+ async function oneClick(path,body,click){
+  const r=await fetch(path,{method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json','x-fi-business-click':click},
+   body:JSON.stringify(body)});
+  const data=await r.json();
+  if(!r.ok)throw Error('HTTP '+r.status+' '+String(data.error||'request held'));
+  return data;
+ }
+ async function financeCase(){
+  if(!finance||!financeResult||!financeButton)return;
+  let values;
+  try{
+   if(!finance.value.trim()||finance.value.length>1600)throw Error('Enter JSON numeric scenario values (maximum 1,600 characters).');
+   values=JSON.parse(finance.value);
+   if(!values||typeof values!=='object'||Array.isArray(values))throw Error('Expected a JSON object.');
+  }catch(e){financeResult.textContent=String(e.message||e);return}
+  financeButton.disabled=true;financeResult.replaceChildren();
+  try{
+   const data=await oneClick('/api/operator/competence/finance',
+    {metrics:values},'one-local-financial-calculation');
+   if(data.claim_verified!==false)throw Error('Unexpected finance verification claim');
+   add(financeResult,'Financial evidence','Operator-supplied scenario only; not verified company actuals');
+   for(const [label,output] of Object.entries(data.calculations||{})){
+    const compact=Object.entries(output||{}).map(([k,v])=>k+'='+String(v===null?'unknown':v)).join(' · ');
+    add(financeResult,label.replaceAll('_',' '),compact.slice(0,500));
+   }
+  }catch(e){add(financeResult,'Finance HOLD',String(e.message||e).slice(0,180))}
+  finally{financeButton.disabled=false}
+ }
+ async function writingCase(){
+  if(!writing||!writingButton||!writingResult)return;
+  const draft=writing.value;
+  if(!draft.trim()||draft.length>4000){writingResult.textContent='Paste a writing draft of up to 4,000 characters.';return}
+  writingButton.disabled=true;writingResult.replaceChildren();
+  try{
+   const data=await oneClick('/api/operator/competence/writing',
+    {draft},'one-local-writing-review');
+   if(data.review?.version!=='fial5.6-business-writing-v1')throw Error('Unexpected writing result');
+   add(writingResult,'Heuristic review','Suggestions only; grammar and factual accuracy are not certified');
+   const issues=Array.isArray(data.review.issues)?data.review.issues:[];
+   for(const item of issues.slice(0,25))add(writingResult,item.code+' (line '+String(item.line??'general')+')',item.suggestion);
+   if(!issues.length)add(writingResult,'Findings','No issues detected by the limited local rules');
+  }catch(e){add(writingResult,'Writing HOLD',String(e.message||e).slice(0,160))}
+  finally{writingButton.disabled=false}
+ }
+ if(financeButton)financeButton.addEventListener('click',financeCase);
+ if(writingButton)writingButton.addEventListener('click',writingCase);
  button.addEventListener('click',analyze);
  question.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();if(!button.disabled)void analyze()}
