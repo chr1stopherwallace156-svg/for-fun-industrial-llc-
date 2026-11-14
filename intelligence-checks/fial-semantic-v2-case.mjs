@@ -54,7 +54,7 @@ test("FIAL 2 has a new restricted grammar with quote-grounding and explicit unkn
 });
 test("FIAL 2 cannot compile shell, network, approval bypass, arbitrary source or missing ground rules",()=>{
  for(const [from,to] of [
-  ["FIAL 2","FIAL 3"],
+  // Version declaration has to be tested separately from introductory comments.
   ["SOURCE GRANTS","SOURCE ANY_URL"],
   ["MODEL LOCAL_QWEN","MODEL REMOTE_API"],
   ["GROUND QUOTES","GROUND MODEL_GUESSES"],
@@ -64,6 +64,9 @@ test("FIAL 2 cannot compile shell, network, approval bypass, arbitrary source or
  ]){
   assert.throws(()=>compileSemantic(source.replace(from,to)),FialSemanticSyntaxError,to);
  }
+ assert.match(source,/^FIAL 2$/m);
+ assert.throws(()=>compileSemantic(source.replace(/^FIAL 2$/m,"FIAL 3")),/EXPECTED_FIAL_2/);
+ assert.doesNotThrow(()=>compileSemantic(source.replace("# FIAL 2","# FIAL 3")));
  assert.throws(()=>compileSemantic(source+"\nEXEC SHELL"),FialSemanticSyntaxError);
  assert.throws(()=>compileSemantic("x".repeat(9000)),FialSemanticSyntaxError);
 });
