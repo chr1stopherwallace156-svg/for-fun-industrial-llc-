@@ -1,6 +1,6 @@
 # Enable existing local Cognee recall, read-only, without restarting services.
 # No model call, embedding download, REA execution, memory ingestion or writes.
-[CmdletBinding()]param()
+[CmdletBinding()]param([switch]$AuthorizeReadOnlyTransition)
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $Original=Join-Path $HOME 'FunIndustrial-REA-MCP-Activation'
@@ -13,6 +13,8 @@ function GetJson([string]$u){return Invoke-RestMethod -Uri $u -TimeoutSec 12 -Er
 $Git=(Get-Command git.exe -ErrorAction Stop).Source
 $roots=@($Original,$Integrations)
 $changes=@()
+$previousWriteFlags=0
+$previousIngestionFlags=0
 foreach($root in $roots){
  if(!(Test-Path -LiteralPath $root -PathType Container)){Hold ('ROOT_MISSING='+$root)}
  foreach($rel in @('src\intelligence\memory.mjs','cognee\memory_bridge.py')){
@@ -26,6 +28,17 @@ foreach($root in $roots){
  if(Test-Path -LiteralPath $cfg){
   $item=Get-Item -LiteralPath $cfg
   if(($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or $item.Length -gt 8192){Hold 'MEMORY_SETTINGS_UNTRUSTED'}
+  try{$existing=[IO.File]::ReadAllText($cfg)|ConvertFrom-Json}
+  catch{Hold 'EXISTING_SETTINGS_JSON_INVALID'}
+  if($existing -isnot [pscustomobject]){Hold 'EXISTING_SETTINGS_NOT_OBJECT'}
+  if($existing.PSObject.Properties['writesEnabled'] -and $existing.writesEnabled -eq $true){
+   $previousWriteFlags++
+   if(!$AuthorizeReadOnlyTransition){Hold 'EXISTING_WRITE_AUTHORITY_REQUIRES_SEPARATE_REVIEW'}
+  }
+  if($existing.PSObject.Properties['automaticIngestion'] -and $existing.automaticIngestion -eq $true){
+   $previousIngestionFlags++
+   if(!$AuthorizeReadOnlyTransition){Hold 'EXISTING_INGESTION_REQUIRES_SEPARATE_REVIEW'}
+  }
  }
 }
 $Python=Join-Path $env:LOCALAPPDATA 'FunIndustrial\CognitiveMemory\venv\Scripts\python.exe'
@@ -62,12 +75,10 @@ try{
    else{$config=$oldCfg|ConvertFrom-Json}
   }catch{Hold 'EXISTING_SETTINGS_JSON_INVALID'}
   if($config -isnot [pscustomobject]){Hold 'EXISTING_SETTINGS_NOT_OBJECT'}
-  if($config.PSObject.Properties['writesEnabled'] -and $config.writesEnabled -eq $true){
-   Hold 'EXISTING_WRITE_AUTHORITY_REQUIRES_SEPARATE_REVIEW'
-  }
-  if($config.PSObject.Properties['automaticIngestion'] -and $config.automaticIngestion -eq $true){
-   Hold 'EXISTING_INGESTION_REQUIRES_SEPARATE_REVIEW'
-  }
+  if($config.PSObject.Properties['writesEnabled'] -and $config.writesEnabled -eq $true -and
+   !$AuthorizeReadOnlyTransition){Hold 'EXISTING_WRITE_AUTHORITY_REQUIRES_SEPARATE_REVIEW'}
+  if($config.PSObject.Properties['automaticIngestion'] -and $config.automaticIngestion -eq $true -and
+   !$AuthorizeReadOnlyTransition){Hold 'EXISTING_INGESTION_REQUIRES_SEPARATE_REVIEW'}
   $config|Add-Member -NotePropertyName enabled -NotePropertyValue $true -Force
   $config|Add-Member -NotePropertyName writesEnabled -NotePropertyValue $false -Force
   $config|Add-Member -NotePropertyName automaticIngestion -NotePropertyValue $false -Force
@@ -96,6 +107,7 @@ try{
  if((Get-FileHash -LiteralPath $server -Algorithm SHA256).Hash -cne $originalServerSHA){
   Hold 'PROTECTED_SERVER_SOURCE_CHANGED'
  }
+ Write-Host ('FUN_MEMORY_READ_ONLY_TRANSITION=CONFIRMED PREVIOUS_WRITE_FLAGS_DISABLED='+$previousWriteFlags+' PREVIOUS_INGESTION_FLAGS_DISABLED='+$previousIngestionFlags)
  Write-Host 'FUN_COGNEE_RECALL=ENABLED_AUTOMATIC_READ_ONLY'
  Write-Host 'FIAL51_MEMORY_ADAPTER=AVAILABLE_CONFIGURED'
  Write-Host 'FUN_MEMORY_WRITES=DISABLED AUTOMATIC_INGESTION=DISABLED'
