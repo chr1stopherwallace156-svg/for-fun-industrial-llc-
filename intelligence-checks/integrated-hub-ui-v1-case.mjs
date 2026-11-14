@@ -112,7 +112,7 @@ test('the live HTTP adapter serves only immutable UI assets, without proxying or
 test('UI-only deployment checks assets and upgrades only 8802, with a known working fallback',async()=>{
  const activation=await readFile(new URL('../Activate-Fun-Commerce-V1.ps1',import.meta.url),'utf8');
  assert.match(activation,/param\(\[switch\]\$SkipGoogleRefresh\)/);
- assert.match(activation,/404752943e6d3dcbb164784ef9dc371d75ce8ecf/);
+ assert.match(activation,/24ef0a6affa148f33d54208cbf369069be1be7ce/);
  assert.match(activation,/\/api\/ui\/client\.js/);
  assert.match(activation,/\/api\/ui\/style\.css/);
  assert.match(activation,/\$uiClient\.Content -match 'FUN_INTEGRATED_CONTROL_CENTER_UI_V1'/);
@@ -121,4 +121,14 @@ test('UI-only deployment checks assets and upgrades only 8802, with a known work
  assert.match(activation,/Stop-Process -Id \$oldPid/);
  assert.match(activation,/\$protected=@\(11434,8088,8791,8789,8796,8797,8798,8801,8443\)/);
  assert.match(activation,/FUN_INTEGRATED_UI_V1=PASS/);
+});
+
+test('California RSS refresh is optional and independent of US refresh or local UI activation',async()=>{
+ const activation=await readFile(new URL('../Activate-Fun-Commerce-V1.ps1',import.meta.url),'utf8');
+ assert.match(activation,/param\(\[switch\]\$SkipGoogleRefresh,\[switch\]\$RefreshCalifornia\)/);
+ assert.match(activation,/\/api\/commerce\/focus/);
+ assert.match(activation,/GOOGLE_CALIFORNIA_RSS=PASS/);
+ assert.match(activation,/GOOGLE_COMMERCE_FILTER_V12=PASS/);
+ assert.match(activation,/FUN_COMMERCE_EXTERNAL_ACTIONS=ONE_CALIFORNIA_RSS_READ_NO_PURCHASES/);
+ assert.match(activation,/GOOGLE_CA_COUNTY_DIRECTORY=58 METRICS=UNAVAILABLE/);
 });
