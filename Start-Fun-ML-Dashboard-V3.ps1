@@ -35,11 +35,72 @@ try{
   & $Node --test $Test $QwenTest
   if($LASTEXITCODE -ne 0){Hold 'OFFLINE_TESTS_FAILED'}
 }finally{Pop-Location}
-try{
-  $parent=Invoke-RestMethod 'http://127.0.0.1:8789/api/status' -TimeoutSec 10
-  $chat=Invoke-RestMethod 'http://127.0.0.1:8798/api/unified/status' -TimeoutSec 10
-  $ml=Invoke-RestMethod 'http://127.0.0.1:8801/api/ml/status' -TimeoutSec 10
-}catch{Hold ('REQUIRED_SERVICE_UNAVAILABLE='+$_.Exception.Message)}
+# Exact diagnostics: never classify an unhealthy existing listener as "missing".
+function Probe([int]$port,[string]$path){
+  $url='http://127.0.0.1:'+$port+$path
+  try{
+    $data=Invoke-RestMethod -Uri $url -TimeoutSec 8 -ErrorAction Stop
+    Write-Host ('FUN_ML_DEPENDENCY_'+$port+'=HTTP_READY')
+    return $data
+  }catch{
+    $list=@(Listener $port)
+    if($list.Count){
+      Write-Host ('FUN_ML_DEPENDENCY_'+$port+'=LISTENING_BUT_HTTP_FAILED')
+      Hold ('PORT_'+$port+'_UNHEALTHY_LISTENER_MANUAL_REVIEW_NO_RESTART')
+    }
+    Write-Host ('FUN_ML_DEPENDENCY_'+$port+'=MISSING')
+    return $null
+  }
+}
+$parent=Probe 8789 '/api/status'
+$chat=Probe 8798 '/api/unified/status'
+$ml=Probe 8801 '/api/ml/status'
+if($null -ne $parent -and $null -eq $parent.lifecycle){Hold '8789_STATUS_INVALID'}
+if($null -ne $chat -and $chat.version -ne 'fi-unified-task-chat-8798-v1'){Hold '8798_IDENTITY_INVALID'}
+if($null -ne $ml -and ($ml.version -ne 'fun-qwen-scikit-v2' -or $ml.pythonInstalled -ne $true -or
+  $ml.reaExecutionGrants -ne 0 -or $ml.externalActions -ne 0)){Hold '8801_ML_IDENTITY_INVALID'}
+if($null -eq $parent -or $null -eq $chat -or $null -eq $ml){
+  if($CheckOnly){
+    Write-Host 'FUN_ML_DEPENDENCIES=INCOMPLETE CHECK_ONLY=TRUE NO_CHANGES=TRUE'
+    Hold 'DEPENDENCY_MISSING_CHECK_ONLY'
+  }
+  $recoveryPorts=@(11434,8088,8791,8789,8796,8797,8798,8801,8443)
+  $preRecovery=@{}
+  foreach($p in $recoveryPorts){$preRecovery[$p]=Snapshot $p}
+  if($null -eq $parent -or $null -eq $chat){
+    $startScript=Join-Path $Root 'Start-Fun-Industrial.ps1'
+    if(-not(Test-Path -LiteralPath $startScript -PathType Leaf)){Hold 'GUARDED_STARTER_MISSING'}
+    Write-Host 'FUN_ML_RECOVERY=START_MISSING_FUN_CORE_NO_GATEWAY_CHANGES'
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $startScript -SkipPrivateGateway
+    if($LASTEXITCODE -ne 0){Hold 'CORE_RECOVERY_FAILED_NO_RETRY'}
+  }
+  if($null -eq $ml){
+    $v2=Join-Path $HOME 'FunIndustrial-QwenML-V2'
+    $v2Start=Join-Path $v2 'Start-Fun-Qwen-ML-V2.ps1'
+    $origin='https://github.com/chr1stopherwallace156-svg/for-fun-industrial-llc-.git'
+    if(-not(Test-Path -LiteralPath $v2Start -PathType Leaf)){Hold 'V2_INSTALLED_STARTER_NOT_FOUND'}
+    $actualOrigin=git.exe -C $v2 remote get-url origin
+    if($LASTEXITCODE -ne 0 -or $actualOrigin -cne $origin){Hold 'V2_SOURCE_ORIGIN_MISMATCH'}
+    $actualBranch=git.exe -C $v2 branch --show-current
+    if($LASTEXITCODE -ne 0 -or $actualBranch -cne 'feature/fun-scikit-qwen-bridge-v2-20261113'){Hold 'V2_SOURCE_BRANCH_MISMATCH'}
+    if(@(git.exe -C $v2 status --porcelain=v1 --untracked-files=all).Count){Hold 'V2_SOURCE_DIRTY'}
+    Write-Host 'FUN_ML_RECOVERY=START_MISSING_VERIFIED_ML_8801'
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $v2Start
+    if($LASTEXITCODE -ne 0){Hold 'V2_ML_RECOVERY_FAILED_NO_RETRY'}
+  }
+  foreach($p in $recoveryPorts){
+    if($preRecovery[$p] -and (Snapshot $p) -cne $preRecovery[$p]){
+      Hold ('EXISTING_SERVICE_CHANGED_DURING_RECOVERY_PORT_'+$p)
+    }
+  }
+  Write-Host 'FUN_ML_RECOVERY=COMPLETED_RECHECKING_DEPENDENCIES'
+  $parent=Probe 8789 '/api/status'
+  $chat=Probe 8798 '/api/unified/status'
+  $ml=Probe 8801 '/api/ml/status'
+}
+if($null -eq $parent){Hold '8789_STILL_MISSING'}
+if($null -eq $chat){Hold '8798_STILL_MISSING'}
+if($null -eq $ml){Hold '8801_STILL_MISSING'}
 if($null -eq $parent.lifecycle){Hold '8789_STATUS_INVALID'}
 if($chat.version -ne 'fi-unified-task-chat-8798-v1'){Hold '8798_IDENTITY_INVALID'}
 if($ml.version -ne 'fun-qwen-scikit-v2' -or $ml.pythonInstalled -ne $true -or
