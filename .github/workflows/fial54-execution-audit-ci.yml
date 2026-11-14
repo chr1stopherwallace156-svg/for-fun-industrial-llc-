@@ -64,8 +64,8 @@ jobs:
             'if($RunScheduledCycle)')){
             if(!$source.Contains($needle)){throw ('FIAL54_AUDIT_REQUIRED_CHECK_MISSING='+$needle)}
           }
-          if($source -match '(?im)^\s*\$(home|pid|host|input|error|matches)\s*='
-            -or $source -match 'Stop-Process|Restart-Service|Remove-Item|git reset|Invoke-Expression|Set-NetFirewallRule'){
+          if(($source -match '(?im)^\s*\$(home|pid|host|input|error|matches)\s*=') -or
+             ($source -match 'Stop-Process|Restart-Service|Remove-Item|git reset|Invoke-Expression|Set-NetFirewallRule')){
             throw 'FIAL54_AUDIT_PROTECTED_MUTATION_OR_AUTOMATIC_VARIABLE'
           }
           if($source -match '(?<!@)\(Get-NetTCPConnection[^\n]*\)\.Count'){
