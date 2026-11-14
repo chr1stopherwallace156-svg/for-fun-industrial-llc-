@@ -41,12 +41,14 @@ function PortOwners([int]$port){
 SourceIdentity $Root $Branch
 SourceIdentity $OldRoot 'feature/fial5-4-executive-operator-v1-20261114'
 foreach($file in @($NewScript,$Worker,$Source,(Join-Path $Root 'src\operator\official-source-watch-v5-5.mjs'),
- (Join-Path $Root 'intelligence-checks\fial55-real-operations-case.mjs'))){
+ (Join-Path $Root 'src\operator\elektron-gmail-v5-5.mjs'),
+ (Join-Path $Root 'intelligence-checks\fial55-real-operations-case.mjs'),
+ (Join-Path $Root 'intelligence-checks\fial55-elektron-mail-case.mjs'))){
  if(!(Test-Path -LiteralPath $file -PathType Leaf)){Hold ('REQUIRED_FILE_MISSING='+$file)}
  if(((Get-Item -LiteralPath $file).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){Hold ('SYMLINK_FILE_REFUSED='+$file)}
  if($file.EndsWith('.mjs')){& $NodeExe --check $file;if($LASTEXITCODE -ne 0){Hold ('SYNTAX_HOLD='+$file)}}
 }
-& $NodeExe --test (Join-Path $Root 'intelligence-checks\fial55-real-operations-case.mjs')
+& $NodeExe --test (Join-Path $Root 'intelligence-checks\fial55-real-operations-case.mjs') (Join-Path $Root 'intelligence-checks\fial55-elektron-mail-case.mjs')
 if($LASTEXITCODE -ne 0){Hold 'REAL_OPERATIONS_OFFLINE_TESTS_HOLD'}
 Write-Host 'FIAL55_OFFLINE_TESTS=PASS'
 $protected=@(11434,8088,8789,8791,8796,8797,8798,8801,8802,8803,8804,8805,8806,8443)
