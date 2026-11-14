@@ -123,3 +123,12 @@ test('one cold recovery restores core, ML, Commerce, then separately attests opt
  assert.match(script,/FUN_REA_ACTIONS=0 FUN_SHOPIFY_MUTATIONS=0 FUN_MODEL_TRAINING=0/);
  assert.doesNotMatch(script,/Invoke-Expression|taskkill\.exe|Set-Content|Remove-Item|Start-Process/);
 });
+
+test('gateway restart uses a different PowerShell variable from status so path is never overwritten',async()=>{
+ const script=await clean(new URL('../Recover-Fun-After-Disconnect-V1.ps1',import.meta.url));
+ assert.match(script,/\$GatewayScriptPath=Join-Path \$Root 'Start-Fun-Private-Gateway-V43\.ps1'/);
+ assert.match(script,/\$gatewayStatus='HOLD'/);
+ assert.match(script,/-File \$GatewayScriptPath/);
+ assert.match(script,/FUN_PRIVATE_IPHONE_8443='\+\$gatewayStatus/);
+ assert.doesNotMatch(script,/\$Gateway='HOLD'|\$gateway='HOLD'|\-File \$Gateway(?:[\s\r\n]|$)/);
+});
