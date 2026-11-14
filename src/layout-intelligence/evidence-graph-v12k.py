@@ -29,7 +29,8 @@ def build(doc,max_nodes,max_edges):
   evidence_ids={}
   for e in evidence:
    line=e.get("line");value=clean(e.get("text",""))
-   if type(line)!=int or line<1 or not value:raise ValueError("INVALID_LINE_EVIDENCE")
+   if type(line)!=int or line<1:raise ValueError("INVALID_LINE_EVIDENCE")
+   if not value:stats["blankContextLinesSkipped"]+=1;continue
    lid=node("source_line",(sid,page,line,value),sourceSha256=sid,page=page,line=line,text=value)
    evidence_ids[(line,value)]=lid
    edge(tid,lid,"nearby_text_candidate","v12j_bounded_anchor_window")
