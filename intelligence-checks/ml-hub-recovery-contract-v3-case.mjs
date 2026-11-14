@@ -96,3 +96,25 @@ test('degraded existing 8798 triggers sidecar recovery without restarting unifie
  assert.match(source,/EXISTING_8798_DEGRADED_ADOPT_RECHECK_NO_RESTART/);
  assert.match(source,/8798_STILL_DEGRADED_AFTER_SIDECAR_RECOVERY_NO_RESTART/);
 });
+
+test('cold restart accepts only the pinned original or exact reviewed 8789 evidence-dashboard Git object',async()=>{
+ const core=await clean(startup);
+ assert.match(core,/ExpectedSourceSha='9C8667C1299102156968A79FD8CF524AC23EFAC25B7E924D369954EC638C6844'/);
+ assert.match(core,/ReviewedEvidenceSourceBlob='422d4f75e57dc6099f7c6b05f535843d8f08929f'/);
+ assert.match(core,/git\.exe -C \$Primary hash-object --no-filters -- \$Source/);
+ assert.match(core,/\$SourceGitBlob -cne \$ReviewedEvidenceSourceBlob/);
+ assert.match(core,/8789_SOURCE_HASH_CHANGED_MANUAL_REVIEW_NO_RESTORE/);
+ assert.doesNotMatch(core,/Set-Content[^\n]*\$Source|Copy-Item[^\n]*\$Source/);
+});
+test('one cold recovery restores core, ML, Commerce, then separately attests optional iPhone gateway',async()=>{
+ const script=await clean(new URL('../Recover-Fun-After-Disconnect-V1.ps1',import.meta.url));
+ const start=script.indexOf('& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Main');
+ const commerce=script.indexOf('& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Commerce');
+ const gateway=script.indexOf('& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Gateway');
+ assert.ok(start>0&&commerce>start&&gateway>commerce);
+ assert.match(script,/FUN_COLD_RECOVERY_CORE_AND_ML=PASS/);
+ assert.match(script,/FUN_COLD_RECOVERY_COMMERCE_V1_1=PASS/);
+ assert.match(script,/FUN_SERVICES_8088_8791_8789_8796_8797_8798_8801_8802=HEALTHY/);
+ assert.match(script,/FUN_REA_ACTIONS=0 FUN_SHOPIFY_MUTATIONS=0 FUN_MODEL_TRAINING=0/);
+ assert.doesNotMatch(script,/Invoke-Expression|taskkill\.exe|Set-Content|Remove-Item|Start-Process/);
+});
