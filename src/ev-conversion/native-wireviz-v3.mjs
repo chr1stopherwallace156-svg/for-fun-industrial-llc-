@@ -2,7 +2,7 @@
 // Probe is read-only. Render requires explicit, exact SHA-256 for both external tools.
 // No installs, background daemons, ports, user shell, or other-project inspection.
 import {createHash} from 'node:crypto';
-import {existsSync,lstatSync,readdirSync,mkdirSync,readFileSync,writeFileSync,realpathSync} from 'node:fs';
+import {existsSync,lstatSync,readdirSync,mkdirSync,readFileSync,writeFileSync,realpathSync,openSync,readSync,closeSync} from 'node:fs';
 import {resolve,join,parse,sep,dirname} from 'node:path';
 import {homedir} from 'node:os';
 import {spawnSync} from 'node:child_process';
@@ -11,6 +11,12 @@ const ID=/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 const HASH=/^[a-f0-9]{64}$/i;
 function hold(code){throw Error('FUN_EV_NATIVE_'+code+'_HOLD');}
 function sha(buffer){return createHash('sha256').update(buffer).digest('hex');}
+function streamingSha(p){
+ const h=createHash('sha256'),buff=Buffer.allocUnsafe(256*1024),fd=openSync(p,'r');
+ try{let n;while((n=readSync(fd,buff,0,buff.length,null))>0)h.update(buff.subarray(0,n));}
+ finally{closeSync(fd);}
+ return h.digest('hex');
+}
 function within(root,p){const r=resolve(root),v=resolve(p);return v===r||v.startsWith(r+sep);}
 function inspectDirs(p){
  let walk=parse(resolve(p)).root;
@@ -29,7 +35,7 @@ function checkedFile(p,max=150000000){
   const st=lstatSync(p);
   if(!st.isFile()||st.isSymbolicLink()||st.size<1||st.size>max)hold('UNSAFE_FILE');
   if(realpathSync(p)!==resolve(p))hold('REPARSE_TARGET');
-  return {path:resolve(p),sha256:sha(readFileSync(p)),size_bytes:st.size};
+  return {path:resolve(p),sha256:streamingSha(p),size_bytes:st.size};
  }catch(e){if(e.code==='ENOENT')return null;throw e;}
 }
 function base(){return process.env.LOCALAPPDATA||join(homedir(),'AppData','Local');}
