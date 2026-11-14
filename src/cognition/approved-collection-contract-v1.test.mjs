@@ -77,5 +77,12 @@ test("single captured response persists inspection, original bytes, verified tex
   assert.equal(answer.state,"citation_identifiers_validated");
   assert.deepEqual(answer.citations,["source:"+result.claim_id]);
   assert.equal(answer.factual_claim_verified,false);
+  if(process.env.FUN_TEST_LIVE_QWEN==="1"){
+   const live=await answerWithGroundedClaim({database:f.database,python,claim_id:result.claim_id,question:"Does this synthetic passage independently verify actual fleet demand?"});
+   assert.equal(live.state,"citation_identifiers_validated");
+   assert.deepEqual(live.citations,["source:"+result.claim_id]);
+   assert.equal(live.factual_claim_verified,false);
+   console.log("REAL_LOCAL_QWEN_GROUNDED_CITATION=PASS");
+  }
  }finally{f.clean()}
 });
