@@ -25,6 +25,9 @@ try{
   console.log('FIAL55_READONLY_CONFIG='+r.real.config_source.status);
   console.log('FIAL55_WORK_RECEIPT='+join(ROOT(),'RealWorkV55','last-real-cycle.json'));
   console.log('FIAL55_EMAIL_SENT=0 FILINGS_SUBMITTED=0 MONEY_SPENT=0 REA_CALLS=0');
+ }else if(action==='--connect-elektron-gmail'){
+  if(process.argv.length!==3)throw Error('UNEXPECTED_EXTRA_ARGUMENT');
+  console.log(JSON.stringify(await connectElektronGmail()));
  }else if(action==='--status'){
   if(process.argv.length!==3)throw Error('UNEXPECTED_EXTRA_ARGUMENT');
   const status=await readRealStatus();
