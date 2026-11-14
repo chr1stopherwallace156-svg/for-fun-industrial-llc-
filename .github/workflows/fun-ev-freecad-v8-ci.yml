@@ -1,0 +1,23 @@
+name: Fun EV V8 FreeCAD read-only preflight
+on:
+  push:
+    branches:
+      - feature/fun-ev-freecad-native-v8-20261114
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preflight:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check src/ev-conversion/freecad-preflight-v8.mjs
+      - run: node --test test/ev-freecad-preflight-v8.test.mjs
