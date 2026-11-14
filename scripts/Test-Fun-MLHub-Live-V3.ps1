@@ -66,7 +66,8 @@ if(Test-Path -LiteralPath $modelFile){$modelAfter=(Get-FileHash -LiteralPath $mo
 if($modelBefore -cne $modelAfter){throw 'SALES_MODEL_FILE_CHANGED_HOLD'}
 if($result.modelState -cne 'ready' -or [string]::IsNullOrWhiteSpace([string]$result.explanation)){throw 'QWEN_EXPLANATION_NOT_READY_ML_RESULT_VALID'}
 foreach($port in $ports){if((Snap $port) -cne $before[$port]){throw ('SERVICE_LISTENER_CHANGED_PORT_'+$port)}}
-Write-Host 'INTEGRATED_PAGES_RENDER=PASS'\nWrite-Host 'LIVE_SCIKIT_LEARN_ISOLATION_FOREST=PASS'
+Write-Host 'INTEGRATED_PAGES_RENDER=PASS'
+Write-Host 'LIVE_SCIKIT_LEARN_ISOLATION_FOREST=PASS'
 Write-Host 'ESTIMATED_PROFIT_VERIFIED=8/8'
 Write-Host ('ANOMALIES_FLAGGED='+@($rows|Where-Object {$_.unusual_pattern -eq $true}).Count)
 Write-Host ('SCIKIT_LEARN_VERSION='+[string]$result.verifiedML.version)
