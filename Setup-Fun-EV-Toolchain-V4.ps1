@@ -63,6 +63,9 @@ if($Action -eq 'SelfTest'){
   mode='NO_INSTALL';native_argument_forwarding='PASS';
   node_passed=$true;python_passed=$pythonVerified;winget_passed=$wingetVerified;
   wireviz_target_exists=(Test-Path -LiteralPath (Join-Path $tools 'WireViz'));
+  wireviz_venv_python_exists=(Test-Path -LiteralPath (Join-Path $tools 'WireViz\venv\Scripts\python.exe') -PathType Leaf);
+  wireviz_entrypoint_exists=(Test-Path -LiteralPath (Join-Path $tools 'WireViz\venv\Scripts\wireviz.exe') -PathType Leaf);
+  wireviz_wheel_folder_exists=(Test-Path -LiteralPath (Join-Path $tools 'WireViz\wheels') -PathType Container);
   installer_executed=$false
  } | ConvertTo-Json -Depth 4
  exit 0
