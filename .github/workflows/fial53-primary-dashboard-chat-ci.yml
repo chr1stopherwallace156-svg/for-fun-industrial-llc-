@@ -1,0 +1,35 @@
+name: Fun Industrial FIAL5.3 Primary Dashboard Chat CI
+on:
+  push:
+    branches:
+      - feature/fial5-3-primary-dashboard-grounded-chat-20261114
+    paths:
+      - "src/fial/primary-grounded-ui-v5-3.mjs"
+      - "src/fial/primary-grounded-client-v5-3.js"
+      - "src/ui/integrated-hub-v1.js"
+      - "scripts/Run-Fun-ML-Dashboard8802.mjs"
+      - "intelligence-checks/fial-primary-dashboard-chat-v5-3-case.mjs"
+      - ".github/workflows/fial53-primary-dashboard-chat-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Syntax checks
+        shell: pwsh
+        run: |
+          node --check scripts/Run-Fun-ML-Dashboard8802.mjs
+          node --check src/fial/primary-grounded-ui-v5-3.mjs
+          node --check src/fial/primary-grounded-client-v5-3.js
+          node --check src/ui/integrated-hub-v1.js
+          node --check intelligence-checks/fial-primary-dashboard-chat-v5-3-case.mjs
+      - name: Focused integration and previous dashboard regression tests
+        run: |
+          node --test intelligence-checks/fial-primary-dashboard-chat-v5-3-case.mjs intelligence-checks/fi-ml-hub-v3-case.mjs intelligence-checks/integrated-hub-ui-v1-case.mjs intelligence-checks/fial-grounded-qwen-v5-2-case.mjs intelligence-checks/commerce-opportunities-v1-1-case.mjs intelligence-checks/google-trends-focus-v1-2-case.mjs
