@@ -8,6 +8,7 @@ import {createLiveController,currentLiveStatus} from "../src/fial/live-official-
 export const LIVE_HOST="127.0.0.1",LIVE_PORT=8803;
 const WIDGET=new URL("../src/fial/live-widget-v4.js",import.meta.url);
 const UPSTREAM="http://127.0.0.1:8802",MAX_PAGE=260000,MAX_PROXY=12*1024*1024;
+const FALLBACK='<doctype html><html><head><meta charset="utf-8"><title>Fun Industrial · Live Government Grants</title></head><body style="max-width:1100px;padding:25px;margin:auto;background:#0e141c;color:#eaf1f8;font:15px system-ui"><h1>Fun Industrial · Active FIAL 4</h1><p>The existing 8802 dashboard is unavailable. Live official-source verification remains accessible here; existing services were not restarted.</p></body></html>'.replace('<doctype','<!doctype');
 const PANEL='<section id="fi-fial4-live" style="box-sizing:border-box;margin:18px auto;padding:17px;max-width:1100px;background:#152a3a;border:1px solid #4e7087;border-radius:12px;color:#e6f4fc;font:14px/1.5 system-ui">'+
  '<h2>FIAL 4 — Live Official Grant Verification</h2>'+
  '<p>Official California Grants Portal feed · refresh automatically every 6 hours. Check published changes and current status. Eligibility is not certified.</p>'+
@@ -118,7 +119,14 @@ export function createLiveDashboard({controller=createLiveController(),
      host:LIVE_HOST,port:LIVE_PORT,source:"OFFICIAL_CALIFORNIA_GRANTS_PORTAL",
      auto_refresh_hours:6,existing_services_restarted:0,rea_permissions_added:0});
    if(req.method==="GET"&&["/","/unified/"].includes(url.pathname)){
-    const page=await readPage(url.pathname);
+    let page;
+    try{page=await readPage(url.pathname)}
+    catch(e){
+     if(url.pathname!=="/"||
+      !/fetch failed|FIAL4_LIVE_8802_PAGE_UNAVAILABLE|FIAL4_LIVE_8802_PAGE/i.test(String(e?.message||e)))
+      throw e;
+     page={html:FALLBACK,csp:"default-src 'self'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'"};
+    }
     const html=injectLivePanel(typeof page==="string"?page:page.html);
     // Preserve strict upstream CSP when present; the new widget loads as same-origin script.
     const csp=typeof page==="object"&&page.csp?page.csp:
