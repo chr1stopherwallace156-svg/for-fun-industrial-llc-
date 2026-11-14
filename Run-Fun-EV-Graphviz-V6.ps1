@@ -67,7 +67,7 @@ if(-not $before.wireviz_exe_exists -or $before.wireviz_v5_receipt_state -cne 'WI
 if($before.graphviz_found_in_scoped_paths){throw 'FUN_EV_V6_GRAPHVIZ_ALREADY_PRESENT_HOLD'}
 $winget=Get-Command winget.exe -ErrorAction SilentlyContinue
 if(-not $winget){throw 'FUN_EV_V6_WINGET_MISSING_HOLD'}
-# Native argument names deliberately never use PowerShell's automatic $args variable.
+# Native argument arrays use an unambiguous parameter name, not an automatic variable.
 $showArguments=@('show','--id',$packageId,'--exact','--version',$version,'--source','winget')
 $shown=@(& $winget.Source @showArguments)
 if($LASTEXITCODE -ne 0){throw 'FUN_EV_V6_CATALOG_EXIT_HOLD'}
