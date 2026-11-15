@@ -4,7 +4,7 @@ import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {createUnifiedMlHub} from '../scripts/Run-Fun-ML-Dashboard8802.mjs';
 import {EXEC_PAGE} from '../src/operator/executive-console-v1.mjs';
-import {VERSION,CATALOG_VERSION} from '../src/fleet/fleet-sources-v5-9.mjs';
+import {VERSION as CATALOG_VERSION} from '../src/fleet/fleet-sources-v5-9.mjs';
 import {readFleetStatus,verifyPublicFleetReport} from '../src/fleet/fleet-engine-v5-9.mjs';
 const ml={status:async()=>({state:'ready'}),run:async()=>{throw Error('NO_RUN')}};
 const commerce={status:async()=>({version:'commerce'}),data:async()=>({})};
@@ -42,7 +42,7 @@ test('browser fleet opportunities are strictly same origin, read only and text e
 test('GET fleet status is bounded, inert and contains named historical leads, POST blocked',async()=>{
  const report=await readFleetStatus({root:'/nonexistent-fial59-local-test'});
  assert.equal(report.state,'NOT_ACTIVATED');
- assert.equal(report.source_catalog_version,VERSION);
+ assert.equal(report.source_catalog_version,CATALOG_VERSION);
  let calls=0;
  await withServer(async()=>{calls++;return report},async server=>{
   const page=await request(server,'/operations/');
