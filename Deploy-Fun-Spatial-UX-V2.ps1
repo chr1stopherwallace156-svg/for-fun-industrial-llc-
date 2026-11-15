@@ -6,6 +6,9 @@ $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $Root=$PSScriptRoot
 $OldRoot=Join-Path $HOME 'FunIndustrial-OnePort-Dashboard'
+# Dashboard rollback source is V1; the scheduled executive worker is still FIAL5.14.
+# Those are separate, independently reviewed installations.
+$ScheduleRoot=Join-Path $HOME 'FunIndustrial-FIAL514-Demand'
 $Branch='feature/fun-oneport-spatial-ux-v2-20261115'
 $OldBranch='feature/fun-one-port-dashboard-v1-20261115'
 $Origin='https://github.com/chr1stopherwallace156-svg/for-fun-industrial-llc-.git'
@@ -467,10 +470,13 @@ if($mem.memoryAvailable -ne $true -or $mem.memoryWrites -ne $false -or
  $mem.mode -cne 'automatic_contextual_read_only'){Hold 'EXISTING_COGNEE_READ_ONLY_POLICY_HOLD'}
 $task=Get-ScheduledTask -TaskName 'FunIndustrial-Executive-Operator-V1' -ErrorAction SilentlyContinue
 if(!$task -or $task.State -eq 'Disabled'){Hold 'EXECUTIVE_SCHEDULE_NOT_ACTIVE'}
-$newTaskAction='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+(Join-Path $OldRoot 'Run-Fun-Purchase-Demand-V5-14.ps1')+'"'
+$scheduledRunner=Join-Path $ScheduleRoot 'Run-Fun-Purchase-Demand-V5-14.ps1'
+Leaf $scheduledRunner
+$newTaskAction='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$scheduledRunner+'"'
 if(@($task.Actions).Count -ne 1 -or
  [string]$task.Actions[0].Arguments -cne $newTaskAction -or
  @($task.Triggers).Count -ne 4){Hold 'REAL_OPERATIONS_SCHEDULE_NOT_VERIFIED'}
+Write-Host 'FUN_SPATIAL_V2_SCHEDULE=FIAL514_UNCHANGED_FOUR_TRIGGERS'
 $receiptFile=Join-Path $env:LOCALAPPDATA 'FunIndustrial\ExecutiveOperatorV1\last-cycle-v1.json'
 $realReceiptFile=Join-Path $env:LOCALAPPDATA 'FunIndustrial\ExecutiveOperatorV1\RealWorkV55\last-real-cycle.json'
 if(!(Test-Path -LiteralPath $realReceiptFile -PathType Leaf)){Hold 'FIAL58_REAL_WORK_RECEIPT_MISSING'}
