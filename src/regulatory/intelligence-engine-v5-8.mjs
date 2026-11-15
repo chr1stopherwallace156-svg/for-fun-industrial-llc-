@@ -14,8 +14,10 @@ const MAX_HTML=240000,MAX_JSON=90000;
 function hold(name){throw Error('FIAL58_'+name)}
 function validOfficial(source){
  const u=new URL(source.url);
+ const fixedFederalQuery='?per_page=5&order=newest&conditions%5Bterm%5D=truck%20emissions';
  if(u.protocol!=='https:'||u.username||u.password||u.port||
-  u.hash||u.search||u.hostname!==source.host||
+  u.hash||(u.search&&!(source.kind==='federal_api'&&u.search===fixedFederalQuery))||
+  u.hostname!==source.host||
   !['ww2.arb.ca.gov','procurement.ucop.edu','www.calstate.edu','api.bls.gov','www.federalregister.gov'].includes(u.hostname))
   hold('UNAPPROVED_OFFICIAL_ENDPOINT');
  return source.url;
