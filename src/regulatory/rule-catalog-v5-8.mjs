@@ -3,8 +3,8 @@
 export const CATALOG_VERSION='fial5.8-regulatory-catalog-v1';
 export const RULES=Object.freeze([
  {id:'ctc-obd-quarterly',domain:'heavy_duty',name:'Clean Truck Check OBD testing frequency',
-  effective:'2027-10-01',date_type:'program_frequency_change',applies_to:'Covered on-road OBD-equipped vehicles subject to California Clean Truck Check (exceptions exist)',
-  summary:'OBD-equipped covered vehicles move from two to four emissions compliance tests per year beginning October 2027.',
+  effective:'2027-10',date_type:'program_frequency_change_month',applies_to:'Covered on-road OBD-equipped vehicles subject to California Clean Truck Check (exceptions exist)',
+  summary:'OBD-equipped covered vehicles move from two to four emissions compliance tests per year beginning October 2027. Only the month, not an October 1 legal effective day, is documented here.',
   caveat:'Not one fixed fleet-wide due date: check each vehicle CTC-VIS account for specific compliance deadlines; agricultural vehicles and certain motorhomes differ.',
   source:'https://ww2.arb.ca.gov/vehicle-owners-emissions-compliance-testing-requirements-clean-truck-check',
   legal_status:'published_regulatory_guidance',sectors:['trucking','schools','campus','public_fleets','vendors'],priority:95},
@@ -41,7 +41,7 @@ export const RULES=Object.freeze([
   applies_to:'California statewide climate policy',
   summary:'California law sets a statewide carbon-neutrality policy target no later than 2045.',
   caveat:'Not a universal individual vehicle retirement, business-license, procurement or conversion deadline.',
-  source:'https://ww2.arb.ca.gov/our-work/programs/school-buses/regulations-affecting-school-fleets',
+  source:'https://ww2.arb.ca.gov/ghg-limits',
   legal_status:'statewide_policy_goal',sectors:['schools','campus','public_fleets','trucking','public_transit'],priority:45},
  {id:'airport-shuttle-2028',domain:'airport_shuttle',name:'Airport shuttle phase-in',
   effective:'2028-01-01',date_type:'fleet_share_milestone',
@@ -79,14 +79,15 @@ export const BLS_SERIES=Object.freeze([
  {id:'CUUR0000SA0',label:'U.S. CPI-U (all items)',unit:'index',claim:'National consumer price level, not a truck-fleet cost quote'},
  {id:'LNS14000000',label:'U.S. unemployment rate',unit:'percent',claim:'National labor market context, not verified local hiring costs'}
 ]);
-function isoDate(x){return typeof x==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x)&&Number.isFinite(Date.parse(x+'T00:00:00Z'))}
+function isoDate(x){return typeof x==='string'&&/^\d{4}-\d{2}(?:-\d{2})?$/.test(x)&&
+ Number.isFinite(Date.parse((x.length===7?x+'-01':x)+'T00:00:00Z'))}
 export function dueWatch({now=new Date(),limit=16}={}){
  if(!(now instanceof Date)||!Number.isFinite(+now))throw Error('FIAL58_INVALID_CLOCK');
  const today=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate());
  return RULES.map(rule=>{
   const valid=isoDate(rule.effective);
-  const days=valid?Math.round((Date.parse(rule.effective+'T00:00:00Z')-today)/86400000):null;
-  return {...rule,days_until_milestone:days,
+  const days=valid?Math.round((Date.parse((rule.effective.length===7?rule.effective+'-01':rule.effective)+'T00:00:00Z')-today)/86400000):null;
+  return {...rule,days_until_milestone:days,milestone_precision:rule.effective?.length===7?'month':'day',
    urgency:!valid?'REQUIRES_SPECIFIC_SOURCE':days<0?'HISTORICAL_MILESTONE_REVERIFY_RULE':days<=90?'UPCOMING_MILESTONE_REVIEW':days<=365?'YEAR_AHEAD_PLANNING':'LONG_RANGE_PLANNING',
    person_or_vehicle_due_date_verified:false,
    certified_applicability:false,
