@@ -11,6 +11,30 @@ const FOLDER='RegulatoryEconomicV58',FILE='last-intelligence-v1.json';
 const hash=x=>createHash('sha256').update(x).digest('hex');
 const obj=x=>x&&typeof x==='object'&&!Array.isArray(x);
 const MAX_HTML=240000,MAX_JSON=90000;
+// Fixed, dated cross-source anchor: the BLS October 2026 release (CUUR0000SA0)
+// states 337.511 for the not-seasonally-adjusted U.S. CPI-U All Items index.
+// This is a published historical sanity check, NOT a fabricated live estimate.
+export const BLS_PUBLISHED_ANCHOR=Object.freeze({
+ series_id:'CUUR0000SA0',month:'2026-10',value:337.511,
+ published_at:'2026-11-10',
+ source_url:'https://www.bls.gov/news.release/cpi.nr0.htm',
+ tolerance:0.0005
+});
+export function validateEconomicCache(series){
+ if(!Array.isArray(series)||series.length>4)return {ok:false,reason:'INVALID_SERIES_COLLECTION'};
+ for(const row of series){
+  if(!BLS_SERIES.some(x=>x.id===row?.id)||!Array.isArray(row.observations)||row.observations.length>26)
+   return {ok:false,reason:'UNKNOWN_SERIES_OR_POINTS'};
+  const anchor=row.id===BLS_PUBLISHED_ANCHOR.series_id?
+   row.observations.find(x=>x.month===BLS_PUBLISHED_ANCHOR.month):null;
+  if(anchor&&(!Number.isFinite(anchor.value)||Math.abs(anchor.value-BLS_PUBLISHED_ANCHOR.value)>BLS_PUBLISHED_ANCHOR.tolerance))
+   return {ok:false,reason:'BLS_OCT2026_CPI_CROSS_SOURCE_MISMATCH'};
+  if(row.id===BLS_PUBLISHED_ANCHOR.series_id&&row.latest_month===BLS_PUBLISHED_ANCHOR.month&&
+   Math.abs(row.latest_value-BLS_PUBLISHED_ANCHOR.value)>BLS_PUBLISHED_ANCHOR.tolerance)
+   return {ok:false,reason:'BLS_OCT2026_LATEST_CPI_CROSS_SOURCE_MISMATCH'};
+ }
+ return {ok:true,reason:null}
+}
 function hold(name){throw Error('FIAL58_'+name)}
 function validOfficial(source){
  const u=new URL(source.url);
@@ -99,6 +123,11 @@ export function parseEconomicResponse(raw,{asOf=new Date()}={}){
    .filter(p=>Number.isFinite(p.value)&&p.value>=0&&p.value<1e7)
    .sort((a,b)=>a.month.localeCompare(b.month)).slice(-26);
   if(data.length===0)continue;
+  if(spec.id===BLS_PUBLISHED_ANCHOR.series_id){
+   const anchor=data.find(x=>x.month===BLS_PUBLISHED_ANCHOR.month);
+   if(anchor&&Math.abs(anchor.value-BLS_PUBLISHED_ANCHOR.value)>BLS_PUBLISHED_ANCHOR.tolerance)
+    hold('BLS_OCT2026_CPI_CROSS_SOURCE_MISMATCH');
+  }
   const latest=data.at(-1),prior=data.find(x=>x.month===
    String(Number(latest.month.slice(0,4))-1)+latest.month.slice(4));
   const yoy=prior&&prior.value!==0?
@@ -153,12 +182,16 @@ export async function runRegulatoryCycle({root=ROOT(),now=new Date(),fetcher=fet
  if(prior&&prior.version!==VERSION)hold('PRIOR_LEDGER_VERSION');
  const previous=new Map((prior?.sources||[]).map(x=>[x.id,x]));
  const records=[],events=[];
- let economic=Array.isArray(prior?.economic_series)?prior.economic_series:[],
+ const priorEconomic=Array.isArray(prior?.economic_series)?prior.economic_series:[];
+ const priorCheck=validateEconomicCache(priorEconomic);
+ const sourceUpdate=prior?.source_catalog_version!==CATALOG_VERSION;
+ const dataQualityWarnings=priorCheck.ok?[]:[priorCheck.reason];
+ let economic=priorCheck.ok?priorEconomic:[],
   federal=Array.isArray(prior?.federal_notices)?prior.federal_notices:[];
  let refreshed=0,changed=0,held=0;
  for(const s of SOURCES){
   const before=previous.get(s.id);
-  if(before&&!fetchTime(before,s,now)){
+  if(before&&!sourceUpdate&&before.source_url===s.url&&!(s.kind==='economic_api'&&!priorCheck.ok)&&!fetchTime(before,s,now)){
    records.push({...before,checked_this_cycle:false,change_state:'NOT_CHECKED_TTL'});
    continue;
   }
@@ -176,12 +209,17 @@ export async function runRegulatoryCycle({root=ROOT(),now=new Date(),fetcher=fet
    await immutable(evidence,r.bytes);
    if(s.kind==='economic_api')economic=derived;
    if(s.kind==='federal_api')federal=derived;
-   const isChanged=!!before?.sha256&&before.sha256!==r.sha256;
+   const replacedURL=!!before?.source_url&&before.source_url!==s.url;
+   const isChanged=!replacedURL&&!!before?.sha256&&before.sha256!==r.sha256;
+   if(replacedURL)events.push({id:s.id,type:'SOURCE_URL_REBASED_TO_CURRENT_AUTHORITY',
+    source_url:s.url,previous_source_url:before.source_url,observed_at_utc:now.toISOString(),
+    human_verification_required:true});
    if(isChanged){changed++;events.push({id:s.id,type:'PUBLISHED_SOURCE_CHANGED',source_url:s.url,
     observed_at_utc:now.toISOString(),old_sha256:before.sha256,new_sha256:r.sha256,
     human_verification_required:true})}
    records.push({id:s.id,source_url:s.url,kind:s.kind,
-    state:'SOURCE_RETRIEVED',change_state:!before?.sha256?'FIRST_BASELINE_NO_CHANGE_CLAIM':
+    state:'SOURCE_RETRIEVED',change_state:replacedURL?'SOURCE_URL_CHANGED_NO_INFERRED_AMENDMENT':
+      !before?.sha256?'FIRST_BASELINE_NO_CHANGE_CLAIM':
       isChanged?'PUBLISHED_SOURCE_CHANGED':'PUBLISHED_SOURCE_UNCHANGED',
     sha256:r.sha256,raw_evidence_file:evidence,bytes:r.bytes.length,
     last_checked_utc:now.toISOString(),checked_this_cycle:true,
@@ -198,13 +236,16 @@ export async function runRegulatoryCycle({root=ROOT(),now=new Date(),fetcher=fet
  }
  const history=Array.isArray(prior?.history)?prior.history.filter(x=>obj(x)).slice(-47):[];
  const counts={monitored:SOURCES.length,refreshed,source_changes:changed,source_holds:held,
-  economic_series:economic.length,visible_milestones:graphMilestones().length};
+  economic_series:economic.length,visible_milestones:graphMilestones().length,
+  unresolved_data_quality_warnings:dataQualityWarnings.length};
  const newEntry={as_of_utc:now.toISOString(),changed,held,refreshed,economic_latest:
   economic.map(x=>({id:x.id,month:x.latest_month,value:x.latest_value}))};
  history.push(newEntry);
  const out={version:VERSION,source_catalog_version:CATALOG_VERSION,
   as_of_utc:now.toISOString(),state:'REAL_PUBLIC_DATA_CHECK_COMPLETED',
   monitoring_policy:'TTL_REFRESH_24_TO_48_HOURS_INCREMENTAL',
+  data_quality_warnings:dataQualityWarnings,
+  authority_update:'ACF_2026_FINAL_AMENDMENT_SUPERSEDES_2027_PURCHASE_RULE',
   counts,sources:records,economic_series:economic,
   federal_notices:federal,rule_watch:dueWatch({now,limit:30}),
   timeline:graphMilestones(),published_changes:events,history,
@@ -221,6 +262,15 @@ export async function readRegulatoryStatus({root=ROOT()}={}){
   refreshed:0,source_changes:0,source_holds:0,economic_series:0},
   rule_watch:dueWatch(),timeline:graphMilestones(),economic_series:[],sources:[],history:[],
   boundaries:{emails_sent:0,automatic_filing:0,model_calls:0}};
+ if(raw.source_catalog_version!==CATALOG_VERSION||
+  !validateEconomicCache(raw.economic_series).ok)
+  return {version:VERSION,state:'HOLD_STALE_OR_UNVERIFIED_INTELLIGENCE_REQUIRES_REFRESH',
+   source_catalog_version:CATALOG_VERSION,as_of_utc:raw.as_of_utc,
+   counts:{monitored:SOURCES.length,refreshed:0,source_changes:0,source_holds:0,
+    economic_series:0,visible_milestones:graphMilestones().length},
+   rule_watch:dueWatch(),timeline:graphMilestones(),economic_series:[],
+   sources:[],history:[],data_quality_warnings:['Old regulatory catalog or mismatched BLS observation held'],
+   boundaries:{emails_sent:0,automatic_filing:0,model_calls:0,verified_individual_due_dates:0}};
  if(raw.version!==VERSION||raw.boundaries?.emails_sent!==0||
   raw.boundaries?.automatic_filing!==0||raw.boundaries?.model_calls!==0||
   !Array.isArray(raw.sources)||raw.sources.length!==SOURCES.length)hold('STATUS_MALFORMED');
