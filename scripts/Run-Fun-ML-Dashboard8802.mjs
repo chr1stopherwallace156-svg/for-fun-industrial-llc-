@@ -18,6 +18,7 @@ import {readRealStatus,VERSION as REAL_VERSION} from '../src/operator/real-opera
 import {readBusinessCompetenceStatus,OPERATOR_VERSION} from '../src/competence/business-operator-v5-6.mjs';
 import {readOutcomeStatus,VERSION as OUTCOME_VERSION} from '../src/outcomes/outcome-engine-v5-7.mjs';
 import {readRegulatoryStatus,VERSION as REG_VERSION} from '../src/regulatory/intelligence-engine-v5-8.mjs';
+import {readFleetStatus,VERSION as FLEET_VERSION,verifyPublicFleetReport} from '../src/fleet/fleet-engine-v5-9.mjs';
 import {planBusinessDecision} from '../src/competence/business-knowledge-v5-6.mjs';
 import {calculateFinancials} from '../src/competence/business-finance-v5-6.mjs';
 import {reviewBusinessWriting} from '../src/competence/business-writing-v5-6.mjs';
@@ -25,6 +26,7 @@ const REAL_WIDGET=new URL('../src/operator/real-operations-widget-v5-5.js',impor
 const BUSINESS_CLIENT=new URL('../src/competence/business-console-v5-6.js',import.meta.url);
 const OUTCOME_CLIENT=new URL('../src/outcomes/outcome-console-v5-7.js',import.meta.url);
 const REG_CLIENT=new URL('../src/regulatory/regulatory-console-v5-8.js',import.meta.url);
+const FLEET_CLIENT=new URL('../src/fleet/fleet-console-v5-9.js',import.meta.url);
 
 export const HOST='127.0.0.1',PORT=8802,ORIGIN='http://127.0.0.1:8802';
 const MAX_PAGE=240000,MAX_PROXY=12*1024*1024;
@@ -180,7 +182,7 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
  readCommerceWidget=()=>readFile(COMMERCE_WIDGET,'utf8'),
  executiveStatus=readExecutiveStatus,realStatus=readRealStatus,
  businessStatus=readBusinessCompetenceStatus,businessPlan=planBusinessDecision,
- outcomeStatus=readOutcomeStatus,regulatoryStatus=readRegulatoryStatus,
+ outcomeStatus=readOutcomeStatus,regulatoryStatus=readRegulatoryStatus,fleetStatus=readFleetStatus,
  readUiClient=()=>readFile(UI_CLIENT,'utf8'),readUiStyle=()=>readFile(UI_CSS,'utf8')}={}){
   return http.createServer(async(req,res)=>{
     try{
@@ -203,6 +205,16 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
       }
       if(req.method==='GET'&&u.pathname==='/api/operator/client.js'){
         return send(res,200,await readFile(EXEC_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      }
+      if(req.method==='GET'&&u.pathname==='/api/operator/fleet/client.js'){
+        return send(res,200,await readFile(FLEET_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      }
+      if(req.method==='GET'&&u.pathname==='/api/operator/fleet/status'){
+        const report=await fleetStatus();
+        if(report.version!==FLEET_VERSION||
+          (report.state!=='NOT_ACTIVATED'&&!verifyPublicFleetReport(report)))
+          throw Error('FIAL59_FLEET_RECEIPT_AUTHORITY_INVALID');
+        return send(res,200,report);
       }
       if(req.method==='GET'&&u.pathname==='/api/operator/regulatory/client.js'){
         return send(res,200,await readFile(REG_CLIENT,'utf8'),'text/javascript; charset=utf-8');
