@@ -20,11 +20,15 @@ jobs:
   windows:
     runs-on: windows-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['24', '26']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: ${{ matrix.node }}
       - name: Syntax check all new dashboard code and existing server
         shell: pwsh
         run: |
@@ -58,6 +62,23 @@ jobs:
               throw ('ONEPORT_UNAPPROVED_INSTALLER_MUTATION='+$file)}
           }
           $deployment=Get-Content 'Deploy-Fun-OnePort-Dashboard-V1.ps1' -Raw
+          # Regression: Node 26 rejects --check *.css with ERR_UNKNOWN_FILE_EXTENSION.
+          # The actual Windows installer must check executable JS only, and treat
+          # CSS as a nonempty static asset, with all files still required.
+          foreach($mark in @("GetExtension($f)", "$ext -ceq '.js'", "$ext -ceq '.mjs'",
+            "$ext -ceq '.css'", 'NEW_CSS_ASSET_EMPTY',
+            'UNEXPECTED_SOURCE_FILE_EXTENSION')){
+            if(!$deployment.Contains($mark)){throw ('ONEPORT_CSS_PREFLIGHT_REGRESSION='+$mark)}
+          }
+          if(!$deployment.Contains("Join-Path $OldRoot 'Run-Fun-Purchase-Demand-V5-14.ps1'")){
+            throw 'ONEPORT_SCHEDULER_MUST_VERIFY_PRIOR_FIAL514_INSTALLATION'
+          }
+          foreach($file in @('src/ui/oneport-dashboard-v1.css','src/ui/oneport-embedded-v1.css')){
+            if(!(Test-Path $file -PathType Leaf) -or (Get-Item $file).Length -lt 20){
+              throw ('ONEPORT_CSS_MISSING_OR_EMPTY='+$file)
+            }
+          }
+          Write-Host 'FUN_ONEPORT_NODE26_CSS_AND_OLD_SCHEDULE_GUARDS=PASS'
           foreach($required in @('363ee4608f376b43cc6cbfad3b299263fbfafa54',
             'OLD_DASHBOARD_SOURCE_NOT_REVIEWED',
             'FIAL58_ROLLBACK_OLD_PRIMARY_DASHBOARD=PASS',
