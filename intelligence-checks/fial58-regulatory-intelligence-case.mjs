@@ -8,12 +8,12 @@ import {runRegulatoryCycle,readRegulatoryStatus,parseEconomicResponse,parseFeder
 const FIRST=new Date('2026-11-14T23:00:00.000Z');
 const samples=(delta=0)=>({status:'REQUEST_SUCCEEDED',Results:{series:[
  {seriesID:'CUUR0000SA0',data:[
-  {year:'2026',period:'M10',value:String(324+delta)},
-  {year:'2026',period:'M09',value:'322'},
-  {year:'2025',period:'M10',value:'313'},
-  {year:'2025',period:'M09',value:'312'}]},
+  {year:'2026',period:'M10',value:'337.511'},
+  {year:'2026',period:'M09',value:'336.940'},
+  {year:'2025',period:'M10',value:'326.5'},
+  {year:'2025',period:'M09',value:'325.0'}]},
  {seriesID:'LNS14000000',data:[
-  {year:'2026',period:'M10',value:String(4.4+delta)},
+  {year:'2026',period:'M10',value:String(4.1+delta)},
   {year:'2026',period:'M09',value:'4.3'},
   {year:'2025',period:'M10',value:'4.1'}]}]}});
 function response(body,type){
@@ -72,7 +72,7 @@ test('BLS series use actual numeric government data, month validation, chronolog
  assert.equal(rows.length,2);
  const cpi=rows.find(x=>x.id==='CUUR0000SA0');
  assert.equal(cpi.latest_month,'2026-10');
- assert.equal(cpi.latest_value,324);
+ assert.equal(cpi.latest_value,337.511);
  assert.ok(cpi.year_over_year_change_pct>3&&cpi.year_over_year_change_pct<4);
  assert.equal(cpi.context.includes('not a truck-fleet cost quote'),true);
  assert.equal(cpi.observations.at(-1).month,'2026-10');
