@@ -218,6 +218,7 @@ foreach($file in @(
  'src\fleet\fleet-sources-v5-9.mjs',
  'src\fleet\fleet-engine-v5-9.mjs',
  'src\fleet\fleet-console-v5-9.js',
+ 'src\fleet\fleet-qwen-v5-9.mjs',
  'scripts\Run-Fun-Fleet-Opportunity-V5-9.mjs',
  'src\operator\real-operations-widget-v5-5.js',
  'src\ui\integrated-hub-v1.js',
@@ -234,7 +235,8 @@ foreach($file in @(
  'intelligence-checks\fial58-regulatory-intelligence-case.mjs',
  'intelligence-checks\fial58-regulatory-dashboard-case.mjs',
  'intelligence-checks\fial59-fleet-evidence-case.mjs',
- 'intelligence-checks\fial59-dashboard-case.mjs')){
+ 'intelligence-checks\fial59-dashboard-case.mjs',
+ 'intelligence-checks\fial59-qwen-context-case.mjs')){
  $f=Join-Path $Root $file;Leaf $f
  & $Node --check $f
  if($LASTEXITCODE -ne 0){Hold ('NEW_SOURCE_SYNTAX_HOLD='+$file)}
@@ -242,6 +244,7 @@ foreach($file in @(
 $tests=@(
  'intelligence-checks\fial59-fleet-evidence-case.mjs',
  'intelligence-checks\fial59-dashboard-case.mjs',
+ 'intelligence-checks\fial59-qwen-context-case.mjs',
  'intelligence-checks\fial58-regulatory-intelligence-case.mjs',
  'intelligence-checks\fial58-regulatory-dashboard-case.mjs',
  'intelligence-checks\fial57-outcomes-case.mjs',
