@@ -73,7 +73,7 @@ test('same-origin real asset URLs are GET-only on the single 8802 listener',asyn
    const r=await request(server,path);
    assert.equal(r.status,200,path);
   }
-  assert.equal((await request(server,'/api/oneport/vendor/vanilla-tilt.js','POST')).status,404);
+  assert.equal((await request(server,'/api/oneport/vendor/vanilla-tilt.js','POST')).status,403); // origin guard correctly refuses before routing
   assert.equal((await request(server,'/api/oneport/vendor/unknown.js')).status,404)
  })
 });
