@@ -75,6 +75,10 @@ export function verifyPublicFleetReport(r){
   r.boundaries?.filed_forms!==0||r.boundaries?.orders_placed!==0||
   r.boundaries?.rea_calls!==0||r.boundaries?.model_calls!==0||
   r.boundaries?.actual_revenue_usd!==0||
+  r.counts?.verified_open_rfps!==0||
+  r.counts?.awarded_contracts!==0||
+  r.counts?.actual_revenue_usd!==0||
+  r.counts?.named_prospects!==r.prospects?.length||
   !Array.isArray(r.sources)||r.sources.length!==SOURCES.length||
   !Array.isArray(r.prospects)||r.prospects.length<1||r.prospects.length>150||
   !Array.isArray(r.procurement_watch)||r.procurement_watch.length!==3||
