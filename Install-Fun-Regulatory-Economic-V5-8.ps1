@@ -4,12 +4,12 @@
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $Root=$PSScriptRoot
-$Branch='feature/fial5-8-regulatory-economic-intelligence-20261114'
+$Branch='repair/fial58-2026-amendment-data-integrity-20261114'
 $Origin='https://github.com/chr1stopherwallace156-svg/for-fun-industrial-llc-.git'
-$OldRoot=Join-Path $HOME 'FunIndustrial-FIAL57-VerifiedOutcomes'
-$OldBranch='feature/fial5-7-verifiable-business-outcomes-20261114'
-$OldScript=Join-Path $OldRoot 'Run-Fun-Verified-Outcomes-V5-7.ps1'
-$OldBlob='6cad7f6c578d61ad463cc28398a66885b08e545c'
+$OldRoot=Join-Path $HOME 'FunIndustrial-FIAL58-RegulatoryIntelligence'
+$OldBranch='feature/fial5-8-regulatory-economic-intelligence-20261114'
+$OldScript=Join-Path $OldRoot 'Run-Fun-Regulatory-Economic-V5-8.ps1'
+$OldBlob='fa2ebe4a46654ab299520bbb1ae3901526a5b92a'
 $NewScript=Join-Path $Root 'Run-Fun-Regulatory-Economic-V5-8.ps1'
 $TaskName='FunIndustrial-Executive-Operator-V1'
 $Data=Join-Path $env:LOCALAPPDATA 'FunIndustrial\ExecutiveOperatorV1'
@@ -31,7 +31,7 @@ function PortOwners([int]$port){
 }
 SourceIdentity $Root $Branch
 SourceIdentity $OldRoot $OldBranch
-$oldHash=(& git.exe -C $OldRoot hash-object --path=Run-Fun-Verified-Outcomes-V5-7.ps1 -- $OldScript|Out-String).Trim()
+$oldHash=(& git.exe -C $OldRoot hash-object --path=Run-Fun-Regulatory-Economic-V5-8.ps1 -- $OldScript|Out-String).Trim()
 if($LASTEXITCODE -ne 0 -or $oldHash -cne $OldBlob){Hold 'OLD_SCHEDULED_RUNNER_BLOB_DRIFT'}
 $files=@(
  'src\regulatory\rule-catalog-v5-8.mjs',
@@ -81,6 +81,15 @@ if($last.version -cne 'fial5.8-regulatory-economic-v1' -or
  $last.boundaries.model_calls -ne 0 -or
  $last.boundaries.verified_individual_due_dates -ne 0){Hold 'FIRST_PUBLIC_EVIDENCE_INVALID'}
 foreach($p in $ports){if((PortOwners $p) -cne $before[$p]){Hold ('PROTECTED_SERVICE_CHANGED_PORT_'+$p)}}
+if($last.source_catalog_version -cne 'fial5.8.1-regulatory-catalog-2026-amendment-v1' -or
+ $last.authority_update -cne 'ACF_2026_FINAL_AMENDMENT_SUPERSEDES_2027_PURCHASE_RULE'){
+ Hold 'APPROVED_2026_AMENDMENT_NOT_ACTIVE'
+}
+$acf=@($last.rule_watch|Where-Object {$_.id -eq 'acf-state-local-purchasing'})
+if($acf.Count -ne 1 -or $acf[0].effective -cne '2030-01-01' -or
+ $acf[0].supersedes -cne '2027-01-01'){
+ Hold 'OUTDATED_2027_MILESTONE_NOT_REPLACED'
+}
 Write-Host ('FIAL58_FIRST_REAL_CYCLE=PASS SOURCES='+$last.counts.monitored+
  ' FETCHED='+$last.counts.refreshed+
  ' HOLDS='+$last.counts.source_holds+
