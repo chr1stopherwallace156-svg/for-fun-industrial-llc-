@@ -21,6 +21,7 @@ import {readRegulatoryStatus,VERSION as REG_VERSION} from '../src/regulatory/int
 import {readFleetStatus,VERSION as FLEET_VERSION,verifyPublicFleetReport} from '../src/fleet/fleet-engine-v5-9.mjs';
 import {readProcurementStatus,VERSION as PROCUREMENT_VERSION} from '../src/procurement/procurement-engine-v5-10.mjs';
 import {readFitStatus,VERSION as FIT_VERSION} from '../src/fit/commercial-fit-engine-v5-11.mjs';
+import {readReadinessStatus,VERSION as BID_VERSION} from '../src/bid-readiness/readiness-engine-v5-12.mjs';
 import {planBusinessDecision} from '../src/competence/business-knowledge-v5-6.mjs';
 import {calculateFinancials} from '../src/competence/business-finance-v5-6.mjs';
 import {reviewBusinessWriting} from '../src/competence/business-writing-v5-6.mjs';
@@ -31,6 +32,7 @@ const REG_CLIENT=new URL('../src/regulatory/regulatory-console-v5-8.js',import.m
 const FLEET_CLIENT=new URL('../src/fleet/fleet-console-v5-9.js',import.meta.url);
 const PROCUREMENT_CLIENT=new URL('../src/procurement/procurement-console-v5-10.js',import.meta.url);
 const FIT_CLIENT=new URL('../src/fit/commercial-fit-console-v5-11.js',import.meta.url);
+const BID_CLIENT=new URL('../src/bid-readiness/readiness-console-v5-12.js',import.meta.url);
 
 export const HOST='127.0.0.1',PORT=8802,ORIGIN='http://127.0.0.1:8802';
 const MAX_PAGE=240000,MAX_PROXY=12*1024*1024;
@@ -188,6 +190,7 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
  businessStatus=readBusinessCompetenceStatus,businessPlan=planBusinessDecision,
  outcomeStatus=readOutcomeStatus,regulatoryStatus=readRegulatoryStatus,fleetStatus=readFleetStatus,
  procurementStatus=readProcurementStatus,fitStatus=readFitStatus,
+ bidStatus=readReadinessStatus,
  readUiClient=()=>readFile(UI_CLIENT,'utf8'),readUiStyle=()=>readFile(UI_CSS,'utf8')}={}){
   return http.createServer(async(req,res)=>{
     try{
@@ -210,6 +213,23 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
       }
       if(req.method==='GET'&&u.pathname==='/api/operator/client.js'){
         return send(res,200,await readFile(EXEC_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      }
+      if(req.method==='GET'&&u.pathname==='/api/operator/bid-readiness/client.js'){
+        return send(res,200,await readFile(BID_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      }
+      if(req.method==='GET'&&u.pathname==='/api/operator/bid-readiness/status'){
+        const r=await bidStatus();
+        if(r.version!==BID_VERSION||r.counts?.verified_bid_ready!==0||
+           r.counts?.actual_revenue_usd!==0||r.boundaries?.bids_submitted!==0||
+           r.boundaries?.rea_tool_calls!==0||r.boundaries?.emails_sent!==0||
+           r.boundaries?.registrations_made!==0||r.boundaries?.model_calls!==0||
+           r.boundaries?.applications_submitted!==0||r.boundaries?.payments_made!==0||
+           !Array.isArray(r.leads)||r.leads.length!==2||
+           r.leads.some(x=>x.direct_bid_ready!==false||x.verified_eligibility!==false||
+            x.contract_awarded!==false||x.contract_value_usd_verified!==0||
+            x.buyer_accepting_submissions_verified!==false))
+            throw Error('FIAL512_BID_READINESS_AUTHORITY_OR_SCHEMA_INVALID');
+        return send(res,200,r);
       }
       if(req.method==='GET'&&u.pathname==='/api/operator/fit/client.js'){
         return send(res,200,await readFile(FIT_CLIENT,'utf8'),'text/javascript; charset=utf-8');
