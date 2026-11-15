@@ -217,9 +217,13 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         const r=await procurementStatus();
         if(r.version!==PROCUREMENT_VERSION||r.boundaries?.actual_rfps_submitted!==0||
          r.boundaries?.emails_sent!==0||r.boundaries?.rea_calls!==0||
+         r.boundaries?.model_calls!==0||r.boundaries?.revenue_usd!==0||
+         r.boundaries?.orders!==0||r.boundaries?.awarded_contracts!==0||
          r.counts?.verified_fit_for_elektron!==0||
          !Array.isArray(r.verified_current_published_notices)||
-         r.verified_current_published_notices.length>1)
+         r.verified_current_published_notices.length>1||
+         r.counts?.verified_current_published_notices!==r.verified_current_published_notices.length||
+         (r.state==='NOT_ACTIVATED'&&r.verified_current_published_notices.length!==0))
           throw Error('FIAL510_PROVENANCE_OR_AUTHORITY_INVALID');
         return send(res,200,r);
       }
