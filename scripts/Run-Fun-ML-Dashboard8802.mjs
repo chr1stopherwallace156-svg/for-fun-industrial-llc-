@@ -23,6 +23,7 @@ import {readProcurementStatus,VERSION as PROCUREMENT_VERSION} from '../src/procu
 import {readFitStatus,VERSION as FIT_VERSION} from '../src/fit/commercial-fit-engine-v5-11.mjs';
 import {readReadinessStatus,VERSION as BID_VERSION} from '../src/bid-readiness/readiness-engine-v5-12.mjs';
 import {readBuyerStatus,VERSION as BUYER_VERSION} from '../src/buyers/buyer-engine-v5-13.mjs';
+import {readDemandStatus,VERSION as DEMAND_VERSION} from '../src/demand/demand-engine-v5-14.mjs';
 import {planBusinessDecision} from '../src/competence/business-knowledge-v5-6.mjs';
 import {calculateFinancials} from '../src/competence/business-finance-v5-6.mjs';
 import {reviewBusinessWriting} from '../src/competence/business-writing-v5-6.mjs';
@@ -35,6 +36,7 @@ const PROCUREMENT_CLIENT=new URL('../src/procurement/procurement-console-v5-10.j
 const FIT_CLIENT=new URL('../src/fit/commercial-fit-console-v5-11.js',import.meta.url);
 const BID_CLIENT=new URL('../src/bid-readiness/readiness-console-v5-12.js',import.meta.url);
 const BUYER_CLIENT=new URL('../src/buyers/buyer-console-v5-13.js',import.meta.url);
+const DEMAND_CLIENT=new URL('../src/demand/demand-console-v5-14.js',import.meta.url);
 
 export const HOST='127.0.0.1',PORT=8802,ORIGIN='http://127.0.0.1:8802';
 const MAX_PAGE=240000,MAX_PROXY=12*1024*1024;
@@ -192,7 +194,7 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
  businessStatus=readBusinessCompetenceStatus,businessPlan=planBusinessDecision,
  outcomeStatus=readOutcomeStatus,regulatoryStatus=readRegulatoryStatus,fleetStatus=readFleetStatus,
  procurementStatus=readProcurementStatus,fitStatus=readFitStatus,
- bidStatus=readReadinessStatus,buyerStatus=readBuyerStatus,
+ bidStatus=readReadinessStatus,buyerStatus=readBuyerStatus,demandStatus=readDemandStatus,
  readUiClient=()=>readFile(UI_CLIENT,'utf8'),readUiStyle=()=>readFile(UI_CSS,'utf8')}={}){
   return http.createServer(async(req,res)=>{
     try{
@@ -215,6 +217,35 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
       }
       if(req.method==='GET'&&u.pathname==='/api/operator/client.js'){
         return send(res,200,await readFile(EXEC_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      }
+      if(req.method==='GET'&&u.pathname==='/api/operator/demand/client.js'){
+        return send(res,200,await readFile(DEMAND_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      }
+      if(req.method==='GET'&&u.pathname==='/api/operator/demand/status'){
+        const r=await demandStatus();
+        if(r.version!==DEMAND_VERSION||
+         r.buyer?.id!=='bakersfield-city-school-district'||
+         r.program?.awarded_to_bcsd_verified!==false||
+         r.program?.awarded_to_elektron_verified!==false||
+         r.program?.direct_vendor_order!==false||
+         r.counts?.verified_live_ev_repair_rfps!==0||
+         r.counts?.buyer_orders!==0||r.counts?.actual_revenue_usd!==0||
+         r.counts?.verified_funded_district_awards!==0||
+         r.decision?.bids_ready!==0||r.decision?.contact_authorized!==false||
+         r.decision?.verified_live_ev_repair_rfps!==0||
+         r.decision?.confirmed_current_ev_maintenance_buyers!==0||
+         r.decision?.revenue_usd!==0||
+         r.boundaries?.emails_sent!==0||r.boundaries?.bids_submitted!==0||
+         r.boundaries?.forms_submitted!==0||r.boundaries?.applications_filed!==0||
+         r.boundaries?.vendor_accounts_created!==0||
+         r.boundaries?.customer_purchase_orders!==0||
+         r.boundaries?.rea_calls!==0||r.boundaries?.model_calls!==0||
+         !r.active_bid_review||
+         r.active_bid_review.buyer_service_bid_verified!==0||
+         !Array.isArray(r.active_bid_review.possible_relevant_titles)||
+         r.active_bid_review.possible_relevant_titles.length>25)
+         throw Error('FIAL514_DEMAND_AUTHORITY_OR_SCHEMA_INVALID');
+        return send(res,200,r);
       }
       if(req.method==='GET'&&u.pathname==='/api/operator/buyer/client.js'){
         return send(res,200,await readFile(BUYER_CLIENT,'utf8'),'text/javascript; charset=utf-8');
