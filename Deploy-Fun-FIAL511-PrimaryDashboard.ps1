@@ -258,6 +258,7 @@ foreach($file in @(
  'src\fit\commercial-fit-catalog-v5-11.mjs',
  'src\fit\commercial-fit-engine-v5-11.mjs',
  'src\fit\commercial-fit-console-v5-11.js',
+ 'src\fit\commercial-fit-qwen-v5-11.mjs',
  'scripts\Run-Fun-Commercial-Fit-V5-11.mjs',
  'src\operator\real-operations-widget-v5-5.js',
  'src\ui\integrated-hub-v1.js',
@@ -279,7 +280,8 @@ foreach($file in @(
  'intelligence-checks\fial510-procurement-case.mjs',
  'intelligence-checks\fial510-dashboard-case.mjs',
  'intelligence-checks\fial511-commercial-fit-case.mjs',
- 'intelligence-checks\fial511-dashboard-case.mjs')){
+ 'intelligence-checks\fial511-dashboard-case.mjs',
+ 'intelligence-checks\fial511-qwen-context-case.mjs')){
  $f=Join-Path $Root $file;Leaf $f
  & $Node --check $f
  if($LASTEXITCODE -ne 0){Hold ('NEW_SOURCE_SYNTAX_HOLD='+$file)}
@@ -287,6 +289,7 @@ foreach($file in @(
 $tests=@(
  'intelligence-checks\fial511-commercial-fit-case.mjs',
  'intelligence-checks\fial511-dashboard-case.mjs',
+ 'intelligence-checks\fial511-qwen-context-case.mjs',
  'intelligence-checks\fial510-procurement-case.mjs',
  'intelligence-checks\fial510-dashboard-case.mjs',
  'intelligence-checks\fial59-fleet-evidence-case.mjs',
