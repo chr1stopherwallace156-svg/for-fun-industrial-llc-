@@ -21,6 +21,10 @@ Write-Host 'FIAL58_PHASE_2=PRIMARY_8802_DASHBOARD_PASS'
 $data=Invoke-RestMethod 'http://127.0.0.1:8802/api/operator/regulatory/status' -TimeoutSec 18 -ErrorAction Stop
 if($data.version -cne 'fial5.8-regulatory-economic-v1' -or
  $data.state -cne 'REAL_PUBLIC_DATA_CHECK_COMPLETED' -or
+ $data.source_catalog_version -cne 'fial5.8.1-regulatory-catalog-2026-amendment-v1' -or
+ $data.authority_update -cne 'ACF_2026_FINAL_AMENDMENT_SUPERSEDES_2027_PURCHASE_RULE' -or
+ @($data.rule_watch|Where-Object {$_.id -eq 'acf-state-local-purchasing' -and
+   $_.effective -ceq '2030-01-01' -and $_.supersedes -ceq '2027-01-01'}).Count -ne 1 -or
  $data.boundaries.emails_sent -ne 0 -or
  $data.boundaries.automatic_filing -ne 0 -or
  $data.boundaries.model_calls -ne 0 -or
@@ -34,4 +38,9 @@ Write-Host ('FIAL58_ECONOMIC_SERIES='+$data.counts.economic_series+
 Write-Host 'FIAL58_GMAIL_AUTHORIZATION=NOT_REQUIRED'
 Write-Host 'FIAL58_NO_EMAIL_SEND_NO_FILING_NO_SPENDING=TRUE'
 Write-Host 'FIAL58_DASHBOARD=http://127.0.0.1:8802/operations/'
+Write-Host 'FIAL581_SUPERSEDED_2027_FLEET_MILESTONE=QUARANTINED'
+Write-Host 'FIAL581_AMENDED_ACF_2030_MILESTONE=ACTIVE'
+Write-Host 'FIAL581_BLS_CPI_OCT2026_CROSS_SOURCE_CHECK=ENABLED'
+Write-Host 'FIAL581_HELD_SOURCE_REASON_DIAGNOSTICS=ENABLED'
 Write-Host 'FIAL58_ALL_IN_ONE=PASS'
+Write-Host 'FIAL581_DATA_INTEGRITY_REPAIR=PASS'
