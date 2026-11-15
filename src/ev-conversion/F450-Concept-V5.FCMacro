@@ -1,0 +1,50 @@
+# FreeCAD native macro — synthetic, unqualified F-450 concept assembly
+import FreeCAD as App, Part, Import
+import os,json,hashlib,traceback
+from FreeCAD import Vector
+root=os.environ.get("FUN_F450_V5_OUTPUT")
+if not root: raise RuntimeError("FUN_F450_V5_OUTPUT_REQUIRED")
+os.makedirs(root,exist_ok=True)
+doc=App.newDocument("F450_Concept_V5")
+objects=[]
+def box(name,x,y,z,l,w,h,color):
+ obj=doc.addObject("PartDesign::Feature",name)
+ obj.Label=name.replace("_"," ")
+ obj.Shape=Part.makeBox(l,w,h,Vector(x,y,z))
+ obj.ViewObject.ShapeColor=color
+ objects.append(obj)
+ return obj
+# Units: millimetres. Every dimension is a DESIGN PLACEHOLDER, not an OEM spec.
+box("Frame_Left",-2900,-520,650,5800,100,180,(0.32,0.35,0.39))
+box("Frame_Right",-2900,420,650,5800,100,180,(0.32,0.35,0.39))
+for i,x in enumerate((-2450,-1200,0,1200,2450)):
+ box("Crossmember_"+str(i),x,-420,670,100,840,110,(0.38,0.39,0.42))
+box("Cab_Envelope",-2800,-1050,900,2100,2100,1800,(0.72,0.79,0.88))
+box("Front_Axle_Envelope",-2050,-1000,400,220,2000,260,(0.30,0.30,0.32))
+box("Rear_Axle_Envelope",1850,-1000,400,220,2000,260,(0.30,0.30,0.32))
+box("Battery_Left_Envelope",-550,-1020,850,1700,420,350,(0.19,0.60,0.37))
+box("Battery_Right_Envelope",-550,600,850,1700,420,350,(0.19,0.60,0.37))
+box("Drive_Unit_Envelope",1200,-300,950,750,600,500,(0.24,0.43,0.82))
+box("Electrical_Junction_Envelope",350,-250,1370,450,500,230,(0.88,0.61,0.23))
+doc.recompute()
+fc=os.path.join(root,"F450-Concept-V5.FCStd")
+step=os.path.join(root,"F450-Concept-V5.step")
+doc.saveAs(fc)
+Import.export(objects,step)
+def digest(path):
+ h=hashlib.sha256()
+ with open(path,"rb") as f:
+  for b in iter(lambda:f.read(1024*1024),b""):h.update(b)
+ return h.hexdigest()
+receipt={"schema":"fun.ev.f450_concept_v5","model":"2021 F-450 CONCEPT ONLY",
+"dimensions":"ALL_PLACEHOLDER_MM","objectCount":len(objects),
+"artifacts":[{"name":os.path.basename(p),"bytes":os.path.getsize(p),"sha256":digest(p)} for p in (fc,step)],
+"oemGeometryVerified":False,"vehicleSpecific":False,"electricalValidated":False,
+"collisionClearanceVerified":False,"engineeringReleased":False,"manufacturingAuthorized":False}
+with open(os.path.join(root,"F450-Concept-V5-receipt.json"),"x",encoding="utf-8") as f:json.dump(receipt,f,indent=2)
+try:
+ import FreeCADGui as Gui
+ Gui.activeDocument().activeView().viewAxonometric()
+ Gui.activeDocument().activeView().fitAll()
+except Exception:pass
+print("FUN_F450_CONCEPT_V5_CREATED="+root)
