@@ -391,8 +391,17 @@ foreach($file in @(
  'intelligence-checks\fial514-dashboard-case.mjs',
  'intelligence-checks\fial514-qwen-context-case.mjs')){
  $f=Join-Path $Root $file;Leaf $f
- & $Node --check $f
- if($LASTEXITCODE -ne 0){Hold ('NEW_SOURCE_SYNTAX_HOLD='+$file)}
+ $ext=[IO.Path]::GetExtension($f).ToLowerInvariant()
+ if($ext -ceq '.js' -or $ext -ceq '.mjs'){
+  & $Node --check $f
+  if($LASTEXITCODE -ne 0){Hold ('NEW_SOURCE_SYNTAX_HOLD='+$file)}
+ }elseif($ext -ceq '.css'){
+  # CSS is a static asset, NOT an executable JS module. Node 26 rejects
+  # --check *.css with ERR_UNKNOWN_FILE_EXTENSION before any process swap.
+  if((Get-Item -LiteralPath $f).Length -lt 20){Hold ('NEW_CSS_ASSET_EMPTY='+$file)}
+ }else{
+  Hold ('UNEXPECTED_SOURCE_FILE_EXTENSION='+$file)
+ }
 }
 $tests=@(
  'intelligence-checks\fial514-demand-evidence-case.mjs',
@@ -440,7 +449,7 @@ if($mem.memoryAvailable -ne $true -or $mem.memoryWrites -ne $false -or
  $mem.mode -cne 'automatic_contextual_read_only'){Hold 'EXISTING_COGNEE_READ_ONLY_POLICY_HOLD'}
 $task=Get-ScheduledTask -TaskName 'FunIndustrial-Executive-Operator-V1' -ErrorAction SilentlyContinue
 if(!$task -or $task.State -eq 'Disabled'){Hold 'EXECUTIVE_SCHEDULE_NOT_ACTIVE'}
-$newTaskAction='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+(Join-Path $Root 'Run-Fun-Purchase-Demand-V5-14.ps1')+'"'
+$newTaskAction='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+(Join-Path $OldRoot 'Run-Fun-Purchase-Demand-V5-14.ps1')+'"'
 if(@($task.Actions).Count -ne 1 -or
  [string]$task.Actions[0].Arguments -cne $newTaskAction -or
  @($task.Triggers).Count -ne 4){Hold 'REAL_OPERATIONS_SCHEDULE_NOT_VERIFIED'}
