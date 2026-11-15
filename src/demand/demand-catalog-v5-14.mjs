@@ -63,10 +63,10 @@ export function reviewActiveBidTitles(markup){
   .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,' ')
   .replace(/<[^>]+>/g,' ').replace(/&nbsp;|&#160;/gi,' ')
   .replace(/&amp;/gi,'&').replace(/[ \t\r\n]+/g,' ').trim();
- const a=cleaned.search(/\bActive Bids\b/i);
- const b=cleaned.search(/\bAwarded Bids\b/i);
+ const a=cleaned.toLowerCase().lastIndexOf('active bids');
+ const b=cleaned.toLowerCase().lastIndexOf('awarded bids');
  if(a<0||b<0||b<=a||b-a>40000)throw Error('FIAL514_ACTIVE_AWARDED_SECTION_UNVERIFIED');
- const zone=cleaned.slice(a+11,b);
+ const zone=cleaned.slice(a+'active bids'.length,b);
  // Extract only human-review title hints. Nothing can become a verified open solicitation
  // without its independent dated official bid package and legal qualification.
  const m=[...zone.matchAll(/\b(?:BCSD\s+)?([^.!?]{4,160}?)\s+(?:Bid|RFPQ|RFP|RFQ)\s*#?\s*(\d{2}-\d{2}-\d{2})\b/gi)];
