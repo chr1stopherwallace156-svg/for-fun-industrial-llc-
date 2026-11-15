@@ -6,6 +6,7 @@ import {businessContextForQwen} from "../competence/business-knowledge-v5-6.mjs"
 import {regulatoryContextForQwen} from "../regulatory/regulatory-qwen-v5-8.mjs";
 import {fleetContextForQwen} from "../fleet/fleet-qwen-v5-9.mjs";
 import {commercialFitContextForQwen} from "../fit/commercial-fit-qwen-v5-11.mjs";
+import {bidReadinessContextForQwen} from "../bid-readiness/readiness-qwen-v5-12.mjs";
 
 export const GROUNDED_CHAT_VERSION="fial5.2-grounded-chat-v1";
 export const COGNEE="http://127.0.0.1:8789/api/intelligence/memory/recall";
@@ -104,10 +105,12 @@ export function createGroundedChat({fetchImpl=fetch,now=()=>new Date()}={}){
    try{fleetContext=await fleetContextForQwen(q)}catch{/* fleet references never block chat */}
    let commercialFitContext='';
    try{commercialFitContext=await commercialFitContextForQwen(q)}catch{/* keep chat available */}
+   let bidReadinessContext='';
+   try{bidReadinessContext=await bidReadinessContextForQwen(q)}catch{/* no new authority */}
    // Intentionally no tools or tool_choice in the Qwen API request.
    const payload={model:"local-model",stream:false,temperature:0.2,max_tokens:512,
     chat_template_kwargs:{enable_thinking:false},reasoning_effort:"none",
-    messages:[{role:"system",content:[sys,context,regulatoryContext,fleetContext,commercialFitContext].filter(Boolean).join("\n")},{role:"user",content:text}]};
+    messages:[{role:"system",content:[sys,context,regulatoryContext,fleetContext,commercialFitContext,bidReadinessContext].filter(Boolean).join("\n")},{role:"user",content:text}]};
    let model;
    try{
     model=await boundedJson(QWEN,{body:payload,timeoutMs:180000},fetchImpl);
