@@ -152,6 +152,90 @@ async function health(){
  checking=false;btn.disabled=false
 }
 $('fi-health-refresh').addEventListener('click',health);
+
+// Keyboard-first local command palette: navigation only, never submits data.
+const command=$('fi-command-dialog'),search=$('fi-command-input'),results=$('fi-command-results');
+const commandButton=$('fi-command-open');
+const NAV_LABELS=Object.entries(VIEWS).map(([id,v])=>({id,name:v.name,description:v.description}));
+let matching=[];
+let selected=0;
+function commandResults(){
+ const phrase=search.value.trim().toLocaleLowerCase().slice(0,80);
+ matching=NAV_LABELS.filter(v=>(v.name+' '+v.description+' '+v.id).toLocaleLowerCase().includes(phrase)).slice(0,11);
+ if(selected>=matching.length)selected=0;
+ results.replaceChildren();
+ if(!matching.length){
+  const empty=document.createElement('p');
+  empty.className='fi-command-empty';empty.textContent='No matching local workspace.';
+  results.append(empty);return
+ }
+ for(const [i,v] of matching.entries()){
+  const button=document.createElement('button');
+  button.type='button';button.className='fi-command-item';
+  button.setAttribute('role','option');button.setAttribute('aria-selected',String(selected===i));
+  if(selected===i)button.dataset.highlight='true';
+  const block=document.createElement('span');
+  const name=document.createElement('strong');name.textContent=v.name;
+  const hint=document.createElement('small');hint.textContent=v.description.slice(0,88)||'Open the overview';
+  block.append(name,hint);
+  const indicator=document.createElement('span');indicator.textContent='Open ↗';
+  button.append(block,indicator);
+  button.addEventListener('mousemove',()=>{if(selected!==i){selected=i;commandResults()}});
+  button.addEventListener('click',()=>pickCommand(i));
+  results.append(button)
+ }
+}
+function pickCommand(i){
+ const target=matching[i];if(!target)return;
+ command.close();
+ if(route()!==target.id)window.location.hash=target.id;
+ else show()
+}
+function openCommand(){
+ if(!command.open){
+  search.value='';selected=0;commandResults();command.showModal();
+  search.focus();
+ }
+}
+commandButton.addEventListener('click',openCommand);
+$('fi-command-close').addEventListener('click',()=>command.close());
+search.addEventListener('input',()=>{selected=0;commandResults()});
+search.addEventListener('keydown',e=>{
+ if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+  e.preventDefault();
+  if(matching.length)selected=(selected+(e.key==='ArrowDown'?1:-1)+matching.length)%matching.length;
+  commandResults()
+ }
+ if(e.key==='Enter'){e.preventDefault();pickCommand(selected)}
+});
+document.addEventListener('keydown',e=>{
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){
+  e.preventDefault();openCommand()
+ }
+});
+// Clicks outside the modal body close search without navigation side effects.
+command.addEventListener('click',e=>{
+ if(e.target!==command)return;
+ const box=command.getBoundingClientRect();
+ if(e.clientX<box.left||e.clientX>box.right||e.clientY<box.top||e.clientY>box.bottom)command.close()
+});
+
+// Vendored MIT VanillaTilt. Pointer-capable, no external assets, memory-conscious.
+function enableSpatialDepth(){
+ const noMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+ const pointer=window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+ if(noMotion||!pointer||typeof VanillaTilt==='undefined')return;
+ const stage=$('fi-spatial-stage');
+ if(stage)VanillaTilt.init(stage,{max:10,speed:480,perspective:950,
+  scale:1,glare:false,reset:true,gyroscope:false,
+  'full-page-listening':false});
+ for(const card of document.querySelectorAll('[data-spatial-card="true"]')){
+  VanillaTilt.init(card,{max:3,speed:560,perspective:1250,
+   scale:1.008,glare:false,reset:true,gyroscope:false,
+   'full-page-listening':false})
+ }
+}
+enableSpatialDepth();
 show();
 health();
 })();
