@@ -22,6 +22,7 @@ import {readFleetStatus,VERSION as FLEET_VERSION,verifyPublicFleetReport} from '
 import {readProcurementStatus,VERSION as PROCUREMENT_VERSION} from '../src/procurement/procurement-engine-v5-10.mjs';
 import {readFitStatus,VERSION as FIT_VERSION} from '../src/fit/commercial-fit-engine-v5-11.mjs';
 import {readReadinessStatus,VERSION as BID_VERSION} from '../src/bid-readiness/readiness-engine-v5-12.mjs';
+import {readBuyerStatus,VERSION as BUYER_VERSION} from '../src/buyers/buyer-engine-v5-13.mjs';
 import {planBusinessDecision} from '../src/competence/business-knowledge-v5-6.mjs';
 import {calculateFinancials} from '../src/competence/business-finance-v5-6.mjs';
 import {reviewBusinessWriting} from '../src/competence/business-writing-v5-6.mjs';
@@ -33,6 +34,7 @@ const FLEET_CLIENT=new URL('../src/fleet/fleet-console-v5-9.js',import.meta.url)
 const PROCUREMENT_CLIENT=new URL('../src/procurement/procurement-console-v5-10.js',import.meta.url);
 const FIT_CLIENT=new URL('../src/fit/commercial-fit-console-v5-11.js',import.meta.url);
 const BID_CLIENT=new URL('../src/bid-readiness/readiness-console-v5-12.js',import.meta.url);
+const BUYER_CLIENT=new URL('../src/buyers/buyer-console-v5-13.js',import.meta.url);
 
 export const HOST='127.0.0.1',PORT=8802,ORIGIN='http://127.0.0.1:8802';
 const MAX_PAGE=240000,MAX_PROXY=12*1024*1024;
@@ -190,7 +192,7 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
  businessStatus=readBusinessCompetenceStatus,businessPlan=planBusinessDecision,
  outcomeStatus=readOutcomeStatus,regulatoryStatus=readRegulatoryStatus,fleetStatus=readFleetStatus,
  procurementStatus=readProcurementStatus,fitStatus=readFitStatus,
- bidStatus=readReadinessStatus,
+ bidStatus=readReadinessStatus,buyerStatus=readBuyerStatus,
  readUiClient=()=>readFile(UI_CLIENT,'utf8'),readUiStyle=()=>readFile(UI_CSS,'utf8')}={}){
   return http.createServer(async(req,res)=>{
     try{
@@ -213,6 +215,27 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
       }
       if(req.method==='GET'&&u.pathname==='/api/operator/client.js'){
         return send(res,200,await readFile(EXEC_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      }
+      if(req.method==='GET'&&u.pathname==='/api/operator/buyer/client.js'){
+        return send(res,200,await readFile(BUYER_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      }
+      if(req.method==='GET'&&u.pathname==='/api/operator/buyer/status'){
+        const r=await buyerStatus();
+        if(r.version!==BUYER_VERSION||r.buyer?.id!=='bakersfield-city-school-district'||
+         r.buyer?.ev_bus_count_verified!==null||
+         r.buyer?.actual_current_need_verified!==false||
+         r.buyer?.open_ev_service_solicitation_verified!==false||
+         r.buyer?.elektron_vendor_approved!==false||
+         r.counts?.verified_revenue_usd!==0||r.counts?.verified_open_repair_bids!==0||
+         r.counts?.verified_service_orders!==0||
+         r.counts?.verified_public_buyer_pathways>1||
+         r.boundaries?.emails_sent!==0||r.boundaries?.phone_calls_placed!==0||
+         r.boundaries?.site_visits!==0||r.boundaries?.purchase_orders_verified!==0||
+         r.boundaries?.rea_calls!==0||r.boundaries?.model_calls!==0||
+         r.decision?.direct_bid_ready!==false||r.decision?.contact_approved!==false||
+         r.decision?.current_need_status!=='NOT_VERIFIED')
+          throw Error('FIAL513_BUYER_AUTHORITY_OR_SCHEMA_INVALID');
+        return send(res,200,r);
       }
       if(req.method==='GET'&&u.pathname==='/api/operator/bid-readiness/client.js'){
         return send(res,200,await readFile(BID_CLIENT,'utf8'),'text/javascript; charset=utf-8');
