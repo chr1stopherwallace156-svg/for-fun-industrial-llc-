@@ -22,7 +22,7 @@ Write-Host 'FUN_ONEPORT_SCOPE=REVIEWED_LOCAL_DASHBOARD_8802_ONLY'
 Write-Host 'FUN_ONEPORT_UNRELATED_SERVICES=DO_NOT_RESTART'
 & $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Deploy -VerifyLive
 if($LASTEXITCODE -ne 0){Hold 'DASHBOARD_RESTART_OR_ROLLBACK_HOLD'}
-$home=Invoke-WebRequest ($Url+'/') -UseBasicParsing -TimeoutSec 15
+$homeResponse=Invoke-WebRequest ($Url+'/') -UseBasicParsing -TimeoutSec 15
 $style=Invoke-WebRequest ($Url+'/api/oneport/style.css') -UseBasicParsing -TimeoutSec 15
 $client=Invoke-WebRequest ($Url+'/api/oneport/client.js') -UseBasicParsing -TimeoutSec 15
 $ops=Invoke-WebRequest ($Url+'/operations/?embedded=1') -UseBasicParsing -TimeoutSec 15
@@ -32,9 +32,9 @@ $old=Invoke-WebRequest ($Url+'/workspace/?view=workspace&embedded=1') -UseBasicP
 $task=Get-ScheduledTask -TaskName 'FunIndustrial-Executive-Operator-V1' -ErrorAction Stop
 $expected='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+
  (Join-Path $HOME 'FunIndustrial-FIAL514-Demand\Run-Fun-Purchase-Demand-V5-14.ps1')+'"'
-if($home.StatusCode -ne 200 -or $home.Headers['x-fi-dashboard-version'] -cne 'fun-industrial-one-port-dashboard-v1' -or
- $home.Content -notmatch 'id="fi-app"' -or
- $home.Content -notmatch 'data-section="procurement"' -or
+if($homeResponse.StatusCode -ne 200 -or $homeResponse.Headers['x-fi-dashboard-version'] -cne 'fun-industrial-one-port-dashboard-v1' -or
+ $homeResponse.Content -notmatch 'id="fi-app"' -or
+ $homeResponse.Content -notmatch 'data-section="procurement"' -or
  $style.StatusCode -ne 200 -or $client.StatusCode -ne 200 -or
  $ops.Content -notmatch 'fi-exec-queue' -or
  $chat.Content -notmatch 'fi-fial53-grounded' -or
