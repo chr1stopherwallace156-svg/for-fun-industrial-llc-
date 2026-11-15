@@ -36,9 +36,10 @@ $hash=(& git.exe -C $OldRoot hash-object --path=Run-Fun-Regulatory-Economic-V5-8
 if($LASTEXITCODE -ne 0 -or $hash -cne $OldBlob){Hold 'PREVIOUS_FIAL581_RUNNER_HASH_DRIFT'}
 $files=@(
  'src\fleet\fleet-sources-v5-9.mjs','src\fleet\fleet-engine-v5-9.mjs',
- 'src\fleet\fleet-console-v5-9.js','scripts\Run-Fun-Fleet-Opportunity-V5-9.mjs',
+ 'src\fleet\fleet-console-v5-9.js','src\fleet\fleet-qwen-v5-9.mjs',
+ 'scripts\Run-Fun-Fleet-Opportunity-V5-9.mjs',
  'intelligence-checks\fial59-fleet-evidence-case.mjs',
- 'intelligence-checks\fial59-dashboard-case.mjs',
+ 'intelligence-checks\fial59-dashboard-case.mjs','intelligence-checks\fial59-qwen-context-case.mjs',
  'scripts\Run-Fun-ML-Dashboard8802.mjs')
 foreach($relative in $files){
  $file=Join-Path $Root $relative
@@ -49,7 +50,7 @@ foreach($relative in $files){
  & $Node --check $file
  if($LASTEXITCODE -ne 0){Hold ('JS_PARSE_FAILED='+$relative)}
 }
-& $Node --test (Join-Path $Root 'intelligence-checks\fial59-fleet-evidence-case.mjs') (Join-Path $Root 'intelligence-checks\fial59-dashboard-case.mjs') (Join-Path $Root 'intelligence-checks\fial58-regulatory-intelligence-case.mjs') (Join-Path $Root 'intelligence-checks\fial58-regulatory-dashboard-case.mjs')
+& $Node --test (Join-Path $Root 'intelligence-checks\fial59-fleet-evidence-case.mjs') (Join-Path $Root 'intelligence-checks\fial59-dashboard-case.mjs') (Join-Path $Root 'intelligence-checks\fial59-qwen-context-case.mjs') (Join-Path $Root 'intelligence-checks\fial58-regulatory-intelligence-case.mjs') (Join-Path $Root 'intelligence-checks\fial58-regulatory-dashboard-case.mjs')
 if($LASTEXITCODE -ne 0){Hold 'FLEET_REGRESSION_TEST_HOLD'}
 Write-Host 'FIAL59_OFFLINE_TESTS=PASS'
 $task=Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
