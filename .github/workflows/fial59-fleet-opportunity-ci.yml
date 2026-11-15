@@ -87,6 +87,122 @@ jobs:
             if(!$deploy.Contains($guard)){throw ('FIAL59_DEPLOY_GUARD_MISSING='+$guard)}
           }
           Write-Host 'FIAL59_WINDOWS_SCHEDULE_AND_ROLLBACK=PASS'
+      - name: Exercise actual PowerShell dashboard readiness with mocked real statuses
+        shell: pwsh
+        run: |
+          $file=Join-Path $PWD 'Deploy-Fun-FIAL59-PrimaryDashboard.ps1'
+          $tokens=$null;$errors=$null
+          $ast=[Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$errors)
+          if(@($errors).Count){throw 'FIAL59_DEPLOY_PARSE_FAILED'}
+          $functions=$ast.FindAll({param($node)
+            $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'ReadyNew'
+          },$true)
+          if(@($functions).Count -ne 1){throw 'FIAL59_READY_NEW_MISSING'}
+          $fixture=@'
+          Set-StrictMode -Version Latest
+          $Runner='C:\test\scripts\Run-Fun-ML-Dashboard8802.mjs'
+          $Url='http://127.0.0.1:8802'
+          $OldCommerceShopifyConfigured=$false
+          $ElevateOutcome=$false
+          $ElevateRegulatory=$false
+          $ElevateFleet=$false
+          function Hold([string]$message){throw ('MOCK_HOLD='+$message)}
+          function Owner([int]$port){
+            if($port -ne 8802){throw 'WRONG_PORT'}
+            return [pscustomobject]@{ProcessId=9090;CommandLine=('node.exe "'+$Runner+'" --serve')}
+          }
+          function GetJson([string]$path){
+            switch($path){
+              '/api/fun/hub/status' {return [pscustomobject]@{version='fi-ml-hub-v3'}}
+              '/api/ml/dashboard/status' {return [pscustomobject]@{state='ready'}}
+              '/api/fial/grounded/status' {return [pscustomobject]@{
+                version='fial5.3-primary-grounded-chat-v1';model_interface='fixed_local_qwen_8088'
+                memory_interface='fixed_readonly_cognee_8789';authority_added=$false;tool_executions=0}}
+              '/api/commerce/status' {return [pscustomobject]@{version='commerce';shopify=[pscustomobject]@{configured=$false}}}
+              '/api/unified/status' {return [pscustomobject]@{state='ready'}}
+              '/api/operator/status' {return [pscustomobject]@{
+                version='fial5.4-executive-operator-v1';console_version='fial5.4-executive-console-v1'
+                outbound_permissions=[pscustomobject]@{email_sent=0;government_filings=0;spent_usd=0;rea_runs=0}}}
+              '/api/operator/real/status' {return [pscustomobject]@{
+                version='fial5.5-real-business-operations-v1'
+                company_identity_status='OPERATOR_PROVIDED_NOT_OFFICIALLY_VERIFIED'
+                government_filings=0;emails_sent=0;payments=0;rea_executions=0;applied_configs=0}}
+              '/api/operator/competence/status' {return [pscustomobject]@{
+                version='fial5.6-business-operator-v1'
+                state='EXECUTED_LOCAL_BUSINESS_COMPETENCE_CYCLE'
+                actions=[pscustomobject]@{mail_sent=0;
+                 government_filings=0;rea_executions=0;code_mutations=0;model_invocations=0}}}
+              '/api/operator/outcomes/status' {return [pscustomobject]@{
+                version='fial5.7-verified-outcomes-v1';external_form_submissions=0;
+                verified_customer_revenue=$(if($ElevateOutcome){1}else{0});
+                certified_license_status=$false;send_attempts=0}}
+              '/api/operator/regulatory/status' {return [pscustomobject]@{
+                version='fial5.8-regulatory-economic-v1'
+                state='REAL_PUBLIC_DATA_CHECK_COMPLETED'
+                source_catalog_version='fial5.8.1-regulatory-catalog-2026-amendment-v1'
+                authority_update='ACF_2026_FINAL_AMENDMENT_SUPERSEDES_2027_PURCHASE_RULE'
+                rule_watch=@([pscustomobject]@{id='acf-state-local-purchasing'
+                  effective='2030-01-01';supersedes='2027-01-01'})
+                boundaries=[pscustomobject]@{emails_sent=0;automatic_filing=0;model_calls=0
+                  verified_individual_due_dates=$(if($ElevateRegulatory){1}else{0})}}}
+              '/api/operator/fleet/status' {return [pscustomobject]@{
+                version='fial5.9-fleet-opportunity-evidence-v1'
+                state='PUBLISHED_HISTORICAL_FLEET_PROSPECTS_AND_OFFICIAL_SOURCE_MONITOR'
+                prospects=@(1..40)
+                counts=[pscustomobject]@{verified_open_rfps=$(if($ElevateFleet){1}else{0});
+                  awarded_contracts=0;actual_revenue_usd=0}
+                boundaries=[pscustomobject]@{rea_calls=0;emails_sent=0;model_calls=0}}}
+              default {throw ('UNEXPECTED_READ='+$path)}
+            }
+          }
+          function Invoke-WebRequest {
+            param([string]$Uri,[switch]$UseBasicParsing,[int]$TimeoutSec)
+            if($Uri.EndsWith('/unified/?view=chat')){
+              return [pscustomobject]@{StatusCode=200;Content='id="fi-fial53-grounded" id="action-review" fi-ml-panel fi-commerce-panel'}
+            }
+            if($Uri.EndsWith('/api/fial/grounded/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='x-fi-chat-click textContent'}
+            }
+            if($Uri.EndsWith('/operations/')){
+              return [pscustomobject]@{StatusCode=200;Content='fi-exec-queue Executive Assistant fi-real-work fi-competence-question fi-outcome-status fi-regulatory-intelligence fi-fleet-opportunities'}
+            }
+            if($Uri.EndsWith('/api/operator/client.js') -or $Uri.EndsWith('/api/operator/real/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='textContent'}
+            }
+            if($Uri.EndsWith('/api/operator/regulatory/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='createElementNS textContent'}
+            }
+            if($Uri.EndsWith('/api/operator/fleet/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='textContent'}
+            }
+            if($Uri.EndsWith('/api/operator/outcomes/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='textContent'}
+            }
+            if($Uri.EndsWith('/api/operator/competence/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='textContent x-fi-business-click'}
+            }
+            if($Uri.EndsWith('/')){return [pscustomobject]@{StatusCode=200;Content='fi-ui-shell'}}
+            throw ('UNEXPECTED_HTML='+$Uri)
+          }
+          $homeBefore=$HOME
+          ReadyNew 9090
+          if($HOME -cne $homeBefore){throw 'FIAL59_HOME_CHANGED'}
+          $ElevateFleet=$true
+          $held=$false
+          try{ReadyNew 9090}catch{
+            if([string]$_.Exception.Message -match 'NEW_DASHBOARD_HEALTH_OR_POLICY_MISMATCH'){$held=$true}
+            else{throw}
+          }
+          if(!$held){throw 'FIAL59_FORGED_FLEET_BID_NOT_REJECTED'}
+          $held=$false
+          try{ReadyNew 9091}catch{
+            if([string]$_.Exception.Message -match 'NEW_8802_OWNER_DRIFT'){$held=$true}
+            else{throw}
+          }
+          if(!$held){throw 'FIAL59_WRONG_OWNER_NOT_REJECTED'}
+          Write-Host 'FIAL59_REAL_WINDOWS_READINESS_FUNCTION=PASS'
+          '@
+          & ([scriptblock]::Create($functions[0].Extent.Text+[Environment]::NewLine+$fixture))
       - name: Fleet privacy and no external authority
         shell: pwsh
         run: |
