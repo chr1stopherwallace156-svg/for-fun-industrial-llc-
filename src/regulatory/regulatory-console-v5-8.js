@@ -76,14 +76,19 @@
    const data=await resp.json();
    if(data.version!=='fial5.8-regulatory-economic-v1')throw Error('WRONG_MONITOR_VERSION');
    subtitle.textContent=data.state==='NOT_ACTIVATED'?'Not yet activated':
-    'Last successful local cycle: '+String(data.as_of_utc||'unknown')+
-    ' · Next refresh follows 24–48 hour source-specific TTL';
+    data.state!=='REAL_PUBLIC_DATA_CHECK_COMPLETED'?
+    'DATA INTEGRITY HOLD: '+data.state+' — do not use stale compliance alerts or economic graphs':
+    'Last local cycle: '+String(data.as_of_utc||'unknown')+
+    ' · Current ACF 2026 amendment supersedes the old January 2027 100% purchasing requirement'+
+    ' · Next source refresh follows 24–48 hour TTL';
    clear(counts);
    p(counts,'Sources configured',data.counts?.monitored||0);
    p(counts,'Sources fetched this cycle',data.counts?.refreshed||0);
    p(counts,'Published pages changed',data.counts?.source_changes||0);
    p(counts,'Unavailable source checks',data.counts?.source_holds||0);
    p(counts,'Personally verified due dates',0);
+   for(const warning of (Array.isArray(data.data_quality_warnings)?data.data_quality_warnings:[]).slice(0,5))
+    p(counts,'DATA QUALITY WARNING',warning);
    clear(rules);
    for(const m of (Array.isArray(data.rule_watch)?data.rule_watch:[]).slice(0,18)){
     const card=document.createElement('div');card.className='item';
