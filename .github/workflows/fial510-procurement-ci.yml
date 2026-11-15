@@ -1,0 +1,242 @@
+name: Fun Industrial FIAL5.10 Official Procurement CI
+on:
+  push:
+    branches:
+      - feature/fial5-10-verified-procurement-20261114
+    paths:
+      - 'src/procurement/**'
+      - 'src/fleet/**'
+      - 'src/fial/grounded-chat-v5-2.mjs'
+      - 'src/operator/executive-console-v1.mjs'
+      - 'scripts/Run-Fun-ML-Dashboard8802.mjs'
+      - 'scripts/Run-Fun-Procurement-V5-10.mjs'
+      - 'scripts/Run-Fun-Fleet-Opportunity-V5-9.mjs'
+      - '*Procurement*V5-10.ps1'
+      - '*Fleet*V5-9.ps1'
+      - 'Deploy-Fun-FIAL510-PrimaryDashboard.ps1'
+      - 'intelligence-checks/fial510-*.mjs'
+      - 'intelligence-checks/fial59-*.mjs'
+      - '.github/workflows/fial510-procurement-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Parse executable JavaScript and modules
+        shell: pwsh
+        run: |
+          foreach($file in @('src/procurement/procurement-catalog-v5-10.mjs',
+           'src/procurement/procurement-engine-v5-10.mjs',
+           'src/procurement/procurement-console-v5-10.js',
+           'scripts/Run-Fun-Procurement-V5-10.mjs',
+           'intelligence-checks/fial510-procurement-case.mjs',
+           'intelligence-checks/fial510-dashboard-case.mjs',
+           'src/fleet/fleet-sources-v5-9.mjs',
+           'src/fleet/fleet-engine-v5-9.mjs',
+           'src/fleet/fleet-console-v5-9.js',
+           'src/fleet/fleet-qwen-v5-9.mjs',
+           'src/fial/grounded-chat-v5-2.mjs',
+           'scripts/Run-Fun-Fleet-Opportunity-V5-9.mjs',
+           'src/operator/executive-console-v1.mjs',
+           'scripts/Run-Fun-ML-Dashboard8802.mjs',
+           'intelligence-checks/fial59-fleet-evidence-case.mjs',
+           'intelligence-checks/fial59-dashboard-case.mjs',
+           'intelligence-checks/fial59-qwen-context-case.mjs')){
+            node --check $file
+            if($LASTEXITCODE -ne 0){throw ('FIAL59_PARSE_HOLD='+$file)}
+          }
+          Write-Host 'FIAL59_JS_SYNTAX=PASS'
+      - name: Test real source-provenance patterns and previous dashboard regressions
+        run: |
+          node --test intelligence-checks/fial510-procurement-case.mjs intelligence-checks/fial510-dashboard-case.mjs intelligence-checks/fial59-fleet-evidence-case.mjs intelligence-checks/fial59-dashboard-case.mjs intelligence-checks/fial59-qwen-context-case.mjs intelligence-checks/fial58-regulatory-intelligence-case.mjs intelligence-checks/fial58-regulatory-dashboard-case.mjs intelligence-checks/fial57-outcomes-case.mjs intelligence-checks/fial57-dashboard-case.mjs intelligence-checks/fial56-business-competence-case.mjs intelligence-checks/fial56-primary-business-dashboard-case.mjs intelligence-checks/fial55-real-operations-case.mjs intelligence-checks/fial55-primary-dashboard-case.mjs intelligence-checks/fial55-elektron-mail-case.mjs intelligence-checks/fial54-executive-operator-v1-case.mjs intelligence-checks/fial54-primary-console-v1-case.mjs intelligence-checks/fial-primary-dashboard-chat-v5-3-case.mjs intelligence-checks/fial-grounded-qwen-v5-2-case.mjs intelligence-checks/fi-ml-hub-v3-case.mjs intelligence-checks/integrated-hub-ui-v1-case.mjs intelligence-checks/commerce-opportunities-v1-1-case.mjs intelligence-checks/google-trends-focus-v1-2-case.mjs
+      - name: Validate four-trigger scheduler upgrade and verified old process rollback
+        shell: pwsh
+        run: |
+          $paths=@('Run-Fun-Procurement-V5-10.ps1',
+           'Install-Fun-Procurement-V5-10.ps1',
+           'Deploy-Fun-FIAL510-PrimaryDashboard.ps1',
+           'Activate-Fun-Procurement-V5-10.ps1')
+          foreach($file in $paths){
+            $tok=$null;$errs=$null
+            [Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $file),[ref]$tok,[ref]$errs)|Out-Null
+            if(@($errs).Count){$errs|ForEach-Object{Write-Host $_.Message};throw ('FIAL510_PS_PARSE_HOLD='+$file)}
+            $src=Get-Content $file -Raw
+            if($src -match '(?im)^\s*\$(home|pid|host|input|error|matches)\s*='){
+              throw ('FIAL510_POWERSHELL_RESERVED_VAR='+$file)}
+            if(($file -ne 'Deploy-Fun-FIAL510-PrimaryDashboard.ps1' -and $src -match 'Stop-Process') -or
+             $src -match 'Invoke-Expression|Restart-Service|git reset|winget install|pip install'){
+              throw ('FIAL510_UNREVIEWED_MUTATION='+$file)}
+          }
+          $install=Get-Content 'Install-Fun-Procurement-V5-10.ps1' -Raw
+          foreach($guard in @('UNKNOWN_TASK_ACTION_WILL_NOT_REPLACE',
+           'FIAL510_FIRST_LIVE_OFFICIAL_NOTICE_CHECK=PASS',
+           'FIAL510_PREVIOUS_FIAL59_SCHEDULE_RESTORED=PASS',
+           'FIAL510_FOUR_DAILY_TRIGGERS=PRESERVED')){
+            if(!$install.Contains($guard)){throw ('FIAL510_REQUIRED_GUARD_MISSING='+$guard)}
+          }
+          $expected='0e36713ca95f8fbb5e9bf48b0f120779bdcd430d'
+          $actual=(git hash-object --path=Run-Fun-Fleet-Opportunity-V5-9.ps1 -- Run-Fun-Fleet-Opportunity-V5-9.ps1|Out-String).Trim()
+          if($actual -cne $expected){throw ('FIAL510_PREVIOUS_RUNNER_HASH_DRIFT='+$actual)}
+          $old='629deef3ff8730460d073f7fa1865c1f32005695'
+          $actualHub=(git show HEAD~0:scripts/Run-Fun-ML-Dashboard8802.mjs | git hash-object --stdin | Out-String).Trim()
+          if($actualHub -ceq $old){throw 'FIAL510_NEW_DASHBOARD_DID_NOT_REGISTER_PROCUREMENT_API'}
+          $deployment=Get-Content 'Deploy-Fun-FIAL510-PrimaryDashboard.ps1' -Raw
+          foreach($marker in @('OLD_DASHBOARD_SOURCE_NOT_REVIEWED',
+           'FIAL58_ROLLBACK_OLD_PRIMARY_DASHBOARD=PASS',
+           'FIAL510_PROCUREMENT_PRIMARY_DASHBOARD=PASS',
+           'OFFICIAL_PROCUREMENT_RECEIPT_MISSING',
+           'PROTECTED_PROCESS_CHANGED_PORT_')){
+            if(!$deployment.Contains($marker)){throw ('FIAL510_DEPLOYMENT_GUARD_MISSING='+$marker)}
+          }
+          Write-Host 'FIAL510_WINDOWS_SCHEDULER_AND_ROLLBACK=PASS'
+      - name: Exercise actual PowerShell dashboard readiness with mocked real statuses
+        shell: pwsh
+        run: |
+          $file=Join-Path $PWD 'Deploy-Fun-FIAL510-PrimaryDashboard.ps1'
+          $tokens=$null;$errors=$null
+          $ast=[Management.Automation.Language.Parser]::ParseFile($file,[ref]$tokens,[ref]$errors)
+          if(@($errors).Count){throw 'FIAL59_DEPLOY_PARSE_FAILED'}
+          $functions=$ast.FindAll({param($node)
+            $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'ReadyNew'
+          },$true)
+          if(@($functions).Count -ne 1){throw 'FIAL59_READY_NEW_MISSING'}
+          $fixture=@'
+          Set-StrictMode -Version Latest
+          $Runner='C:\test\scripts\Run-Fun-ML-Dashboard8802.mjs'
+          $Url='http://127.0.0.1:8802'
+          $OldCommerceShopifyConfigured=$false
+          $ElevateOutcome=$false
+          $ElevateRegulatory=$false
+          $ElevateFleet=$false
+          $ElevateProcurement=$false
+          function Hold([string]$message){throw ('MOCK_HOLD='+$message)}
+          function Owner([int]$port){
+            if($port -ne 8802){throw 'WRONG_PORT'}
+            return [pscustomobject]@{ProcessId=9090;CommandLine=('node.exe "'+$Runner+'" --serve')}
+          }
+          function GetJson([string]$path){
+            switch($path){
+              '/api/fun/hub/status' {return [pscustomobject]@{version='fi-ml-hub-v3'}}
+              '/api/ml/dashboard/status' {return [pscustomobject]@{state='ready'}}
+              '/api/fial/grounded/status' {return [pscustomobject]@{
+                version='fial5.3-primary-grounded-chat-v1';model_interface='fixed_local_qwen_8088'
+                memory_interface='fixed_readonly_cognee_8789';authority_added=$false;tool_executions=0}}
+              '/api/commerce/status' {return [pscustomobject]@{version='commerce';shopify=[pscustomobject]@{configured=$false}}}
+              '/api/unified/status' {return [pscustomobject]@{state='ready'}}
+              '/api/operator/status' {return [pscustomobject]@{
+                version='fial5.4-executive-operator-v1';console_version='fial5.4-executive-console-v1'
+                outbound_permissions=[pscustomobject]@{email_sent=0;government_filings=0;spent_usd=0;rea_runs=0}}}
+              '/api/operator/real/status' {return [pscustomobject]@{
+                version='fial5.5-real-business-operations-v1'
+                company_identity_status='OPERATOR_PROVIDED_NOT_OFFICIALLY_VERIFIED'
+                government_filings=0;emails_sent=0;payments=0;rea_executions=0;applied_configs=0}}
+              '/api/operator/competence/status' {return [pscustomobject]@{
+                version='fial5.6-business-operator-v1'
+                state='EXECUTED_LOCAL_BUSINESS_COMPETENCE_CYCLE'
+                actions=[pscustomobject]@{mail_sent=0;
+                 government_filings=0;rea_executions=0;code_mutations=0;model_invocations=0}}}
+              '/api/operator/outcomes/status' {return [pscustomobject]@{
+                version='fial5.7-verified-outcomes-v1';external_form_submissions=0;
+                verified_customer_revenue=$(if($ElevateOutcome){1}else{0});
+                certified_license_status=$false;send_attempts=0}}
+              '/api/operator/regulatory/status' {return [pscustomobject]@{
+                version='fial5.8-regulatory-economic-v1'
+                state='REAL_PUBLIC_DATA_CHECK_COMPLETED'
+                source_catalog_version='fial5.8.1-regulatory-catalog-2026-amendment-v1'
+                authority_update='ACF_2026_FINAL_AMENDMENT_SUPERSEDES_2027_PURCHASE_RULE'
+                rule_watch=@([pscustomobject]@{id='acf-state-local-purchasing'
+                  effective='2030-01-01';supersedes='2027-01-01'})
+                boundaries=[pscustomobject]@{emails_sent=0;automatic_filing=0;model_calls=0
+                  verified_individual_due_dates=$(if($ElevateRegulatory){1}else{0})}}}
+              '/api/operator/fleet/status' {return [pscustomobject]@{
+                version='fial5.9-fleet-opportunity-evidence-v1'
+                state='PUBLISHED_HISTORICAL_FLEET_PROSPECTS_AND_OFFICIAL_SOURCE_MONITOR'
+                prospects=@(1..40)
+                counts=[pscustomobject]@{verified_open_rfps=$(if($ElevateFleet){1}else{0});
+                  awarded_contracts=0;actual_revenue_usd=0}
+                boundaries=[pscustomobject]@{rea_calls=0;emails_sent=0;model_calls=0}}}
+              '/api/operator/procurement/status' {return [pscustomobject]@{
+                version='fial5.10-published-procurement-v1'
+                notice=[pscustomobject]@{solicitation_id='26-27-02TR'}
+                counts=[pscustomobject]@{verified_fit_for_elektron=$(if($ElevateProcurement){1}else{0});
+                  verified_current_published_notices=1}
+                boundaries=[pscustomobject]@{actual_rfps_submitted=0;rea_calls=0;emails_sent=0;model_calls=0}}}
+              default {throw ('UNEXPECTED_READ='+$path)}
+            }
+          }
+          function Invoke-WebRequest {
+            param([string]$Uri,[switch]$UseBasicParsing,[int]$TimeoutSec)
+            if($Uri.EndsWith('/unified/?view=chat')){
+              return [pscustomobject]@{StatusCode=200;Content='id="fi-fial53-grounded" id="action-review" fi-ml-panel fi-commerce-panel'}
+            }
+            if($Uri.EndsWith('/api/fial/grounded/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='x-fi-chat-click textContent'}
+            }
+            if($Uri.EndsWith('/operations/')){
+              return [pscustomobject]@{StatusCode=200;Content='fi-exec-queue Executive Assistant fi-real-work fi-competence-question fi-outcome-status fi-regulatory-intelligence fi-fleet-opportunities fi-procurement'}
+            }
+            if($Uri.EndsWith('/api/operator/client.js') -or $Uri.EndsWith('/api/operator/real/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='textContent'}
+            }
+            if($Uri.EndsWith('/api/operator/regulatory/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='createElementNS textContent'}
+            }
+            if($Uri.EndsWith('/api/operator/fleet/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='textContent'}
+            }
+            if($Uri.EndsWith('/api/operator/procurement/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='textContent'}
+            }
+            if($Uri.EndsWith('/api/operator/outcomes/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='textContent'}
+            }
+            if($Uri.EndsWith('/api/operator/competence/client.js')){
+              return [pscustomobject]@{StatusCode=200;Content='textContent x-fi-business-click'}
+            }
+            if($Uri.EndsWith('/')){return [pscustomobject]@{StatusCode=200;Content='fi-ui-shell'}}
+            throw ('UNEXPECTED_HTML='+$Uri)
+          }
+          $homeBefore=$HOME
+          ReadyNew 9090
+          if($HOME -cne $homeBefore){throw 'FIAL59_HOME_CHANGED'}
+          $ElevateProcurement=$true
+          $held=$false
+          try{ReadyNew 9090}catch{
+            if([string]$_.Exception.Message -match 'NEW_DASHBOARD_HEALTH_OR_POLICY_MISMATCH'){$held=$true}
+            else{throw}
+          }
+          if(!$held){throw 'FIAL510_FORGED_VENDOR_FIT_NOT_REJECTED'}
+          $held=$false
+          try{ReadyNew 9091}catch{
+            if([string]$_.Exception.Message -match 'NEW_8802_OWNER_DRIFT'){$held=$true}
+            else{throw}
+          }
+          if(!$held){throw 'FIAL59_WRONG_OWNER_NOT_REJECTED'}
+          Write-Host 'FIAL59_REAL_WINDOWS_READINESS_FUNCTION=PASS'
+          '@
+          & ([scriptblock]::Create($functions[0].Extent.Text+[Environment]::NewLine+$fixture))
+      - name: Public evidence, no bid submission or private company data
+        shell: pwsh
+        run: |
+          $sources=((Get-ChildItem src/procurement -File|ForEach-Object{Get-Content $_.FullName -Raw}) -join '')
+          foreach($secret in @('B20260233096','13479 Abbot','elektronindustrial@gmail.com')){
+            if($sources.Contains($secret)){throw 'FIAL510_PRIVATE_ELEKTRON_DATA_LEAK'}
+          }
+          foreach($marker in @('26-27-02TR','2026-12-11T22:00:00.000Z',
+           'NOT_ESTABLISHED_FULL_SERVICE_TRANSPORT_PROVIDER_UNVERIFIED',
+           'OFFICIAL_SOURCE_CHANGED_HUMAN_REVIEW_REQUIRED',
+           'actual_rfps_submitted:0')){
+            if(!$sources.Contains($marker)){throw ('FIAL510_MISSING_PROVENANCE='+$marker)}
+          }
+          $runner=Get-Content 'Run-Fun-Procurement-V5-10.ps1' -Raw
+          if($runner -match 'messages/send|api/rea/execute|connect-send|send-approved-stdin|api/ai/chat'){
+            throw 'FIAL510_SCHEDULE_CAN_EXECUTE_EXTERNAL_ACTIONS'
+          }
+          Write-Host 'FIAL510_SOURCE_PROVENANCE_AND_NO_OUTBOUND_ACTION=PASS'
