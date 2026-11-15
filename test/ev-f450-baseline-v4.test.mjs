@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import {spawnSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
+const p=new URL('../src/ev-conversion/f450-baseline-v4.py',import.meta.url);
+test('V4 requires source chain, artifact rehash and preserves unknown OEM values',()=>{const s=fs.readFileSync(p,'utf8');for(const x of ['GATE_PROVENANCE_HOLD','INTEGRITY_PROVENANCE_HOLD','mod.validate(root,manifest)','MISSING_VEHICLE_VERIFIED_EVIDENCE','vehicleSpecificSpecificationsAccepted','externalActionsExecuted'])assert.ok(s.includes(x))});
+test('V4 rejects non-vehicle source path',()=>{const r=spawnSync('python',[fileURLToPath(p),'--folder',process.cwd(),'--registry',fileURLToPath(p)],{encoding:'utf8'});if(r.error)throw r.error;assert.notEqual(r.status,0);assert.match(r.stderr,/SCOPE_HOLD/)});
