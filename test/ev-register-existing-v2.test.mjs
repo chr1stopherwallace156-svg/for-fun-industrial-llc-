@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import {spawnSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
+const p=new URL('../src/ev-conversion/register-existing-v2.py',import.meta.url);
+test('registry pins previously observed hashes and prevents approval',()=>{const s=fs.readFileSync(p,'utf8');assert.match(s,/ARTIFACT_HASH_MISMATCH_HOLD/);assert.match(s,/BENCH_ARTIFACT_ONLY/);assert.match(s,/"engineeringReleased":False/);assert.match(s,/"nativeRuntimeRechecked":False/);assert.match(s,/with out.open\("x"/)});
+test('registry refuses non-FunIndustrial scope',()=>{const r=spawnSync('python',[fileURLToPath(p),'--root',process.cwd()],{encoding:'utf8'});if(r.error)throw r.error;assert.notEqual(r.status,0);assert.match(r.stderr,/ROOT_SCOPE_HOLD/)});
