@@ -19,7 +19,7 @@ function mocked({missing='',changed=false,redirect=false,invalid=false,large=fal
   if(redirect)return Response.redirect('https://untrusted.example',302);
   const pdf=url.endsWith('.pdf');
   const b=pdf?(changed?Buffer.concat([PDF,Buffer.from('APPEND')]):PDF):
-   (missingNotice?HTML.replace('Open','Closed'):changed?HTML.replace('Hydrogen','Hydrogen Revised'):HTML);
+   (missingNotice?HTML.replace('Open','Closed'):changed?HTML.replace('</body>',' <p>Official addendum change notice</p></body>'):HTML);
   const value=large?Buffer.concat([Buffer.from(b),Buffer.alloc(4100000)]):b;
   return new Response(value,{status:200,headers:{'content-type':invalid?
    'application/json':pdf?'application/pdf':'text/html'}})
