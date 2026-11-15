@@ -158,3 +158,51 @@ test('malformed legacy ledger fails closed and does not erase or rewrite source 
    /PRIOR_LEDGER_VERSION/);
  }finally{await rm(root,{recursive:true,force:true})}
 });
+
+test('OAL approved 2026 amendment supersedes old 2027 100 percent ACF purchasing countdown',()=>{
+ const acf=RULES.find(x=>x.id==='acf-state-local-purchasing');
+ assert.equal(acf.effective,'2030-01-01');
+ assert.equal(acf.amendment_approved,'2026-09-10');
+ assert.equal(acf.supersedes,'2027-01-01');
+ assert.match(acf.source,/\/rulemaking\/2025\/acfab1594$/);
+ assert.ok(acf.caveat.includes('SUPERSEDED'));
+ const now=dueWatch({now:FIRST,limit:30});
+ assert.ok(!now.some(x=>x.id==='acf-state-local-purchasing'&&x.urgency==='UPCOMING_MILESTONE_REVIEW'));
+ assert.ok(now.some(x=>x.id==='acf-annual-public-reporting'&&x.effective==='2027-04-01'));
+});
+test('discrepant raw October 2026 CPI 511 fails against dated official BLS 337.511 anchor',()=>{
+ const forged=samples();
+ forged.Results.series.find(x=>x.seriesID==='CUUR0000SA0').data[0].value='511';
+ assert.throws(()=>parseEconomicResponse(forged,{asOf:FIRST}),/BLS_OCT2026_CPI_CROSS_SOURCE_MISMATCH/);
+});
+test('prior stale legal catalog and suspect economic graph cannot be served as current guidance',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'fial58-stale-'));
+ try{
+  const first=await runRegulatoryCycle({root,now:FIRST,fetcher:simulator().fetcher});
+  const file=join(root,'RegulatoryEconomicV58','last-intelligence-v1.json');
+  const stale={...first,source_catalog_version:'fial5.8-regulatory-catalog-v1'};
+  stale.economic_series[0].latest_value=511;
+  stale.economic_series[0].observations.find(x=>x.month==='2026-10').value=511;
+  await writeFile(file,JSON.stringify(stale));
+  const status=await readRegulatoryStatus({root});
+  assert.equal(status.state,'HOLD_STALE_OR_UNVERIFIED_INTELLIGENCE_REQUIRES_REFRESH');
+  assert.equal(status.economic_series.length,0);
+  assert.ok(!status.rule_watch.some(x=>x.id==='acf-state-local-purchasing'&&x.effective==='2027-01-01'));
+  const next=await runRegulatoryCycle({root,now:new Date(+FIRST+60000),fetcher:simulator().fetcher});
+  assert.equal(next.economic_series.find(x=>x.id==='CUUR0000SA0').latest_value,337.511);
+  assert.equal(next.counts.refreshed,SOURCES.length);
+  assert.equal((await readRegulatoryStatus({root})).state,'REAL_PUBLIC_DATA_CHECK_COMPLETED');
+ }finally{await rm(root,{force:true,recursive:true})}
+});
+test('source URL rebasing is not incorrectly called a newly amended regulation',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'fial58-rebase-'));
+ try{
+  const first=await runRegulatoryCycle({root,now:FIRST,fetcher:simulator().fetcher});
+  const file=join(root,'RegulatoryEconomicV58','last-intelligence-v1.json');
+  const old={...first,source_catalog_version:'outdated-rule-catalog',sources:first.sources.map(x=>x.id==='carb-acf'?{...x,source_url:'https://ww2.arb.ca.gov/zero-emission-regulation-deadline-schedules-truckstop'}:x)};
+  await writeFile(file,JSON.stringify(old));
+  const next=await runRegulatoryCycle({root,now:new Date(+FIRST+1000),fetcher:simulator().fetcher});
+  assert.equal(next.counts.source_changes,0);
+  assert.ok(next.published_changes.some(x=>x.type==='SOURCE_URL_REBASED_TO_CURRENT_AUTHORITY'));
+ }finally{await rm(root,{force:true,recursive:true})}
+});
