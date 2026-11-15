@@ -9,6 +9,7 @@ import {createCommerceIntelligence} from '../src/commerce/trends-commerce-v1.mjs
 import {rankCommerceOpportunities} from '../src/commerce/opportunity-ranking-v1-1.mjs';
 import {buildTrendsFocus} from '../src/commerce/google-trends-focus-v1-2.mjs';
 import {SHELL,UI_CSS,UI_CLIENT} from '../src/ui/integrated-hub-shell-v1.mjs';
+import {DASHBOARD_HTML,DASHBOARD_VERSION} from '../src/ui/oneport-dashboard-v1.mjs';
 import {readFial4DashboardStatus} from '../src/fial/dashboard-status-v4.mjs';
 import {createGroundedChat} from '../src/fial/grounded-chat-v5-2.mjs';
 import {GROUNDED_PANEL,GROUNDED_CLIENT,GROUNDED_VERSION} from '../src/fial/primary-grounded-ui-v5-3.mjs';
@@ -37,6 +38,10 @@ const FIT_CLIENT=new URL('../src/fit/commercial-fit-console-v5-11.js',import.met
 const BID_CLIENT=new URL('../src/bid-readiness/readiness-console-v5-12.js',import.meta.url);
 const BUYER_CLIENT=new URL('../src/buyers/buyer-console-v5-13.js',import.meta.url);
 const DEMAND_CLIENT=new URL('../src/demand/demand-console-v5-14.js',import.meta.url);
+const ONEPORT_CSS=new URL('../src/ui/oneport-dashboard-v1.css',import.meta.url);
+const ONEPORT_CLIENT=new URL('../src/ui/oneport-dashboard-v1.js',import.meta.url);
+const ONEPORT_EMBED=new URL('../src/ui/oneport-embedded-v1.css',import.meta.url);
+const ONEPORT_EMBED_CLIENT=new URL('../src/ui/oneport-embedded-operations-v1.js',import.meta.url);
 
 export const HOST='127.0.0.1',PORT=8802,ORIGIN='http://127.0.0.1:8802';
 const MAX_PAGE=240000,MAX_PROXY=12*1024*1024;
@@ -203,16 +208,36 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         return send(res,400,{error:'ML_HUB_REQUEST_TARGET_INVALID'});
       const u=new URL(req.url,ORIGIN);
       if(u.search.length>2048||u.pathname.includes('..'))return send(res,400,{error:'ML_HUB_INVALID_PATH'});
-      if(req.method==='GET'&&['/','/unified/'].includes(u.pathname)){
+      if(req.method==='GET'&&(u.pathname==='/'||u.pathname==='/dashboard/')){
+        const csp="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src 'self'; img-src 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; form-action 'none'";
+        return send(res,200,DASHBOARD_HTML,'text/html; charset=utf-8',
+          {'content-security-policy':csp,'x-fi-dashboard-version':DASHBOARD_VERSION});
+      }
+      if(req.method==='GET'&&u.pathname==='/api/oneport/style.css')
+        return send(res,200,await readFile(ONEPORT_CSS,'utf8'),'text/css; charset=utf-8');
+      if(req.method==='GET'&&u.pathname==='/api/oneport/client.js')
+        return send(res,200,await readFile(ONEPORT_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      if(req.method==='GET'&&u.pathname==='/api/oneport/embed.css')
+        return send(res,200,await readFile(ONEPORT_EMBED,'utf8'),'text/css; charset=utf-8');
+      if(req.method==='GET'&&u.pathname==='/api/oneport/embed-operations.js')
+        return send(res,200,await readFile(ONEPORT_EMBED_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      if(req.method==='GET'&&['/workspace/','/unified/'].includes(u.pathname)){
         const unified=u.pathname==='/unified/';
+        const embedded=u.searchParams.get('embedded')==='1';
         const source=await readPage(unified?8798:8789);
-        const html=integrateDashboardHtml(source,await readWidget(),{unified});
+        let html=integrateDashboardHtml(source,await readWidget(),{unified});
+        if(embedded)html=html.replace(/<\/head>/i,
+          '<link rel="stylesheet" href="/api/oneport/embed.css"></head>');
         const csp=unified?"default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'":
           "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'";
         return send(res,200,html,'text/html; charset=utf-8',{'content-security-policy':csp});
       }
       if(req.method==='GET'&&u.pathname==='/operations/'){
-        return send(res,200,EXEC_PAGE,'text/html; charset=utf-8',
+        const embedded=u.searchParams.get('embedded')==='1';
+        const page=embedded?EXEC_PAGE
+          .replace(/<\/head>/i,'<link rel="stylesheet" href="/api/oneport/embed.css"></head>')
+          .replace(/<\/body>/i,'<script src="/api/oneport/embed-operations.js" defer></script></body>'):EXEC_PAGE;
+        return send(res,200,page,'text/html; charset=utf-8',
           {'content-security-policy':"default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"});
       }
       if(req.method==='GET'&&u.pathname==='/api/operator/client.js'){
@@ -492,7 +517,7 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         if(req.method==='POST'&&!acceptedActionOrigin(req))return send(res,403,{error:'ML_HUB_ORIGIN_REQUIRED'});
         if(u.pathname.startsWith('/api/ml/'))return send(res,404,{error:'ML_HUB_ML_ROUTE_UNKNOWN'});
         if(u.pathname.startsWith('/api/commerce/'))return send(res,404,{error:'ML_HUB_COMMERCE_ROUTE_UNKNOWN'});
-        if(u.pathname.startsWith('/api/ui/'))return send(res,404,{error:'ML_HUB_UI_ROUTE_UNKNOWN'});
+        if(u.pathname.startsWith('/api/ui/')||u.pathname.startsWith('/api/oneport/'))return send(res,404,{error:'ML_HUB_UI_ROUTE_UNKNOWN'});
         if(u.pathname.startsWith('/api/fial/grounded/'))return send(res,404,{error:'FIAL53_GROUNDED_ROUTE_UNKNOWN'});
         return proxy(req,res,u.pathname.startsWith('/api/unified/')?8798:8789);
       }
