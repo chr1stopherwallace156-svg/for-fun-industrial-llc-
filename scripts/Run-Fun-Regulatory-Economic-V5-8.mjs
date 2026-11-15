@@ -2,9 +2,32 @@
 // Scheduled worker invokes --once. No separate process/server/model required.
 import {runRegulatoryCycle,readRegulatoryStatus,VERSION} from '../src/regulatory/intelligence-engine-v5-8.mjs';
 try{
- if(process.argv.length!==3||!['--once','--status'].includes(process.argv[2]))
-  throw Error('FIAL58_ALLOWED=--once|--status');
- if(process.argv[2]==='--status'){
+ if(process.argv.length!==3||!['--once','--status','--diagnostic'].includes(process.argv[2]))
+  throw Error('FIAL581_ALLOWED=--once|--status|--diagnostic');
+ if(process.argv[2]==='--diagnostic'){
+  const r=await readRegulatoryStatus();
+  console.log('FIAL581_MONITOR_STATE='+r.state);
+  console.log('FIAL581_CATALOG='+r.source_catalog_version);
+  console.log('FIAL581_LAST_CYCLE='+String(r.as_of_utc||'none'));
+  console.log('FIAL581_RECORDED_SOURCE_HOLDS='+String(r.counts?.source_holds??'unknown'));
+  const held=(r.sources||[]).filter(x=>x.state==='SOURCE_UNAVAILABLE');
+  for(const source of held)
+   console.log('FIAL581_HELD_SOURCE='+source.id+' REASON='+String(source.reason||'UNKNOWN').replace(/[\r\n]/g,' ')+' URL='+source.source_url);
+  if(held.length===0)console.log('FIAL581_HELD_SOURCE_DETAILS=NONE');
+  for(const x of r.economic_series||[]){
+   const value=Number(x.latest_value);
+   console.log('FIAL581_ECONOMIC_SERIES='+x.id+' MONTH='+x.latest_month+
+     ' VALUE='+String(x.latest_value)+' UNIT='+x.unit+
+     ' SOURCE='+x.source+' VALID_NUMERIC='+Number.isFinite(value));
+  }
+  for(const warning of r.data_quality_warnings||[])
+   console.log('FIAL581_DATA_QUALITY_HOLD='+String(warning).slice(0,150));
+  const old=(r.rule_watch||[]).filter(x=>x.id==='acf-state-local-purchasing');
+  for(const rule of old)console.log('FIAL581_CURRENT_ACF_PURCHASE_DATE='+rule.effective+
+   ' AMENDMENT_APPROVED='+String(rule.amendment_approved||'unknown')+
+   ' LEGACY_2027_SUPERSEDED='+String(rule.supersedes==='2027-01-01'));
+  console.log('FIAL581_DIAGNOSTIC=COMPLETE_READ_ONLY');
+ }else if(process.argv[2]==='--status'){
   const r=await readRegulatoryStatus();
   console.log(JSON.stringify({version:r.version,state:r.state,as_of_utc:r.as_of_utc||null,
    counts:r.counts,latest_economic:r.economic_series?.map(x=>({
