@@ -74,13 +74,29 @@ jobs:
             'UNEXPECTED_SOURCE_FILE_EXTENSION')){
             if(!$deployment.Contains($mark)){throw ('ONEPORT_CSS_PREFLIGHT_REGRESSION='+$mark)}
           }
-          if(!$deployment.Contains('Join-Path $OldRoot ''Run-Fun-Purchase-Demand-V5-14.ps1''') -or
-           !$deployment.Contains("$" + "OldRoot=Join-Path $" + "HOME 'FunIndustrial-OnePort-Dashboard'")){
-            throw 'V2_REVIEWED_OLD_ONEPORT_SOURCE_IDENTITY_INVALID'
+          # Do not confuse the rollback dashboard checkout with the scheduler
+          # that was installed independently by FIAL5.14.
+          foreach($marker in @(
+            '$OldRoot=Join-Path $HOME ''FunIndustrial-OnePort-Dashboard''',
+            '$ScheduleRoot=Join-Path $HOME ''FunIndustrial-FIAL514-Demand''',
+            '$scheduledRunner=Join-Path $ScheduleRoot ''Run-Fun-Purchase-Demand-V5-14.ps1''',
+            'Leaf $scheduledRunner',
+            'FUN_SPATIAL_V2_SCHEDULE=FIAL514_UNCHANGED_FOUR_TRIGGERS')) {
+            if(!$deployment.Contains($marker)){throw ('SPATIAL_V2_SCHEDULER_ROOT_REGRESSION='+$marker)}
           }
-          if(!$deployment.Contains('Join-Path $OldRoot ''Run-Fun-Purchase-Demand-V5-14.ps1''')){
-            throw 'ONEPORT_SCHEDULER_MUST_VERIFY_PRIOR_FIAL514_INSTALLATION'
+          if($deployment.Contains('Join-Path $OldRoot ''Run-Fun-Purchase-Demand-V5-14.ps1''') -or
+             !$deployment.Contains("$" + "newTaskAction='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ")){
+            throw 'SPATIAL_V2_SCHEDULE_TASK_ACTION_BOUND_TO_WRONG_CHECKOUT'
           }
+          $testHome=Join-Path $env:TEMP 'fun-spatial-scheduler-guard-test'
+          $priorRunner=Join-Path (Join-Path $testHome 'FunIndustrial-FIAL514-Demand') 'Run-Fun-Purchase-Demand-V5-14.ps1'
+          $otherRunner=Join-Path (Join-Path $testHome 'FunIndustrial-OnePort-Dashboard') 'Run-Fun-Purchase-Demand-V5-14.ps1'
+          $arguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$priorRunner+'"'
+          $wrongArguments='-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'+$otherRunner+'"'
+          if($arguments -ceq $wrongArguments -or !$arguments.Contains('FunIndustrial-FIAL514-Demand')){
+            throw 'SPATIAL_V2_DISTINCT_SCHEDULER_AND_DASHBOARD_ROLLBACK_INVALID'
+          }
+          Write-Host 'SPATIAL_V2_FIAL514_SCHEDULE_ROOT_IS_INDEPENDENT_OF_DASHBOARD_ROLLBACK=PASS'
           foreach($file in @('src/ui/oneport-dashboard-v1.css','src/ui/oneport-embedded-v1.css')){
             if(!(Test-Path $file -PathType Leaf) -or (Get-Item $file).Length -lt 20){
               throw ('ONEPORT_CSS_MISSING_OR_EMPTY='+$file)
