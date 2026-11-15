@@ -5,11 +5,11 @@
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $Root=$PSScriptRoot
-$OldRoot=Join-Path $HOME 'FunIndustrial-FIAL57-VerifiedOutcomes'
-$Branch='feature/fial5-8-regulatory-economic-intelligence-20261114'
-$OldBranch='feature/fial5-7-verifiable-business-outcomes-20261114'
+$OldRoot=Join-Path $HOME 'FunIndustrial-FIAL58-RegulatoryIntelligence'
+$Branch='repair/fial58-2026-amendment-data-integrity-20261114'
+$OldBranch='feature/fial5-8-regulatory-economic-intelligence-20261114'
 $Origin='https://github.com/chr1stopherwallace156-svg/for-fun-industrial-llc-.git'
-$OldBlob='8a569b1b557202cae0baa964b940345622b1eede'
+$OldBlob='774de9231e9e0d07b9326a687922e291492c8aa7'
 $Runner=Join-Path $Root 'scripts\Run-Fun-ML-Dashboard8802.mjs'
 $OldRunner=Join-Path $OldRoot 'scripts\Run-Fun-ML-Dashboard8802.mjs'
 $Url='http://127.0.0.1:8802'
@@ -17,7 +17,7 @@ $OriginalState='not_checked'
 $OldStopped=$false
 $NewChild=$null
 $OriginalPid=0
-$Log=Join-Path $env:LOCALAPPDATA ('FunIndustrial\FIAL58RegulatoryDashboard\logs\'+
+$Log=Join-Path $env:LOCALAPPDATA ('FunIndustrial\FIAL581DataIntegrityDashboard\logs\'+
  (Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,7))
 function Hold([string]$why){throw ('FIAL58_PRIMARY_HUB_HOLD='+$why)}
 function Listeners([int]$port){
@@ -99,6 +99,10 @@ function ReadyNew([int]$expectedPid){
   $outcome.send_attempts -gt 1 -or
   $regulatory.version -cne 'fial5.8-regulatory-economic-v1' -or
   $regulatory.state -cne 'REAL_PUBLIC_DATA_CHECK_COMPLETED' -or
+  $regulatory.source_catalog_version -cne 'fial5.8.1-regulatory-catalog-2026-amendment-v1' -or
+  $regulatory.authority_update -cne 'ACF_2026_FINAL_AMENDMENT_SUPERSEDES_2027_PURCHASE_RULE' -or
+  @($regulatory.rule_watch|Where-Object {$_.id -eq 'acf-state-local-purchasing' -and
+     $_.effective -ceq '2030-01-01' -and $_.supersedes -ceq '2027-01-01'}).Count -ne 1 -or
   $regulatory.boundaries.emails_sent -ne 0 -or
   $regulatory.boundaries.automatic_filing -ne 0 -or
   $regulatory.boundaries.model_calls -ne 0 -or
