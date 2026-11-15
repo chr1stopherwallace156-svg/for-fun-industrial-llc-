@@ -1,7 +1,7 @@
 // One user-facing port and one coherent application surface.
 // Existing reviewed local services remain independent backend workers.
 export const DASHBOARD_VERSION='fun-industrial-one-port-dashboard-v1';
-export const DASHBOARD_HTML=String.raw\`<!doctype html>
+export const DASHBOARD_HTML=String.raw`<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark"><meta name="theme-color" content="#0b1019">
@@ -89,4 +89,4 @@ export const DASHBOARD_HTML=String.raw\`<!doctype html>
   </div>
 </div>
 <div class="fi-shade" id="fi-shade" hidden></div>
-</body></html>\`;
+</body></html>`;
