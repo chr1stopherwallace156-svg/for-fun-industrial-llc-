@@ -228,8 +228,8 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         let html=integrateDashboardHtml(source,await readWidget(),{unified});
         if(embedded)html=html.replace(/<\/head>/i,
           '<link rel="stylesheet" href="/api/oneport/embed.css"></head>');
-        const csp=unified?"default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'":
-          "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'";
+        const csp=unified?"default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'none'; base-uri 'none'; frame-ancestors "+(embedded?"'self'":"'none'")+"; form-action 'none'":
+          "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors "+(embedded?"'self'":"'none'");
         return send(res,200,html,'text/html; charset=utf-8',{'content-security-policy':csp});
       }
       if(req.method==='GET'&&u.pathname==='/operations/'){
@@ -238,7 +238,7 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
           .replace(/<\/head>/i,'<link rel="stylesheet" href="/api/oneport/embed.css"></head>')
           .replace(/<\/body>/i,'<script src="/api/oneport/embed-operations.js" defer></script></body>'):EXEC_PAGE;
         return send(res,200,page,'text/html; charset=utf-8',
-          {'content-security-policy':"default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"});
+          {'content-security-policy':"default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors "+(embedded?"'self'":"'none'")});
       }
       if(req.method==='GET'&&u.pathname==='/api/operator/client.js'){
         return send(res,200,await readFile(EXEC_CLIENT,'utf8'),'text/javascript; charset=utf-8');
