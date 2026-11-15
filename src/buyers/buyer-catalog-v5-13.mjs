@@ -9,7 +9,7 @@ export const SOURCES=Object.freeze([
  {id:'bcsd-purchasing-bids',url:'https://www.bcsd.com/business-services/purchasing/bids',
   host:'www.bcsd.com',ttl_hours:12,max_bytes:500000,
   facts:['PlanetBids','Future Opportunities']},
- {id:'bcsd-vendor-relations',url:'https://www.bcsd.com/departments/purchasing/vendor-relations',
+ {id:'bcsd-vendor-relations',url:'https://www.bcsd.com/business-services/purchasing/vendor-relations',
   host:'www.bcsd.com',ttl_hours:24,max_bytes:500000,
   facts:['purchase order','Purchasing Office','prior authorization']},
  {id:'zesbi-eligible-transport-costs',url:'https://californiazesbi.org/applicants/eligible-costs/',
