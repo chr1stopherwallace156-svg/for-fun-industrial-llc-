@@ -65,12 +65,12 @@ jobs:
           # Regression: Node 26 rejects --check *.css with ERR_UNKNOWN_FILE_EXTENSION.
           # The actual Windows installer must check executable JS only, and treat
           # CSS as a nonempty static asset, with all files still required.
-          foreach($mark in @("GetExtension($f)", "$ext -ceq '.js'", "$ext -ceq '.mjs'",
-            "$ext -ceq '.css'", 'NEW_CSS_ASSET_EMPTY',
+          foreach($mark in @('GetExtension($f)', '$ext -ceq ''.js''', '$ext -ceq ''.mjs''',
+            '$ext -ceq ''.css''', 'NEW_CSS_ASSET_EMPTY',
             'UNEXPECTED_SOURCE_FILE_EXTENSION')){
             if(!$deployment.Contains($mark)){throw ('ONEPORT_CSS_PREFLIGHT_REGRESSION='+$mark)}
           }
-          if(!$deployment.Contains("Join-Path $OldRoot 'Run-Fun-Purchase-Demand-V5-14.ps1'")){
+          if(!$deployment.Contains('Join-Path $OldRoot ''Run-Fun-Purchase-Demand-V5-14.ps1''')){
             throw 'ONEPORT_SCHEDULER_MUST_VERIFY_PRIOR_FIAL514_INSTALLATION'
           }
           foreach($file in @('src/ui/oneport-dashboard-v1.css','src/ui/oneport-embedded-v1.css')){
