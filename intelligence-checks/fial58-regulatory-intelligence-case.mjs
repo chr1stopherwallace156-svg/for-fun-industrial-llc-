@@ -42,7 +42,7 @@ test('catalog has different truck, school, public, campus, off-road rules withou
  assert.ok(RULES.length>=9);
  assert.equal(new Set(RULES.map(x=>x.id)).size,RULES.length);
  assert.equal(new Set(SOURCES.map(x=>x.id)).size,SOURCES.length);
- assert.ok(RULES.some(x=>x.id==='ctc-obd-quarterly'&&x.effective==='2027-10-01'));
+ assert.ok(RULES.some(x=>x.id==='ctc-obd-quarterly'&&x.effective==='2027-10'&&x.date_type==='program_frequency_change_month'));
  assert.ok(RULES.some(x=>x.id==='school-bus-ab579'&&x.effective==='2035-01-01'));
  const uncertain=RULES.find(x=>x.id==='unknown-2037');
  assert.equal(uncertain.effective,null);assert.equal(uncertain.legal_status,'unverified_watch_only');
