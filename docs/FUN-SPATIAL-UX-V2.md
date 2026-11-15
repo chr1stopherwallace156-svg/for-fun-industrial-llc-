@@ -17,6 +17,17 @@ There is a new **Ctrl+K / Cmd+K keyboard command palette**. Type a module name (
 - `GET /api/oneport/vendor/vanilla-tilt.js` serves the pinned MIT VanillaTilt source on the **same origin**. The license is bundled in `src/ui/vendor/VANILLA-TILT-LICENSE.txt`. HTTP POST to this asset route remains blocked.
 - Legacy Qwen, Tools/REA approval, Operations and ML routes use the exact same reviewed 8802 endpoint. They are mounted on demand, with no change to their authority rules.
 
+### November 15 deployment repair — FIAL 5.14 scheduler folder
+
+If the previous attempt printed `FIAL58_PRIMARY_HUB_HOLD=REAL_OPERATIONS_SCHEDULE_NOT_VERIFIED`, it was stopped before the 8802 handoff because the installer incorrectly looked for the scheduled worker inside the V1 **dashboard** checkout. This has been corrected without weakening the scheduled-task policy:
+
+- The previous dashboard and rollback source remain `$HOME\FunIndustrial-OnePort-Dashboard` on the reviewed V1 GitHub branch.
+- The existing FIAL 5.14 scheduled worker remains `$HOME\FunIndustrial-FIAL514-Demand\Run-Fun-Purchase-Demand-V5-14.ps1`.
+- The installer verifies that file exists, that the task action matches its exact path and that **four triggers** are still present. It never edits, replaces or disables the scheduled task.
+- Windows Node 24 and Node 26 CI now includes a dedicated check refusing to conflate those two separate root folders.
+
+Simply rerun the **same single PowerShell activation command** below; its `git pull --ff-only` picks up the fix. A failed preflight is not confirmation of UI deployment. Only `FUN_SPATIAL_UX_V2=PASS` after the guarded handoff confirms the live upgrade.
+
 ### Controlled rollout and rollback
 
 Use the reviewed **V1 one-port Windows checkout** as the rollback. The new `Deploy-Fun-Spatial-UX-V2.ps1` checks the exact previous branch, Git blob `89f94b83153e9a13af1d9690dcc9376e9db12e3e`, pinned vendor and license, Node 24/26 syntax, complete business regression tests, current four-trigger scheduler (still FIAL 5.14), Qwen/Cognee/ML health and all protected PIDs before touching any listener.
