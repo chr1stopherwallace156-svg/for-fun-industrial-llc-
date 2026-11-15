@@ -19,6 +19,34 @@
   a.textContent=label;parent.append(a);
  }
  const clean=x=>{x.replaceChildren()};
+ function renderGraph(){
+  const holder=$('fi-fleet-graph');
+  if(!holder||!data)return;
+  holder.replaceChildren();
+  const selected=(data.prospects||[]).slice(0,9);
+  const max=Math.max(1,...selected.map(x=>Number(x.listed_buses)||0));
+  const ns='http://www.w3.org/2000/svg';
+  const make=(tag,attrs={},value)=>{
+   const n=document.createElementNS(ns,tag);
+   for(const [k,v] of Object.entries(attrs))n.setAttribute(k,String(v));
+   if(value!==undefined)n.textContent=String(value);return n
+  };
+  const height=selected.length*38+45;
+  const svg=make('svg',{viewBox:'0 0 760 '+height,role:'img',
+   'aria-label':'Historical ZESBI funding reservation list bus quantities; not current purchase orders',
+   style:'width:100%;max-width:760px;display:block;background:#112538;border-radius:7px'});
+  selected.forEach((p,i)=>{
+   const y=i*38+12;
+   const label=String(p.name).slice(0,32);
+   svg.append(make('text',{x:7,y:y+13,fill:'#c5deeb','font-size':11},label));
+   const width=Math.max(1,360*Number(p.listed_buses)/max);
+   svg.append(make('rect',{x:300,y,width,height:17,rx:3,fill:'#76c9bc'}));
+   svg.append(make('text',{x:308+width,y:y+13,fill:'#e4f0f8','font-size':12},p.listed_buses+' buses'));
+  });
+  svg.append(make('text',{x:8,y:height-11,fill:'#bdd0df','font-size':11},
+   'Published September 2026 application quantities · Not a current RFP'));
+  holder.append(svg);
+ }
  function render(){
   if(!data)return;clean(queue);
   const raw=filter.value.trim().toLowerCase();
@@ -72,7 +100,7 @@
      (s.sha256?' · hash '+s.sha256.slice(0,16):'');
     sources.append(div)
    }
-   render();filter.addEventListener('input',render);
+   renderGraph();render();filter.addEventListener('input',render);
   }catch(e){summary.textContent='FLEET_INTELLIGENCE_HOLD: '+String(e.message||e).slice(0,140)}
  })();
 })();
