@@ -1,0 +1,185 @@
+{
+  "schema": "fun.ev.integrations.v1",
+  "mission": "Commercial fleet ICE-to-EV conversions; Fun Industrial planning, Elektron independent verification",
+  "groups": [
+    {
+      "id": "cad_wiring",
+      "capabilities": [
+        "mechanical_cad",
+        "electrical_schematics",
+        "harness_documentation"
+      ],
+      "tools": [
+        {
+          "name": "FreeCAD",
+          "repo": "https://github.com/FreeCAD/FreeCAD",
+          "role": "parametric mechanical CAD"
+        },
+        {
+          "name": "KiCad",
+          "repo": "https://github.com/KiCad/kicad-source-mirror",
+          "role": "schematics"
+        },
+        {
+          "name": "WireViz",
+          "repo": "https://github.com/wireviz/WireViz",
+          "role": "harness documentation"
+        }
+      ]
+    },
+    {
+      "id": "ev_capabilities",
+      "capabilities": [
+        "vehicle_database",
+        "powertrain_simulation",
+        "parts_procurement_inventory",
+        "safety_verification",
+        "manufacturing_operations"
+      ],
+      "tools": [
+        {
+          "name": "PostgreSQL",
+          "repo": "https://github.com/postgres/postgres",
+          "role": "vehicle configuration records"
+        },
+        {
+          "name": "OpenModelica",
+          "repo": "https://github.com/OpenModelica/OpenModelica",
+          "role": "physics simulation"
+        },
+        {
+          "name": "Optuna",
+          "repo": "https://github.com/optuna/optuna",
+          "role": "optimization proposals"
+        },
+        {
+          "name": "OR-Tools",
+          "repo": "https://github.com/google/or-tools",
+          "role": "scheduling and constrained optimization"
+        },
+        {
+          "name": "ERPNext",
+          "repo": "https://github.com/frappe/erpnext",
+          "role": "BOM purchasing inventory and manufacturing"
+        },
+        {
+          "name": "pytest",
+          "repo": "https://github.com/pytest-dev/pytest",
+          "role": "test evidence"
+        }
+      ]
+    }
+  ],
+  "contracts": [
+    {
+      "id": "vehicle_database",
+      "required": [
+        "vehicle_id",
+        "model_year",
+        "chassis_configuration",
+        "oem_document_sha256",
+        "gvwr",
+        "front_gawr",
+        "rear_gawr"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "mechanical_cad",
+      "required": [
+        "vehicle_id",
+        "geometry_source_sha256",
+        "cad_artifact_sha256",
+        "mounting_constraints"
+      ],
+      "dependsOn": [
+        "vehicle_database"
+      ]
+    },
+    {
+      "id": "electrical_schematics",
+      "required": [
+        "vehicle_id",
+        "schematic_sha256",
+        "netlist_sha256",
+        "voltage_domain"
+      ],
+      "dependsOn": [
+        "vehicle_database"
+      ]
+    },
+    {
+      "id": "harness_documentation",
+      "required": [
+        "vehicle_id",
+        "harness_sha256",
+        "connector_pinout_sha256"
+      ],
+      "dependsOn": [
+        "electrical_schematics"
+      ]
+    },
+    {
+      "id": "powertrain_simulation",
+      "required": [
+        "vehicle_id",
+        "duty_cycle_sha256",
+        "model_sha256",
+        "component_data_sha256",
+        "result_sha256"
+      ],
+      "dependsOn": [
+        "vehicle_database"
+      ]
+    },
+    {
+      "id": "parts_procurement_inventory",
+      "required": [
+        "vehicle_id",
+        "bom_sha256",
+        "supplier_quotes_sha256",
+        "compatibility_review_sha256"
+      ],
+      "dependsOn": [
+        "vehicle_database",
+        "mechanical_cad",
+        "electrical_schematics"
+      ]
+    },
+    {
+      "id": "safety_verification",
+      "required": [
+        "vehicle_id",
+        "hazard_analysis_sha256",
+        "test_plan_sha256",
+        "independent_review_sha256"
+      ],
+      "dependsOn": [
+        "powertrain_simulation",
+        "electrical_schematics",
+        "mechanical_cad"
+      ]
+    },
+    {
+      "id": "manufacturing_operations",
+      "required": [
+        "vehicle_id",
+        "work_order_sha256",
+        "qc_plan_sha256",
+        "traceability_sha256"
+      ],
+      "dependsOn": [
+        "parts_procurement_inventory",
+        "safety_verification"
+      ]
+    }
+  ],
+  "authority": {
+    "externalExecution": "OPERATOR_APPROVAL_REQUIRED",
+    "engineeringRelease": false,
+    "procurementAuthorized": false,
+    "manufacturingAuthorized": false,
+    "readOnly": true
+  },
+  "state": "CONTRACTS_DEFINED_ADAPTERS_NOT_CONNECTED"
+}
