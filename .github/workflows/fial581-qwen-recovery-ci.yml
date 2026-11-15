@@ -1,0 +1,105 @@
+name: Fun Industrial FIAL5.8.1 Qwen 8088 Conditional Recovery CI
+on:
+  push:
+    branches:
+      - repair/fial58-2026-amendment-data-integrity-20261114
+    paths:
+      - 'Recover-Fun-FIAL581-Qwen8088-Then-Dashboard.ps1'
+      - '.github/workflows/fial581-qwen-recovery-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-guarded-recovery:
+    runs-on: windows-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse guarded Windows recovery and audit external-action boundaries
+        shell: pwsh
+        run: |
+          $path=Join-Path $PWD 'Recover-Fun-FIAL581-Qwen8088-Then-Dashboard.ps1'
+          $tokens=$null;$errors=$null
+          $ast=[Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
+          if(@($errors).Count){$errors|ForEach-Object{Write-Error $_.Message};throw 'FIAL581_QWEN_PS_PARSE_HOLD'}
+          $source=Get-Content $path -Raw
+          foreach($guard in @(
+           '8088_NOT_EXACTLY_ONE_LOOPBACK_LISTENER',
+           '8088_OWNER_UNREVIEWED_PID_',
+           'EXISTING_8088_UNHEALTHY_DO_NOT_RESTART_PID_',
+           'QWEN_MODEL_ALREADY_RUNNING_WITHOUT_8088_PID_',
+           'QWEN_EXITED_LOGS=',
+           'UNRELATED_SERVICE_CHANGED_PORT_',
+           'COGNEE_8789_POLICY_OR_AVAILABILITY_NOT_VERIFIED',
+           'ML_8801_NOT_READY_OR_AUTHORITY_INVALID',
+           'FIAL581_QWEN_AND_DASHBOARD_RECOVERY=PASS',
+           'FIAL581_ELEKTRON_OLLAMA=UNTOUCHED',
+           'FIAL581_SCHEDULER=UNCHANGED')){
+             if(!$source.Contains($guard)){throw ('FIAL581_GUARD_NOT_PRESENT='+$guard)}
+          }
+          if($source -match 'Stop-Process|Restart-Service|Invoke-Expression|Set-ScheduledTask|Register-ScheduledTask|Set-NetFirewallRule|winget|pip install|REA_ALLOWED_TOOLS'){
+            throw 'FIAL581_UNAUTHORIZED_MUTATION'
+          }
+          if($source -match '(?im)^\s*\$(home|pid|host|input|error|matches)\s*='){
+            throw 'FIAL581_AUTOMATIC_POWERSHELL_VARIABLE_MUTATION'
+          }
+          $cmds=@($ast.FindAll({param($n)
+            $n -is [Management.Automation.Language.CommandAst] -and
+            $n.GetCommandName() -eq 'Start-Process'
+          },$true))
+          if($cmds.Count -ne 1 -or $cmds[0].Extent.Text -notmatch 'FilePath \$Llama'){
+            throw 'FIAL581_ONLY_LLAMA_CPP_MAY_BE_STARTED'
+          }
+          if($source -notmatch 'Start-Process -FilePath \$Llama' -or
+           $source -notmatch 'port 8088' -or
+           $source -notmatch '127\.0\.0\.1' -or
+           $source -notmatch '--n-gpu-layers 0' -or
+           $source -notmatch 'CheckOnly'){
+            throw 'FIAL581_MODEL_CONFIG_NOT_BOUNDED'
+          }
+          Write-Host 'FIAL581_QWEN_SCRIPT_AST_AND_AUTHORITY=PASS'
+      - name: Verify QwenOwner rejects wrong existing process and adopts only pinned binary
+        shell: pwsh
+        run: |
+          $path=Join-Path $PWD 'Recover-Fun-FIAL581-Qwen8088-Then-Dashboard.ps1'
+          $tokens=$null;$errors=$null
+          $ast=[Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
+          $defs=@($ast.FindAll({param($n)
+            $n -is [Management.Automation.Language.FunctionDefinitionAst] -and
+            @('Hold','Listening','QwenOwner','QwenHealth') -contains $n.Name
+          },$true))
+          if($defs.Count -ne 4){throw 'FIAL581_OWNER_FUNCTIONS_MISSING'}
+          $body=($defs|ForEach-Object{$_.Extent.Text}) -join ([Environment]::NewLine)
+          $fixture=@'
+          Set-StrictMode -Version Latest
+          $Llama='C:\mock\llama-server.exe'
+          $Url='http://127.0.0.1:8088/health'
+          $global:Scenario='none'
+          function Get-NetTCPConnection {
+            if($global:Scenario -eq 'none'){return @()}
+            return [pscustomobject]@{LocalAddress='127.0.0.1';OwningProcess=4444}
+          }
+          function Get-CimInstance {
+            if($global:Scenario -eq 'valid'){
+              return [pscustomobject]@{Name='llama-server.exe';ExecutablePath=$Llama;CommandLine='llama-server.exe --model C:\models\Qwen3-4B-Q4_K_M.gguf'}
+            }
+            return [pscustomobject]@{Name='node.exe';ExecutablePath='C:\mock\node.exe';CommandLine='node.exe'}
+          }
+          function Invoke-RestMethod {
+            if($global:Scenario -eq 'valid'){return [pscustomobject]@{status='ok'}}
+            throw 'OFFLINE'
+          }
+          if($null -ne (QwenOwner)){throw 'FIAL581_MISSING_QWEN_NOT_RECOGNIZED'}
+          $global:Scenario='invalid'
+          $held=$false
+          try{QwenOwner}catch{
+            if([string]$_.Exception.Message -match '8088_OWNER_UNREVIEWED_PID_4444'){$held=$true}
+            else{throw}
+          }
+          if(!$held){throw 'FIAL581_FOREIGN_8088_NOT_REJECTED'}
+          $global:Scenario='valid'
+          if((QwenOwner) -ne 4444){throw 'FIAL581_PINNED_QWEN_NOT_ADOPTED'}
+          if(!(QwenHealth)){throw 'FIAL581_GOOD_HEALTH_NOT_ACCEPTED'}
+          Write-Host 'FIAL581_OWNER_MISSING_FOREIGN_AND_ADOPTION=PASS'
+          '@
+          & ([scriptblock]::Create($body+[Environment]::NewLine+$fixture))
