@@ -1,6 +1,6 @@
 // Fun Industrial FIAL5.8: curated regulatory anchors, NOT an automatic legal
 // interpretation engine. All source dates require official revalidation.
-export const CATALOG_VERSION='fial5.8-regulatory-catalog-v1';
+export const CATALOG_VERSION='fial5.8.1-regulatory-catalog-2026-amendment-v1';
 export const RULES=Object.freeze([
  {id:'ctc-obd-quarterly',domain:'heavy_duty',name:'Clean Truck Check OBD testing frequency',
   effective:'2027-10',date_type:'program_frequency_change_month',applies_to:'Covered on-road OBD-equipped vehicles subject to California Clean Truck Check (exceptions exist)',
@@ -15,13 +15,14 @@ export const RULES=Object.freeze([
   caveat:'The exact entity reporting obligation and any applicable extension or amendment must be verified; do not claim an individual university or school district has filed.',
   source:'https://ww2.arb.ca.gov/advanced-clean-fleets-truckstop',
   legal_status:'published_regulatory_guidance',sectors:['public_fleets','schools','campus'],priority:88},
- {id:'acf-state-local-purchasing',domain:'public_fleets',name:'State/local fleet acquisition milestone',
-  effective:'2027-01-01',date_type:'vehicle_purchase_standard',
-  applies_to:'California state and local government agency fleets covered by applicable current ACF public-fleet requirements',
-  summary:'State/local procurement reaches its 2027 ZEV or qualifying near-zero-emission milestone, subject to adopted rules and exceptions.',
-  caveat:'Fleet size, exemptions, applicable amendments, vehicle classifications and transitional provisions must be independently checked. Private/federal ACF portions have changed.',
-  source:'https://ww2.arb.ca.gov/zero-emission-regulation-deadline-schedules-truckstop',
-  legal_status:'published_regulatory_guidance',sectors:['public_fleets','schools','campus'],priority:90},
+ {id:'acf-state-local-purchasing',domain:'public_fleets',name:'State/local fleet acquisition milestone — amended 2026',
+  effective:'2030-01-01',date_type:'amended_vehicle_purchase_standard',
+  applies_to:'Covered California state/local agency fleet purchases under the current ACF ZEV Purchase Schedule, not all fleet vehicles or every school bus',
+  summary:'CARB 2026 final amendment extends the 50% ZEV/NZEV purchase requirement through 2029 and delays the 100% purchase requirement to 2030.',
+  caveat:'The previous 2027 100% purchasing deadline is SUPERSEDED. The optional ZEV Milestones Option, small-fleet/designated-county delays, exemptions and actual buyer applicability require independent case review.',
+  source:'https://ww2.arb.ca.gov/rulemaking/2025/acfab1594',
+  amendment_approved:'2026-09-10',supersedes:'2027-01-01',
+  legal_status:'oal_approved_final_regulation',sectors:['public_fleets','schools','campus'],priority:96},
  {id:'school-bus-ab579',domain:'schools',name:'New school bus acquisition standard',
   effective:'2035-01-01',date_type:'vehicle_purchase_standard',
   applies_to:'California school districts, county offices of education and charter schools for covered newly purchased or contracted school buses',
@@ -73,8 +74,8 @@ export const RULES=Object.freeze([
   legal_status:'unverified_watch_only',sectors:['trucking','schools','campus'],priority:20}
 ].map(x=>Object.freeze({...x,sectors:Object.freeze(x.sectors)})));
 export const SOURCES=Object.freeze([
- {id:'carb-ctc',kind:'regulatory_html',url:'https://ww2.arb.ca.gov/vehicle-owners-emissions-compliance-testing-requirements-clean-truck-check',refresh_hours:24,sectors:['trucking','schools','campus'],host:'ww2.arb.ca.gov'},
- {id:'carb-acf',kind:'regulatory_html',url:'https://ww2.arb.ca.gov/zero-emission-regulation-deadline-schedules-truckstop',refresh_hours:24,sectors:['public_fleets','campus','schools'],host:'ww2.arb.ca.gov'},
+ {id:'carb-ctc',kind:'regulatory_html',url:'https://ww2.arb.ca.gov/clean-truck-check-emissions-compliance-testing-requirements',refresh_hours:24,sectors:['trucking','schools','campus'],host:'ww2.arb.ca.gov'},
+ {id:'carb-acf',kind:'regulatory_html',url:'https://ww2.arb.ca.gov/rulemaking/2025/acfab1594',refresh_hours:24,sectors:['public_fleets','campus','schools'],host:'ww2.arb.ca.gov'},
  {id:'carb-school',kind:'regulatory_html',url:'https://ww2.arb.ca.gov/our-work/programs/school-buses/regulations-affecting-school-fleets',refresh_hours:24,sectors:['schools'],host:'ww2.arb.ca.gov'},
  {id:'carb-offroad',kind:'regulatory_html',url:'https://ww2.arb.ca.gov/our-work/programs/truckstop-resources/road-zone',refresh_hours:48,sectors:['off_road','campus','schools'],host:'ww2.arb.ca.gov'},
  {id:'uc-procurement',kind:'procurement_portal_page',url:'https://procurement.ucop.edu/',refresh_hours:48,sectors:['campus'],host:'procurement.ucop.edu'},
