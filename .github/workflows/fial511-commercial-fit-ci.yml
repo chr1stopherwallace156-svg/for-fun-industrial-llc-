@@ -255,7 +255,7 @@ jobs:
           foreach($secret in @('B20260233096','13479 Abbot','elektronindustrial@gmail.com')){
             if($all.Contains($secret)){throw 'FIAL511_PRIVATE_INFORMATION_LEAK'}
           }
-          foreach($marker in @('NOT_ESTABLISHED_FULL_SERVICE_TRANSPORT_PROVIDER_UNVERIFIED',
+          foreach($marker in @('pe_electrical_license:',
            'CONDITIONAL_ENGINEERING_PARTNER_RESEARCH_ONLY',
            'GRANT_FUNDING_OPPORTUNITY','INCENTIVE_REBATE_PROGRAM',
            'NO_QUALIFIED_VENDOR_CLAIM')){
