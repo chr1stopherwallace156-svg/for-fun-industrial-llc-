@@ -40,6 +40,7 @@ const BUYER_CLIENT=new URL('../src/buyers/buyer-console-v5-13.js',import.meta.ur
 const DEMAND_CLIENT=new URL('../src/demand/demand-console-v5-14.js',import.meta.url);
 const ONEPORT_CSS=new URL('../src/ui/oneport-dashboard-v1.css',import.meta.url);
 const ONEPORT_CLIENT=new URL('../src/ui/oneport-dashboard-v1.js',import.meta.url);
+const ONEPORT_TILT=new URL('../src/ui/vendor/vanilla-tilt-1.8.1.js',import.meta.url);
 const ONEPORT_EMBED=new URL('../src/ui/oneport-embedded-v1.css',import.meta.url);
 const ONEPORT_EMBED_CLIENT=new URL('../src/ui/oneport-embedded-operations-v1.js',import.meta.url);
 
@@ -215,6 +216,8 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
       }
       if(req.method==='GET'&&u.pathname==='/api/oneport/style.css')
         return send(res,200,await readFile(ONEPORT_CSS,'utf8'),'text/css; charset=utf-8');
+      if(req.method==='GET'&&u.pathname==='/api/oneport/vendor/vanilla-tilt.js')
+        return send(res,200,await readFile(ONEPORT_TILT,'utf8'),'text/javascript; charset=utf-8');
       if(req.method==='GET'&&u.pathname==='/api/oneport/client.js')
         return send(res,200,await readFile(ONEPORT_CLIENT,'utf8'),'text/javascript; charset=utf-8');
       if(req.method==='GET'&&u.pathname==='/api/oneport/embed.css')
