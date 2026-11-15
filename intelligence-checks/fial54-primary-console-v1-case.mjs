@@ -49,7 +49,7 @@ test('primary 8802 serves status read-only, never changes state or routes to REA
  let calls=0;
  await serverTest(async()=>{calls++;return status()},async server=>{
   const home=await request(server,'/');
-  assert.equal(home.status,200);assert.match(home.body,/Executive Assistant/);
+  assert.equal(home.status,200);assert.match(home.body,/id="fi-app"/);
   const consolePage=await request(server,'/operations/');
   assert.equal(consolePage.status,200);
   assert.match(consolePage.headers['content-security-policy'],/script-src 'self'/);
