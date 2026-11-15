@@ -1,12 +1,13 @@
 // One user-facing port and one coherent application surface.
 // Existing reviewed local services remain independent backend workers.
-export const DASHBOARD_VERSION='fun-industrial-one-port-dashboard-v1';
+export const DASHBOARD_VERSION='fun-industrial-one-port-spatial-ux-v2';
 export const DASHBOARD_HTML=String.raw`<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="color-scheme" content="dark"><meta name="theme-color" content="#0b1019">
 <title>Fun Industrial — Local Workspace</title>
 <link rel="stylesheet" href="/api/oneport/style.css">
+<script src="/api/oneport/vendor/vanilla-tilt.js" defer></script>
 <script src="/api/oneport/client.js" defer></script>
 </head><body>
 <div class="fi-app" id="fi-app">
@@ -42,40 +43,54 @@ export const DASHBOARD_HTML=String.raw`<!doctype html>
     <header class="fi-topbar">
       <div class="fi-top-left"><button class="fi-menu" id="fi-menu" aria-label="Open navigation" aria-expanded="false" aria-controls="fi-sidebar">☰</button>
         <div class="fi-crumb">FUN INDUSTRIAL <span>/</span> <strong id="fi-crumb-current">Overview</strong></div></div>
-      <div class="fi-top-right"><span class="fi-local-pill"><span class="fi-dot"></span> LOCALHOST <strong>8802</strong></span>
+      <div class="fi-top-right"><button type="button" id="fi-command-open" class="fi-command-open" aria-haspopup="dialog" aria-controls="fi-command-dialog" title="Find a workspace (Ctrl+K)">⌕ <span>Search</span> <kbd>Ctrl K</kbd></button><span class="fi-local-pill"><span class="fi-dot"></span> LOCALHOST <strong>8802</strong></span>
        <span class="fi-verification" id="fi-top-health">Checking services</span></div>
     </header>
     <main class="fi-content" id="fi-main">
       <section id="fi-overview" class="fi-overview" aria-label="System overview">
         <div class="fi-hero">
-          <div class="fi-hero-copy"><div class="fi-overline"><span class="fi-mini-dot"></span> LOCAL COMMAND CENTER</div>
-            <h1>Everything in one workspace.</h1>
-            <p>Operate local AI, tools, fleet research and business intelligence from one address. Services remain separate behind the dashboard; approvals stay in your hands.</p>
+          <div class="fi-hero-copy"><div class="fi-overline"><span class="fi-mini-dot"></span> YOUR LOCAL CONTROL CENTER <span class="fi-hero-version">V2 · SPATIAL</span></div>
+            <h1>Build. Operate.<span class="fi-gradient-word">See the whole picture.</span></h1>
+            <p>One connected local workspace for AI, business intelligence, tools and everything you build. Interact with a system designed to stay on your PC.</p>
             <div class="fi-hero-actions"><a href="#chat" data-section="chat" class="fi-button fi-button-primary">Open local AI <span aria-hidden="true">↗</span></a>
               <a href="#operations" data-section="operations" class="fi-button fi-button-quiet">View operations</a></div>
           </div>
-          <div class="fi-hero-graphic" aria-hidden="true"><div class="fi-orbit fi-orbit-outer"></div><div class="fi-orbit fi-orbit-mid"></div><div class="fi-orbit fi-orbit-inner"></div>
-            <div class="fi-orbit-core">FI</div><div class="fi-orbit-label fi-orbit-label-a">AI</div>
-            <div class="fi-orbit-label fi-orbit-label-b">OPS</div><div class="fi-orbit-label fi-orbit-label-c">ML</div></div>
+          <div class="fi-hero-graphic" aria-hidden="true">
+          <div class="fi-spatial-stage" id="fi-spatial-stage">
+            <div class="fi-spatial-backdrop"></div>
+            <div class="fi-spatial-orbit fi-spatial-orbit-one"></div>
+            <div class="fi-spatial-orbit fi-spatial-orbit-two"></div>
+            <div class="fi-spatial-orbit fi-spatial-orbit-three"></div>
+            <div class="fi-spatial-device">
+              <div class="fi-spatial-device-top"><span class="fi-spatial-led"></span> FUN INDUSTRIAL <em>LOCAL · 01</em></div>
+              <div class="fi-spatial-core"><span>FI</span></div>
+              <div class="fi-spatial-device-bottom"><i></i><i></i><i></i><span>ONE CONNECTED SYSTEM</span></div>
+            </div>
+            <div class="fi-spatial-chip fi-spatial-chip-ai"><span>✦</span><b>AI</b></div>
+            <div class="fi-spatial-chip fi-spatial-chip-ops"><span>▤</span><b>OPS</b></div>
+            <div class="fi-spatial-chip fi-spatial-chip-ml"><span>⌘</span><b>ML</b></div>
+            <div class="fi-spatial-chip fi-spatial-chip-data"><span>◈</span><b>DATA</b></div>
+          </div>
+        </div>
         </div>
         <div class="fi-heading-line"><div><div class="fi-overline">CURRENT STATE</div><h2>System overview</h2>
           <p id="fi-last-check" class="fi-muted">Read-only health checks are loading.</p></div>
           <button type="button" class="fi-button fi-button-small" id="fi-health-refresh">Refresh status</button></div>
         <div class="fi-metrics">
-          <article class="fi-metric"><div class="fi-metric-top"><span>Local AI</span><span class="fi-symbol">✦</span></div><strong id="fi-ai-state">Checking</strong><small id="fi-ai-note">Qwen conversation</small></article>
-          <article class="fi-metric"><div class="fi-metric-top"><span>Tool catalog</span><span class="fi-symbol">⬡</span></div><strong id="fi-tools-state">Checking</strong><small>Approvals required to execute</small></article>
-          <article class="fi-metric"><div class="fi-metric-top"><span>Machine learning</span><span class="fi-symbol">⌘</span></div><strong id="fi-ml-state">Checking</strong><small>Run only when authorized</small></article>
-          <article class="fi-metric"><div class="fi-metric-top"><span>Fleet demand</span><span class="fi-symbol">▧</span></div><strong id="fi-demand-state">Checking</strong><small>Verified orders only</small></article>
+          <article class="fi-metric" data-spatial-card="true"><div class="fi-metric-top"><span>Local AI</span><span class="fi-symbol">✦</span></div><strong id="fi-ai-state">Checking</strong><small id="fi-ai-note">Qwen conversation</small></article>
+          <article class="fi-metric" data-spatial-card="true"><div class="fi-metric-top"><span>Tool catalog</span><span class="fi-symbol">⬡</span></div><strong id="fi-tools-state">Checking</strong><small>Approvals required to execute</small></article>
+          <article class="fi-metric" data-spatial-card="true"><div class="fi-metric-top"><span>Machine learning</span><span class="fi-symbol">⌘</span></div><strong id="fi-ml-state">Checking</strong><small>Run only when authorized</small></article>
+          <article class="fi-metric" data-spatial-card="true"><div class="fi-metric-top"><span>Fleet demand</span><span class="fi-symbol">▧</span></div><strong id="fi-demand-state">Checking</strong><small>Verified orders only</small></article>
         </div>
         <div class="fi-heading-line"><div><div class="fi-overline">QUICK ACCESS</div><h2>Workspaces</h2>
           <p class="fi-muted">All functions stay inside this dashboard.</p></div></div>
         <div class="fi-tiles">
-          <a href="#chat" data-section="chat" class="fi-tile"><span class="fi-tile-symbol">✦</span><strong>Ask Qwen</strong><span>Conversation and contextual memory</span><b>Open ↗</b></a>
-          <a href="#tools" data-section="tools" class="fi-tile"><span class="fi-tile-symbol">⬡</span><strong>Inspect tools</strong><span>REA catalog and reviewed execution</span><b>Open ↗</b></a>
-          <a href="#operations" data-section="operations" class="fi-tile"><span class="fi-tile-symbol">▤</span><strong>Operations center</strong><span>Business queue and verified outcomes</span><b>Open ↗</b></a>
-          <a href="#procurement" data-section="procurement" class="fi-tile"><span class="fi-tile-symbol">◈</span><strong>Fleet procurement</strong><span>Official source-linked buyer demand</span><b>Open ↗</b></a>
-          <a href="#commerce" data-section="commerce" class="fi-tile"><span class="fi-tile-symbol">▥</span><strong>Commerce</strong><span>Trends and saved catalog research</span><b>Open ↗</b></a>
-          <a href="#ml" data-section="ml" class="fi-tile"><span class="fi-tile-symbol">⌘</span><strong>Machine learning</strong><span>Bounded data and model analysis</span><b>Open ↗</b></a>
+          <a href="#chat" data-section="chat" class="fi-tile" data-spatial-card="true"><span class="fi-tile-symbol">✦</span><strong>Ask Qwen</strong><span>Conversation and contextual memory</span><b>Open ↗</b></a>
+          <a href="#tools" data-section="tools" class="fi-tile" data-spatial-card="true"><span class="fi-tile-symbol">⬡</span><strong>Inspect tools</strong><span>REA catalog and reviewed execution</span><b>Open ↗</b></a>
+          <a href="#operations" data-section="operations" class="fi-tile" data-spatial-card="true"><span class="fi-tile-symbol">▤</span><strong>Operations center</strong><span>Business queue and verified outcomes</span><b>Open ↗</b></a>
+          <a href="#procurement" data-section="procurement" class="fi-tile" data-spatial-card="true"><span class="fi-tile-symbol">◈</span><strong>Fleet procurement</strong><span>Official source-linked buyer demand</span><b>Open ↗</b></a>
+          <a href="#commerce" data-section="commerce" class="fi-tile" data-spatial-card="true"><span class="fi-tile-symbol">▥</span><strong>Commerce</strong><span>Trends and saved catalog research</span><b>Open ↗</b></a>
+          <a href="#ml" data-section="ml" class="fi-tile" data-spatial-card="true"><span class="fi-tile-symbol">⌘</span><strong>Machine learning</strong><span>Bounded data and model analysis</span><b>Open ↗</b></a>
         </div>
         <p class="fi-evidence">Research is not a purchase order, approval, revenue, or an authorized external action. This dashboard only reads status until you choose a supported action.</p>
       </section>
@@ -89,4 +104,10 @@ export const DASHBOARD_HTML=String.raw`<!doctype html>
   </div>
 </div>
 <div class="fi-shade" id="fi-shade" hidden></div>
+<dialog id="fi-command-dialog" class="fi-command-dialog" aria-labelledby="fi-command-title">
+ <div class="fi-command-head"><div><strong id="fi-command-title">Find a workspace</strong><p>Search connected modules. Press Esc to close.</p></div><button type="button" class="fi-command-close" id="fi-command-close" aria-label="Close search">×</button></div>
+ <label class="fi-command-search"><span aria-hidden="true">⌕</span><input id="fi-command-input" type="search" placeholder="Search chat, tools, procurement…" autocomplete="off" spellcheck="false" aria-label="Search workspace modules"></label>
+ <div id="fi-command-results" class="fi-command-results" role="listbox" aria-label="Matching modules"></div>
+ <div class="fi-command-bottom">LOCAL-ONLY NAVIGATION <span>↵ Open · Esc Close</span></div>
+</dialog>
 </body></html>`;
