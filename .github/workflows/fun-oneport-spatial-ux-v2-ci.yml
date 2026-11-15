@@ -1,0 +1,135 @@
+name: Fun Industrial Spatial UX V2 Windows
+on:
+  push:
+    branches:
+      - feature/fun-oneport-spatial-ux-v2-20261115
+    paths:
+      - 'src/ui/oneport-*'
+      - 'src/ui/vendor/**'
+      - 'scripts/Run-Fun-ML-Dashboard8802.mjs'
+      - 'Deploy-Fun-Spatial-UX-V2.ps1'
+      - 'Activate-Fun-Spatial-UX-V2.ps1'
+      - 'intelligence-checks/oneport-spatial-ux-v2-case.mjs'
+      - 'intelligence-checks/oneport-dashboard-v1-case.mjs'
+      - 'intelligence-checks/integrated-hub-ui-v1-case.mjs'
+      - 'intelligence-checks/fi-ml-hub-v3-case.mjs'
+      - 'intelligence-checks/fial54-primary-console-v1-case.mjs'
+      - '.github/workflows/fun-oneport-spatial-ux-v2-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['24', '26']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Syntax check all new dashboard code and existing server
+        shell: pwsh
+        run: |
+          foreach($file in @(
+            'src/ui/oneport-dashboard-v1.mjs',
+            'src/ui/oneport-dashboard-v1.js',
+            'src/ui/vendor/vanilla-tilt-1.8.1.js',
+            'intelligence-checks/oneport-spatial-ux-v2-case.mjs',
+            'src/ui/oneport-embedded-operations-v1.js',
+            'scripts/Run-Fun-ML-Dashboard8802.mjs',
+            'intelligence-checks/oneport-dashboard-v1-case.mjs')){
+            node --check $file
+            if($LASTEXITCODE -ne 0){throw ('ONEPORT_JS_SYNTAX_HOLD='+$file)}
+          }
+          Write-Host 'FUN_ONEPORT_JS_SYNTAX=PASS'
+      - name: Full prior local business and UI regressions, plus one-port and legacy contracts
+        shell: pwsh
+        run: |
+          node --test intelligence-checks/oneport-spatial-ux-v2-case.mjs intelligence-checks/oneport-dashboard-v1-case.mjs intelligence-checks/fial514-demand-evidence-case.mjs intelligence-checks/fial514-dashboard-case.mjs intelligence-checks/fial514-qwen-context-case.mjs intelligence-checks/fial513-buyer-evidence-case.mjs intelligence-checks/fial513-dashboard-case.mjs intelligence-checks/fial513-qwen-context-case.mjs intelligence-checks/fial512-bid-readiness-case.mjs intelligence-checks/fial512-dashboard-case.mjs intelligence-checks/fial512-qwen-context-case.mjs intelligence-checks/fial511-commercial-fit-case.mjs intelligence-checks/fial511-dashboard-case.mjs intelligence-checks/fial511-qwen-context-case.mjs intelligence-checks/fial510-procurement-case.mjs intelligence-checks/fial510-dashboard-case.mjs intelligence-checks/fial59-fleet-evidence-case.mjs intelligence-checks/fial59-dashboard-case.mjs intelligence-checks/fial59-qwen-context-case.mjs intelligence-checks/fial58-regulatory-intelligence-case.mjs intelligence-checks/fial58-regulatory-dashboard-case.mjs intelligence-checks/fial57-outcomes-case.mjs intelligence-checks/fial57-dashboard-case.mjs intelligence-checks/fial56-business-competence-case.mjs intelligence-checks/fial56-primary-business-dashboard-case.mjs intelligence-checks/fial55-real-operations-case.mjs intelligence-checks/fial55-primary-dashboard-case.mjs intelligence-checks/fial55-elektron-mail-case.mjs intelligence-checks/fial54-executive-operator-v1-case.mjs intelligence-checks/fial54-primary-console-v1-case.mjs intelligence-checks/fial-primary-dashboard-chat-v5-3-case.mjs intelligence-checks/fial-grounded-qwen-v5-2-case.mjs intelligence-checks/fi-ml-hub-v3-case.mjs intelligence-checks/integrated-hub-ui-v1-case.mjs intelligence-checks/commerce-opportunities-v1-1-case.mjs intelligence-checks/google-trends-focus-v1-2-case.mjs
+          if($LASTEXITCODE -ne 0){throw 'FUN_ONEPORT_REGRESSIONS_FAILED'}
+          Write-Host 'FUN_ONEPORT_FULL_LOCAL_REGRESSIONS=PASS'
+      - name: Parse guarded restart and verify exact process and scheduled task constraints
+        shell: pwsh
+        run: |
+          foreach($file in @('Deploy-Fun-Spatial-UX-V2.ps1','Activate-Fun-Spatial-UX-V2.ps1')){
+            $tok=$null;$errs=$null
+            [Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $file),[ref]$tok,[ref]$errs)|Out-Null
+            if(@($errs).Count){$errs|ForEach-Object{Write-Host $_.Message};throw ('ONEPORT_POWERSHELL_SYNTAX_HOLD='+$file)}
+            $script=Get-Content $file -Raw
+            if($script -match '(?im)^\s*\$(home|pid|host|input|error|matches)\s*='){
+              throw ('ONEPORT_RESERVED_POWERSHELL_VARIABLE='+$file)}
+            if($script -match 'Invoke-Expression|Restart-Service|git reset|winget install|pip install'){
+              throw ('ONEPORT_UNAPPROVED_INSTALLER_MUTATION='+$file)}
+          }
+          $deployment=Get-Content 'Deploy-Fun-Spatial-UX-V2.ps1' -Raw
+          # Regression: Node 26 rejects --check *.css with ERR_UNKNOWN_FILE_EXTENSION.
+          # The actual Windows installer must check executable JS only, and treat
+          # CSS as a nonempty static asset, with all files still required.
+          foreach($mark in @('GetExtension($f)', '$ext -ceq ''.js''', '$ext -ceq ''.mjs''',
+            '$ext -ceq ''.css''', 'NEW_CSS_ASSET_EMPTY',
+            'UNEXPECTED_SOURCE_FILE_EXTENSION')){
+            if(!$deployment.Contains($mark)){throw ('ONEPORT_CSS_PREFLIGHT_REGRESSION='+$mark)}
+          }
+          if(!$deployment.Contains('Join-Path $OldRoot ''Run-Fun-Purchase-Demand-V5-14.ps1''') -or
+           !$deployment.Contains("$" + "OldRoot=Join-Path $" + "HOME 'FunIndustrial-OnePort-Dashboard'")){
+            throw 'V2_REVIEWED_OLD_ONEPORT_SOURCE_IDENTITY_INVALID'
+          }
+          if(!$deployment.Contains('Join-Path $OldRoot ''Run-Fun-Purchase-Demand-V5-14.ps1''')){
+            throw 'ONEPORT_SCHEDULER_MUST_VERIFY_PRIOR_FIAL514_INSTALLATION'
+          }
+          foreach($file in @('src/ui/oneport-dashboard-v1.css','src/ui/oneport-embedded-v1.css')){
+            if(!(Test-Path $file -PathType Leaf) -or (Get-Item $file).Length -lt 20){
+              throw ('ONEPORT_CSS_MISSING_OR_EMPTY='+$file)
+            }
+          }
+          Write-Host 'FUN_ONEPORT_NODE26_CSS_AND_OLD_SCHEDULE_GUARDS=PASS'
+          foreach($required in @('89f94b83153e9a13af1d9690dcc9376e9db12e3e',
+            'fun-industrial-one-port-spatial-ux-v2',
+            'UNVERIFIED_OPEN_SOURCE_INTERACTION_OR_LICENSE',
+            'FUN_SPATIAL_UX_V2_DASHBOARD=PASS',
+            'OLD_DASHBOARD_SOURCE_NOT_REVIEWED',
+            'FIAL58_ROLLBACK_OLD_PRIMARY_DASHBOARD=PASS',
+            'FUN_ONEPORT_PRIMARY_DASHBOARD=PASS',
+            'OTHER_SERVICES_RESTARTED=0 ELEKTRON=UNTOUCHED',
+            'PROTECTED_PROCESS_CHANGED_PORT_',
+            'frame-ancestors',
+            '/workspace/?view=ml&embedded=1')){
+            if(!$deployment.Contains($required)){throw ('ONEPORT_DEPLOY_PROTECTION_MISSING='+$required)}
+          }
+          $activation=Get-Content 'Activate-Fun-Spatial-UX-V2.ps1' -Raw
+          foreach($required in @('FUN_ONEPORT_USER_FACING_PORTS=1',
+             'Get-ScheduledTask','FUN_ONEPORT_ACTIVATION=PASS',
+             'FUN_ONEPORT_QWEN_TOOL_AUTHORITY=UNCHANGED',
+             'Activate-Fun-Spatial-UX-V2.ps1')){
+            if($required -eq 'Activate-Fun-Spatial-UX-V2.ps1'){continue}
+            if(!$activation.Contains($required)){throw ('ONEPORT_ACTIVATION_GUARD_MISSING='+$required)}
+          }
+          if($activation.Contains('Stop-Process')){throw 'ONEPORT_WRAPPER_MUST_NOT_STOP_PROCESS'}
+          Write-Host 'FUN_ONEPORT_GUARDED_RESTART_AND_FOUR_TRIGGERS=PASS'
+      - name: UI stays within 8802 with no new external execution authority
+        shell: pwsh
+        run: |
+          $client=Get-Content 'src/ui/oneport-dashboard-v1.js' -Raw
+          $vendor=Get-Content 'src/ui/vendor/vanilla-tilt-1.8.1.js' -Raw
+          $license=Get-Content 'src/ui/vendor/VANILLA-TILT-LICENSE.txt' -Raw
+          if($vendor -notmatch 'Version 1.8.1' -or $license -notmatch 'MIT License'){
+            throw 'SPATIAL_V2_LICENSE_SOURCE_MISSING'
+          }
+          if($client -notmatch 'VanillaTilt.init' -or
+             $client -notmatch 'prefers-reduced-motion' -or
+             $client -notmatch 'fi-command-dialog'){
+            throw 'SPATIAL_V2_REAL_INTERACTION_MISSING'
+          }
+          $html=Get-Content 'src/ui/oneport-dashboard-v1.mjs' -Raw
+          $hub=Get-Content 'scripts/Run-Fun-ML-Dashboard8802.mjs' -Raw
+          if($client -match 'innerHTML\s*=|eval\(|setInterval\(|method:\s*[''"]POST' -or
+           $client -match 'https?://|fetch\([''"]https?://' -or
+           $html -match ':8088|:8789|:8798|:8801|src="https?' -or
+           $hub -notmatch 'frame-src ''self''' -or
+           $hub -notmatch "frame-ancestors"){
+            throw 'FUN_ONEPORT_RESTRICTED_BROWSER_BOUNDARY_HOLD'}
+          Write-Host 'FUN_ONEPORT_REVIEW_ONLY_BROWSER=PASS'
