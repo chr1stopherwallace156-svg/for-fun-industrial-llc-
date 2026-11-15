@@ -97,7 +97,7 @@ test('the live HTTP adapter serves only immutable UI assets, without proxying or
   assert.equal(js.status,200);assert.match(js.headers['content-type'],/^text\/javascript/);
   assert.match(css.text,/FUN_INTEGRATED_CONTROL_CENTER_UI_V1/);
   assert.match(js.text,/FUN_INTEGRATED_CONTROL_CENTER_UI_V1/);
-  for(const path of ['/','/unified/']){
+  for(const path of ['/workspace/','/unified/']){
    const page=await request(server,path);
    assert.equal(page.status,200);
    assert.match(page.text,/id="fi-ui-shell"/);
