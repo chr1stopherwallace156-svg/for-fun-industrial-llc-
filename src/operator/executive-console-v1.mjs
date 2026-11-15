@@ -22,6 +22,8 @@ export const EXEC_PAGE=String.raw`<!doctype html><html lang="en"><head><meta cha
 <div id="fi-fleet-current-signals"></div>
 <label for="fi-fleet-filter">Filter agency name or city</label>
 <input id="fi-fleet-filter" type="search" placeholder="Victorville, Palmdale, Bakersfield, Temecula…" style="padding:9px;width:95%;max-width:440px;color:#e4f0fa;background:#0e1f2d;border:1px solid #53687a;border-radius:7px">
+<h3>Historic ZESBI listed buses — published research signals</h3>
+<div id="fi-fleet-graph" role="img" aria-label="Published September 2026 ZESBI listed buses by selected LEA, not current RFPs"></div>
 <h3>Historical fleet prospect research queue</h3>
 <div id="fi-fleet-queue" class="list"></div>
 <h3>Official public data source health</h3>
