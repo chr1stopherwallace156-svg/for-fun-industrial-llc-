@@ -41,10 +41,13 @@ $files=@('src\fit\commercial-fit-catalog-v5-11.mjs',
  'scripts\Run-Fun-Commercial-Fit-V5-11.mjs',
  'src\bid-readiness\readiness-catalog-v5-12.mjs',
  'src\bid-readiness\readiness-engine-v5-12.mjs',
+ 'src\bid-readiness\readiness-qwen-v5-12.mjs',
+ 'src\fial\grounded-chat-v5-2.mjs',
  'src\bid-readiness\readiness-console-v5-12.js',
  'scripts\Run-Fun-Bid-Readiness-V5-12.mjs',
  'intelligence-checks\fial512-bid-readiness-case.mjs',
  'intelligence-checks\fial512-dashboard-case.mjs',
+ 'intelligence-checks\fial512-qwen-context-case.mjs',
  'intelligence-checks\fial511-commercial-fit-case.mjs',
  'intelligence-checks\fial511-dashboard-case.mjs','intelligence-checks\fial511-qwen-context-case.mjs',
  'scripts\Run-Fun-ML-Dashboard8802.mjs')
@@ -55,7 +58,7 @@ foreach($rel in $files){
  & $Node --check $file
  if($LASTEXITCODE -ne 0){Hold ('SOURCE_PARSE_FAILED='+$rel)}
 }
-& $Node --test (Join-Path $Root 'intelligence-checks\fial512-bid-readiness-case.mjs') (Join-Path $Root 'intelligence-checks\fial512-dashboard-case.mjs') (Join-Path $Root 'intelligence-checks\fial511-commercial-fit-case.mjs') (Join-Path $Root 'intelligence-checks\fial511-dashboard-case.mjs') (Join-Path $Root 'intelligence-checks\fial511-qwen-context-case.mjs') (Join-Path $Root 'intelligence-checks\fial510-procurement-case.mjs') (Join-Path $Root 'intelligence-checks\fial510-dashboard-case.mjs') (Join-Path $Root 'intelligence-checks\fial59-fleet-evidence-case.mjs')
+& $Node --test (Join-Path $Root 'intelligence-checks\fial512-bid-readiness-case.mjs') (Join-Path $Root 'intelligence-checks\fial512-dashboard-case.mjs') (Join-Path $Root 'intelligence-checks\fial512-qwen-context-case.mjs') (Join-Path $Root 'intelligence-checks\fial511-commercial-fit-case.mjs') (Join-Path $Root 'intelligence-checks\fial511-dashboard-case.mjs') (Join-Path $Root 'intelligence-checks\fial511-qwen-context-case.mjs') (Join-Path $Root 'intelligence-checks\fial510-procurement-case.mjs') (Join-Path $Root 'intelligence-checks\fial510-dashboard-case.mjs') (Join-Path $Root 'intelligence-checks\fial59-fleet-evidence-case.mjs')
 if($LASTEXITCODE -ne 0){Hold 'COMMERCIAL_FIT_REGRESSION_HOLD'}
 Write-Host 'FIAL512_OFFLINE_TESTS=PASS'
 $task=Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
