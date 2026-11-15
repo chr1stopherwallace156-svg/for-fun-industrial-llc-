@@ -61,7 +61,7 @@ test('status request is read-only and does not execute an ML task',async()=>{
   try{
     const x=await req(server,'GET','/api/ml/dashboard/status');
     assert.equal(x.status,200);assert.equal(f.counts().taskCalls,0);
-    const main=await req(server,'GET','/');
+    const main=await req(server,'GET','/workspace/');
     assert.equal(main.status,200);
     assert.match(main.body,/fi-ml-panel/);
     assert.equal(f.counts().taskCalls,0);
