@@ -37,7 +37,7 @@ export function validateOfficialListing(text){
  if(typeof text!=='string'||text.length>220000)return false;
  // Require both district-published listing identifiers and exact opportunity scope,
  // and the notice download link within the same page.
- return /26-27-02TR/i.test(text)&&/Student\s+Transportation\s+Services\s+RFP/i.test(text)&&
+ return /26-27-02TR\s*[-–]\s*Student\s+Transportation\s+Services\s+RFP/i.test(text)&&
   /26-27-02TR[\s\S]{0,400}Notice\s+Inviting\s+Bids/i.test(text);
 }
 export function deadlineState(now=new Date()){
