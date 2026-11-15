@@ -18,12 +18,12 @@ export async function fleetContextForQwen(question){
  else lines.push('Last local official-source observation: '+String(report.last_cycle_utc||'unknown')+
   '; source holds: '+report.counts.held+'; open verified RFPs: ZERO; awarded contracts: ZERO; actual revenue: ZERO.');
  const words=question.toLowerCase();
- let relevant=(report.prospects||[]).filter(p=>{
+ let matches=(report.prospects||[]).filter(p=>{
   const terms=(p.name+' '+p.city).toLowerCase().split(/\s+/).filter(w=>w.length>5);
   return terms.some(t=>words.includes(t));
  });
- if(!relevant.length)relevant=(report.prospects||[]).slice(0,5);
- for(const p of relevant.slice(0,5))
+ if(!matches.length)matches=(report.prospects||[]).slice(0,5);
+ for(const p of matches.slice(0,5))
   lines.push(p.name+' ('+p.city+'): '+p.listed_buses+' historically listed buses, '+
    p.listed_chargers+' historically listed chargers, PDF page(s) '+p.pdf_pages.join(', ')+
    '; research priority '+p.research_priority_points+'/85; current open bid not verified.');
