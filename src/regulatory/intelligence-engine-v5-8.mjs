@@ -30,7 +30,7 @@ export function validateEconomicCache(series){
   if(anchor&&(!Number.isFinite(anchor.value)||Math.abs(anchor.value-BLS_PUBLISHED_ANCHOR.value)>BLS_PUBLISHED_ANCHOR.tolerance))
    return {ok:false,reason:'BLS_OCT2026_CPI_CROSS_SOURCE_MISMATCH'};
   if(row.id===BLS_PUBLISHED_ANCHOR.series_id&&row.latest_month===BLS_PUBLISHED_ANCHOR.month&&
-   Math.abs(row.latest_value-BLS_PUBLISHED_ANCHOR.value)>BLS_PUBLISHED_ANCHOR.tolerance)
+   (!Number.isFinite(row.latest_value)||Math.abs(row.latest_value-BLS_PUBLISHED_ANCHOR.value)>BLS_PUBLISHED_ANCHOR.tolerance))
    return {ok:false,reason:'BLS_OCT2026_LATEST_CPI_CROSS_SOURCE_MISMATCH'};
  }
  return {ok:true,reason:null}
@@ -207,7 +207,7 @@ export async function runRegulatoryCycle({root=ROOT(),now=new Date(),fetcher=fet
     derived=parseFederalRegister(JSON.parse(r.bytes.toString('utf8')));
    }
    await immutable(evidence,r.bytes);
-   if(s.kind==='economic_api')economic=derived;
+   if(s.kind==='economic_api'){economic=derived;dataQualityWarnings.length=0}
    if(s.kind==='federal_api')federal=derived;
    const replacedURL=!!before?.source_url&&before.source_url!==s.url;
    const isChanged=!replacedURL&&!!before?.sha256&&before.sha256!==r.sha256;
