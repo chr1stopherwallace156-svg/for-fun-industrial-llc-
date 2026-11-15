@@ -1,0 +1,104 @@
+name: Fun Industrial FIAL5.9 Fleet Opportunity Evidence CI
+on:
+  push:
+    branches:
+      - feature/fial5-9-fleet-opportunity-evidence-20261114
+    paths:
+      - 'src/fleet/**'
+      - 'src/operator/executive-console-v1.mjs'
+      - 'scripts/Run-Fun-ML-Dashboard8802.mjs'
+      - 'scripts/Run-Fun-Fleet-Opportunity-V5-9.mjs'
+      - '*Fleet*V5-9.ps1'
+      - 'Deploy-Fun-FIAL59-PrimaryDashboard.ps1'
+      - 'intelligence-checks/fial59-*.mjs'
+      - '.github/workflows/fial59-fleet-opportunity-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Parse executable JavaScript and modules
+        shell: pwsh
+        run: |
+          foreach($file in @('src/fleet/fleet-sources-v5-9.mjs',
+           'src/fleet/fleet-engine-v5-9.mjs',
+           'src/fleet/fleet-console-v5-9.js',
+           'scripts/Run-Fun-Fleet-Opportunity-V5-9.mjs',
+           'src/operator/executive-console-v1.mjs',
+           'scripts/Run-Fun-ML-Dashboard8802.mjs',
+           'intelligence-checks/fial59-fleet-evidence-case.mjs',
+           'intelligence-checks/fial59-dashboard-case.mjs')){
+            node --check $file
+            if($LASTEXITCODE -ne 0){throw ('FIAL59_PARSE_HOLD='+$file)}
+          }
+          Write-Host 'FIAL59_JS_SYNTAX=PASS'
+      - name: Test real source-provenance patterns and previous dashboard regressions
+        run: |
+          node --test intelligence-checks/fial59-fleet-evidence-case.mjs intelligence-checks/fial59-dashboard-case.mjs intelligence-checks/fial58-regulatory-intelligence-case.mjs intelligence-checks/fial58-regulatory-dashboard-case.mjs intelligence-checks/fial57-outcomes-case.mjs intelligence-checks/fial57-dashboard-case.mjs intelligence-checks/fial56-business-competence-case.mjs intelligence-checks/fial56-primary-business-dashboard-case.mjs intelligence-checks/fial55-real-operations-case.mjs intelligence-checks/fial55-primary-dashboard-case.mjs intelligence-checks/fial55-elektron-mail-case.mjs intelligence-checks/fial54-executive-operator-v1-case.mjs intelligence-checks/fial54-primary-console-v1-case.mjs intelligence-checks/fial-primary-dashboard-chat-v5-3-case.mjs intelligence-checks/fial-grounded-qwen-v5-2-case.mjs intelligence-checks/fi-ml-hub-v3-case.mjs intelligence-checks/integrated-hub-ui-v1-case.mjs intelligence-checks/commerce-opportunities-v1-1-case.mjs intelligence-checks/google-trends-focus-v1-2-case.mjs
+      - name: Windows scheduler and dashboard safe-update preflight
+        shell: pwsh
+        run: |
+          $paths=@('Run-Fun-Fleet-Opportunity-V5-9.ps1',
+           'Install-Fun-Fleet-Opportunity-V5-9.ps1',
+           'Deploy-Fun-FIAL59-PrimaryDashboard.ps1',
+           'Activate-Fun-Fleet-Opportunity-V5-9.ps1')
+          foreach($file in $paths){
+            $tok=$null;$errs=$null
+            [Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $file),[ref]$tok,[ref]$errs)|Out-Null
+            if(@($errs).Count){$errs|ForEach-Object{Write-Host $_.Message};throw ('FIAL59_PS_PARSE_HOLD='+$file)}
+            $src=Get-Content -LiteralPath $file -Raw
+            if($src -match '(?im)^\s*\$(home|pid|host|input|error|matches)\s*='){
+              throw ('FIAL59_AUTOMATIC_VAR_MUTATION='+$file)}
+            if(($file -ne 'Deploy-Fun-FIAL59-PrimaryDashboard.ps1' -and $src -match 'Stop-Process') -or
+             $src -match 'Invoke-Expression|Restart-Service|git reset|winget install|pip install'){
+              throw ('FIAL59_UNREVIEWED_PROCESS_MUTATION='+$file)}
+          }
+          $install=Get-Content 'Install-Fun-Fleet-Opportunity-V5-9.ps1' -Raw
+          foreach($guard in @('UNKNOWN_TASK_ACTION_WILL_NOT_REPLACE',
+           'FIAL59_FIRST_REAL_FLEET_OBSERVATION=PASS',
+           'FIAL59_PREVIOUS_FIAL581_SCHEDULE_RESTORED=PASS',
+           'FIAL59_FOUR_DAILY_TRIGGERS=PRESERVED')){
+            if(!$install.Contains($guard)){throw ('FIAL59_SCHEDULE_GUARD_MISSING='+$guard)}
+          }
+          $runner=(git hash-object --path=Run-Fun-Regulatory-Economic-V5-8.ps1 -- Run-Fun-Regulatory-Economic-V5-8.ps1|Out-String).Trim()
+          if($runner -cne 'fa2ebe4a46654ab299520bbb1ae3901526a5b92a'){
+            throw ('FIAL59_PRIOR_RUNNER_BLOB_DRIFT='+$runner)}
+          $hub=(git hash-object --path=scripts/Run-Fun-ML-Dashboard8802.mjs -- scripts/Run-Fun-ML-Dashboard8802.mjs|Out-String).Trim()
+          if($hub -ceq '774de9231e9e0d07b9326a687922e291492c8aa7'){
+            throw 'FIAL59_NEW_HUB_DID_NOT_INCLUDE_FLEET_API'
+          }
+          $deploy=Get-Content 'Deploy-Fun-FIAL59-PrimaryDashboard.ps1' -Raw
+          foreach($guard in @('OLD_DASHBOARD_SOURCE_NOT_REVIEWED',
+           'FIAL58_ROLLBACK_OLD_PRIMARY_DASHBOARD=PASS',
+           'FIAL59_FLEET_PRIMARY_DASHBOARD=PASS',
+           'FLEET_EVIDENCE_RECEIPT_MISSING',
+           'PROTECTED_PROCESS_CHANGED_PORT_')){
+            if(!$deploy.Contains($guard)){throw ('FIAL59_DEPLOY_GUARD_MISSING='+$guard)}
+          }
+          Write-Host 'FIAL59_WINDOWS_SCHEDULE_AND_ROLLBACK=PASS'
+      - name: Fleet privacy and no external authority
+        shell: pwsh
+        run: |
+          $src=((Get-ChildItem src/fleet -File|ForEach-Object{Get-Content $_.FullName -Raw}) -join '')
+          foreach($value in @('B20260233096','13479 Abbot','elektronindustrial@gmail.com')){
+            if($src.Contains($value)){throw 'FIAL59_EXPOSES_PRIVATE_COMPANY_PROFILE'}
+          }
+          $cli=Get-Content 'Run-Fun-Fleet-Opportunity-V5-9.ps1' -Raw
+          if($cli -match 'send-approved-stdin|connect-send|messages/send|api/rea/execute|api/ai/chat'){
+            throw 'FIAL59_SCHEDULED_EXTERNAL_OR_MODEL_ACTION'
+          }
+          $catalog=Get-Content 'src/fleet/fleet-sources-v5-9.mjs' -Raw
+          if($catalog -notmatch 'RESERVED_FUNDING_APPLICATION_NOT_CONFIRMED_AWARD' -or
+             $catalog -notmatch '2026-09-09' -or
+             $catalog -notmatch 'current_bid_confirmed:false' -or
+             $catalog -notmatch 'verified_contract_value_usd:0'){
+            throw 'FIAL59_FALSE_PROCUREMENT_CLAIMS_NOT_BLOCKED'
+          }
+          Write-Host 'FIAL59_PRIVACY_AND_AUTHORITY=PASS'
