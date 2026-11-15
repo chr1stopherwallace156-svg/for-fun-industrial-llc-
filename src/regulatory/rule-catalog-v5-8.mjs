@@ -8,6 +8,13 @@ export const RULES=Object.freeze([
   caveat:'Not one fixed fleet-wide due date: check each vehicle CTC-VIS account for specific compliance deadlines; agricultural vehicles and certain motorhomes differ.',
   source:'https://ww2.arb.ca.gov/vehicle-owners-emissions-compliance-testing-requirements-clean-truck-check',
   legal_status:'published_regulatory_guidance',sectors:['trucking','schools','campus','public_fleets','vendors'],priority:95},
+ {id:'acf-annual-public-reporting',domain:'public_fleets',name:'Annual state/local government ACF reporting',
+  effective:'2027-04-01',date_type:'recurring_reporting_anchor',
+  applies_to:'California state and local government fleets subject to the current ACF reporting provisions',
+  summary:'CARB states reporting is due annually by April 1 for covered state and local fleets.',
+  caveat:'The exact entity reporting obligation and any applicable extension or amendment must be verified; do not claim an individual university or school district has filed.',
+  source:'https://ww2.arb.ca.gov/advanced-clean-fleets-truckstop',
+  legal_status:'published_regulatory_guidance',sectors:['public_fleets','schools','campus'],priority:88},
  {id:'acf-state-local-purchasing',domain:'public_fleets',name:'State/local fleet acquisition milestone',
   effective:'2027-01-01',date_type:'vehicle_purchase_standard',
   applies_to:'California state and local government agency fleets covered by applicable current ACF public-fleet requirements',
@@ -73,7 +80,7 @@ export const SOURCES=Object.freeze([
  {id:'uc-procurement',kind:'procurement_portal_page',url:'https://procurement.ucop.edu/',refresh_hours:48,sectors:['campus'],host:'procurement.ucop.edu'},
  {id:'csu-procurement',kind:'procurement_portal_page',url:'https://www.calstate.edu/csu-system/doing-business-with-the-csu/contract-services-and-procurement/supplier-resources',refresh_hours:48,sectors:['campus'],host:'www.calstate.edu'},
  {id:'bls-inflation',kind:'economic_api',url:'https://api.bls.gov/publicAPI/v1/timeseries/data/',refresh_hours:48,sectors:['economy'],host:'api.bls.gov'},
- {id:'federal-register',kind:'federal_api',url:'https://www.federalregister.gov/api/v1/documents.json',refresh_hours:24,sectors:['regulatory'],host:'www.federalregister.gov'}
+ {id:'federal-register',kind:'federal_api',url:'https://www.federalregister.gov/api/v1/documents.json?per_page=5&order=newest&conditions%5Bterm%5D=truck%20emissions',refresh_hours:24,sectors:['regulatory'],host:'www.federalregister.gov'}
 ].map(x=>Object.freeze({...x,sectors:Object.freeze(x.sectors)})));
 export const BLS_SERIES=Object.freeze([
  {id:'CUUR0000SA0',label:'U.S. CPI-U (all items)',unit:'index',claim:'National consumer price level, not a truck-fleet cost quote'},
