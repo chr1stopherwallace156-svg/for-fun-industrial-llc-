@@ -1,0 +1,4 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import {spawnSync} from 'node:child_process';import {fileURLToPath} from 'node:url';
+const p=new URL('../src/ev-conversion/reconcile-existing-v1.py',import.meta.url);
+test('audit preserves no-approval and no-execution-claim boundaries',()=>{const s=fs.readFileSync(p,'utf8');for(const x of ['FUN_INDUSTRIAL_ROOT_REQUIRED','followlinks=False','FILE_SCAN_BUDGET_HOLD','nativeExecutionVerified','NOT_DETERMINED','engineeringApproved'])assert.ok(s.includes(x))});
+test('audit refuses a non-FunIndustrial root',()=>{const r=spawnSync('python',[fileURLToPath(p),'--root',process.cwd()],{encoding:'utf8'});if(r.error)throw r.error;assert.notEqual(r.status,0);assert.match(r.stderr,/FUN_INDUSTRIAL_ROOT_REQUIRED/)});
