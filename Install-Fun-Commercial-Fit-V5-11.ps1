@@ -37,9 +37,10 @@ $actual=(& git.exe -C $OldRoot hash-object --path=Run-Fun-Procurement-V5-10.ps1 
 if($LASTEXITCODE -ne 0 -or $actual -cne $OldBlob){Hold 'PRIOR_EXECUTIVE_RUNNER_HASH_DRIFT'}
 $files=@('src\fit\commercial-fit-catalog-v5-11.mjs',
  'src\fit\commercial-fit-engine-v5-11.mjs','src\fit\commercial-fit-console-v5-11.js',
+ 'src\fit\commercial-fit-qwen-v5-11.mjs','src\fial\grounded-chat-v5-2.mjs',
  'scripts\Run-Fun-Commercial-Fit-V5-11.mjs',
  'intelligence-checks\fial511-commercial-fit-case.mjs',
- 'intelligence-checks\fial511-dashboard-case.mjs',
+ 'intelligence-checks\fial511-dashboard-case.mjs','intelligence-checks\fial511-qwen-context-case.mjs',
  'scripts\Run-Fun-ML-Dashboard8802.mjs')
 foreach($rel in $files){
  $file=Join-Path $Root $rel
@@ -48,7 +49,7 @@ foreach($rel in $files){
  & $Node --check $file
  if($LASTEXITCODE -ne 0){Hold ('SOURCE_PARSE_FAILED='+$rel)}
 }
-& $Node --test (Join-Path $Root 'intelligence-checks\fial511-commercial-fit-case.mjs') (Join-Path $Root 'intelligence-checks\fial511-dashboard-case.mjs') (Join-Path $Root 'intelligence-checks\fial510-procurement-case.mjs') (Join-Path $Root 'intelligence-checks\fial510-dashboard-case.mjs') (Join-Path $Root 'intelligence-checks\fial59-fleet-evidence-case.mjs')
+& $Node --test (Join-Path $Root 'intelligence-checks\fial511-commercial-fit-case.mjs') (Join-Path $Root 'intelligence-checks\fial511-dashboard-case.mjs') (Join-Path $Root 'intelligence-checks\fial511-qwen-context-case.mjs') (Join-Path $Root 'intelligence-checks\fial510-procurement-case.mjs') (Join-Path $Root 'intelligence-checks\fial510-dashboard-case.mjs') (Join-Path $Root 'intelligence-checks\fial59-fleet-evidence-case.mjs')
 if($LASTEXITCODE -ne 0){Hold 'COMMERCIAL_FIT_REGRESSION_HOLD'}
 Write-Host 'FIAL511_OFFLINE_TESTS=PASS'
 $task=Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
