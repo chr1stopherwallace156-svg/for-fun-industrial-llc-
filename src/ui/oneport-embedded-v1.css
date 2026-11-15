@@ -1,0 +1,28 @@
+/* FIAL one-port embedded module surface: hide duplicate navigation, retain every old DOM node. */
+:root{color-scheme:dark}
+html{scroll-padding-top:12px;min-height:100%;background:#0b1521}
+body,body.fi-ui-ready{box-sizing:border-box!important;width:100%!important;max-width:none!important;margin:0!important;padding:12px 14px 28px!important;background:#0b1521!important;color:#e4eff7!important;overflow-x:hidden!important;min-height:100vh!important}
+#fi-ui-shell,body.fi-ui-ready #fi-ui-shell,#fi-hub-nav,.fi-ui-header,.fi-ui-side{display:none!important}
+body.fi-ui-ready>main{max-width:none!important;margin:0 auto!important;padding:0 8px!important}
+#fi-fial53-grounded{max-width:none!important;margin:0 auto!important;padding:22px!important;background:#101e2e!important;border:1px solid #294257!important}
+body.fi-ui-ready #fi-ml-panel,body.fi-ui-ready #fi-commerce-panel{max-width:none!important;width:100%!important;margin:0 auto 18px!important;box-shadow:none!important;border-color:#2c4357!important;background:#112032!important}
+body.fi-ui-ready #fi-commerce-panel h2,body.fi-ui-ready #fi-ml-panel h2{font-size:22px!important}
+body>header{display:none!important}
+body>main{max-width:none!important;padding:0 8px!important}
+main>p:first-child{color:#8ea8ba;font-size:12px}
+main>.panel,main>section.panel,main>div.grid>.panel,main>.item{border:1px solid #2a4053!important;background:#122234!important;border-radius:12px!important;box-shadow:none!important}
+main>section.panel h2{font-size:17px!important}
+button,input,textarea,select{max-width:100%;border-radius:8px}
+a{color:#90e4d7}
+main .grid{gap:12px}
+body.fi-ops-target main>[data-fi-ops-hidden="true"]{display:none!important}
+body.fi-ops-target main>[data-fi-ops-visible="true"]{display:block!important}
+body.fi-ops-target main>section.panel{scroll-margin-top:8px}
+body.fi-ops-target main>section.panel:not([data-fi-ops-visible="true"]){display:none!important}
+@media(max-width:700px){
+ body,body.fi-ui-ready{padding:11px 10px 26px!important}
+ body.fi-ui-ready>main,body>main{padding:0!important}
+ #fi-fial53-grounded{padding:14px!important}
+ body.fi-ui-ready #fi-ml-panel,body.fi-ui-ready #fi-commerce-panel{padding:14px!important}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
