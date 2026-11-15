@@ -278,6 +278,7 @@ foreach($file in @(
  'scripts\Run-Fun-Commercial-Fit-V5-11.mjs',
  'src\bid-readiness\readiness-catalog-v5-12.mjs',
  'src\bid-readiness\readiness-engine-v5-12.mjs',
+ 'src\bid-readiness\readiness-qwen-v5-12.mjs',
  'src\bid-readiness\readiness-console-v5-12.js',
  'scripts\Run-Fun-Bid-Readiness-V5-12.mjs',
  'src\operator\real-operations-widget-v5-5.js',
@@ -303,7 +304,8 @@ foreach($file in @(
  'intelligence-checks\fial511-dashboard-case.mjs',
  'intelligence-checks\fial511-qwen-context-case.mjs',
  'intelligence-checks\fial512-bid-readiness-case.mjs',
- 'intelligence-checks\fial512-dashboard-case.mjs')){
+ 'intelligence-checks\fial512-dashboard-case.mjs',
+ 'intelligence-checks\fial512-qwen-context-case.mjs')){
  $f=Join-Path $Root $file;Leaf $f
  & $Node --check $f
  if($LASTEXITCODE -ne 0){Hold ('NEW_SOURCE_SYNTAX_HOLD='+$file)}
@@ -311,6 +313,7 @@ foreach($file in @(
 $tests=@(
  'intelligence-checks\fial512-bid-readiness-case.mjs',
  'intelligence-checks\fial512-dashboard-case.mjs',
+ 'intelligence-checks\fial512-qwen-context-case.mjs',
  'intelligence-checks\fial511-commercial-fit-case.mjs',
  'intelligence-checks\fial511-dashboard-case.mjs',
  'intelligence-checks\fial511-qwen-context-case.mjs',
