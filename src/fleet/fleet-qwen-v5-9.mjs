@@ -18,10 +18,9 @@ export async function fleetContextForQwen(question){
  else lines.push('Last local official-source observation: '+String(report.last_cycle_utc||'unknown')+
   '; source holds: '+report.counts.held+'; open verified RFPs: ZERO; awarded contracts: ZERO; actual revenue: ZERO.');
  const words=question.toLowerCase();
- let matches=(report.prospects||[]).filter(p=>{
-  const terms=(p.name+' '+p.city).toLowerCase().split(/\s+/).filter(w=>w.length>5);
-  return terms.some(t=>words.includes(t));
- });
+ let matches=(report.prospects||[]).filter(p=>
+  words.includes(String(p.city||'').toLowerCase())||
+  words.includes(String(p.name||'').toLowerCase()));
  if(!matches.length)matches=(report.prospects||[]).slice(0,5);
  for(const p of matches.slice(0,5))
   lines.push(p.name+' ('+p.city+'): '+p.listed_buses+' historically listed buses, '+
