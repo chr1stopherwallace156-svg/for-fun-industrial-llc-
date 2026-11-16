@@ -2,7 +2,7 @@
 import http from 'node:http';
 import {readFile,stat} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-import {join,resolve,basename} from 'node:path';
+import {join} from 'node:path';
 import {buildGraph,SPATIAL_VERSION} from './graph.mjs';
 import {observeSpatialV3} from './observer.mjs';
 const ROOT=fileURLToPath(new URL('./',import.meta.url));
@@ -11,8 +11,8 @@ const FILES=Object.freeze({
  '/assets/spatial-v3.css':'spatial-v3.css',
  '/assets/spatial-v3.js':'spatial-v3.js'
 });
-export const HOST='127.0.0.1',PORT=8807;
-const ALLOWED_HOSTS=new Set(['127.0.0.1:8807','localhost:8807','127.0.0.1:18807','localhost:18807']);
+export const HOST='127.0.0.1',PORT=8808;
+const ALLOWED_HOSTS=new Set(['127.0.0.1:8808','localhost:8808','127.0.0.1:18808','localhost:18808']);
 function reply(req,res,status,body,type='text/plain; charset=utf-8',headers={}){
  const bytes=Buffer.from(typeof body==='string'?body:JSON.stringify(body));
  res.writeHead(status,{
@@ -25,7 +25,7 @@ function reply(req,res,status,body,type='text/plain; charset=utf-8',headers={}){
  });
  if(req.method==='HEAD')res.end();else res.end(bytes)
 }
-export function createSpatialPreview({observer=observeSpatialV3,files=readFile,vendor=process.env.FUN_SPATIAL_V3_VENDOR_BUNDLE}={}){
+export function createSpatialPreview({observer=observeSpatialV3,files=readFile}={}){
  return http.createServer(async(req,res)=>{
   try{
    if(!ALLOWED_HOSTS.has(String(req.headers.host||'').toLowerCase()))
@@ -51,9 +51,6 @@ export function createSpatialPreview({observer=observeSpatialV3,files=readFile,v
    if(Object.hasOwn(FILES,target)){
     filename=join(ROOT,FILES[target]);
     type=target.endsWith('.css')?'text/css; charset=utf-8':target.endsWith('.js')?'text/javascript; charset=utf-8':'text/html; charset=utf-8';
-   }else if(target==='/vendor/3d-force-graph.min.js'){
-    if(!vendor||basename(vendor)!=='3d-force-graph.min.js')return reply(req,res,503,{error:'SPATIAL_VENDOR_MISSING'},'application/json');
-    filename=resolve(vendor);type='text/javascript; charset=utf-8';
    }else return reply(req,res,404,{error:'SPATIAL_ROUTE_NOT_FOUND'},'application/json');
    const meta=await stat(filename);
    if(!meta.isFile()||meta.size>8*1024*1024)throw Error('SPATIAL_ASSET_INVALID_SIZE');
@@ -65,7 +62,7 @@ export function createSpatialPreview({observer=observeSpatialV3,files=readFile,v
 }
 if(process.argv.includes('--serve')){
  const s=createSpatialPreview();
- s.listen(PORT,HOST,()=>console.log('FUN_SPATIAL_V3_PREVIEW=LISTENING http://'+HOST+':'+PORT+'/ READ_ONLY=true'));
+ s.listen(PORT,HOST,()=>console.log('FUN_SPATIAL_V31_IMMERSIVE=LISTENING http://'+HOST+':'+PORT+'/ READ_ONLY=true'));
  const stop=()=>s.close(()=>process.exit(0));
  process.once('SIGINT',stop);process.once('SIGTERM',stop)
 }
