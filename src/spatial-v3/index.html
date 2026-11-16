@@ -1,32 +1,39 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#08121c"><meta name="color-scheme" content="dark">
-<title>Fun Industrial · Spatial System V3 Preview</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,viewport-fit=cover">
+<meta name="theme-color" content="#03060d"><meta name="color-scheme" content="dark">
+<title>Fun Industrial · System Universe V3.1</title>
 <link rel="stylesheet" href="/assets/spatial-v3.css">
-<script src="/vendor/3d-force-graph.min.js" defer></script>
 <script src="/assets/spatial-v3.js" defer></script></head>
 <body>
-<div class="shell">
-<header class="header"><div class="brand"><span class="brand-symbol">F<span>·</span>I</span><div><b>FUN INDUSTRIAL</b><small>Spatial System V3 · Preview</small></div></div>
-<div class="header-right"><span class="read-only">READ-ONLY PREVIEW</span><a href="http://127.0.0.1:8802/" class="desktop-only">V2 dashboard (PC only)</a></div></header>
-<main class="main"><div class="heading"><div><p class="eyebrow">SYSTEM TOPOLOGY / INTERACTIVE</p>
-<h1>See your entire system.</h1><p class="subheading">Explore real Fun Industrial capabilities, dependencies, and verified local health. Animated connections are navigation aids—not evidence of activity.</p></div>
-<div class="actions"><button id="refresh" type="button">Refresh evidence</button><button id="mode" type="button">Switch to 2D</button></div></div>
-<div class="workspace">
-<section class="scene-wrap" aria-label="Interactive capability map"><div class="scene-top">
-<span id="scene-status" role="status">Loading read-only topology…</span><span class="scene-help">Drag to rotate · pinch or scroll to zoom · tap a node</span>
-</div><div id="graph" role="img" aria-label="3D network graph of Fun Industrial capability branches"></div>
-<div id="fallback" hidden aria-label="Accessible 2D capability map"></div>
-<div class="scene-footer"><span><i class="dot ready"></i> Verified endpoint</span><span><i class="dot unknown"></i> Not verified</span><span><i class="dot held"></i> Hold</span></div>
+<main class="universe" id="universe" aria-label="Fun Industrial interactive system universe">
+<canvas id="scene" aria-label="Touch-controlled spatial projection of the Fun Industrial architecture. Use Explore to navigate with buttons."></canvas>
+<div class="vignette" aria-hidden="true"></div>
+<header class="hud-top">
+ <div class="brand"><span class="monogram" aria-hidden="true">FI</span><div><strong>FUN INDUSTRIAL</strong><span>SYSTEM UNIVERSE <i>V3.1</i></span></div></div>
+ <div class="top-controls"><span class="safe-mark"><i></i> LOCAL · READ ONLY</span><button id="refresh" class="icon-control" type="button" aria-label="Refresh verified local service status" title="Refresh evidence">↻</button><button id="explore" class="button-quiet" type="button" aria-controls="navigator" aria-expanded="false">Explore <span aria-hidden="true">☷</span></button></div>
+</header>
+<div class="world-label" id="world-label" aria-hidden="true"><span>FUN INDUSTRIAL</span><small>ONE CONNECTED SYSTEM</small></div>
+<div class="hero-hint" aria-hidden="true"><span>YOUR SYSTEM, VISUALIZED</span><small>Rotate · Zoom · Tap to inspect</small></div>
+<div class="hud-bottom">
+ <div class="legend"><span><i class="ready"></i>VERIFIED</span><span><i class="unknown"></i>UNVERIFIED</span><span><i class="hold"></i>HOLD</span></div>
+ <div class="status" id="status" role="status" aria-live="polite">Loading system topology…</div>
+ <div class="controls"><button id="reset" type="button">Center</button><button id="motion" type="button" aria-pressed="false">Pause motion</button></div>
+</div>
+<section id="navigator" class="navigator" hidden aria-label="System navigator">
+ <div class="sheet-head"><div><p class="eyebrow">CAPABILITIES</p><h2>Explore the system</h2></div><button type="button" id="close-nav" class="close" aria-label="Close navigator">×</button></div>
+ <p class="sheet-subtitle">Select a subsystem to focus the visualization. Status is based on read-only evidence.</p>
+ <div class="nav-list" id="nav-list"></div>
 </section>
-<aside class="inspector"><p class="eyebrow">NODE INSPECTOR</p><h2 id="node-title">FUN INDUSTRIAL</h2>
-<p id="node-description">Select a branch, capability, or connection in the system map.</p>
-<div class="property"><span>Reported state</span><strong id="node-state">Not verified</strong></div>
-<div class="property"><span>Evidence</span><strong id="node-evidence">No observation loaded</strong></div>
-<div class="property"><span>Action authority</span><strong>None — inspection only</strong></div>
-<a id="open-module" href="#" hidden>Open existing workspace</a>
-<div class="rule"></div><label for="node-list">Explore capabilities</label>
-<div id="node-list" class="nodes" aria-label="Capability selection"></div>
-</aside></div>
-<footer>Local preview port 8807 · 3D Force Graph 1.80.2 (MIT) · No REA execution, external actions, model prompts, or automatic polling. Existing V2 remains unchanged.</footer>
-</main></div></body></html>
+<section id="inspector" class="inspector" hidden role="dialog" aria-modal="false" aria-labelledby="node-title">
+ <div class="sheet-head"><div><p class="eyebrow">SYSTEM NODE / READ ONLY</p><h2 id="node-title">Fun Industrial</h2></div><button type="button" id="close-inspector" class="close" aria-label="Close details">×</button></div>
+ <p class="sheet-subtitle" id="node-description"></p>
+ <div class="state-line"><span id="state-dot" class="state-dot unknown"></span><strong id="node-state">NOT VERIFIED</strong></div>
+ <div class="detail-row"><span>Observation</span><small id="node-evidence">No live evidence</small></div>
+ <div class="detail-row"><span>Subsystem</span><small id="node-group">Core</small></div>
+ <div class="detail-row"><span>Authority</span><small>No tool execution granted by this view</small></div>
+ <div class="section-rule"></div>
+ <h3>Related capabilities</h3><div class="child-list" id="child-list"></div>
+ <p class="fineprint">This is an interactive view of a curated architecture. A visual link is not proof that a service or business operation is active.</p>
+</section>
+<div id="input-hint" class="input-hint" aria-hidden="true">DRAG TO ROTATE · PINCH TO ZOOM · TAP A NODE</div>
+</main></body></html>
