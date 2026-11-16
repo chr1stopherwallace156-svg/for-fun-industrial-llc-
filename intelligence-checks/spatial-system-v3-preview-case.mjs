@@ -37,7 +37,7 @@ test('real bounded observations are GET only and never count an unverified model
  const mock=async(url,init)=>{
   requests.push({url,method:init.method});
   let result={state:'wrong'};
-  if(url.endsWith('/api/fial/grounded/status'))result={version:'fial5.3-primary-grounded-chat-v1',state:'ready',authority_added:false};
+  if(url.endsWith('/api/fial/grounded/status'))result={version:'fial5.3-primary-grounded-chat-v1',state:'ANSWERED_BY_QWEN',model_interface:'fixed_local_qwen_8088',authority_added:false};
   if(url.endsWith('/api/ai/automatic-memory/status'))result={memoryAvailable:true,memoryWrites:false,mode:'automatic_contextual_read_only'};
   if(url.endsWith('/api/unified/status'))result={version:'fi-unified-task-chat-8798-v1',rea:{ready:true,count:229}};
   return new Response(JSON.stringify(result),{status:200,headers:{'content-type':'application/json'}})
