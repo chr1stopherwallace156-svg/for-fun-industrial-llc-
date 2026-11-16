@@ -3,6 +3,7 @@
 import {buildGraph} from './graph.mjs';
 const SOURCES=Object.freeze([
  ['qwen',8802,'/api/fial/grounded/status'],
+ ['model-health',8088,'/health'],
  ['memory',8789,'/api/ai/automatic-memory/status'],
  ['rea',8802,'/api/unified/status'],
  ['ml',8802,'/api/ml/dashboard/status'],
@@ -18,6 +19,7 @@ function verified(id,d){
  if(!d||typeof d!=='object'||Array.isArray(d))return 'unverified';
  switch(id){
   case 'qwen':return d.version==='fial5.3-primary-grounded-chat-v1'&&d.model_interface==='fixed_local_qwen_8088'&&d.authority_added===false?'available':'unverified';
+  case 'model-health':return d.status==='ok'?'available':'unverified';
   case 'memory':return d.memoryAvailable===true&&d.memoryWrites===false&&d.mode==='automatic_contextual_read_only'?'available':'unverified';
   case 'rea':return d.version==='fi-unified-task-chat-8798-v1'&&d.rea?.ready===true&&Number(d.rea.count)===229?'available':'unverified';
   case 'ml':return d.state==='ready'?'available':'unverified';
@@ -52,6 +54,10 @@ export async function observeSpatialV3(fetchImpl=fetch){
   states[id]=state;
   evidence.push({node:id,state,source:'127.0.0.1:'+port+path});
  }));
+ // Adapter existence alone does NOT prove that the Qwen model is healthy.
+ states['grounded-chat']=states.qwen;
+ if(states['model-health']!=='available')states.qwen='unverified';
+ states['economic-data']=states.regulatory;
  for(const branch of ['ai','tools','compute','business','voice']){
   const kids={'ai':['qwen','memory'],'tools':['rea'],'compute':['compute-engine','ml'],
     'business':['buyers','procurement','regulatory','commerce'],'voice':['mobile-voice']}[branch];
