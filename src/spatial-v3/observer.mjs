@@ -17,7 +17,7 @@ export const OBSERVED_ENDPOINTS=SOURCES.map(([id,port,path])=>({id,port,path}));
 function verified(id,d){
  if(!d||typeof d!=='object'||Array.isArray(d))return 'unverified';
  switch(id){
-  case 'qwen':return d.version==='fial5.3-primary-grounded-chat-v1'&&d.state==='ready'&&d.authority_added===false?'available':'unverified';
+  case 'qwen':return d.version==='fial5.3-primary-grounded-chat-v1'&&d.model_interface==='fixed_local_qwen_8088'&&d.authority_added===false?'available':'unverified';
   case 'memory':return d.memoryAvailable===true&&d.memoryWrites===false&&d.mode==='automatic_contextual_read_only'?'available':'unverified';
   case 'rea':return d.version==='fi-unified-task-chat-8798-v1'&&d.rea?.ready===true&&Number(d.rea.count)===229?'available':'unverified';
   case 'ml':return d.state==='ready'?'available':'unverified';
