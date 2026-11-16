@@ -1,0 +1,39 @@
+name: Fun Spatial System V3 Preview (read-only)
+on:
+  push:
+    branches:
+      - feature/spatial-system-v3-preview-20261115
+    paths:
+      - 'src/spatial-v3/**'
+      - 'intelligence-checks/spatial-system-v3-preview-case.mjs'
+      - 'Start-Fun-Spatial-V3-Preview.ps1'
+      - '.github/workflows/fun-spatial-system-v3-preview-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preview-test:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax checks (no services started)
+        shell: pwsh
+        run: |
+          node --check src/spatial-v3/server.mjs
+          node --check src/spatial-v3/observer.mjs
+          node --check src/spatial-v3/graph.mjs
+          node --check src/spatial-v3/spatial-v3.js
+          if ($LASTEXITCODE -ne 0) { throw 'NODE_SYNTAX_HOLD' }
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile('Start-Fun-Spatial-V3-Preview.ps1',[ref]$tokens,[ref]$errors) | Out-Null
+          if (@($errors).Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            throw 'POWERSHELL_SYNTAX_HOLD'
+          }
+      - name: Read-only topology and HTTP boundary tests
+        run: node --test intelligence-checks/spatial-system-v3-preview-case.mjs
