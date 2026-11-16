@@ -1,0 +1,39 @@
+name: Fun Spatial V3.1 Immersive Preview
+on:
+  push:
+    branches:
+      - feature/spatial-system-v31-immersive-iphone-20261115
+    paths:
+      - 'src/spatial-v3/**'
+      - 'intelligence-checks/spatial-system-v3-preview-case.mjs'
+      - 'Start-Fun-Spatial-V31-Immersive.ps1'
+      - '.github/workflows/fun-spatial-v31-immersive-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-immersive:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate JavaScript and PowerShell syntax
+        shell: pwsh
+        run: |
+          node --check src/spatial-v3/server.mjs
+          node --check src/spatial-v3/observer.mjs
+          node --check src/spatial-v3/graph.mjs
+          node --check src/spatial-v3/spatial-v3.js
+          if ($LASTEXITCODE -ne 0) { throw 'JS_SYNTAX_HOLD' }
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile('Start-Fun-Spatial-V31-Immersive.ps1',[ref]$tokens,[ref]$errors) | Out-Null
+          if (@($errors).Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            throw 'WINDOWS_PS_SYNTAX_HOLD'
+          }
+      - name: Verify topology, evidence and read-only boundaries
+        run: node --test intelligence-checks/spatial-system-v3-preview-case.mjs
