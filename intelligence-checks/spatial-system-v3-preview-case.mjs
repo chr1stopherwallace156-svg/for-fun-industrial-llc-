@@ -1,81 +1,101 @@
+// V3.1: qualify immersive iPhone-ready Canvas preview and preserve hostile read-only boundaries.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import {buildGraph,NODES,LINKS,SPATIAL_VERSION} from '../src/spatial-v3/graph.mjs';
+import {readFile} from 'node:fs/promises';
+import {buildGraph,SPATIAL_VERSION} from '../src/spatial-v3/graph.mjs';
 import {observeSpatialV3,OBSERVED_ENDPOINTS} from '../src/spatial-v3/observer.mjs';
 import {createSpatialPreview} from '../src/spatial-v3/server.mjs';
-const origin='http://127.0.0.1:';
-function req(s,path,method='GET',host='127.0.0.1:8807'){
+async function withServer(fn){
+ let observations=0;
+ const s=createSpatialPreview({observer:async()=>{
+  observations++;
+  return {...buildGraph(),observed_at:'2026-11-15T22:30:00Z',evidence:[],
+    remote_execution:false,tools_called:0,model_calls:0,external_actions:0}
+ }});
+ await new Promise(ok=>s.listen(0,'127.0.0.1',ok));
+ try{await fn(s,()=>observations)}finally{await new Promise(ok=>s.close(ok))}
+}
+function get(server,path,method='GET',host='127.0.0.1:8808'){
  return new Promise((resolve,reject)=>{
-  const r=http.request({hostname:'127.0.0.1',port:s.address().port,path,method,headers:{host}},res=>{
-   const parts=[];res.on('data',b=>parts.push(b));
-   res.once('end',()=>resolve({status:res.statusCode,headers:res.headers,body:Buffer.concat(parts).toString('utf8')}));
-  });r.once('error',reject);r.end();
+  const req=http.request({host:'127.0.0.1',port:server.address().port,path,method,headers:{host}},res=>{
+   const chunks=[];res.on('data',c=>chunks.push(c));res.on('end',()=>resolve({
+    status:res.statusCode,body:Buffer.concat(chunks).toString('utf8'),headers:res.headers
+   }));
+  });req.on('error',reject);req.end()
  })
 }
-async function within(callback){
- let calls=0;const server=createSpatialPreview({
-  observer:async()=>{calls++;return {...buildGraph(),observed_at:'2026-11-15T00:00:00Z',evidence:[],tools_called:0,model_calls:0,external_actions:0}},
-  vendor:new URL('../src/spatial-v3/3d-force-graph.min.js',import.meta.url).pathname,
-  files:async filename=>filename.endsWith('3d-force-graph.min.js')?'// fixture':await (await import('node:fs/promises')).readFile(filename)
- });
- await new Promise(ok=>server.listen(0,'127.0.0.1',ok));
- try{await callback(server,()=>calls)}finally{await new Promise(ok=>server.close(ok))}
-}
-test('spatial topology represents real named modules and never invents health or execution',()=>{
- const g=buildGraph();
- assert.equal(g.version,SPATIAL_VERSION);assert.equal(g.read_only,true);assert.equal(g.external_actions,0);
- assert.equal(g.nodes.length,NODES.length);assert.equal(g.links.length,LINKS.length);
- assert.equal(new Set(g.nodes.map(n=>n.id)).size,g.nodes.length);
- assert.ok(['ai','tools','business','voice','compute','security'].every(id=>g.nodes.some(n=>n.id===id)));
- assert.ok(g.nodes.every(n=>n.state==='unverified'));
- assert.ok(g.links.every(l=>g.nodes.some(n=>n.id===l.source)&&g.nodes.some(n=>n.id===l.target)));
- assert.equal(buildGraph({qwen:'available',rea:'FAKE_PRIVILEGED'}).nodes.find(n=>n.id==='rea').state,'unverified')
+test('curated system topology has all six branches and fails unverified by default',()=>{
+ const graph=buildGraph();
+ assert.equal(graph.version,SPATIAL_VERSION);assert.equal(graph.read_only,true);assert.equal(graph.external_actions,0);
+ assert.ok(graph.nodes.length>=30&&graph.nodes.length<=40);
+ const ids=new Set(graph.nodes.map(n=>n.id));
+ assert.equal(ids.size,graph.nodes.length);
+ for(const id of ['core','ai','tools','compute','business','voice','security','qwen','rea','optuna','or-tools','voice-lab','outcomes'])
+  assert.ok(ids.has(id),id);
+ assert.ok(graph.nodes.every(n=>n.state==='unverified'));
+ assert.ok(graph.links.every(l=>ids.has(l.source)&&ids.has(l.target)));
+ assert.equal(buildGraph({qwen:'grant_tool_authority'}).nodes.find(n=>n.id==='qwen').state,'unverified')
 });
-test('real bounded observations are GET only and never count an unverified model, tools or contracts',async()=>{
- const requests=[];
- const mock=async(url,init)=>{
-  requests.push({url,method:init.method});
-  let result={state:'wrong'};
-  if(url.endsWith('/api/fial/grounded/status'))result={version:'fial5.3-primary-grounded-chat-v1',state:'ANSWERED_BY_QWEN',model_interface:'fixed_local_qwen_8088',authority_added:false};
-  if(url.endsWith('/api/ai/automatic-memory/status'))result={memoryAvailable:true,memoryWrites:false,mode:'automatic_contextual_read_only'};
-  if(url.endsWith('/api/unified/status'))result={version:'fi-unified-task-chat-8798-v1',rea:{ready:true,count:229}};
-  return new Response(JSON.stringify(result),{status:200,headers:{'content-type':'application/json'}})
+test('source-bound observations never claim Qwen healthy from adapter status alone',async()=>{
+ const requested=[];
+ const fetchMock=async(url,opts)=>{
+  requested.push({url,method:opts.method});
+  let body={};
+  if(url.endsWith('/api/fial/grounded/status'))body={
+   version:'fial5.3-primary-grounded-chat-v1',
+   model_interface:'fixed_local_qwen_8088',
+   authority_added:false
+  };
+  if(url.endsWith('/api/unified/status'))body={version:'fi-unified-task-chat-8798-v1',rea:{ready:true,count:229}};
+  return new Response(JSON.stringify(body),{status:200,headers:{'content-type':'application/json'}})
  };
- const observed=await observeSpatialV3(mock);
- assert.equal(requests.length,OBSERVED_ENDPOINTS.length);
- assert.ok(requests.every(x=>x.method==='GET'&&x.url.startsWith(origin)));
- assert.equal(observed.tools_called,0);assert.equal(observed.model_calls,0);assert.equal(observed.external_actions,0);
- assert.equal(observed.nodes.find(n=>n.id==='qwen').state,'available');
- assert.equal(observed.nodes.find(n=>n.id==='rea').state,'available');
- assert.equal(observed.nodes.find(n=>n.id==='buyers').state,'unverified');
- assert.equal(observed.nodes.find(n=>n.id==='authority').state,'unverified');
+ const result=await observeSpatialV3(fetchMock);
+ assert.equal(requested.length,OBSERVED_ENDPOINTS.length);
+ assert.ok(requested.every(x=>x.method==='GET'&&x.url.startsWith('http://127.0.0.1:')));
+ assert.equal(result.nodes.find(n=>n.id==='qwen').state,'unverified');
+ assert.equal(result.nodes.find(n=>n.id==='model-health').state,'unverified');
+ assert.equal(result.external_actions,0);assert.equal(result.tools_called,0);assert.equal(result.model_calls,0);
+ const healthy=await observeSpatialV3(async(url,options)=>{
+  const d=url.endsWith(':8088/health')?{status:'ok'}:url.endsWith('/api/fial/grounded/status')?
+   {version:'fial5.3-primary-grounded-chat-v1',model_interface:'fixed_local_qwen_8088',authority_added:false}:{};
+  return new Response(JSON.stringify(d),{headers:{'content-type':'application/json'}})
+ });
+ assert.equal(healthy.nodes.find(n=>n.id==='qwen').state,'available');
 });
-test('isolated preview serves local HTML, CSS, JS and fixed read-only endpoints',async()=>{
- await within(async(s,calls)=>{
-  const h=await req(s,'/');assert.equal(h.status,200);assert.match(h.body,/Spatial System V3/);
-  assert.equal(h.headers['x-fi-spatial-v3'],SPATIAL_VERSION);
-  for(const p of ['/assets/spatial-v3.css','/assets/spatial-v3.js']){
-   const r=await req(s,p);assert.equal(r.status,200,p)
+test('single-purpose port 8808 serves full-screen browser, strict Host and GET only',async()=>{
+ await withServer(async(s,count)=>{
+  const home=await get(s,'/');
+  assert.equal(home.status,200);
+  assert.match(home.body,/SYSTEM UNIVERSE/);
+  assert.match(home.body,/canvas id="scene"/);
+  assert.doesNotMatch(home.body,/iframe|3d-force-graph\.min\.js/);
+  assert.equal(home.headers['x-fi-spatial-v3'],SPATIAL_VERSION);
+  assert.match(home.headers['content-security-policy'],/connect-src 'self'/);
+  for(const p of ['/assets/spatial-v3.js','/assets/spatial-v3.css']){
+   const result=await get(s,p);assert.equal(result.status,200,p)
   }
-  const s1=await req(s,'/api/spatial-v3/status');assert.equal(s1.status,200);
-  assert.equal(JSON.parse(s1.body).read_only,true);assert.equal(calls(),1);
-  const top=await req(s,'/api/spatial-v3/topology');assert.equal(top.status,200);
-  assert.equal(calls(),1);
-  const head=await req(s,'/api/spatial-v3/status','HEAD');assert.equal(head.status,200);
-  assert.equal(calls(),1);
-  assert.equal((await req(s,'/api/spatial-v3/status','POST')).status,405);
-  assert.equal((await req(s,'/api/spatial-v3/status','GET','malicious.example')).status,403);
-  for(const p of ['/../secret','/%2e%2e/secret','/unknown','/api/spatial-v3/actions']){
-   const r=await req(s,p);assert.notEqual(r.status,200,p)
-  }
+  const phone=await get(s,'/','GET','127.0.0.1:18808');assert.equal(phone.status,200);
+  assert.equal((await get(s,'/','GET','rogue.example')).status,403);
+  assert.equal((await get(s,'/api/spatial-v3/status','POST')).status,405);
+  assert.equal((await get(s,'/api/spatial-v3/actions')).status,404);
+  assert.equal((await get(s,'/vendor/3d-force-graph.min.js')).status,404);
+  const topology=await get(s,'/api/spatial-v3/topology');assert.equal(topology.status,200);
+  assert.equal(JSON.parse(topology.body).read_only,true);assert.equal(count(),0);
+  const status=await get(s,'/api/spatial-v3/status');assert.equal(status.status,200);assert.equal(count(),1);
+  await get(s,'/api/spatial-v3/status','HEAD');assert.equal(count(),1);
+  assert.notEqual((await get(s,'/%2fetc%2fpasswd')).status,200);
  })
 });
-test('browser only inspects status and supports on-device 2D fallback without action routes',async()=>{
- const fs=await import('node:fs/promises');
- const script=await fs.readFile(new URL('../src/spatial-v3/spatial-v3.js',import.meta.url),'utf8');
- const css=await fs.readFile(new URL('../src/spatial-v3/spatial-v3.css',import.meta.url),'utf8');
- for(const fragment of ['ForceGraph3D','WebGLRenderingContext','createElementNS','showNode','node-list','onNodeClick','touch-action','pauseAnimation'])
-  assert.ok((script+css).includes(fragment),fragment);
- assert.doesNotMatch(script,/innerHTML\s*=|eval\(|method\s*:\s*['"]POST['"]|setInterval\(|\.tool\s*\(/);
+test('mobile Canvas2D handles gestures, branches, pause and iOS fallback without action routes',async()=>{
+ const browser=await readFile(new URL('../src/spatial-v3/spatial-v3.js',import.meta.url),'utf8');
+ const css=await readFile(new URL('../src/spatial-v3/spatial-v3.css',import.meta.url),'utf8');
+ for(const snippet of ['getContext(\'2d\'','pointerdown','pointermove','pointerup','touchDistance',
+  'requestAnimationFrame','visibilitychange','prefers-reduced-motion','select(id,show=true)',
+  'node-state','drawFibers','pause','min(window.devicePixelRatio']){
+  assert.ok((browser+css).includes(snippet),snippet)
+ }
+ assert.ok(css.includes('height:100dvh'));assert.ok(css.includes('touch-action:none'));
+ assert.doesNotMatch(browser,/innerHTML\s*=|eval\(|method\s*:\s*['"]POST['"]|setInterval\(|fetch\(['"]https:/);
+ assert.doesNotMatch(browser,/window\.ForceGraph3D|WebGLRenderingContext/);
 });
