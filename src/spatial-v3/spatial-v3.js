@@ -115,6 +115,7 @@ function drawFibers(){
  ctx.lineCap='round';ctx.lineJoin='round';
  // Paused on lower-power devices: glows are subtle, no repeated effects from web requests.
  for(let i=0;i<fibers.length;i++){
+  if(width<650&&i%2===1)continue; // Lower draw-call budget on mobile Safari.
   const f=fibers[i];
   const glow=paused?1:(.91+.09*Math.sin(time*.00055+i*.31));
   line(f.pts,f.col,f.alpha*glow,f.width*(width<650?.8:1));
@@ -206,7 +207,7 @@ function draw(){
 }
 function frame(now){
  raf=requestAnimationFrame(frame);
- if(!visible)return;
+ if(!visible||paused)return; // No idle redraw when motion is paused or reduced motion is requested.
  const mobile=width<700,interval=mobile?1000/24:1000/36;
  if(now-lastFrame<interval)return;lastFrame=now;
  if(!paused){
@@ -342,7 +343,7 @@ $('reset').addEventListener('click',()=>{selected='core';selectedBranch=null;zoo
 $('motion').addEventListener('click',()=>{
  paused=!paused;$('motion').textContent=paused?'Resume motion':'Pause motion';
  $('motion').setAttribute('aria-pressed',String(paused));
- lastInput=performance.now()
+ lastInput=performance.now();draw()
 });
 $('motion').textContent=paused?'Resume motion':'Pause motion';
 document.addEventListener('visibilitychange',()=>{visible=!document.hidden;if(visible)lastFrame=0});
