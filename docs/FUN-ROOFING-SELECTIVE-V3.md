@@ -220,6 +220,57 @@ CLI comparison (after the completed official imports):
 
 `python -B src/roofing/roofing_dual_formulas_v4.py --db "%LOCALAPPDATA%/FunIndustrial/RoofingBulkV2/roofing.sqlite3" --years 20 --recent-years 5`
 
+## Formula C — similar-age neighborhood permit activity (V5)
+
+**Reason for this separate formula:** investigate the hypothesis that older
+houses in a comparable small area might experience some correlated roofing
+work as shingles weather or age. Data from permits can test local *recorded
+activity*, **not** infer a neighbor's leaks, worn shingles, a completed
+replacement or the subject property's roof age.
+
+The already-working Formula A (existing V3 research priority) and Formula B
+(same-APN historical/recent permit gap) remain intact and are calculated
+independently. Formula C is a *third* report on the same read-only route, with
+user-adjustable filters:
+
+- **X** = historical permit-gap years for Formula B (10–50, default 20).
+- **R** = recent roof-permit window for B and C (1–10 years, default 5).
+- **Construction age** = minimum building age (20–100, default 25).
+- **±Y** = comparison band around a candidate property's construction year
+  (0–15 years, default ±5).
+- **Minimum peers** = at least 3–30 *other* selected residential parcels in
+  the same named street and number 100-block, default 5.
+
+For an eligible older parcel without a recent exact-APN roofing permit, C
+finds other eligible properties with identical ZIP, normalized street name,
+and street-number block (e.g. 100–199), whose construction years fall within
+±Y years of its construction year. It counts **distinct other parcels** with
+a roof-related permit in the last R years, then displays aggregate results by
+ZIP. A subject property with its own recent permit is not labeled an
+unpermitted-neighbor candidate. Unit/suite addresses, unknown years and
+unparseable streets are not used for neighborhood comparisons.
+
+This is **only a proxy for neighbors**, not geographic adjacency or actual
+distance: long streets, multi-address parcels, street spelling differences,
+subdivisions and missing unit information can mislead the grouping.
+Conservative default reporting requires at least five comparable peers.
+Reports include a denominator, local peer permit share, ZIP-wide reference
+permit share, and an observational comparison ratio when there is enough
+evidence; overlapping neighbor windows are *not independent* observations.
+No statistical significance or roof-replacement probability is inferred.
+
+Only official completed LA City permit sources and exact assessor APN joins
+enter B and C. Other municipalities remain unverified; ZIP-only permit
+matches do not establish that any subject property has a new roof.
+
+The module is `src/roofing/roofing_neighbor_context_v5.py`. The same
+**Calculate all three formulas** dashboard button calls it alongside V3 and
+V4 with read-only SQLite; no new job, automated outreach, Qwen, REA,
+Elektron access, database writes, or permanent raw data are introduced.
+Six isolated tests validate the street-block proxy, multiple recent peer
+permits, construction-year tolerances, minimum peer counts, source isolation,
+and A/B/C integration.
+
 ## Preflight
 
 The guarded deployment reruns prior Node.js tests and the original Python
