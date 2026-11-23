@@ -119,7 +119,7 @@ test('UI integrated into organized dashboard without changing original homepage'
  assert.match(ROOF_UI_HTML,/id="roof-weather-refresh"/);
  assert.match(ROOF_UI_HTML,/No-permit properties included/);
  assert.match(ROOF_UI_HTML,/No automatic outreach/);
- assert.match(PREVIEW_HTML,/href="\/roofing\/"/);
+ assert.match(PREVIEW_HTML,/href="\/roofing\/bulk\/"/);
 });
 
 test('same-origin roofing routes work; mutation endpoints reject unapproved requests',async()=>{
