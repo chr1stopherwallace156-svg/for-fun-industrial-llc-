@@ -1,5 +1,5 @@
 # Fun Industrial V10: exact mathematical supervision and evaluation foundation.
-# Default: offline 15-test + 392-case dry-run (NO FILES created).
+# Default: offline 16-test + 392-case dry-run (NO FILES created).
 # Explicit -Create / -Approval: versioned local dataset only, NEVER training.
 [CmdletBinding()]param([switch]$Create,[string]$Approval='')
 $ErrorActionPreference='Stop'
@@ -22,7 +22,7 @@ if($LASTEXITCODE -ne 0 -or $version -notmatch '^Python 3\.12\.'){Hold 'PYTHON_31
 Write-Host 'FUN_QWEN_V10=EQUATION_VERIFIED_MATH_SUPERVISION'
 Write-Host 'FUN_QWEN_V10_DATA=392_EXAMPLES_TRAIN_VALIDATION_TEST'
 Write-Host 'FUN_QWEN_V10_LABELS=SET_VALUED_ARGMIN_AND_TIE_AWARE'
-Write-Host 'FUN_QWEN_V10_EQUATIONS=MARGIN_CONTRASTIVE_BRIER_NLL_AND_AFFINE_INVARIANCE'
+Write-Host 'FUN_QWEN_V10_EQUATIONS=PAIRWISE_DIFFERENCES_SET_ARGMIN_CONTRASTIVE_BRIER_NLL_AND_AFFINE_INVARIANCE'
 Write-Host 'FUN_QWEN_V10_NATIVE_TRAINING=NOT_AUTHORIZED_OR_PERFORMED'
 Write-Host 'FUN_QWEN_V10_GGUF_ADAPTERS_SERVICES_AND_ELEKTRON=UNTOUCHED'
 Write-Host 'FUN_QWEN_V10_OFFLINE_TESTS=START'
