@@ -48,6 +48,17 @@ test('roof permit matching updates only the correct address and selected county'
  assert.equal(filter.total,1);
  assert.equal(filter.rows[0].address,'450 SAMPLE WAY');
 }));
+test('LA neighborhood alias matches official LA City roof permit by ZIP and address',()=>sandbox(async root=>{
+ await importRoofData({kind:'properties',sourceId:'test_properties',rows:[
+  {county:'Los Angeles',city:'Hollywood',address:'123 N EXAMPLE ST',zip:'90028',year_built:1970}
+ ]},{root});
+ await importRoofData({kind:'roof_permits',sourceId:'la_test',rows:[
+  {county:'Los Angeles',city:'Los Angeles',address:'123 N EXAMPLE ST',zip:'90028',
+   issue_date:'2025-04-01',work_description:'REROOF'}
+ ]},{root});
+ const all=await roofingLeads({root,filters:{minAge:20}});
+ assert.equal(all.rows[0].category,'RECENT_ROOF_PERMIT_FOUND');
+}));
 test('bad data, owner contacts and invalid imports do not get copied into state',()=>sandbox(async root=>{
  await assert.rejects(importRoofData({kind:'properties',sourceId:'test_properties',rows:[
   {county:'Los Angeles',city:'Los Angeles',address:'1 A ST',year_built:'unknown'}]},{root}));
