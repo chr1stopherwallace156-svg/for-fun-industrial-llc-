@@ -9,7 +9,7 @@ const VIEWS=Object.freeze({
  tools:{name:'Tools & REA review',type:'tools',description:'Inspect tools and review execution proposals. Tool execution requires separate operator approval.'},
  operations:{name:'Operations',type:'ops',anchor:'',description:'Business work queue, verified results and local operational controls.'},
  buyers:{name:'Fleet Buyers',type:'ops',anchor:'fi-fleet-buyer',description:'Source-linked buyer research, fleet evidence and unmet qualification gates.'},
- procurement:{name:'Procurement',type:'ops',anchor:'fi-purchase-demand',description:'Current official bid index versus funding programs, not assumed sales or active contracts.'},
+ procurement:{name:'Procurement',type:'procurement',description:'Published notice research and source verification, not assumed sales or active contracts.'},
  commercial:{name:'Commercial Fit',type:'ops',anchor:'fi-commercial-fit',description:'Independent contractor credentials, official opportunities and partnership eligibility.'},
  regulatory:{name:'Regulatory & Evidence',type:'ops',anchor:'fi-regulatory-intelligence',description:'Regulatory monitoring, dated source records and economic indicators.'},
  commerce:{name:'Commerce',type:'legacy',mode:'commerce',description:'Search trends and Shopify research with explicit refresh controls.'},
@@ -59,7 +59,7 @@ function show(){
  if(!overview){
   $('fi-module-name').textContent=view.name;
   $('fi-module-description').textContent=view.description;
-  $('fi-module-eyebrow').textContent=view.type==='ops'?'BUSINESS INTELLIGENCE':
+  $('fi-module-eyebrow').textContent=(view.type==='ops'||view.type==='procurement')?'BUSINESS INTELLIGENCE':
    view.type==='legacy'?'LOCAL CAPABILITIES':'LOCAL WORKSPACE';
   let frame;
   if(view.type==='ops'){
@@ -73,6 +73,7 @@ function show(){
    }else if(frame.dataset.loaded==='true'){
     try{frame.contentWindow?.location.replace('#')}catch{}
    }
+  }else if(view.type==='procurement')frame=safeFrame('procurement','/procurement/','Procurement Evidence');
   }else if(view.type==='chat')frame=safeFrame('chat','/chat/?embedded=1','Local AI Chat · Qwen + FISRE');
   else if(view.type==='tools')frame=safeFrame('tools','/unified/?view=tools&embedded=1','Tools & REA review');
   else if(view.type==='reasoning')frame=safeFrame('reasoning','/fisre/?embedded=1','Semantic Reasoning');
