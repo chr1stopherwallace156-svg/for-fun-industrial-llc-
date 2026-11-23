@@ -108,13 +108,21 @@ ZIP activity = 1,000 × recent permit parcels ÷ selected older parcels</div>
  <th>ZIP</th><th>Formula A: older parcels</th><th>A: mean score</th>
  <th>B: exact APN matches</th><th>B: latest permit ≥ X years</th>
  <th>B: recent permit parcels</th><th>B: recent repeat after ≥ X years</th>
- <th>B: recent permits / 1,000</th><th>C: comparable-peer candidates</th><th>C: 2+ recent peer permits</th><th>C: local-to-ZIP activity ratio</th></tr></thead>
- <tbody id="formula-body"><tr><td colspan="11">No comparison calculated yet.</td></tr></tbody>
+ <th>B: recent permits / 1,000</th><th>C: comparable-peer candidates</th><th>C: 2+ recent peer permits</th><th>C: unique qualifying street blocks</th><th>C: local-to-ZIP activity ratio</th></tr></thead>
+ <tbody id="formula-body"><tr><td colspan="12">No comparison calculated yet.</td></tr></tbody>
  </table></div>
  <h3>Sample parcels with dated permit evidence</h3>
  <div class="table-wrap"><table><thead><tr><th>ZIP</th><th>Assessor parcel ID</th>
  <th>Existing V3 research score</th><th>Latest roof-related permit</th><th>Years since record</th><th>Recent long-gap repeat observed?</th></tr></thead>
  <tbody id="formula-samples"><tr><td colspan="6">Calculate to see up to 12 example parcel IDs.</td></tr></tbody></table></div>
+ <h3>Formula C — distinct street-block clusters</h3>
+ <p>Count each qualifying same-street number block once, even if many individual properties share the same neighbor-permit evidence. These are address-block proxies, not measured physical neighborhoods.</p>
+ <div class="table-wrap"><table><thead><tr>
+  <th>ZIP</th><th>Street number block</th><th>Selected older parcels</th>
+  <th>Recently permitted parcels</th><th>Comparable candidates with 2+ peer permits</th>
+  <th>Construction year range</th></tr></thead>
+  <tbody id="unique-block-body"><tr><td colspan="6">Calculate to inspect independent block summaries.</td></tr></tbody>
+ </table></div>
  <h3>Formula C — parcel examples for neighborhood verification</h3>
  <p>Examples show recorded roofing-permit activity on comparable nearby parcels—not evidence that the listed property's roof is leaking, worn, or due for replacement.</p>
  <div class="table-wrap"><table><thead><tr>
