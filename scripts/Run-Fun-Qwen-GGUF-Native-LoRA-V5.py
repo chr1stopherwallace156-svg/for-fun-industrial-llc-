@@ -282,10 +282,72 @@ def prepare_source(root):
         raise RuntimeError("PINNED_SOURCE_DIRTY_NO_BUILD")
     return target
 
+def prepare_msvc_noasm_overlay(root, pinned_source):
+    """Create a separate source copy, with exactly one safe MSVC CMake tweak.
+
+    The pristine checkout remains pinned and git-clean. CMake 4.1+ CMP0194 NEW
+    refuses MSVC cl.exe as an ASM compiler, though this CPU Windows build has
+    no ASM sources. Only omit ASM from ggml's project() on the MSVC branch.
+    """
+    overlay = root / "llama-tq-build-source-msvc-noasm-v1"
+    relative = Path("ggml") / "CMakeLists.txt"
+    original_file = pinned_source / relative
+    if not original_file.is_file() or original_file.is_symlink():
+        raise RuntimeError("PINNED_GGML_CMAKE_FILE_MISSING_OR_LINKED")
+    base = original_file.read_bytes()
+    before = b'project("ggml" C CXX ASM)'
+    after = (b'if(MSVC)\n'
+             b'    project("ggml" C CXX)\n'
+             b'else()\n'
+             b'    project("ggml" C CXX ASM)\n'
+             b'endif()')
+    if base.count(before) != 1:
+        raise RuntimeError("PINNED_GGML_CMAKE_ASM_PATTERN_CHANGED")
+    patched = base.replace(before, after)
+    marker_name = ".fun-noasm-overlay-v1.json"
+    expected_receipt = {
+        "source_pin": PIN_SHA,
+        "source_original_sha256": hashlib.sha256(base).hexdigest(),
+        "source_patched_sha256": hashlib.sha256(patched).hexdigest(),
+        "reason": "CMake CMP0194 NEW disallows MSVC cl.exe as ASM compiler; no ASM language required for Windows MSVC CPU build",
+        "files_changed": [str(relative).replace("\\", "/")],
+    }
+    if overlay.exists():
+        if not overlay.is_dir() or overlay.is_symlink():
+            raise RuntimeError("SOURCE_OVERLAY_PATH_UNTRUSTED")
+        marker = overlay / marker_name
+        modified = overlay / relative
+        if not marker.is_file() or not modified.is_file() or modified.is_symlink():
+            raise RuntimeError("SOURCE_OVERLAY_INCOMPLETE_REQUIRES_REVIEW")
+        if json.loads(marker.read_text("utf-8")) != expected_receipt or modified.read_bytes() != patched:
+            raise RuntimeError("SOURCE_OVERLAY_PATCH_INTEGRITY_MISMATCH")
+        return overlay
+    # Keep the pinned checkout unchanged, and exclude any git metadata from
+    # the build-only working tree; this operation never executes the overlay.
+    shutil.copytree(pinned_source, overlay,
+                    ignore=shutil.ignore_patterns(".git"))
+    modified = overlay / relative
+    if modified.read_bytes() != base:
+        raise RuntimeError("SOURCE_OVERLAY_COPY_MISMATCH")
+    modified.write_bytes(patched)
+    (overlay / marker_name).write_text(
+        json.dumps(expected_receipt, sort_keys=True, indent=2), encoding="utf-8")
+    print("FUN_QWEN_V5_WINDOWS_CMAKE_FIX="+json.dumps({
+        "state":"MSVC_ASM_LANGUAGE_SKIPPED_IN_SEPARATE_BUILD_COPY",
+        "pinned_source_unchanged": True,
+        "overlay": str(overlay),
+        "source_base_sha256":expected_receipt["source_original_sha256"],
+        "source_patched_sha256":expected_receipt["source_patched_sha256"],
+    },sort_keys=True), flush=True)
+    return overlay
+
+
 def prepare_binary(root, source):
-    # Use fresh VS 2022 directory. Do NOT reuse the failed NMake cache in
-    # cpu-train-build, and do not delete or rewrite other build artifacts.
-    build = root/"cpu-train-build-vs2022-x64"
+    # Do not reuse failed NMake or VS2022 (no assembler) configure caches.
+    # This separate build uses a copy of the pinned source with one
+    # inspected MSVC-only CMake fix. Original git source stays clean.
+    build_source = prepare_msvc_noasm_overlay(root, source)
+    build = root/"cpu-train-build-vs2022-noasm-v1"
     bins = list(build.glob("**/llama-finetune.exe")) if build.exists() else []
     if bins:
         return bins[0]
@@ -293,14 +355,14 @@ def prepare_binary(root, source):
     # to existing .runtime or global Python. This builds an external research
     # fork under a new isolated directory.
     safe_run(["cmake","-G","Visual Studio 17 2022","-A","x64",
-              "-S",str(source),"-B",str(build),
+              "-S",str(build_source),"-B",str(build),
               "-DGGML_CUDA=OFF","-DGGML_VULKAN=OFF",
               "-DLLAMA_BUILD_TESTS=OFF","-DLLAMA_BUILD_EXAMPLES=ON",
               "-DLLAMA_BUILD_SERVER=OFF","-DGGML_NATIVE=OFF"],
-             fresh_log(root,"cmake-configure-vs2022"),300,expected_cwd=root)
+             fresh_log(root,"cmake-configure-vs2022-noasm"),300,expected_cwd=root)
     safe_run(["cmake","--build",str(build),"--config","Release",
               "--target","llama-finetune","--parallel","2"],
-             fresh_log(root,"cmake-build-vs2022"),MAX_BUILD_SECONDS,expected_cwd=root)
+             fresh_log(root,"cmake-build-vs2022-noasm"),MAX_BUILD_SECONDS,expected_cwd=root)
     bins = list(build.glob("**/llama-finetune.exe"))
     if len(bins)!=1:
         raise RuntimeError("TRAINER_BINARY_NOT_FOUND_AFTER_BUILD")
