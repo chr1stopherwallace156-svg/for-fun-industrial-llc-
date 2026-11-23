@@ -80,6 +80,12 @@ test('bulk UI is on separate route; original production homepage is preserved',a
   assert.equal(cycleUnknown.status,422);
   const cycleDuplicateZip=await req('/api/fun/roofing/bulk/formulas?zips=90011,90011');
   assert.equal(cycleDuplicateZip.status,422);
+  const badPeerYear=await req('/api/fun/roofing/bulk/formulas?peerYears=22');
+  assert.equal(badPeerYear.status,422);
+  const badPeerSample=await req('/api/fun/roofing/bulk/formulas?minPeers=2');
+  assert.equal(badPeerSample.status,422);
+  const badPeerUnknown=await req('/api/fun/roofing/bulk/formulas?neighborDistanceKm=2');
+  assert.equal(badPeerUnknown.status,422);
  }finally{await new Promise(resolve=>server.close(resolve))}
 });
 
@@ -91,6 +97,7 @@ test('parallel rooftop formulas preserve existing V3 equation and use distinct r
  assert.match(ROOF_BULK_PAGE,/S = clip/);
  assert.match(ROOF_BULK_PAGE,/Formula B — Observed permit cycle by ZIP/);
  for(const id of ['formula-zips','formula-years','formula-recent','formula-age',
+                   'formula-peer-years','formula-min-peers',
                    'formula-kind','run-dual-formulas','formula-body','formula-samples']){
   assert.ok(ROOF_BULK_PAGE.includes('id="'+id+'"'),id);
  }
@@ -102,5 +109,14 @@ test('parallel rooftop formulas preserve existing V3 equation and use distinct r
  assert.match(python,/last_roof_permit_at_least_x_years_ago/);
  assert.match(python,/recent_repeat_with_gap_at_least_x_years/);
  assert.match(python,/REPLACEMENT_LIKE/);
+ assert.match(ROOF_BULK_PAGE,/Formula C — Similar-age neighbors/);
+ assert.match(ROOF_BULK_PAGE,/C: 2\+ recent peer permits/);
+ assert.match(clientSrc,/peerYears:String\(peerYears\)/);
+ assert.match(clientSrc,/candidates_with_two_or_more_recent_peer_roof_permits/);
+ assert.match(bridge,/--min-peers/);
+ assert.match(python,/neighbor_context\(conn/);
+ const street=await readFile(new URL('../src/roofing/roofing_neighbor_context_v5.py',import.meta.url),'utf8');
+ assert.match(street,/PRAGMA query_only|same_100_number_street_block_and_build_year_cohort_proxy|JOIN permits/);
+ assert.doesNotMatch(street,/requests\.|urllib\.|INSERT INTO|UPDATE properties|DELETE FROM/);
  assert.doesNotMatch(clientSrc,/setInterval|localStorage|WebSocket|eval\(/);
 });
