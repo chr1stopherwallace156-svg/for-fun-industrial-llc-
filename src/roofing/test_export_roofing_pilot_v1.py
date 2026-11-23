@@ -1,4 +1,5 @@
 """Deterministic offline tests of the bounded public-property roofing review export."""
+import contextlib
 import csv
 import datetime as dt
 import sqlite3
@@ -17,7 +18,7 @@ class PublicReviewPilotTests(unittest.TestCase):
         self.root = Path(self.root_context.name)
         self.db = self.root / "research.sqlite3"
         self.outputs = self.root / "out"
-        with sqlite3.connect(self.db) as c:
+        with contextlib.closing(sqlite3.connect(self.db)) as c, c:
             c.executescript("""
                 CREATE TABLE source_runs(source_id TEXT PRIMARY KEY,state TEXT);
                 CREATE TABLE roofing_selection_receipt_v3(
@@ -80,7 +81,7 @@ class PublicReviewPilotTests(unittest.TestCase):
         self.assertEqual(before,self.db.read_bytes())
 
     def test_missing_source_forces_hold(self):
-        with sqlite3.connect(self.db) as c:
+        with contextlib.closing(sqlite3.connect(self.db)) as c, c:
             c.execute("UPDATE source_runs SET state='INCOMPLETE_IMPORT_HOLD' "
                       "WHERE source_id='la_permits_pre2010'")
         with self.assertRaisesRegex(ValueError,"FOUR_OFFICIAL_IMPORTS_NOT_COMPLETE_HOLD"):
