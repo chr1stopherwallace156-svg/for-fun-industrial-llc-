@@ -163,7 +163,6 @@ foreach($file in @(
  'src\ui\roofing-bulk-page-v2.js',
  'test\roofing-bulk-v2.test.mjs'
 )){
-{
  $path=Join-Path $Root $file
  RequireFile $path
  if($file -notlike '*.css'){
