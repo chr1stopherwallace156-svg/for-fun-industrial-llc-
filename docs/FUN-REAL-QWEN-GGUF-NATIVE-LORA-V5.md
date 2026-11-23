@@ -63,6 +63,38 @@ before producing a trained adapter. Do not remove memory guards to push ahead.
 A separately operator-approved training session with different resource
 allocation may be needed after reviewing the results.
 
+## Windows toolchain follow-up (after operator's build hold)
+
+The operator's initial V5 run passed six offline tests, verified the pinned
+Qwen GGUF, created 30 training records, and cloned the pinned source. CMake
+4.4.4 was subsequently installed. The first CMake configure failed because
+the selected NMake generator could not find CMAKE_C_COMPILER or
+CMAKE_CXX_COMPILER, while cl.exe, ninja.exe, g++.exe, clang++.exe, and
+vswhere.exe were not found. **No native training had started.**
+
+The runner now explicitly requires Visual Studio **2022** Build Tools with
+the MSVC v143 x64/x86 compiler component and requests the CMake
+"Visual Studio 17 2022" x64 generator. It uses an entirely new build folder
+cpu-train-build-vs2022-x64 rather than reusing the failed
+cpu-train-build/CMakeCache.txt NMake configuration. Build logs use unique
+run-numbered files.
+
+Microsoft's Visual Studio 2022 Build Tools package may be installed separately
+via winget, with the workload Microsoft.VisualStudio.Workload.VCTools and
+recommended components (MSVC compiler and Windows SDK). This is a large
+third-party installer and requires operator authorization and Windows admin
+permission; no automatic driver or Qwen model changes are needed.
+
+The compiler itself may not appear in a normal PowerShell PATH after a
+successful Build Tools installation. That is normal when CMake uses its Visual
+Studio generator. Use vswhere to verify the installed MSVC workload rather
+than requiring cl.exe on ordinary PATH.
+
+One more limitation: the V5 native trainer runs on CPU, independent of the
+successful AMD DirectML synthetic probes. A successful compiler setup cannot
+guarantee that its full-model training graph will fit the PC's available RAM;
+the resource watchdog may safely hold before writing any adapter.
+
 ## One-command execution (explicit external source approval)
 
 First, update your clean Git checkout to V5 and run the command in the
