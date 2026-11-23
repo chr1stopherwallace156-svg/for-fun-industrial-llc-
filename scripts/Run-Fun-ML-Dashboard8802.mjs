@@ -13,6 +13,7 @@ import {DASHBOARD_HTML,DASHBOARD_VERSION} from '../src/ui/oneport-dashboard-v1.m
 import {FISRE_WORKSPACE_HTML} from '../src/ui/fisre-workspace-v4.mjs';
 import {FISRE_QWEN_CHAT_HTML} from '../src/ui/fisre-qwen-chat-v4.mjs';
 import {createFisreChatEvidence} from '../src/semantic/fisre-chat-evidence-v4.mjs';
+import {capabilityInventory} from '../src/intelligence/capability-fabric-v1.mjs';
 import {parseFisreRequest,validateFisrePayload,runFisrePython,fisreStatus} from '../src/semantic/fisre-live-bridge-v4.mjs';
 import {readFial4DashboardStatus} from '../src/fial/dashboard-status-v4.mjs';
 import {createGroundedChat} from '../src/fial/grounded-chat-v5-2.mjs';
@@ -201,7 +202,7 @@ async function emptyCommerceBody(req){
   const value=Buffer.concat(chunks).toString('utf8').trim();
   if(value!=='{}')throw Error('COMMERCE_EMPTY_JSON_REQUIRED');
 }
-export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=createCommerceIntelligence(),grounded=createGroundedChat(),
+export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=createCommerceIntelligence(),grounded=null,
  readPage=pageFrom,proxy=proxyTo,readWidget=()=>readFile(ML_WIDGET,'utf8'),
  readCommerceWidget=()=>readFile(COMMERCE_WIDGET,'utf8'),
  executiveStatus=readExecutiveStatus,realStatus=readRealStatus,
@@ -210,6 +211,10 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
  procurementStatus=readProcurementStatus,fitStatus=readFitStatus,
  bidStatus=readReadinessStatus,buyerStatus=readBuyerStatus,demandStatus=readDemandStatus,
  readUiClient=()=>readFile(UI_CLIENT,'utf8'),readUiStyle=()=>readFile(UI_CSS,'utf8')}={}){
+  const activeGrounded=grounded??createGroundedChat({capabilityReaders:{
+    grants:readFial4DashboardStatus,operations:executiveStatus,outcomes:outcomeStatus,
+    ml:()=>ml.status(),commerce:()=>commerce.status()
+  }});
   return http.createServer(async(req,res)=>{
     try{
       if(!acceptedHost(req))return send(res,403,{error:'ML_HUB_HOST_DENIED'});
@@ -239,6 +244,8 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         return send(res,200,await readFile(FISRE_CLIENT,'utf8'),'text/javascript; charset=utf-8');
       if(req.method==='GET'&&u.pathname==='/api/fisre/status')
         return send(res,200,fisreStatus());
+      if(req.method==='GET'&&u.pathname==='/api/fun/capabilities/status')
+        return send(res,200,capabilityInventory());
       if(req.method==='POST'&&u.pathname==='/api/fisre/analyze'){
         if(!acceptedActionOrigin(req)||req.headers['x-fi-fisre']!=='operator-click')
           return send(res,403,{error:'FISRE_EXPLICIT_OPERATOR_CLICK_REQUIRED'});
@@ -490,11 +497,12 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         return send(res,200,await readWidget(),'text/javascript; charset=utf-8');
       }
       if(req.method==='GET'&&u.pathname==='/api/fial/grounded/status'){
-        const s=grounded.status();
+        const s=activeGrounded.status();
         return send(res,200,{version:GROUNDED_VERSION,model_interface:s.model_interface,
           memory_interface:s.memory_interface,
           state:s.state,busy:s.busy,
-          tool_executions:0,rea_executions:0,authority_added:false});
+          tool_executions:0,rea_executions:0,authority_added:false,
+          capability_fabric_version:s.capability_fabric_version||null});
       }
       if(req.method==='GET'&&u.pathname==='/api/fial/grounded/client.js')
         return send(res,200,await readFile(GROUNDED_CLIENT,'utf8'),'text/javascript; charset=utf-8');
@@ -506,12 +514,12 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
           return send(res,415,{error:'FIAL53_JSON_REQUIRED'});
         const body=await groundedChatBody(req);
         if(body.fisre===undefined)
-          return send(res,200,await grounded.chat({question:body.question}));
+          return send(res,200,await activeGrounded.chat({question:body.question}));
         // Single explicit Send: reviewed FISRE code analysis, then one Qwen
         // answer grounded in its source-bound report. No autonomous model tools.
         const analysis=await runFisrePython(body.fisre);
         const evidence=createFisreChatEvidence(analysis,body.fisre.source);
-        const answer=await grounded.chat({question:body.question,fisreEvidence:evidence});
+        const answer=await activeGrounded.chat({question:body.question,fisreEvidence:evidence});
         return send(res,200,{...answer,
           fisre:{status:analysis.proof.status,source_sha256:analysis.source.sha256,
             replay:analysis.replay.state,cognitive:'proposed_only',
