@@ -12,7 +12,7 @@ const client=new URL('../src/ui/roofing-bulk-page-v2.js',import.meta.url);
 test('bulk system recognizes real full official exports without keys',()=>{
  const c=bulkCatalog();
  assert.equal(c.version,BULK_VERSION);
- assert.equal(c.sources.filter(s=>s.mode==='FULL_EXPORT_SYNC').length,4);
+ assert.equal(c.sources.filter(s=>s.mode==='FULL_EXPORT_SYNC').length,5);
  assert.ok(c.sources.some(s=>s.id==='sb_assessor_characteristics'&&
    s.mode==='MANUAL_CSV_OR_FIXED_WIDTH_HOLD'));
  assert.equal(c.configuredSocrataToken,Boolean(process.env.SOCRATA_APP_TOKEN));
