@@ -49,7 +49,9 @@ class InspectionJoinProbeTests(unittest.TestCase):
         def fetch(url):
             url_seen.append(url)
             return rows
-        result=v8.probe(self.db,zips=zips,per_zip=3,today=TODAY,fetch=fetch,**kwargs)
+        options=dict(zips=zips,per_zip=3,today=TODAY,fetch=fetch)
+        options.update(kwargs)
+        result=v8.probe(self.db,**options)
         return result,url_seen[0]
     def test_exact_permit_join_only_and_no_identifiers_or_db_change(self):
         before=self.db.read_bytes()
