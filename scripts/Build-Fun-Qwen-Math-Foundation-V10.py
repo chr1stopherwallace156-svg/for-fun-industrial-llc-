@@ -36,12 +36,23 @@ def margin(errors):
     values=sorted(errors.values())
     return values[1]-values[0]
 
+def pairwise_differences(errors):
+    """Ground-truth proof features; do NOT leak into user prompts."""
+    argmin_set(errors)
+    return {"D35":errors[3]-errors[5],
+            "D38":errors[3]-errors[8],
+            "D58":errors[5]-errors[8]}
+
+
 def encode_label(errors):
     winners=argmin_set(errors)
     lowest=min(errors.values())
     w=",".join(map(str,winners))
+    d=pairwise_differences(errors)
     return (f"MIN_ERROR={lowest}; BEST_WINDOWS={w}; TIE={'YES' if len(winners)>1 else 'NO'}; "
-            f"FIBONACCI_GUARANTEE=NO; REASON=Minimum measured holdout error; "
+            f"FIBONACCI_GUARANTEE=NO; "
+            f"PROOF_D35={d['D35']},D38={d['D38']},D58={d['D58']}; "
+            "REASON=Minimum measured holdout error; "
             "Fibonacci window sizes do not guarantee generalization.")
 
 def decode_label(answer):
@@ -53,9 +64,13 @@ def decode_label(answer):
     windows=tuple(int(v) for v in result.group(2).split(","))
     if len(set(windows))!=len(windows) or tuple(sorted(windows))!=windows:
         return None
+    proof=re.search(r"PROOF_D35=(-?\d+),D38=(-?\d+),D58=(-?\d+)\b",answer)
+    if not proof:
+        return None
     return {"min_error":int(result.group(1)),"winners":windows,
             "tie":result.group(3)=="YES",
-            "guarantee":result.group(4)=="YES"}
+            "guarantee":result.group(4)=="YES",
+            "pairwise":{k:int(v) for k,v in zip(("D35","D38","D58"),proof.groups())}}
 
 def grade_output(errors,response):
     parsed=decode_label(response)
@@ -63,13 +78,16 @@ def grade_output(errors,response):
         return {"state":"UNPARSEABLE","exact_answer":False,"winner_set_correct":False}
     truth=argmin_set(errors)
     set_correct=parsed["winners"]==truth
+    proof_correct=parsed["pairwise"]==pairwise_differences(errors)
     return {
         "state":"PARSED",
+        "comparison_proof_correct":proof_correct,
         "winner_set_correct":set_correct,
         "minimum_correct":parsed["min_error"]==min(errors.values()),
         "tie_correct":parsed["tie"]==(len(truth)>1),
         "guarantee_correct":not parsed["guarantee"],
-        "exact_answer":set_correct and parsed["min_error"]==min(errors.values())
+        "exact_answer":set_correct and proof_correct
+             and parsed["min_error"]==min(errors.values())
              and parsed["tie"]==(len(truth)>1) and not parsed["guarantee"],
     }
 
@@ -171,7 +189,9 @@ def make_case(split, pattern, ordinal):
               f"window 5 = {errors[5]}, window 8 = {errors[8]}. "
               "Select EVERY window tied for the LOWEST error; report the minimum, "
               "whether there is a tie, and whether Fibonacci guarantees generalization. "
-              "Use MIN_ERROR=...; BEST_WINDOWS=...; TIE=...; FIBONACCI_GUARANTEE=NO.")
+              "Show signed pairwise differences D35=e3-e5, D38=e3-e8, D58=e5-e8. "
+              "Use MIN_ERROR=...; BEST_WINDOWS=...; TIE=...; FIBONACCI_GUARANTEE=NO; "
+              "PROOF_D35=...,D38=...,D58=....")
     answer=encode_label(errors)
     return {"split":split,"pattern":pattern,"ordinal":ordinal,"errors":errors,
             "question":question,"answer":answer,"gap":margin(errors)}
@@ -249,6 +269,7 @@ def render_files(cases):
             "errors":{str(w):x["errors"][w] for w in WINDOWS},
             "best_windows":list(x["pattern"]),"min_error":min(x["errors"].values()),
             "tie":len(x["pattern"])>1,"margin":x["gap"],
+            "oracle_pairwise_differences":pairwise_differences(x["errors"]),
             "question":x["question"]
         }) for x in rows).encode("utf-8")
     files["hard-negatives.jsonl"]="".join(line_json({
