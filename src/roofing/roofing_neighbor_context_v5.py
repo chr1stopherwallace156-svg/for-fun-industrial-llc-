@@ -38,7 +38,8 @@ def _subtract_years(day, years):
 
 def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
                      kind, city, peer_years=5, min_peers=5,
-                     max_blocks_per_zip=5):
+                     max_blocks_per_zip=5,include_property_candidates=False,
+                     max_property_candidates=20000):
     """Aggregate age-matched peers with recent roof-related permits by block.
 
     Each candidate's peers exclude its own APN. Only cohorts of at least
@@ -51,10 +52,16 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
     if (not isinstance(max_blocks_per_zip,int) or isinstance(max_blocks_per_zip,bool)
             or not 1<=max_blocks_per_zip<=1000):
         raise ValueError("NEIGHBOR_BLOCK_REPORT_LIMIT_INVALID")
+    if not isinstance(include_property_candidates,bool) or (
+        not isinstance(max_property_candidates,int) or
+        isinstance(max_property_candidates,bool) or
+        not 1<=max_property_candidates<=20000):
+        raise ValueError("NEIGHBOR_PROPERTY_EXPORT_LIMIT_INVALID")
     if not isinstance(today,dt.date):raise ValueError("NEIGHBOR_DATE_INVALID")
     placeholders=",".join("?" for _ in zips)
     params=("Los Angeles",city,today.year-min_building_age,*zips)
-    property_sql=f"""SELECT zip,apn,address,year_built
+    extra_columns=",priority,last_roof_permit" if include_property_candidates else ""
+    property_sql=f"""SELECT zip,apn,address,year_built{extra_columns}
         FROM roofing_selection_candidates_v3
         WHERE disposition='KEEP' AND county=? AND city=?
          AND year_built IS NOT NULL AND year_built<=?
@@ -62,6 +69,8 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
          AND address IS NOT NULL AND address!=''
         ORDER BY zip,apn"""
     blocks=defaultdict(list)
+    details={} if include_property_candidates else None
+    qualifying_property_rows=[] if include_property_candidates else None
     available=Counter()
     invalid=Counter()
     total=Counter()
@@ -73,6 +82,12 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
             invalid[zip_code]+=1
             continue
         blocks[(zip_code,*key)].append((int(p["year_built"]),str(p["apn"])))
+        if details is not None:
+            details[(zip_code,str(p["apn"]))]={
+                "address":str(p["address"]),
+                "formula_a_existing_priority":p["priority"],
+                "last_v3_observed_roof_permit":p["last_roof_permit"],
+            }
         available[zip_code]+=1
 
     # Only recent permit events are needed for this independent third method.
@@ -130,6 +145,22 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
                 target["candidates_with_at_least_two_recent_peer_permits"]+=1
                 strong_subjects+=1
                 target["blocks_with_two_or_more_recent_peer_permits"].add((street,num))
+                if qualifying_property_rows is not None:
+                    if len(qualifying_property_rows)>=max_property_candidates:
+                        raise ValueError("NEIGHBOR_QUALIFYING_PROPERTY_EXPORT_LIMIT_EXCEEDED")
+                    detail=details[(z,apn)]
+                    qualifying_property_rows.append({
+                        "zip":z,"street_number_block":f"{num*100}-{num*100+99} {street}",
+                        "apn":apn,"address":detail["address"],
+                        "construction_year":year,
+                        "formula_a_existing_priority":detail["formula_a_existing_priority"],
+                        "last_v3_observed_roof_permit":detail["last_v3_observed_roof_permit"],
+                        "other_age_similar_properties":peers,
+                        "other_properties_with_recent_exact_apn_permit":recent_peer_count,
+                        "recent_permit_type_filter":kind,
+                        "recent_subject_exact_apn_permit_observed":False,
+                        "actual_roof_age_or_condition_verified":False,
+                    })
                 # Prefer multiple independently recorded neighbor parcels and
                 # relatively dense peer cohorts, deterministically by APN.
                 example=(recent_peer_count,round(recent_peer_count/peers,5),z,str(apn),year,peers)
@@ -207,7 +238,7 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
         z:[entry[-1] for entry in sorted(best_blocks[z],reverse=True)]
         for z in zips
     }
-    return {"version":VERSION,
+    result={"version":VERSION,
        "public_research_examples":limited_examples,
        "distinct_block_research_examples":unique_block_examples,
        "formula_c_neighborhood_context":{
@@ -217,3 +248,8 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
            "age_cohorts_compare_construction_year_not_actual_roof_age":True,
            "zips":results,
        }}
+    if qualifying_property_rows is not None:
+        result["qualified_property_research_rows"]=sorted(
+            qualifying_property_rows,
+            key=lambda x:(x["zip"],x["street_number_block"],x["apn"]))
+    return result
