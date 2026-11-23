@@ -33,7 +33,7 @@ export const ROOF_BULK_PAGE=String.raw`<!doctype html><html lang="en"><head><met
  <div class="metrics" aria-label="Filtered roofing candidates">
   <article class="metric"><span>Ready for review</span><strong id="selection-selected">—</strong><small>Older plausible houses in verified imported property records</small></article>
   <article class="metric"><span>Enrichment holds</span><strong id="selection-held">—</strong><small>Missing address, age or residential classification; not silently discarded</small></article>
-  <article class="metric"><span>Filtered exclusions</span><strong id="selection-excluded">—</strong><small>Definite non-house uses or newer-than-20-year properties</small></article>
+  <article class="metric"><span>Filtered exclusions</span><strong id="selection-excluded">—</strong><small>Confirmed out-of-scope non-residential parcels</small></article>
   <article class="metric"><span>Extraction state</span><strong id="selection-state">Not started</strong><small>Run automatically when an official source finishes indexing</small></article>
  </div>
  <p class="readout" id="selection-receipt" role="status">No validated selective extraction receipt yet.</p>
