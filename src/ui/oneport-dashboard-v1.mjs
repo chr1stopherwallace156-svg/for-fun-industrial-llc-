@@ -33,7 +33,8 @@ export const DASHBOARD_HTML=String.raw`<!doctype html>
     <nav class="fi-nav" aria-label="System capabilities">
       <a href="#ml" data-section="ml"><span class="fi-icon" aria-hidden="true">⌘</span><span>Machine Learning</span></a>
       <a href="#reasoning" data-section="reasoning"><span class="fi-icon" aria-hidden="true">∑</span><span>Semantic Reasoning</span></a>
-      <a href="/math/"><span class="fi-icon" aria-hidden="true">∫</span><span>Mathematical Research</span></a>
+      <a href="/math/"><span class="fi-icon" aria-hidden="true">∫</span><span>Mathematical Research V2</span></a>
+      <a href="/math/v3/"><span class="fi-icon" aria-hidden="true">∑</span><span>Mathematical Discovery V3</span></a>
       <a href="#workspace" data-section="workspace"><span class="fi-icon" aria-hidden="true">▦</span><span>Original Workspace</span></a>
     </nav>
     <div class="fi-sidebar-bottom">
