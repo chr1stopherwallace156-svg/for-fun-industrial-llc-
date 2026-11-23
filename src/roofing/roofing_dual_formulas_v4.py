@@ -156,7 +156,7 @@ def analyze(db, *, zips=DEFAULT_ZIPS, years=20, recent_years=5,
                 stats["apn_exact_permit_matches"] += 1
                 last = dates[-1]
                 gap = (today-last).days / 365.2425
-                 if last <= old_cutoff:
+                if last <= old_cutoff:
                     stats["gap_at_least_x_years"] += 1
                 recent = [d for d in dates if d >= recent_cutoff]
                 historical = [d for d in dates if d <= old_cutoff]
