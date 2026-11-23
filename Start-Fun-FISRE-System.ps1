@@ -16,7 +16,8 @@ foreach($step in $Steps){
   throw ('FUN_FISRE_START_HOLD_MISSING_SCRIPT='+$step.Script)
  }
  Write-Host ('FUN_FISRE_STARTING='+$step.Name)
- & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $step.Script @($step.Args)
+ $commandArgs=@('-NoProfile','-ExecutionPolicy','Bypass','-File',[string]$step.Script)+@($step.Args)
+ & powershell.exe @commandArgs
  if($LASTEXITCODE -ne 0){throw ('FUN_FISRE_START_HOLD='+$step.Name)}
 }
 Write-Host 'FUN_INDUSTRIAL_FISRE_FULL_START=PASS'
