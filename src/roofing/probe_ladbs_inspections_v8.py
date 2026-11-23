@@ -106,6 +106,8 @@ def probe(db,*,zips=ZIPS,per_zip=3,today=None,fetch=None):
     by_zip={z:Counter() for z in zips}
     matched=set()
     candidate_final_approvals=set()
+    finaled_result_with_final_type=set()
+    finaled_permit_status=set()
     for row in payload:
         number=canonical_permit(row.get("permit"))
         if number is None or number not in chosen:
@@ -116,7 +118,10 @@ def probe(db,*,zips=ZIPS,per_zip=3,today=None,fetch=None):
         by_zip[z]["inspection_rows"]+=1
         kind=re.sub(r"\s+"," ",str(row.get("inspection") or "").strip().upper())
         result=re.sub(r"\s+"," ",str(row.get("inspection_result") or "").strip().upper())
+        permit_status=re.sub(r"\s+"," ",str(row.get("permit_status") or "").strip().upper())
         date=str(row.get("inspection_date") or "").strip()
+        if permit_status=="PERMIT FINALED":
+            finaled_permit_status.add(number)
         # A syntactically valid, real calendar date is necessary; a result
         # with no inspection date must never become "approved final" evidence.
         date_match=re.match(r"^(\d{4}-\d{2}-\d{2})(?:T.*)?$",date)
@@ -128,6 +133,8 @@ def probe(db,*,zips=ZIPS,per_zip=3,today=None,fetch=None):
             except ValueError:pass
         if kind in ALLOWED_TYPES and result in ALLOWED_APPROVAL and date_valid:
             candidate_final_approvals.add(number)
+        elif kind in ALLOWED_TYPES and result=="PERMIT FINALED" and date_valid:
+            finaled_result_with_final_type.add(number)
         elif kind in ALLOWED_TYPES:
             aggregate["final_type_without_verified_approval"]+=1
             by_zip[z]["final_type_without_verified_approval"]+=1
@@ -135,16 +142,22 @@ def probe(db,*,zips=ZIPS,per_zip=3,today=None,fetch=None):
         selected=sum(1 for zip_ in chosen.values() if zip_==z)
         matched_in_zip=sum(1 for k in matched if chosen[k]==z)
         final_in_zip=sum(1 for k in candidate_final_approvals if chosen[k]==z)
+        finaled_result_in_zip=sum(1 for k in finaled_result_with_final_type if chosen[k]==z)
+        finaled_status_in_zip=sum(1 for k in finaled_permit_status if chosen[k]==z)
         by_zip[z].update({
             "selected_exact_permit_ids":selected,
             "found_in_official_inspection_dataset":matched_in_zip,
             "not_found_in_bounded_query":selected-matched_in_zip,
             "has_final_inspection_type_with_approved_result":final_in_zip,
+            "has_final_type_with_permit_finaled_result":finaled_result_in_zip,
+            "has_permit_finaled_status":finaled_status_in_zip,
         })
     aggregate["selected_exact_permit_ids"]=len(chosen)
     aggregate["found_in_official_inspection_dataset"]=len(matched)
     aggregate["not_found_in_bounded_query"]=len(chosen)-len(matched)
     aggregate["has_final_inspection_type_with_approved_result"]=len(candidate_final_approvals)
+    aggregate["has_final_type_with_permit_finaled_result"]=len(finaled_result_with_final_type)
+    aggregate["has_permit_finaled_status"]=len(finaled_permit_status)
     return {
        "version":VERSION,"state":"BOUNDED_INSPECTION_JOIN_OBSERVED",
        "official_dataset":DATASET,"sample_method":"latest_replacement_like_exact_APN_matched_issued_2020_source_not_random",
@@ -154,6 +167,7 @@ def probe(db,*,zips=ZIPS,per_zip=3,today=None,fetch=None):
        "source_is_full_county_coverage":False,
        "no_match_is_not_proof_of_no_inspection":True,
        "approved_final_type_is_not_proof_roof_replacement":True,
+       "permit_finaled_text_is_separate_from_inspection_approval":True,
        "no_personal_data_or_permit_ids_emitted":True,
        "database_modified":False,
     }
