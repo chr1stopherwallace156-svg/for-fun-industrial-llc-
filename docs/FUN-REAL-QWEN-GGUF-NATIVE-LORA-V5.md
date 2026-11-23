@@ -95,6 +95,50 @@ successful AMD DirectML synthetic probes. A successful compiler setup cannot
 guarantee that its full-model training graph will fit the PC's available RAM;
 the resource watchdog may safely hold before writing any adapter.
 
+## Windows CMake 4.4 CMP0194 / assembly-language follow-up
+
+The operator confirmed the Visual Studio 2022 C/C++ compilers and Windows
+SDK 10.0.26100.0 are installed and recognized, but CMake configuration then
+stopped at ggml/CMakeLists.txt:9 with CMAKE_ASM_COMPILER not found.
+
+The pinned fork has:
+
+    if (POLICY CMP0194)
+        cmake_policy(SET CMP0194 NEW)
+    endif()
+    project("ggml" C CXX ASM)
+
+With MSVC, CMake 4.1+ CMP0194 NEW explicitly disallows treating cl.exe as
+a valid assembler. This CPU-only Windows training build has no reason to
+enable generic ASM language in the GGML root project.
+
+V5 therefore creates a **separate build-source copy** under
+%LOCALAPPDATA%/FunIndustrial/QwenActualGGUFLoRAV5/
+llama-tq-build-source-msvc-noasm-v1, verifies the original source is pinned
+to commit fed4890a..., and applies a one-expression source patch:
+
+    if(MSVC)
+        project("ggml" C CXX)
+    else()
+        project("ggml" C CXX ASM)
+    endif()
+
+All other source contents are preserved. This conditional only affects the
+CMake language list when compiling with MSVC. The fork's pristine Git
+checkout remains untouched and clean; the patch is accompanied by a JSON
+marker recording exact before/after file SHA-256 values. The runner refuses
+unexpected patches or partial overlays instead of silently overwriting
+them. The patched source is not installed globally, and the program
+builds in a brand-new cpu-train-build-vs2022-noasm-v1 directory, leaving
+both earlier failed CMake caches alone.
+
+The offline harness now has 10 tests including overlay immutability and
+integrity checks. Passing those tests proves the *source patch construction*,
+not that a full Visual Studio build or Qwen training succeeds. The next
+operator run can encounter additional native compiler errors or a RAM guard
+hold; review the new cmake-configure-vs2022-noasm and
+cmake-build-vs2022-noasm run-specific logs if that occurs.
+
 ## One-command execution (explicit external source approval)
 
 First, update your clean Git checkout to V5 and run the command in the
