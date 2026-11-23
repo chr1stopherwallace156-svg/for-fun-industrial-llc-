@@ -21,7 +21,8 @@ async function readonlyReaRequest(url,body=null){
  const timer=setTimeout(()=>controller.abort(),body===null?5500:18000);
  try{
   const res=await fetch(url,{method:body===null?'GET':'POST',redirect:'error',signal:controller.signal,
-   headers:body===null?{'accept':'application/json'}:{'content-type':'application/json','accept':'application/json'},
+   headers:body===null?{'accept':'application/json'}:{'content-type':'application/json','accept':'application/json',
+    'origin':ROOT,'x-fi-rea229':'operator-click'},
    ...(body===null?{}:{body:JSON.stringify(body)})});
   if(!res.ok)hold('REA_HTTP_'+res.status);
   if(!String(res.headers.get('content-type')||'').toLowerCase().includes('json'))
