@@ -83,7 +83,7 @@ def property_rows(c):
 def select(db_path,*,drop_irrelevant=False):
     """Stage and validate counts before atomic replacement/pruning.
 
-    DROP is restricted to clear non-house or below-20-year properties.
+    DROP is restricted to clearly non-house parcels or unusable identifiers.
     HOLD retains missing address/year/property-type records for future joins.
     """
     path=Path(db_path)
