@@ -29,8 +29,29 @@ const reaReview='<details id="fi-fial53-rea-panel" style="margin:12px 0;padding:
  '<pre id="fi-fial53-rea-review" role="status" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere;color:#d4e3f1;font:12px/1.5 Consolas,monospace">No REA inspection prepared.</pre>'+
  '<p><button type="button" id="fi-fial53-rea-explain" hidden>Ask Qwen to explain the approved observation</button></p>'+
  '<p style="font-size:12px;color:#aec5d2">No shell, file modification, REA configuration changes, or unapproved model-initiated calls. Provider and live REA status verified only at preparation.</p></details>';
+const computeReview='<details id="fi-fial53-compute-panel" style="margin:12px 0;padding:13px;border:1px solid #3d5770;border-radius:12px;background:#0d1b29">'+
+ '<summary style="cursor:pointer;font-weight:700">ML &amp; optimization · one AI, reviewed execution</summary>'+
+ '<p style="color:#a8bac9">Use the existing local scikit-learn backend or fixed Optuna / OR-Tools solver. Input examples are synthetic, not real business data. Every solve requires separate Prepare and Confirm clicks. Qwen can explain the result, never launch it autonomously.</p>'+
+ '<label for="fi-fial53-compute-kind">Choose bounded capability</label>'+
+ '<select id="fi-fial53-compute-kind" style="max-width:100%;width:100%;background:#102338;color:#e6edf5;border:1px solid #52718d;padding:9px;border-radius:8px">'+
+ '<option value="optuna_inventory">Optuna · inventory stock-level optimization</option>'+
+ '<option value="ortools_routing">Google OR-Tools · one-vehicle route</option>'+
+ '<option value="ml_deals">Scikit-learn · scored deals</option>'+
+ '<option value="ml_history">Scikit-learn · local training (review required)</option>'+
+ '<option value="ml_candidates">Scikit-learn · predictions from candidates</option>'+
+ '</select>'+
+ '<label for="fi-fial53-compute-prompt">Analysis objective</label>'+
+ '<input id="fi-fial53-compute-prompt" maxlength="1000" value="Find an economical stock level from the supplied example demand" style="width:100%;background:#0c1825;color:#e6edf5;border:1px solid #537187;border-radius:8px;padding:9px">'+
+ '<label for="fi-fial53-compute-data">Structured inputs (JSON; synthetic examples by default)</label>'+
+ '<textarea id="fi-fial53-compute-data" spellcheck="false" maxlength="12500" style="display:block;width:100%;min-height:155px;background:#0c1825;color:#e6edf5;border:1px solid #537187;border-radius:8px;padding:9px;font:12px/1.5 Consolas,monospace"></textarea>'+
+ '<p><button type="button" id="fi-fial53-compute-prepare">Prepare reviewed job</button> '+
+ '<button type="button" id="fi-fial53-compute-confirm" disabled>Confirm exact computation</button> '+
+ '<button type="button" id="fi-fial53-compute-cancel">Cancel</button></p>'+
+ '<pre id="fi-fial53-compute-review" role="status" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere;color:#d4e3f1;font:12px/1.5 Consolas,monospace">No computation prepared.</pre>'+
+ '<p><button type="button" id="fi-fial53-compute-explain" hidden>Ask Qwen to explain approved result</button></p>'+
+ '<p style="font-size:12px;color:#aec5d2">Isolated Python environment for Optuna and OR-Tools; scikit-learn uses existing 8801. No automatic installation, file edits, external messages or model-weight training. ML history mode trains a local statistical model only after explicit approval.</p></details>';
 const panel=GROUNDED_PANEL
- .replace('<p><button id="fi-fial53-send"',inventory+extra+reaReview+'<p><button id="fi-fial53-send"')
+ .replace('<p><button id="fi-fial53-send"',inventory+extra+reaReview+computeReview+'<p><button id="fi-fial53-send"')
  .replace('No tools are requested or executed from this conversation.',
   'An optional local FISRE analyzer reads code as data; no arbitrary code execution or REA actions occur.')
  .replace('No model tool definitions, automatic retries, memory writes, or REA execution.',
