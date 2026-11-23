@@ -9,6 +9,7 @@ export const FISRE_LIVE_VERSION='fun-fisre-live-v4';
 const SCRIPT=fileURLToPath(new URL('../../scripts/Run-Fun-FISRE-Live-V4.py',import.meta.url));
 const MAX_IN=24000,MAX_OUT=400000,MAX_ERR=1400,TIMEOUT=20000;
 const fail=x=>{throw Error('FISRE_LIVE_'+x)};
+let activeWorker=false; // Single bounded analysis at a time; no background queue.
 
 export async function parseFisreRequest(req){
  if(req.headers['content-type']!=='application/json')fail('JSON_CONTENT_TYPE_REQUIRED');
@@ -33,10 +34,13 @@ export function runFisrePython(payload,{spawnProcess=spawn}={}){
  return new Promise((resolve,reject)=>{
   const input=JSON.stringify(payload);
   if(Buffer.byteLength(input,'utf8')>MAX_IN)return reject(Error('FISRE_LIVE_REQUEST_TOO_LARGE'));
+  if(activeWorker)return reject(Error('FISRE_LIVE_BUSY_OPERATOR_RETRY_REQUIRED'));
+  activeWorker=true;
   let child,done=false,out='',err='';
   const finish=(error,value)=>{
    if(done)return;
    done=true;
+   activeWorker=false;
    clearTimeout(timer);
    if(error)reject(error);else resolve(value);
   };
@@ -46,7 +50,7 @@ export function runFisrePython(payload,{spawnProcess=spawn}={}){
     shell:false,windowsHide:true,stdio:['pipe','pipe','pipe'],
     env:{...process.env,PYTHONDONTWRITEBYTECODE:'1',PYTHONNOUSERSITE:'1'}
    });
-  }catch(e){return reject(Error('FISRE_LIVE_WORKER_START_FAILED'))}
+  }catch(e){return finish(Error('FISRE_LIVE_WORKER_START_FAILED'))}
   timer=setTimeout(()=>{
    try{child.kill()}catch{}
    finish(Error('FISRE_LIVE_WORKER_TIMEOUT'));
