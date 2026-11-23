@@ -60,7 +60,7 @@ class PermitDescriptionAuditTests(unittest.TestCase):
             c.executemany("INSERT INTO permits VALUES (?,?,?,?,?,?)", [
                 (SRC,"R001","Los Angeles","APN001","2025-04-01","REPLACEMENT_LIKE"),
                 (SRC,"R002","Los Angeles","APN002","2025-04-02","ROOF_RELATED_NOT_PROVEN_REPLACED"),
-                (SRC,"R003","Los Angeles","APN003","2025-04-03","ROOF_RELATED_NOT_PROVEN_REPLACED"),
+                (SRC,"R003","Los Angeles","APN003","2010-04-03","ROOF_RELATED_NOT_PROVEN_REPLACED"),
                 (SRC,"R004","Los Angeles","HOLD","2025-04-04","REPLACEMENT_LIKE"),
                 (SRC,"R005","Los Angeles","NEW","2025-04-04","REPLACEMENT_LIKE"),
                 (SRC,"R006","San Bernardino","APN001","2025-04-04","REPLACEMENT_LIKE"),
