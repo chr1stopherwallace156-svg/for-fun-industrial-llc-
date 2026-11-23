@@ -16,6 +16,7 @@ import {createFisreChatEvidence} from '../src/semantic/fisre-chat-evidence-v4.mj
 import {capabilityInventory} from '../src/intelligence/capability-fabric-v1.mjs';
 import {createReviewedDispatch} from '../src/intelligence/operator-reviewed-dispatch-v1.mjs';
 import {createReviewedCompute} from '../src/intelligence/reviewed-compute-v1.mjs';
+import {CONTROL_DECK_HTML,CONTROL_DECK_CSS,CONTROL_DECK_CLIENT,readControlDeckStatus} from '../src/ui/fun-control-deck-v1.mjs';
 import {parseFisreRequest,validateFisrePayload,runFisrePython,fisreStatus} from '../src/semantic/fisre-live-bridge-v4.mjs';
 import {readFial4DashboardStatus} from '../src/fial/dashboard-status-v4.mjs';
 import {createGroundedChat} from '../src/fial/grounded-chat-v5-2.mjs';
@@ -261,6 +262,20 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         return send(res,200,DASHBOARD_HTML,'text/html; charset=utf-8',
           {'content-security-policy':csp,'x-fi-dashboard-version':DASHBOARD_VERSION});
       }
+      if(req.method==='GET'&&u.pathname==='/control/'){
+        // Dedicated optional visual UI. Original homepage remains identical.
+        const csp="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'none'; font-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'none'";
+        return send(res,200,CONTROL_DECK_HTML,'text/html; charset=utf-8',
+          {'content-security-policy':csp,'x-fi-control-deck-version':'fun-control-deck-v1'});
+      }
+      if(req.method==='GET'&&u.pathname==='/api/fun/control/style.css')
+        return send(res,200,await readFile(CONTROL_DECK_CSS,'utf8'),'text/css; charset=utf-8');
+      if(req.method==='GET'&&u.pathname==='/api/fun/control/client.js')
+        return send(res,200,await readFile(CONTROL_DECK_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      if(req.method==='GET'&&u.pathname==='/api/fun/control/status')
+        return send(res,200,await readControlDeckStatus({ml}));
+      if(u.pathname.startsWith('/api/fun/control/')||u.pathname==='/control/')
+        return send(res,404,{error:'FUN_CONTROL_DECK_ROUTE_NOT_SUPPORTED'});
       if(req.method==='GET'&&u.pathname==='/chat/'){
         // Direct same-origin Qwen + memory; does not proxy through 8798.
         const csp="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; form-action 'none'";
