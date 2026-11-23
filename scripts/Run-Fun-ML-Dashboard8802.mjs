@@ -10,6 +10,8 @@ import {rankCommerceOpportunities} from '../src/commerce/opportunity-ranking-v1-
 import {buildTrendsFocus} from '../src/commerce/google-trends-focus-v1-2.mjs';
 import {SHELL,UI_CSS,UI_CLIENT} from '../src/ui/integrated-hub-shell-v1.mjs';
 import {DASHBOARD_HTML,DASHBOARD_VERSION} from '../src/ui/oneport-dashboard-v1.mjs';
+import {FISRE_WORKSPACE_HTML} from '../src/ui/fisre-workspace-v4.mjs';
+import {parseFisreRequest,runFisrePython,fisreStatus} from '../src/semantic/fisre-live-bridge-v4.mjs';
 import {readFial4DashboardStatus} from '../src/fial/dashboard-status-v4.mjs';
 import {createGroundedChat} from '../src/fial/grounded-chat-v5-2.mjs';
 import {GROUNDED_PANEL,GROUNDED_CLIENT,GROUNDED_VERSION} from '../src/fial/primary-grounded-ui-v5-3.mjs';
@@ -40,6 +42,7 @@ const BUYER_CLIENT=new URL('../src/buyers/buyer-console-v5-13.js',import.meta.ur
 const DEMAND_CLIENT=new URL('../src/demand/demand-console-v5-14.js',import.meta.url);
 const ONEPORT_CSS=new URL('../src/ui/oneport-dashboard-v1.css',import.meta.url);
 const ONEPORT_CLIENT=new URL('../src/ui/oneport-dashboard-v1.js',import.meta.url);
+const FISRE_CLIENT=new URL('../src/ui/fisre-workspace-v4.js',import.meta.url);
 const ONEPORT_TILT=new URL('../src/ui/vendor/vanilla-tilt-1.8.1.js',import.meta.url);
 const ONEPORT_EMBED=new URL('../src/ui/oneport-embedded-v1.css',import.meta.url);
 const ONEPORT_EMBED_CLIENT=new URL('../src/ui/oneport-embedded-operations-v1.js',import.meta.url);
@@ -214,6 +217,25 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         return send(res,200,DASHBOARD_HTML,'text/html; charset=utf-8',
           {'content-security-policy':csp,'x-fi-dashboard-version':DASHBOARD_VERSION});
       }
+      // Operator-initiated Semantic Reasoning, served under the existing 8802 host.
+      // The current home page, Qwen, REA, ML, worker ports, and operator authority stay unchanged.
+      if(req.method==='GET'&&u.pathname==='/fisre/'){
+        const csp="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; form-action 'self'";
+        return send(res,200,FISRE_WORKSPACE_HTML,'text/html; charset=utf-8',
+          {'content-security-policy':csp});
+      }
+      if(req.method==='GET'&&u.pathname==='/api/fisre/client.js')
+        return send(res,200,await readFile(FISRE_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      if(req.method==='GET'&&u.pathname==='/api/fisre/status')
+        return send(res,200,fisreStatus());
+      if(req.method==='POST'&&u.pathname==='/api/fisre/analyze'){
+        if(!acceptedActionOrigin(req)||req.headers['x-fi-fisre']!=='operator-click')
+          return send(res,403,{error:'FISRE_EXPLICIT_OPERATOR_CLICK_REQUIRED'});
+        const request=await parseFisreRequest(req);
+        return send(res,200,await runFisrePython(request));
+      }
+      if(u.pathname.startsWith('/api/fisre/')||u.pathname==='/fisre/')
+        return send(res,404,{error:'FISRE_ROUTE_NOT_SUPPORTED'});
       if(req.method==='GET'&&u.pathname==='/api/oneport/style.css')
         return send(res,200,await readFile(ONEPORT_CSS,'utf8'),'text/css; charset=utf-8');
       if(req.method==='GET'&&u.pathname==='/api/oneport/vendor/vanilla-tilt.js')
