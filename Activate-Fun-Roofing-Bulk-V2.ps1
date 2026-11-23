@@ -177,7 +177,9 @@ foreach($file in @(
  'src\ui\oneport-dashboard-v1.js',
  'src\roofing\selective_policy_v3.py',
  'src\roofing\selective_extract_v3.py',
- 'src\roofing\test_selective_v3.py'
+ 'src\roofing\test_selective_v3.py',
+ 'test\roofing-selective-v3.test.mjs',
+ 'Start-Fun-Roofing-RealData-V3.ps1'
 )){
  $path=Join-Path $Root $file
  RequireFile $path
@@ -186,7 +188,7 @@ foreach($file in @(
   if($LASTEXITCODE -ne 0){Hold ('NODE_CHECK_FAILED='+$file)}
  }
 }
-& $Node --test (Join-Path $Root 'test\organized-ui-preview-v1.test.mjs') (Join-Path $Root 'test\roofing-opportunity-v1.test.mjs') (Join-Path $Root 'test\roofing-bulk-v2.test.mjs') (Join-Path $Root 'test\procurement-focus-v1.test.mjs')
+& $Node --test (Join-Path $Root 'test\organized-ui-preview-v1.test.mjs') (Join-Path $Root 'test\roofing-opportunity-v1.test.mjs') (Join-Path $Root 'test\roofing-bulk-v2.test.mjs') (Join-Path $Root 'test\procurement-focus-v1.test.mjs') (Join-Path $Root 'test\roofing-selective-v3.test.mjs')
 if($LASTEXITCODE -ne 0){Hold 'ROOFING_NODE_TESTS_FAILED_NO_PORT_CHANGE'}
 $Python=(Get-Command python.exe -ErrorAction Stop).Source
 & $Python -B (Join-Path $Root 'src\roofing\test_roofing_bulk_v2.py')
