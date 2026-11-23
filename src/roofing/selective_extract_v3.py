@@ -151,6 +151,10 @@ def select(db_path,*,drop_irrelevant=False):
             c.execute("""DELETE FROM properties WHERE EXISTS (
               SELECT 1 FROM roof_drop_keys_v3 k
               WHERE k.county=properties.county AND k.apn=properties.apn)""")
+            # V2's unfiltered candidate cache is superseded by the verified V3
+            # selection. Preserve the schema for old read-only status adapters.
+            if c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='candidates'").fetchone():
+                c.execute('DELETE FROM candidates')
         c.execute("""INSERT OR REPLACE INTO roofing_selection_receipt_v3
           VALUES(1,?,?,?,?,?,?,?,?,?)""",(
             dt.datetime.now(dt.timezone.utc).isoformat(),tally['KEEP'],tally['HOLD'],
