@@ -56,7 +56,7 @@ try{
    if($redirectCount -eq 5){throw 'FUN_LACITY_TOO_MANY_REDIRECTS'}
    $location=$response.Headers.Location
    if($null -eq $location){throw 'FUN_LACITY_REDIRECT_MISSING_LOCATION'}
-   $next=New-Object System.Uri($url,$location)
+   $next=[Uri]::new($url,$location)
    if($next.Scheme -cne 'https' -or $next.Host -cne 'data.lacity.org'){
     throw 'FUN_LACITY_REDIRECT_OUTSIDE_APPROVED_HTTPS_ORIGIN'
    }
@@ -94,7 +94,7 @@ try{
   if($size -gt $maxBytes){throw 'FUN_LACITY_CSV_ABOVE_8GB_BOUND'}
   if($first){
    $first=$false
-   $start=[Text.Encoding]::UTF8.GetString($buffer,0,[Math]::Min($read,256)).TrimStart([char]0xFEFF,[char]32,[char]9,[char]10,[char]13)
+   $start=[Text.Encoding]::UTF8.GetString($buffer,0,[Math]::Min($read,256)).TrimStart([char[]]@([char]0xFEFF,[char]32,[char]9,[char]10,[char]13))
    if($start.StartsWith('<') -or $start.StartsWith('{') -or $start.StartsWith('[')){
     throw 'FUN_LACITY_SOURCE_RETURNED_NON_CSV_BODY'
    }
