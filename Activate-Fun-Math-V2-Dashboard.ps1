@@ -51,9 +51,9 @@ function ExtractRunner([string]$line){
  if(!(Test-Path -LiteralPath $file -PathType Leaf)){Hold 'CURRENT_8802_RUNNER_MISSING'}
  return $file
 }
-function Live(){
+function Live([string]$ExpectedRunner=$Runner){
  $proc=GetOwner
- if(!$proc -or [string]$proc.CommandLine -notmatch [regex]::Escape($Runner)){Hold '8802_NEW_RUNNER_NOT_VERIFIED'}
+ if(!$proc -or [string]$proc.CommandLine -notmatch [regex]::Escape($ExpectedRunner)){Hold '8802_EXPECTED_RUNNER_NOT_VERIFIED'}
  $main=Invoke-WebRequest ($BaseUrl+'/') -UseBasicParsing -TimeoutSec 8
  $math=Invoke-WebRequest ($BaseUrl+'/math/') -UseBasicParsing -TimeoutSec 8
  $mathjs=Invoke-WebRequest ($BaseUrl+'/api/fun/math/client.js') -UseBasicParsing -TimeoutSec 8
@@ -118,6 +118,8 @@ foreach($file in @($Runner,(Join-Path $Root 'src\math\math-report-bridge-v2.mjs'
 }
 & $Py -3 -m unittest discover -s (Join-Path $Root 'math_research_v2') -p 'test_engine.py' -q
 if($LASTEXITCODE -ne 0){Hold 'MATH_V2_TESTS_FAILED'}
+& $Node --test (Join-Path $Root 'test\math-v2-dashboard.test.mjs')
+if($LASTEXITCODE -ne 0){Hold 'MATH_V2_DASHBOARD_TESTS_FAILED'}
 # Research worker runs independently and registers its own scheduled task.
 # RunOnce first, install schedule only after success.
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Install -RunOnce
@@ -141,7 +143,7 @@ if($OriginalProc){
  if($LASTEXITCODE -ne 0 -or $diff.Count -ne 0){Hold 'OLD_RUNNER_MODIFIED'}
  if($oldBranch -ceq $Branch){
   try{
-   $good=Live
+   $good=Live $OriginalRunner
    Protect
    Write-Host 'FUN_MATH_V2_DASHBOARD=PASS ADOPTED_EXISTING_8802'
    Write-Host ('FUN_MATH_V2_DRAWS='+$good.draws)
