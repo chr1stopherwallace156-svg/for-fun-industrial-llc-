@@ -92,3 +92,33 @@ Routes under the existing 8802 loopback listener:
 **Not connected for direct execution:** general ML training, OR-Tools/Optuna solves, FreeCAD/WireViz rendering, arbitrary file and PE analysis, financial transfers, external submissions, Shopify writes, or the remaining REA tools. They require tool-specific schema verification, target review, per-effect permissions, and operator approval. Merely listing them in the 12-domain capability inventory is not evidence that Qwen can operate them.
 
 Deployment remains operator-initiated via `Activate-Fun-FISRE-Live-V4.ps1`, and checks the presence of this review panel and the `fun-ai-reviewed-rea-dispatch-v1` route before changing the active dashboard. The success marker includes `FUN_REA_DISPATCH=EXACT_READONLY_PREPARE_CONFIRM_SEPARATE_CLICKS`.
+
+## Qwen chat ML and optimization — reviewed V1 compute layer
+
+The existing **Local AI Chat** on 8802 now contains **ML & optimization · one AI, reviewed execution**, integrated with the existing Qwen 8088 model. This is **one existing AI model**, not a separate AI, machine or dashboard. The two mathematical solvers are ordinary Python libraries running on the same Windows PC; they do not change Qwen weights.
+
+The reviewed dispatcher offers **five fixed modes**:
+
+1. `optuna_inventory` — Optuna TPE inventory stock-level search. Dataset 1–50 periods, bounded stock 0–1000, 12–64 sequential trials. It additionally enumerates all allowed stock levels for exact discrete verification and reports whether Optuna found the optimum.
+2. `ortools_routing` — Google OR-Tools bounded single-vehicle routing across 3–12 nodes. One fixed vehicle starts and ends at node 0; search has a four-second time limit, and the result's route and cost are checked against the supplied matrix. It **does not** claim global optimality.
+3. `ml_deals` — already reviewed local scikit-learn bridge on 8801, exact `deals` records, no arbitrary Python code.
+4. `ml_history` — reviewed local scikit-learn training on 8801 using `history` records. **Training requires separate human confirmation**; this does not train Qwen or create new permissions.
+5. `ml_candidates` — existing scikit-learn bridge with bounded `candidates` records; availability and model prerequisites are checked by that backend.
+
+Each module is selected explicitly. The input editor is JSON, and its examples are **synthetic**, not real observations or business recommendations.
+
+**Review flow:** Enter or replace input data; click **Prepare reviewed job** to validate exact schema and freeze the reviewed payload with a SHA-256 digest and short-lived token (120 seconds); read the task, exact mode, data count, parameter bounds, and effects; separately click **Confirm exact computation**. Only then can the dispatcher call the fixed local ML backend or a fixed Optuna/OR-Tools Python worker. A new preparation invalidates the previous one; cancel removes the pending review. No Qwen text can invoke this call directly, and the backend has no raw command or arbitrary file argument. Every unverified or ambiguous outcome refuses automatic retry.
+
+After an approved, attested computation, **Ask Qwen to explain approved result** passes a bounded snapshot of the verified result (labeled *untrusted data*, not executable instructions) into the *same* local Qwen chat. It does not retrain Qwen, persist a new cognitive fact, install a model, transfer data over the internet, or spend money.
+
+The standard ML bridge uses existing 8801 without replacing that service. Optuna and OR-Tools are installed into **only** `%LOCALAPPDATA%\FunIndustrial\ApprovedOptimizationV1\.venv` by operator-invoked `Initialize-Fun-Optimization-V1.ps1`, which checks Python 3.12 and runs pip for bounded package-major versions, with wheels-only and no pip cache. This requires package-index internet access once. No package installation occurs just by opening chat, asking Qwen, or preparing a job. The isolated worker is launched once per approved computation, with a maximum 30-second window, one active action at a time, no user-code execution, and thread budgets (`OMP_NUM_THREADS=1`, etc.).
+
+Existing 8802-only endpoints:
+- `GET /api/fun/compute/status` — read-only approval and capability state; not a claim that 8801 or solver dependencies are live.
+- `POST /api/fun/compute/prepare`, `/confirm`, `/cancel` — same-origin separately clicked operator approvals.
+
+Deployment marker: `FUN_QWEN_ML_OPTIMIZATION=REVIEWED_5_MODES_SAME_8802`. This confirms the **dispatcher is registered in the current dashboard**, not that Optuna, OR-Tools or the upstream 8801 model has run successfully. A separate `FUN_REVIEWED_OPTIMIZATION_ENV=READY` marker confirms the two Python libraries were installed to the isolated environment. The optional older 8798 unified proxy may remain degraded independently.
+
+No changes are made to Elektron, existing FreeCAD project, Qwen weights, REA allowlists, main homepage, other listener processes, or network configuration.
+
+**Remaining non-autonomous domains:** FreeCAD/WireViz engineering actions, arbitrary security/PE tasks, Shopify writes, financial actions, bids, messages and the remaining REA tool catalogue. They require their own reviewed target-specific dispatch and authorization; being in the 12-domain registry alone is not executable authority.
