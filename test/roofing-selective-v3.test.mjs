@@ -36,6 +36,14 @@ test('UI defaults to filtered candidates and allows optional enrichment holds',a
  assert.match(js,/selection\.updated_utc/);
  assert.doesNotMatch(js,/setInterval|WebSocket|localStorage/);
 });
+test('PowerShell deployment never sends Python code to the Node syntax validator',async()=>{
+ const script=await readFile(new URL('../Activate-Fun-Roofing-Bulk-V2.ps1',import.meta.url),'utf8');
+ assert.match(script,/if\(\$file -like '\*\.mjs' -or \$file -like '\*\.js'\)/);
+ assert.match(script,/ast\.parse\(/);
+ assert.match(script,/ROOFING_PYTHON_SYNTAX_FAILED_NO_PORT_CHANGE/);
+ assert.ok(script.indexOf('ROOFING_PYTHON_SYNTAX_FAILED_NO_PORT_CHANGE')<
+   script.indexOf('$PreviousProcess=Owner'));
+});
 test('invalid filter inputs fail closed without a database lookup',async()=>{
  await assert.rejects(()=>bulkMarkets({county:'not a county'}),/ROOF_BULK_FILTER_SCHEMA/);
  await assert.rejects(()=>bulkMarkets({city:'<script>'}),/ROOF_BULK_FILTER_SCHEMA/);
