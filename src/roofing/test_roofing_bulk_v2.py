@@ -150,14 +150,10 @@ class RoofingBulkTests(unittest.TestCase):
         ])
         with warnings.catch_warnings(record=True) as notices:
             warnings.simplefilter("always", ResourceWarning)
-            members=list(roof.input_members(Path(path)))
-            # Iterate the stream while it is still inside the source context.
-            # Exhausting the generator closes its scoped binary handle.
+            # Consume each stream before input_members exits its file context.
             rows=[]
-            for _, stream in members:
+            for _, stream in roof.input_members(Path(path)):
                 rows.extend(roof.csv_rows(stream))
-            del stream
-            del members
             gc.collect()
         self.assertEqual(rows,[{"address":"100 TEST ST","city":"LOS ANGELES"}])
         self.assertFalse([w for w in notices if issubclass(w.category,ResourceWarning)],
