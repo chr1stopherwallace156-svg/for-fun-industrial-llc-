@@ -44,6 +44,32 @@ test('PowerShell deployment never sends Python code to the Node syntax validator
  assert.ok(script.indexOf('ROOFING_PYTHON_SYNTAX_FAILED_NO_PORT_CHANGE')<
    script.indexOf('$PreviousProcess=Owner'));
 });
+test('Windows permit downloader requires real TLS chain and fixed official host',async()=>{
+ const code=await readFile(new URL('../Download-Fun-LACity-Permits-WindowsTLS-V1.ps1',import.meta.url),'utf8');
+ assert.match(code,/\[ValidateSet\('la_permits_pre2010','la_permits_2010_2019','la_permits_2020_present'\)\]/);
+ assert.match(code,/https:\/\/data\.lacity\.org\/api\/v3\/views\/pi9x-tg5x\/export\.csv/);
+ assert.match(code,/\$remote\.Scheme -cne 'https' -or \$remote\.Host -cne 'data\.lacity\.org'/);
+ assert.match(code,/\$handler\.AllowAutoRedirect=\$false/);
+ assert.match(code,/\$next\.Scheme -cne 'https' -or \$next\.Host -cne 'data\.lacity\.org'/);
+ assert.match(code,/HttpCompletionOption\]::ResponseHeadersRead/);
+ assert.match(code,/\$maxBytes=\[long\]\(8GB\)/);
+ assert.match(code,/\[IO\.File\]::Move\(\$tempPath,\$destination\)/);
+ assert.match(code,/\$sha\.TransformFinalBlock/);
+ assert.match(code,/FUN_LACITY_NATIVE_CERTIFICATE_VALIDATION=PASS/);
+ assert.doesNotMatch(code,/SkipCertificateCheck|ServerCertificateValidationCallback|CertificatePolicy|SslProtocols\]::None|ValidateServerCertificate\s*=|TrustAllCerts|CertificateValidation=\$false/i);
+});
+test('permit launcher performs certificate-verified download before local sync; source archives are reusable',async()=>{
+ const launcher=await readFile(new URL('../Start-Fun-Roofing-RealData-V3.ps1',import.meta.url),'utf8');
+ const downloader=await readFile(new URL('../Download-Fun-LACity-Permits-WindowsTLS-V1.ps1',import.meta.url),'utf8');
+ const activation=await readFile(new URL('../Activate-Fun-Roofing-Bulk-V2.ps1',import.meta.url),'utf8');
+ assert.match(launcher,/Download-Fun-LACity-Permits-WindowsTLS-V1\.ps1/);
+ assert.match(launcher,/FUN_LACITY_WINDOWS_CERT_VERIFIED_DOWNLOAD_FAILED_NO_IMPORT_STARTED/);
+ assert.ok(launcher.indexOf('FUN_LACITY_WINDOWS_TLS_DOWNLOAD=COMPLETED_IMPORT_STILL_PENDING')<
+   launcher.indexOf('$response=Invoke-RestMethod @params'));
+ assert.match(launcher,/FUN_REALDATA_REUSE_CACHED_ARCHIVE_BYTES/);
+ assert.match(downloader,/FUN_LACITY_CACHED_CSV_RETAINED_BYTES/);
+ assert.match(activation,/Download-Fun-LACity-Permits-WindowsTLS-V1\.ps1/);
+});
 test('invalid filter inputs fail closed without a database lookup',async()=>{
  await assert.rejects(()=>bulkMarkets({county:'not a county'}),/ROOF_BULK_FILTER_SCHEMA/);
  await assert.rejects(()=>bulkMarkets({city:'<script>'}),/ROOF_BULK_FILTER_SCHEMA/);
