@@ -135,11 +135,12 @@ async function renderParallelFormulas(){
    b.recent_roof_permit_activity_per_1000??'Not enough data',
    c.candidates_with_enough_age_similar_street_block_peers??'Unverified',
    c.candidates_with_two_or_more_recent_peer_roof_permits??'Unverified',
+   c.unique_street_blocks_with_two_or_more_age_matched_recent_peer_permits??'Unverified',
    c.peer_activity_relative_to_zip_reference_ratio==null?'Insufficient evidence':
     c.peer_activity_relative_to_zip_reference_ratio+'×'];
   const row=node('tr');for(const value of cells)row.append(node('td',value));body.append(row);
  }
- if(!body.childElementCount){const row=node('tr'),cell=node('td','No verified matches');cell.colSpan=11;row.append(cell);body.append(row)}
+ if(!body.childElementCount){const row=node('tr'),cell=node('td','No verified matches');cell.colSpan=12;row.append(cell);body.append(row)}
  const sampleBody=$('formula-samples');sampleBody.replaceChildren();
  for(const item of result.public_parcel_id_examples||[]){
   const row=node('tr');
@@ -151,6 +152,21 @@ async function renderParallelFormulas(){
   sampleBody.append(row);
  }
  if(!sampleBody.childElementCount){const tr=node('tr'),td=node('td','No older permit examples found in the selected markets');td.colSpan=6;tr.append(td);sampleBody.append(tr)}
+ const blockBody=$('unique-block-body');blockBody.replaceChildren();
+ for(const z of result.parameters?.zips||[]){
+  for(const block of (result.distinct_block_research_examples?.[z]||[]).slice(0,5)){
+   const row=node('tr');
+   for(const value of [block.zip,block.street_number_block,
+       block.distinct_selected_old_parcels_in_block,
+       block.distinct_recent_exact_apn_permit_parcels_in_block,
+       block.subjects_with_two_or_more_recent_peer_permits,
+       block.construction_year_min+'–'+block.construction_year_max]){
+    row.append(node('td',value));
+   }
+   blockBody.append(row);
+  }
+ }
+ if(!blockBody.childElementCount){const row=node('tr'),cell=node('td','No distinct qualifying blocks for the chosen filters');cell.colSpan=6;row.append(cell);blockBody.append(row)}
  const neighborhoodBody=$('neighbor-example-body');neighborhoodBody.replaceChildren();
  for(const item of (result.neighborhood_research_examples||[]).slice(0,25)){
   const row=node('tr');
