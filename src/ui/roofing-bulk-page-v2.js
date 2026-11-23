@@ -109,7 +109,7 @@ async function renderParallelFormulas(){
  if(!/^\d{5}(,\d{5}){0,9}$/.test(zips)||
     new Set(zips.split(',')).size!==zips.split(',').length||
     !Number.isInteger(years)||years<10||years>50||
-    !Number.isInteger(recentYears)||recentYears<1||recentYears>=years||
+    !Number.isInteger(recentYears)||recentYears<1||recentYears>10||recentYears>=years||
     !Number.isInteger(minBuildingAge)||minBuildingAge<20||minBuildingAge>100||
     !['roof_related','replacement_like'].includes(permitKind)){
    display('formula-note','Invalid filters. Use 1–10 distinct five-digit ZIP codes, a 10–50 year interval, a shorter recent window and permitted description types.');
