@@ -16,6 +16,8 @@ import {MATH_HTML} from '../src/ui/math-research-v2.mjs';
 import {mathSnapshot,mathEvidence} from '../src/math/math-report-bridge-v2.mjs';
 import {researchV3Snapshot,researchV3Evidence as researchV3EvidenceAdapter,researchV3Candidates} from '../src/math/math-report-bridge-v3.mjs';
 import {MATH_V3_HTML} from '../src/ui/math-v3-page.mjs';
+import {PREVIEW_HTML,PREVIEW_VERSION} from '../src/ui/organized-preview-v1.mjs';
+import {previewQwenHealth} from '../src/ui/organized-preview-health-v1.mjs';
 import {createFisreChatEvidence} from '../src/semantic/fisre-chat-evidence-v4.mjs';
 import {capabilityInventory} from '../src/intelligence/capability-fabric-v1.mjs';
 import {createReviewedDispatch} from '../src/intelligence/operator-reviewed-dispatch-v1.mjs';
@@ -55,6 +57,8 @@ const ONEPORT_CLIENT=new URL('../src/ui/oneport-dashboard-v1.js',import.meta.url
 const FISRE_CLIENT=new URL('../src/ui/fisre-workspace-v4.js',import.meta.url);
 const MATH_CLIENT=new URL('../src/ui/math-research-v2.js',import.meta.url);
 const MATH_V3_CLIENT=new URL('../src/ui/math-v3-page.js',import.meta.url);
+const PREVIEW_CSS=new URL('../src/ui/organized-preview-v1.css',import.meta.url);
+const PREVIEW_CLIENT=new URL('../src/ui/organized-preview-v1.js',import.meta.url);
 const ONEPORT_TILT=new URL('../src/ui/vendor/vanilla-tilt-1.8.1.js',import.meta.url);
 const ONEPORT_EMBED=new URL('../src/ui/oneport-embedded-v1.css',import.meta.url);
 const ONEPORT_EMBED_CLIENT=new URL('../src/ui/oneport-embedded-operations-v1.js',import.meta.url);
@@ -265,6 +269,20 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         return send(res,400,{error:'ML_HUB_REQUEST_TARGET_INVALID'});
       const u=new URL(req.url,ORIGIN);
       if(u.search.length>2048||u.pathname.includes('..'))return send(res,400,{error:'ML_HUB_INVALID_PATH'});
+      // Opt-in organized interface preview. Production homepage and routes remain unchanged.
+      if(req.method==='GET'&&u.pathname==='/ui-preview/'){
+        const csp="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src 'self'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'";
+        return send(res,200,PREVIEW_HTML,'text/html; charset=utf-8',
+          {'content-security-policy':csp,'x-fi-preview-version':PREVIEW_VERSION});
+      }
+      if(req.method==='GET'&&u.pathname==='/api/fun/ui-preview/app.css')
+        return send(res,200,await readFile(PREVIEW_CSS,'utf8'),'text/css; charset=utf-8');
+      if(req.method==='GET'&&u.pathname==='/api/fun/ui-preview/app.js')
+        return send(res,200,await readFile(PREVIEW_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      if(req.method==='GET'&&u.pathname==='/api/fun/ui-preview/health')
+        return send(res,200,await previewQwenHealth());
+      if(u.pathname==='/ui-preview/'||u.pathname.startsWith('/api/fun/ui-preview/'))
+        return send(res,404,{error:'FUN_UI_PREVIEW_ROUTE_READONLY'});
       if(req.method==='GET'&&(u.pathname==='/'||u.pathname==='/dashboard/')){
         const csp="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src 'self'; img-src 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; form-action 'none'";
         return send(res,200,DASHBOARD_HTML,'text/html; charset=utf-8',
