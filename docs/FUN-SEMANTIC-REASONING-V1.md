@@ -26,10 +26,10 @@ Run in a *separate checkout* of this feature branch; do not use the live Fun Ind
 
 ```powershell
 python -m unittest discover -s intelligence-checks -p test_fisre_v1.py -v
-python src/semantic/fisre_v1.py intelligence-checks/fixtures/fisre_example.py --root . --probe calculate_price --inputs '{"cost":"100","margin":"0.25"}'
+python src/semantic/fisre_v1.py intelligence-checks/fixtures/fisre_example.py --root . --probe calculate_price --var cost=100 --var margin=0.25
 ```
 
-Expected tests: 14 PASS. Expected probe: `result_rational = 400/3`, `inspected_code_executed = false`, with a candidate divide-by-zero hazard on `1 - margin`. Setting `margin` to `1` returns `FISRE_HOLD_DIVISION_BY_ZERO` instead of running the function.
+Expected tests: 17 PASS (including Windows-shell-safe numeric inputs). Expected probe: `result_rational = 400/3`, `inspected_code_executed = false`, with a candidate divide-by-zero hazard on `1 - margin`. Setting `margin` to `1` returns `FISRE_HOLD_DIVISION_BY_ZERO` instead of running the function. Use repeatable `--var name=number` flags on Windows PowerShell to avoid JSON argument quoting; the optional `--inputs` JSON mode is retained for other callers but cannot be combined with `--var`.
 
 For a **reviewed** Python source file under an explicitly selected `--root`:
 
