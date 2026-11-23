@@ -19,6 +19,9 @@ export const SOURCE_DIRECTORY=[
  {name:'Los Angeles County — unincorporated',id:'la_county_epicla',status:'PORTAL_NOT_CONNECTED',coverage:'Unknown',url:'https://epicla.lacounty.gov/'},
  {name:'San Bernardino County — unincorporated',id:'sb_county_ezpermits',status:'PORTAL_NOT_CONNECTED',coverage:'Unknown',url:'https://ezpermits.sbcounty.gov/SBC/Default.aspx'},
  {name:'Victorville — monthly issued CSV',id:'victorville_monthly',status:'CSV_IMPORT_SUPPORTED',coverage:'Depends on files supplied',url:'https://www.victorvilleca.gov/Government/City-Departments/Building/Building-Monthly-Issued-Permit-Reports'},
+ {name:'LA County Assessor — parcel roll & year built',id:'la_assessor_roll',status:'BULK_DATA_AVAILABLE_MANUAL_PREPARATION_REQUIRED',coverage:'2021–2025 roll; not roof history',url:'https://www.arcgis.com/home/item.html?id=70d93266f45a4080a97b285a471493cd'},
+ {name:'San Bernardino County — assessor parcel data',id:'sb_assessor_roll',status:'PUBLIC_LOOKUP_USAGE_AND_ACCESS_REVIEW_REQUIRED',coverage:'Varies by parcel',url:'https://arc.sbcounty.gov/property-information/'},
+ {name:'Data.gov — LA City issued permits catalog',id:'data_gov_catalog',status:'DISCOVERY_ONLY_NOT_ADDITIONAL_DATA',coverage:'LA City 2010–2019',url:'https://catalog.data.gov/dataset/building-and-safety-building-permits-issued-between-2010-and-2019-n'},
  {name:'Other incorporated cities',id:'other_city_permits',status:'MUNICIPAL_FEED_REQUIRED',coverage:'Unknown',url:null}
 ];
 const NWS_PLACES=[
