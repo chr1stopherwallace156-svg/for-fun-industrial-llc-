@@ -168,20 +168,56 @@ def input_members(path):
     else:
         raise ValueError("SUPPORTED_INPUT_IS_CSV_OR_ZIP_CONTAINING_CSV")
 
+# Preserve just the small, auditable set of public fields used for research.
+# Large county exports can have hundreds of irrelevant or repeated headers.
+REQUIRED_CSV_FIELDS = frozenset(
+    ADDRESS_FIELDS + APN_FIELDS + YEAR_FIELDS + ZIP_FIELDS + CITY_FIELDS +
+    USE_FIELDS + DATE_FIELDS + DESC_FIELDS + PERMIT_FIELDS +
+    ("roll_year", "tax_year", "rollyear")
+)
+
 def csv_rows(binary):
-    # TextIOWrapper owns the binary stream; a scoped context ensures Windows
-    # releases each CSV even if parsing throws or iteration is interrupted.
+    """Project relevant columns from very wide CSVs in bounded memory.
+
+    Duplicate irrelevant headers are ignored. Two relevant columns with the
+    same normalized header must agree (or be empty) on *every* row; otherwise
+    reject the source rather than invent a property location, age, or permit.
+    """
+    # TextIOWrapper owns the binary stream; scoped context also avoids Windows
+    # file locks during test cleanup, including on exceptions.
     with io.TextIOWrapper(binary, encoding="utf-8-sig", errors="replace", newline="") as text:
-        reader = csv.DictReader(text)
-        if reader.fieldnames is None:
+        reader = csv.reader(text)
+        raw_headers = next(reader, None)
+        if not raw_headers:
             raise ValueError("CSV_HEADER_MISSING")
-        names = [header(n) for n in reader.fieldnames]
-        if len(names) != len(set(names)) or len(names) > 150:
-            raise ValueError("CSV_HEADERS_DUPLICATE_OR_TOO_MANY")
-        for raw in reader:
-            if None in raw:
-                raise ValueError("CSV_ROW_TOO_MANY_COLUMNS")
-            yield {header(k): v for k, v in raw.items()}
+        if len(raw_headers) > 2048:
+            raise ValueError("CSV_HEADER_ABOVE_SAFE_COLUMN_LIMIT")
+        positions = {}
+        for index, original in enumerate(raw_headers):
+            normalized = header(original)
+            if normalized in REQUIRED_CSV_FIELDS:
+                positions.setdefault(normalized, []).append(index)
+        if not positions:
+            raise ValueError("CSV_NO_SUPPORTED_PROPERTY_OR_PERMIT_COLUMNS")
+        width = len(raw_headers)
+        for line_number, cells in enumerate(reader, 2):
+            if len(cells) > width:
+                raise ValueError("CSV_ROW_EXCEEDS_HEADER_COLUMNS_AT_LINE_" + str(line_number))
+            # Some legitimate CSV exporters omit empty *trailing* columns.
+            if len(cells) < width:
+                cells.extend([""] * (width - len(cells)))
+            projected = {}
+            for name, indices in positions.items():
+                chosen = ""
+                for index in indices:
+                    value = cells[index].strip()
+                    if not value:
+                        continue
+                    if chosen and value != chosen:
+                        raise ValueError("CSV_CRITICAL_DUPLICATE_CONFLICT_" + name)
+                    chosen = value
+                projected[name] = chosen
+            yield projected
 
 def parse_property(row, county, source_id, fallback_roll):
     address, city, zipcode = parse_site(field(row, ADDRESS_FIELDS), row)
