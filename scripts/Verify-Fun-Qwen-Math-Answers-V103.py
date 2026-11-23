@@ -128,6 +128,8 @@ def audit_saved_baseline():
     if len(originals)!=CASE_COUNT:
         raise RuntimeError("V103_CASE_COUNT_UNEXPECTED")
     rows=[]
+    model_decision_correct=0
+    model_proof_correct=0
     protected_hashes=evidence["source"]["source_hashes"]
     for record in originals:
         c=cases[record["id"]]
@@ -135,6 +137,9 @@ def audit_saved_baseline():
         if errors!=c["errors"] or {int(k):int(v) for k,v in record["errors"].items()}!=errors:
             raise RuntimeError("V103_QUESTION_RECORD_VALUE_CONFLICT")
         answer=verify_response(errors,record["generated_text"])
+        independent_grade=v102.grade(c,record["generated_text"])
+        model_decision_correct+=bool(independent_grade["all_decision_fields_correct"])
+        model_proof_correct+=bool(independent_grade["all_proof_fields_correct"])
         # Cross-check the rebuilt oracle against the corrected V10
         # reference, never against the prior Qwen answer itself.
         if answer["verified_answer"]!=c["reference_answer"]:
@@ -170,8 +175,8 @@ def audit_saved_baseline():
         "state":"V103_READONLY_DETERMINISTIC_PROOF_VERIFICATION_COMPLETE",
         "source_v101_report_sha256":evidence["sha256"],
         "cases":len(rows),
-        "model_original_decision_correct":14,
-        "model_original_complete_proof_correct":CASE_COUNT-rebuilt,
+        "model_original_decision_correct":model_decision_correct,
+        "model_original_complete_proof_correct":model_proof_correct,
         "model_outputs_requiring_correction":rebuilt,
         "verified_reconstructed_answers_exact":sum(
             v10.grade_output(cases[x["id"]]["errors"],x["verified_answer"])["exact_answer"]
