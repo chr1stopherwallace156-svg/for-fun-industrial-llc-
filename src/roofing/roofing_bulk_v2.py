@@ -25,9 +25,9 @@ VERSION = "fun-roofing-bulk-v2"
 DEFAULT_ROOT = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "FunIndustrial" / "RoofingBulkV2"
 SOURCES = {
     "la_assessor_2021_2025": ("https://apps.gis.lacounty.gov/static/hub/Assessor/Assessor_Parcel_Roll_2021_2025.zip", "la_properties"),
-    "la_permits_pre2010": ("https://data.lacity.org/api/views/e67z-kt2n/rows.csv?accessType=DOWNLOAD", "la_permits"),
-    "la_permits_2010_2019": ("https://data.lacity.org/api/views/dyxf-7hc4/rows.csv?accessType=DOWNLOAD", "la_permits"),
-    "la_permits_2020_present": ("https://data.lacity.org/api/views/pi9x-tg5x/rows.csv?accessType=DOWNLOAD", "la_permits"),
+    "la_permits_pre2010": ("https://data.lacity.org/api/v3/views/e67z-kt2n/export.csv", "la_permits"),
+    "la_permits_2010_2019": ("https://data.lacity.org/api/v3/views/dyxf-7hc4/export.csv", "la_permits"),
+    "la_permits_2020_present": ("https://data.lacity.org/api/v3/views/pi9x-tg5x/export.csv", "la_permits"),
     "sb_assessor_characteristics": ("https://arc.sbcounty.gov/wp-content/uploads/sites/70/arcforms/PIMSPropertyCharacteristics_20260617_7928_205.zip", "sb_properties"),
 }
 ROOF = re.compile(r"\b(?:REROOF(?:ING)?|RE[\s-]ROOF(?:ING)?|ROOF(?:ING)?|SHINGLE|SHINGLES)\b", re.I)
