@@ -149,7 +149,7 @@ class FisreTests(unittest.TestCase):
         for flags, expected in [
             (['--var', 'cost=100', '--var', 'cost=200'], 'PROBE_VAR_NAME_OR_DUPLICATE'),
             (['--inputs', '{}', '--var', 'cost=100'], 'PROBE_INPUT_MODES_MUTUALLY_EXCLUSIVE'),
-            (['--var', 'bad=1;echo'], 'NUMERIC_INPUT_INVALID'),
+            (['--var', 'cost=100', '--var', 'margin=1;echo'], 'NUMERIC_INPUT_INVALID'),
         ]:
             stdout = io.StringIO()
             stderr = io.StringIO()
