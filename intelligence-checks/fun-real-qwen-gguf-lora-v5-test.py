@@ -115,6 +115,16 @@ class TestV5(unittest.TestCase):
         self.assertIn('Microsoft.VisualStudio.Component.VC.Tools.x86.x64', src)
         self.assertIn('MSVC_2022_CPP_WORKLOAD_NOT_INSTALLED', src)
 
+    def test_launcher_does_not_require_live_inference_server(self):
+        launcher = (ROOT / "Train-Fun-Qwen-Fibonacci-GGUF-Native-V5.ps1").read_text("utf-8")
+        self.assertIn("ALREADY_NOT_LISTENING_LEFT_UNTOUCHED", launcher)
+        self.assertIn("QWEN_8088_MULTIPLE_OWNER_PROCESSES_REFUSED", launcher)
+        self.assertIn("Sort-Object -Unique", launcher)
+        self.assertIn("PROTECTED_LIVE_LISTENER_CHANGED_", launcher)
+        self.assertNotIn("QWEN_8088_NOT_UNIQUELY_LIVE", launcher)
+        self.assertNotIn("Start-Process", launcher)
+        self.assertNotIn("Stop-Process", launcher)
+
     def test_actual_training_requires_explicit_consent(self):
         self.assertEqual(train.CONSENT,"I_APPROVE_ISOLATED_REAL_QWEN_LORA_TRAINING")
         self.assertIn("GGUF",train.VERSION.upper())
