@@ -20,6 +20,8 @@ import {PREVIEW_HTML,PREVIEW_VERSION} from '../src/ui/organized-preview-v1.mjs';
 import {previewQwenHealth} from '../src/ui/organized-preview-health-v1.mjs';
 import {ROOF_UI_HTML} from '../src/ui/roofing-opportunity-v1.mjs';
 import {roofingSnapshot,roofingLeads,importRoofData,refreshLaCity,refreshNws} from '../src/roofing/roofing-intelligence-v1.mjs';
+import {ROOF_BULK_PAGE} from '../src/ui/roofing-bulk-page-v2.mjs';
+import {BULK_VERSION,bulkOverview,bulkMarkets,startBulkSync} from '../src/roofing/roofing-bulk-bridge-v2.mjs';
 import {createFisreChatEvidence} from '../src/semantic/fisre-chat-evidence-v4.mjs';
 import {capabilityInventory} from '../src/intelligence/capability-fabric-v1.mjs';
 import {createReviewedDispatch} from '../src/intelligence/operator-reviewed-dispatch-v1.mjs';
@@ -63,6 +65,8 @@ const PREVIEW_CSS=new URL('../src/ui/organized-preview-v1.css',import.meta.url);
 const PREVIEW_CLIENT=new URL('../src/ui/organized-preview-v1.js',import.meta.url);
 const ROOF_CSS=new URL('../src/ui/roofing-opportunity-v1.css',import.meta.url);
 const ROOF_CLIENT=new URL('../src/ui/roofing-opportunity-v1.js',import.meta.url);
+const ROOF_BULK_CSS=new URL('../src/ui/roofing-bulk-page-v2.css',import.meta.url);
+const ROOF_BULK_CLIENT=new URL('../src/ui/roofing-bulk-page-v2.js',import.meta.url);
 const ONEPORT_TILT=new URL('../src/ui/vendor/vanilla-tilt-1.8.1.js',import.meta.url);
 const ONEPORT_EMBED=new URL('../src/ui/oneport-embedded-v1.css',import.meta.url);
 const ONEPORT_EMBED_CLIENT=new URL('../src/ui/oneport-embedded-operations-v1.js',import.meta.url);
@@ -286,6 +290,46 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         return send(res,400,{error:'ML_HUB_REQUEST_TARGET_INVALID'});
       const u=new URL(req.url,ORIGIN);
       if(u.search.length>2048||u.pathname.includes('..'))return send(res,400,{error:'ML_HUB_INVALID_PATH'});
+      // Full-sized LA/SB parcel and permit warehouse, separate from the V1 preview.
+      if(req.method==='GET'&&u.pathname==='/roofing/bulk/'){
+        const csp="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src 'none'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'none'";
+        return send(res,200,ROOF_BULK_PAGE,'text/html; charset=utf-8',
+          {'content-security-policy':csp,'x-fi-roofing-version':BULK_VERSION});
+      }
+      if(req.method==='GET'&&u.pathname==='/api/fun/roofing/bulk/style.css')
+        return send(res,200,await readFile(ROOF_BULK_CSS,'utf8'),'text/css; charset=utf-8');
+      if(req.method==='GET'&&u.pathname==='/api/fun/roofing/bulk/client.js')
+        return send(res,200,await readFile(ROOF_BULK_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      if(req.method==='GET'&&u.pathname==='/api/fun/roofing/bulk/status')
+        return send(res,200,await bulkOverview());
+      if(req.method==='GET'&&['/api/fun/roofing/bulk/markets','/api/fun/roofing/bulk/candidates'].includes(u.pathname)){
+        const area=u.searchParams.get('county')||'all';
+        const city=u.searchParams.get('city')||'';
+        const minAge=Number(u.searchParams.get('minAge')||20);
+        const onlyNoPermit=u.searchParams.get('onlyNoPermit')==='true';
+        const includeUnclassified=u.searchParams.get('includeUnclassified')!=='false';
+        if(u.searchParams.size>6||!['all','Los Angeles','San Bernardino'].includes(area)||
+          !Number.isSafeInteger(minAge)||minAge<0||minAge>120||city.length>70||
+          !/^[a-zA-Z0-9 '\-]*$/.test(city)||
+          !['',null,'true','false'].includes(u.searchParams.get('onlyNoPermit'))||
+          !['',null,'true','false'].includes(u.searchParams.get('includeUnclassified')))
+          return send(res,422,{error:'ROOF_BULK_FILTER_VALIDATION_HOLD'});
+        return send(res,200,await bulkMarkets({county:area,city,minAge,onlyNoPermit,
+          includeUnclassified,detail:u.pathname.endsWith('/candidates')}));
+      }
+      if(req.method==='POST'&&u.pathname==='/api/fun/roofing/bulk/sync'){
+        if(!acceptedActionOrigin(req)||req.headers['x-fi-roofing-bulk-click']!=='operator-sync-full-export'||
+          (req.headers['sec-fetch-site']&&!['same-origin','none'].includes(req.headers['sec-fetch-site'])))
+          return send(res,403,{error:'ROOF_BULK_OPERATOR_CLICK_REQUIRED'});
+        if(req.headers['content-type']!=='application/json')
+          return send(res,415,{error:'ROOF_BULK_JSON_REQUIRED'});
+        const body=await roofingBody(req,256);
+        if(Object.keys(body).length!==1||typeof body.source!=='string')
+          return send(res,422,{error:'ROOF_BULK_SOURCE_ID_ONLY'});
+        return send(res,202,startBulkSync(body.source));
+      }
+      if(u.pathname==='/roofing/bulk/'||u.pathname.startsWith('/api/fun/roofing/bulk/'))
+        return send(res,404,{error:'ROOF_BULK_READONLY_OR_OPERATOR_SYNC_ONLY'});
       // Property-opportunity research; operator-only refresh and explicit CSV import.
       // No Qwen, REA, external messaging, bid submissions, or model actions.
       if(req.method==='GET'&&u.pathname==='/roofing/'){
