@@ -6,7 +6,7 @@ function node(tag,value,cls){const e=document.createElement(tag);if(value!==unde
 function display(id,v){const e=$(id);if(e)e.textContent=String(v)}
 function count(n){return Number.isSafeInteger(n)?n.toLocaleString():'—'}
 async function request(path,init={}){
- const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),22000);
+ const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),path.startsWith('/api/fun/roofing/bulk/formulas')?95000:22000);
  try{const res=await fetch(path,{credentials:'same-origin',cache:'no-store',
    headers:{accept:'application/json',...init.headers},...init,signal:ctrl.signal});
   const d=await res.json();
@@ -100,6 +100,52 @@ async function renderMarkets(detail=false){
  display('market-note',items.length+' '+(detail?'property':'market')+
   ' rows shown from the filtered local index. Actual roof condition and complete permit history remain unverified.');
 }
+async function renderParallelFormulas(){
+ const zips=$('formula-zips').value.trim();
+ const years=Number($('formula-years').value);
+ const recentYears=Number($('formula-recent').value);
+ const minBuildingAge=Number($('formula-age').value);
+ const permitKind=$('formula-kind').value;
+ if(!/^\d{5}(,\d{5}){0,9}$/.test(zips)||
+    new Set(zips.split(',')).size!==zips.split(',').length||
+    !Number.isInteger(years)||years<10||years>50||
+    !Number.isInteger(recentYears)||recentYears<1||recentYears>=years||
+    !Number.isInteger(minBuildingAge)||minBuildingAge<20||minBuildingAge>100||
+    !['roof_related','replacement_like'].includes(permitKind)){
+   display('formula-note','Invalid filters. Use 1–10 distinct five-digit ZIP codes, a 10–50 year interval, a shorter recent window and permitted description types.');
+   return;
+ }
+ display('formula-note','Calculating both independent methods on local indexed assessor and permit records…');
+ const query=new URLSearchParams({zips,years:String(years),recentYears:String(recentYears),
+   minBuildingAge:String(minBuildingAge),permitKind});
+ const result=await request('/api/fun/roofing/bulk/formulas?'+query.toString());
+ const body=$('formula-body');body.replaceChildren();
+ for(const market of result.markets||[]){
+  const a=market.formula_a_existing,b=market.formula_b_permit_cycle;
+  const cells=[market.zip,a.selected_older_residential_properties,
+   a.mean_review_priority??'Unavailable',b.exact_apn_match_properties,
+   b.last_roof_permit_at_least_x_years_ago,b.recent_permit_properties,
+   b.recent_repeat_with_gap_at_least_x_years,
+   b.recent_roof_permit_activity_per_1000??'Not enough data'];
+  const row=node('tr');for(const value of cells)row.append(node('td',value));body.append(row);
+ }
+ if(!body.childElementCount){const row=node('tr'),cell=node('td','No verified matches');cell.colSpan=8;row.append(cell);body.append(row)}
+ const sampleBody=$('formula-samples');sampleBody.replaceChildren();
+ for(const item of result.public_parcel_id_examples||[]){
+  const row=node('tr');
+  for(const value of [item.zip,item.apn,item.last_roof_related_permit,
+       item.years_since_last_recorded_permit,
+       item.recent_long_gap_repeat_observed?'Yes — permit records only':'No']){
+    row.append(node('td',value));
+  }
+  sampleBody.append(row);
+ }
+ if(!sampleBody.childElementCount){const tr=node('tr'),td=node('td','No older permit examples found in the selected markets');td.colSpan=5;tr.append(td);sampleBody.append(tr)}
+ display('formula-note','Both mathematical methods calculated from four imported official sources. '
+  +'Formula A is unchanged; Formula B uses exact parcel ID matches for a '+years
+  +'-year historical interval and '+recentYears
+  +'-year recent window. Roof age, replacement and permit completeness remain unverified.');
+}
 async function execute(button,callback){
  if(busy)return;busy=true;const all=[...document.querySelectorAll('button')];
  for(const b of all)b.disabled=true;
@@ -128,6 +174,10 @@ async function sync(source){
  });
 }
 $('load-markets').addEventListener('click',e=>execute(e.currentTarget,()=>renderMarkets(false)));
+$('run-dual-formulas').addEventListener('click',e=>execute(e.currentTarget,
+ async()=>{try{await renderParallelFormulas()}catch(error){
+   display('formula-note','Formula comparison held: '+String(error.message||error).slice(0,230));
+ }}));
 $('load-parcels').addEventListener('click',e=>execute(e.currentTarget,()=>renderMarkets(true)));
 $('refresh-sources').addEventListener('click',e=>execute(e.currentTarget,()=>showOverview()));
 showOverview().then(()=>renderMarkets(false)).catch(e=>
