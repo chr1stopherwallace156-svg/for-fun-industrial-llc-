@@ -261,8 +261,8 @@ export async function refreshLaCity({root=ROOT,fetchImpl=fetch}={}){
  },root);
 }
 export async function refreshNws({root=ROOT,fetchImpl=fetch}={}){
- const forecast=[];
- for(const place of NWS_PLACES){
+ // Five independent, small NWS requests in parallel; avoids slow serial HTTP reads.
+ const forecast=await Promise.all(NWS_PLACES.map(async place=>{
   const point=await boundedFetch('https://api.weather.gov/points/'+place.lat+','+place.lon,
     {fetchImpl,limit:75000,timeout:8000,headers:{accept:'application/geo+json'}});
   const next=point?.properties?.forecast;
@@ -273,14 +273,14 @@ export async function refreshNws({root=ROOT,fetchImpl=fetch}={}){
     headers:{accept:'application/geo+json'}});
   const periods=w?.properties?.periods;
   if(!Array.isArray(periods)||periods.length<1)throw Error('NWS_FORECAST_INVALID');
-  forecast.push({place:place.name,county:place.county,issued:limitText(w.properties?.updateTime,80),
+  return {place:place.name,county:place.county,issued:limitText(w.properties?.updateTime,80),
     source:'https://api.weather.gov/',periods:periods.slice(0,14).map(p=>({
       name:limitText(p.name,60),start:limitText(p.startTime,40),
       precipitationProbability:Number.isFinite(p.probabilityOfPrecipitation?.value)?
         p.probabilityOfPrecipitation.value:null,
       summary:limitText(p.shortForecast,95)
-    }))});
- }
+    }))};
+ }));
  return transact(async(state,dir)=>{
   state.weather=forecast;
   state.sourceRuns.nws={source:'US_NATIONAL_WEATHER_SERVICE',last:new Date().toISOString(),
