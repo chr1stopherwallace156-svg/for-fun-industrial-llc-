@@ -29,6 +29,7 @@ SOURCES = {
     "la_permits_2010_2019": ("https://data.lacity.org/api/v3/views/dyxf-7hc4/export.csv", "la_permits"),
     "la_permits_2020_present": ("https://data.lacity.org/api/v3/views/pi9x-tg5x/export.csv", "la_permits"),
     "sb_assessor_characteristics": ("https://arc.sbcounty.gov/wp-content/uploads/sites/70/arcforms/PIMSPropertyCharacteristics_20260617_7928_205.zip", "sb_properties"),
+    "sb_arcgis_parcels": ("https://services.arcgis.com/aA3snZwJfFkVyDuP/arcgis/rest/services/Parcels_for_San_Bernardino_County/FeatureServer/0/query", "sb_properties"),
 }
 ROOF = re.compile(r"\b(?:REROOF(?:ING)?|RE[\s-]ROOF(?:ING)?|ROOF(?:ING)?|SHINGLE|SHINGLES)\b", re.I)
 REPLACED = re.compile(r"\b(?:REROOF(?:ING)?|RE[\s-]ROOF(?:ING)?|ROOF\s*(?:REPLACEMENT|REPLACE)|REPLACE\s*(?:THE\s*)?ROOF)\b", re.I)
@@ -428,12 +429,112 @@ def download(args):
     finally:
         if tmp.exists():tmp.unlink()
 
+def parse_arcgis_sb_feature(feature):
+    """Known public parcel attributes only; never fetch or store the OwnerName field."""
+    a = feature.get("attributes", {}) if isinstance(feature, dict) else {}
+    if not isinstance(a, dict):return None
+    apn = norm(a.get("ParcelNumber")).replace(" ", "")
+    if not apn:return None
+    city = clean(a.get("Jurisdiction"), 90)
+    classification = clean(a.get("AssessClass") or a.get("AssessDescription"), 75)
+    residential = 1 if RESIDENTIAL.search(classification) else 0
+    return ("San Bernardino", apn, city, "", "", "", None, residential,
+            classification, dt.date.today().year, "sb_arcgis_parcels")
+
+def fetch_sb_arcgis_page(query, *, timeout=40):
+    """Fixed official origin, bounded JSON response and no follow-to-unknown-host redirect."""
+    from urllib.parse import urlencode
+    endpoint = SOURCES["sb_arcgis_parcels"][0]
+    if set(query) - {"where", "returnCountOnly", "outFields", "returnGeometry", "resultOffset",
+                     "resultRecordCount", "orderByFields", "f"}:
+        raise ValueError("SB_ARCGIS_QUERY_FIELDS_INVALID")
+    url = endpoint+"?"+urlencode(query)
+    req = urllib.request.Request(url, headers={"Accept":"application/json",
+        "User-Agent":"FunIndustrialRoofingBulkV2 (public parcel research)"})
+    opener = urllib.request.build_opener(FixedOriginRedirect())
+    with opener.open(req,timeout=timeout) as response:
+        if response.status!=200:raise ValueError("SB_ARCGIS_HTTP_"+str(response.status))
+        raw = response.read(4*1024*1024+1)
+        if len(raw)>4*1024*1024:raise ValueError("SB_ARCGIS_PAGE_OVERSIZE")
+    obj=json.loads(raw)
+    if not isinstance(obj,dict) or "error" in obj:
+        raise ValueError("SB_ARCGIS_RESPONSE_ERROR")
+    return obj
+
+def sync_sb_arcgis(args):
+    """Walk the full public parcel layer, not the first 1,000 results."""
+    source="sb_arcgis_parcels"
+    c=db_open(Path(args.db))
+    now=dt.datetime.now(dt.timezone.utc).isoformat()
+    c.execute("""INSERT INTO source_runs(source_id,kind,county,jurisdiction,state,updated)
+      VALUES(?,?,?,?,?,?) ON CONFLICT(source_id) DO UPDATE SET
+      state=excluded.state,updated=excluded.updated,ingested=0,skipped=0,coverage='NOT_VERIFIED'""",
+      (source,"sb_properties","San Bernardino","COUNTYWIDE",
+       "INGEST_IN_PROGRESS",now))
+    c.commit()
+    c.execute("DELETE FROM properties WHERE source_id=?",(source,))
+    c.commit()
+    fetched=accepted=skipped=0
+    try:
+        report=fetch_sb_arcgis_page({"where":"1=1","returnCountOnly":"true","f":"json"})
+        expected=int(report.get("count",0))
+        if expected<1 or expected>3000000:raise ValueError("SB_ARCGIS_COUNT_INVALID")
+        for page in range(args.max_pages):
+            offset=page*1000
+            if offset>=expected:break
+            obj=fetch_sb_arcgis_page({"where":"1=1","outFields":
+              "OBJECTID,ParcelNumber,Jurisdiction,Zoning,AssessClass,AssessDescription",
+              "returnGeometry":"false","resultOffset":str(offset),
+              "resultRecordCount":"1000","orderByFields":"OBJECTID","f":"json"})
+            features=obj.get("features")
+            if not isinstance(features,list) or not features:
+                raise ValueError("SB_ARCGIS_PAGINATION_MISSING_AT_OFFSET_"+str(offset))
+            for feature in features:
+                fetched+=1
+                row=parse_arcgis_sb_feature(feature)
+                if row:
+                    c.execute("""INSERT INTO properties VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                      ON CONFLICT(county,apn) DO UPDATE SET
+                      city=excluded.city,source_id=excluded.source_id,
+                      use_label=excluded.use_label,residential=excluded.residential,
+                      roll_year=excluded.roll_year
+                      WHERE properties.source_id=?""",row+(source,))
+                    accepted+=1
+                else:skipped+=1
+            c.commit()
+            if page%20==0:
+                c.execute("UPDATE source_runs SET ingested=?,skipped=?,updated=? WHERE source_id=?",
+                  (accepted,skipped,dt.datetime.now(dt.timezone.utc).isoformat(),source))
+                c.commit()
+            time.sleep(0.08)
+        if fetched!=expected:
+            raise ValueError("SB_ARCGIS_EXPECTED_"+str(expected)+"_RECEIVED_"+str(fetched))
+        c.execute("""UPDATE source_runs SET state='INGESTED_NOT_COMPLETENESS_VERIFIED',
+          ingested=?,skipped=?,updated=?,coverage='PUBLIC_PARCEL_LAYER_APN_NO_YEAR_BUILT_OR_ADDRESS'
+          WHERE source_id=?""",
+          (accepted,skipped,dt.datetime.now(dt.timezone.utc).isoformat(),source))
+        c.commit()
+    except Exception:
+        c.execute("UPDATE source_runs SET state='INCOMPLETE_IMPORT_HOLD',ingested=?,skipped=? WHERE source_id=?",
+          (accepted,skipped,source))
+        c.commit()
+        raise
+    finally:c.close()
+    emit({"version":VERSION,"source":source,"state":"INGESTED_NOT_COMPLETENESS_VERIFIED",
+      "total_features_reported":expected,"fetched":fetched,"accepted":accepted,"skipped":skipped,
+      "owner_names_collected":False,"street_addresses_available":False,
+      "year_built_available":False,"municipal_permit_coverage":False})
+    rebuild(SimpleNamespace(db=args.db))
+
 def sync(args):
     """Explicit operator sync: download one whole official file, ingest its rows, rebuild candidate indexes."""
     if args.source not in SOURCES:
         raise ValueError("SYNC_SOURCE_NOT_ALLOWLISTED")
     if args.source == "sb_assessor_characteristics":
         raise ValueError("SB_NP450_FIXED_WIDTH_PARSER_NOT_VERIFIED_USE_OFFICIAL_GOVPIMS_CSV_IMPORT")
+    if args.source == "sb_arcgis_parcels":
+        sync_sb_arcgis(args)
+        return
     from types import SimpleNamespace
     dl = SimpleNamespace(source=args.source, root=args.root, max_gb=args.max_gb, replace=args.replace)
     download(dl)
@@ -473,6 +574,7 @@ def main():
     i.add_argument("--county",default="");i.add_argument("--jurisdiction",default="");i.add_argument("--roll-year",type=int)
     y=sub.add_parser("sync");y.add_argument("source",choices=sorted(SOURCES));y.add_argument("--root",default=str(DEFAULT_ROOT))
     y.add_argument("--replace",action="store_true");y.add_argument("--max-gb",type=float,default=8)
+    y.add_argument("--max-pages",type=int,default=1600)
     b=sub.add_parser("rebuild");s=sub.add_parser("status");x=sub.add_parser("inspect");x.add_argument("--file",required=True)
     for name in ("markets","candidates"):
         q=sub.add_parser(name);q.add_argument("--county",default="all")
@@ -485,7 +587,8 @@ def main():
         download(args)
     elif args.cmd=="ingest":ingest(args)
     elif args.cmd=="sync":
-        if not 0.2<=args.max_gb<=32:raise ValueError("MAX_GB_INVALID")
+        if not 0.2<=args.max_gb<=32 or not 1<=args.max_pages<=5000:
+            raise ValueError("SYNC_LIMITS_INVALID")
         sync(args)
     elif args.cmd=="rebuild":rebuild(args)
     elif args.cmd=="status":status(args)
