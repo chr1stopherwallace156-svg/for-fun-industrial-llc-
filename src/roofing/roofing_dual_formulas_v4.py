@@ -17,6 +17,7 @@ import sqlite3
 import sys
 from collections import defaultdict
 from pathlib import Path
+from roofing_neighbor_context_v5 import neighbor_context, VERSION as NEIGHBOR_VERSION
 
 VERSION = "fun-roofing-parallel-formulas-v4"
 DEFAULT_ZIPS = ("90011", "90049", "90731", "90037")
@@ -81,7 +82,7 @@ def require_receipts(conn):
 
 def analyze(db, *, zips=DEFAULT_ZIPS, years=20, recent_years=5,
             min_building_age=25, kind="roof_related", city="LOS ANGELES CA",
-            today=None):
+            peer_years=5, min_peers=5, today=None):
     """Return independent V3 property-age and V4 empirical permit-cycle results.
 
     V4 only counts same-APN permit matches. Address-only joins are excluded
@@ -90,6 +91,8 @@ def analyze(db, *, zips=DEFAULT_ZIPS, years=20, recent_years=5,
     """
     zips = tuple(zips)
     validate(zips, years, recent_years, min_building_age, kind, city)
+    if not isinstance(peer_years,int) or not 0<=peer_years<=15 or not isinstance(min_peers,int) or not 3<=min_peers<=30:
+        raise ValueError("NEIGHBOR_AGE_TOLERANCE_OR_MINIMUM_PEERS_INVALID")
     today = today or dt.date.today()
     if not isinstance(today, dt.date):
         raise ValueError("TODAY_DATE_INVALID")
@@ -214,14 +217,23 @@ def analyze(db, *, zips=DEFAULT_ZIPS, years=20, recent_years=5,
                        round(1000*g["recent_permit_properties"]/n,2) if n else None,
                     "rate_not_a_replacement_probability":True,
                 }})
+        neighborhood=neighbor_context(conn,zips=zips,today=today,
+             recent_years=recent_years,min_building_age=min_building_age,
+             kind=kind,city=city,peer_years=peer_years,min_peers=min_peers)
+        for market in markets:
+            market["formula_c_neighborhood"]=neighborhood["formula_c_neighborhood_context"]["zips"][market["zip"]]
         return {
             "version":VERSION, "state":"PARALLEL_INDEPENDENT_FORMULAS_READY",
+            "third_method_version":NEIGHBOR_VERSION,
             "read_only":True, "sources_verified":len(REQUIRED_SOURCES),
             "as_of_date":today.isoformat(), "city":city,
             "parameters":{"years":years,"recent_years":recent_years,
                           "min_building_age":min_building_age,
-                          "permit_kind":kind,"zips":list(zips)},
+                          "permit_kind":kind,"zips":list(zips),
+                          "peer_years":peer_years,"min_peers":min_peers},
             "formula_a_unchanged":True,
+            "formula_c_method":"Age-matched same-street 100-number-block peer permits; not physical-distance or roof-condition evidence",
+            "formula_c_not_a_roof_damage_prediction":True,
             "formula_b_equations":{
                "gap_indicator":"I(last APN-exact roof-related permit date <= today minus X years)",
                "recent_activity_per_1000":"1000 * parcels with APN-exact roof permits within R years / selected parcels",
@@ -247,11 +259,14 @@ def main():
     parser.add_argument("--permit-kind",choices=["roof_related","replacement_like"],
                         default="roof_related")
     parser.add_argument("--city",default="LOS ANGELES CA")
+    parser.add_argument("--peer-years",type=int,default=5)
+    parser.add_argument("--min-peers",type=int,default=5)
     args=parser.parse_args()
     result=analyze(args.db,zips=args.zips.split(","),years=args.years,
                    recent_years=args.recent_years,
                    min_building_age=args.min_building_age,
-                   kind=args.permit_kind,city=args.city)
+                   kind=args.permit_kind,city=args.city,
+                   peer_years=args.peer_years,min_peers=args.min_peers)
     print(json.dumps(result,sort_keys=True,separators=(",",":")))
 
 
