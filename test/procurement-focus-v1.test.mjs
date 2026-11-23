@@ -59,6 +59,8 @@ test('Both dashboard interfaces link procurement to the dedicated page',async()=
  const organized=await readFile(new URL('../src/ui/organized-preview-v1.js',import.meta.url),'utf8');
  const original=await readFile(new URL('../src/ui/oneport-dashboard-v1.js',import.meta.url),'utf8');
  assert.match(organized,/Open procurement evidence',href:'\/procurement\/'/);
+ assert.match(organized,/renderProcurementEvidence\(host\)/);
+ assert.match(organized,/getJson\('\/api\/operator\/procurement\/status'/);
  assert.match(original,/procurement:\{name:'Procurement',type:'procurement'/);
  assert.match(original,/safeFrame\('procurement','\/procurement\/'/);
  assert.doesNotMatch(organized,/href:'\/operations\/#fi-purchase-demand'/);
