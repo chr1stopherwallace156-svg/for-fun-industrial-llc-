@@ -85,6 +85,8 @@ function PreviewLive([string]$ExpectedRunner){
  $bulkCss=Invoke-WebRequest ($URL+'/api/fun/roofing/bulk/style.css') -UseBasicParsing -TimeoutSec 8
  $bulkJs=Invoke-WebRequest ($URL+'/api/fun/roofing/bulk/client.js') -UseBasicParsing -TimeoutSec 8
  $bulkStatus=Invoke-RestMethod ($URL+'/api/fun/roofing/bulk/status') -TimeoutSec 8
+ $procPage=Invoke-WebRequest ($URL+'/procurement/') -UseBasicParsing -TimeoutSec 8
+ $procClient=Invoke-WebRequest ($URL+'/api/operator/procurement/client.js') -UseBasicParsing -TimeoutSec 8
  if($homepageResponse.StatusCode -ne 200 -or
    $homepageResponse.Headers['x-fi-dashboard-version'] -cne 'fun-industrial-one-port-spatial-ux-v2' -or
    $homepageResponse.Content -notmatch 'id="fi-app"' -or
@@ -113,7 +115,13 @@ function PreviewLive([string]$ExpectedRunner){
    $bulkJs.StatusCode -ne 200 -or $bulkJs.Content -notmatch 'operator-sync-full-export' -or
    $bulkStatus.version -cne 'fun-roofing-bulk-v2' -or
    $bulkStatus.elektronTouched -ne $false -or
-   $bulkStatus.automatedOutreach -ne 0){
+   $bulkStatus.automatedOutreach -ne 0 -or
+   $procPage.StatusCode -ne 200 -or
+   $procPage.Headers['x-fi-procurement-view'] -cne 'fun-procurement-focus-v1' -or
+   $procPage.Content -notmatch 'id="fi-procurement"' -or
+   $procPage.Content -match 'id="fi-exec-queue"' -or
+   $procClient.StatusCode -ne 200 -or
+   $procClient.Content -notmatch '/api/operator/procurement/status'){
   Hold 'PREVIEW_ROUTE_OR_EXISTING_MODULE_VERIFICATION_FAILED'
  }
  return @{home='UNCHANGED';preview='HEALTHY';roofing='BULK_V2_HEALTHY';qwen=$qwen.state;v3ready=$v3.ready}
@@ -161,7 +169,10 @@ foreach($file in @(
  'src\ui\roofing-bulk-page-v2.mjs',
  'src\ui\roofing-bulk-page-v2.css',
  'src\ui\roofing-bulk-page-v2.js',
- 'test\roofing-bulk-v2.test.mjs'
+ 'test\roofing-bulk-v2.test.mjs',
+ 'src\ui\procurement-focus-v1.mjs',
+ 'test\procurement-focus-v1.test.mjs',
+ 'src\ui\oneport-dashboard-v1.js'
 )){
  $path=Join-Path $Root $file
  RequireFile $path
@@ -170,7 +181,7 @@ foreach($file in @(
   if($LASTEXITCODE -ne 0){Hold ('NODE_CHECK_FAILED='+$file)}
  }
 }
-& $Node --test (Join-Path $Root 'test\organized-ui-preview-v1.test.mjs') (Join-Path $Root 'test\roofing-opportunity-v1.test.mjs') (Join-Path $Root 'test\roofing-bulk-v2.test.mjs')
+& $Node --test (Join-Path $Root 'test\organized-ui-preview-v1.test.mjs') (Join-Path $Root 'test\roofing-opportunity-v1.test.mjs') (Join-Path $Root 'test\roofing-bulk-v2.test.mjs') (Join-Path $Root 'test\procurement-focus-v1.test.mjs')
 if($LASTEXITCODE -ne 0){Hold 'ROOFING_NODE_TESTS_FAILED_NO_PORT_CHANGE'}
 $Python=(Get-Command python.exe -ErrorAction Stop).Source
 & $Python -B (Join-Path $Root 'src\roofing\test_roofing_bulk_v2.py')
