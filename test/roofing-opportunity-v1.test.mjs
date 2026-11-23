@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,rm,readFile} from 'node:fs/promises';
+import http from 'node:http';
+import {createUnifiedMlHub} from '../scripts/Run-Fun-ML-Dashboard8802.mjs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {ROOF_VERSION,SOURCE_DIRECTORY,importRoofData,roofingSnapshot,roofingLeads,refreshLaCity,refreshNws} from '../src/roofing/roofing-intelligence-v1.mjs';
@@ -107,4 +109,37 @@ test('UI integrated into organized dashboard without changing original homepage'
  assert.match(ROOF_UI_HTML,/No-permit properties included/);
  assert.match(ROOF_UI_HTML,/No automatic outreach/);
  assert.match(PREVIEW_HTML,/href="\/roofing\/"/);
+});
+
+test('same-origin roofing routes work; mutation endpoints reject unapproved requests',async()=>{
+ const server=createUnifiedMlHub({ml:{},commerce:{},
+   grounded:{status:()=>({})},reviewedDispatch:{},reviewedCompute:{}});
+ await new Promise((resolve,reject)=>server.once('error',reject).listen(0,'127.0.0.1',resolve));
+ const port=server.address().port;
+ async function request(path,method='GET',body='',headers={}){
+  return await new Promise((resolve,reject)=>{
+   const req=http.request({hostname:'127.0.0.1',port,method,path,
+    headers:{host:'127.0.0.1:8802',...headers}},res=>{
+     let value='';res.setEncoding('utf8');res.on('data',part=>value+=part);
+     res.on('end',()=>resolve({status:res.statusCode,headers:res.headers,body:value}));
+    });
+   req.on('error',reject);req.end(body);
+  });
+ }
+ try{
+  const home=await request('/');
+  const panel=await request('/roofing/');
+  const css=await request('/api/fun/roofing/style.css');
+  const js=await request('/api/fun/roofing/client.js');
+  const denied=await request('/api/fun/roofing/refresh-la','POST','{}',{'content-type':'application/json'});
+  const denied2=await request('/api/fun/roofing/import','POST','{}',{'content-type':'application/json'});
+  assert.equal(home.status,200);
+  assert.equal(panel.status,200);
+  assert.equal(panel.headers['x-fi-roofing-version'],ROOF_VERSION);
+  assert.ok(panel.body.includes('roof-property-file'));
+  assert.equal(css.status,200);assert.ok(css.body.includes('market-scroll'));
+  assert.equal(js.status,200);assert.ok(js.body.includes('roof-markets'));
+  assert.equal(denied.status,403);
+  assert.equal(denied2.status,403);
+ }finally{await new Promise(resolve=>server.close(resolve))}
 });
