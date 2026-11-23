@@ -21,6 +21,7 @@ foreach($step in $Steps){
  if($LASTEXITCODE -ne 0){throw ('FUN_FISRE_START_HOLD='+$step.Name)}
 }
 Write-Host 'FUN_INDUSTRIAL_FISRE_FULL_START=PASS'
-Write-Host 'FUN_DASHBOARD=http://127.0.0.1:8802/#reasoning'
+Write-Host 'FUN_DASHBOARD=http://127.0.0.1:8802/#chat'
+Write-Host 'FUN_LOCAL_QWEN_FISRE=UNIFIED_CHAT_WITH_MATH_AND_CODE'
 Write-Host 'FUN_IPHONE=https://100.109.4.20:8443/'
 Write-Host 'FUN_ELEKTRON=UNTOUCHED'
