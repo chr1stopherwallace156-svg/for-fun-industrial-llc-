@@ -57,9 +57,9 @@ class V7Tests(unittest.TestCase):
 
     def test_qwen3_nonthinking_prefill_and_raw_completion(self):
         prompt=mod.qwen_nonthinking_prefill("What comes next?")
-        self.assertTrue(prompt.startswith("<|im_start|>system\\n"))
+        self.assertTrue(prompt.startswith("<|im_start|>system\n"))
         self.assertIn("/no_think",prompt)
-        self.assertTrue(prompt.endswith("<|im_start|>assistant\\n<think>\\n\\n</think>\\n\\n"))
+        self.assertTrue(prompt.endswith("<|im_start|>assistant\n<think>\n\n</think>\n\n"))
         import inspect
         body=inspect.getsource(mod.run_case)
         self.assertIn('"-no-cnv"',body)
