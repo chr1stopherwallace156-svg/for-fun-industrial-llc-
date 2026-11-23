@@ -370,6 +370,49 @@ status categories, ambiguity, COFO nonfinal inconsistency, future/invalid
 status date and refusal to copy private fields into output. The normal
 one-port service and Elektron are not affected by an audit.
 
+## V8 — independent LA building-inspection matching preflight
+
+The official LA City Building and Safety Inspections dataset
+`9w5z-rg2h` publishes `permit`, `permit_status`, `inspection`,
+`inspection_result` and `inspection_date`. The V8 tool performs a tiny
+read-only API query to this exact official source, without mirroring the
+roughly 12-million-row dataset.
+
+`src/roofing/probe_ladbs_inspections_v8.py` samples up to **3 recent,
+replacement-like exact-APN matched permits per ZIP** (maximum configurable
+five per ZIP across four currently selected LA ZIPs). It uses the existing
+completed LA City permit source and its SQLite index in read-only mode,
+normalizes bounded public permit numbers, and requests only selected fields
+from the fixed official Socrata REST endpoint. A maximum of 500 remote
+inspection rows and 1.5 MB JSON response is enforced; a response at the
+cap triggers an uncertainty hold instead of pretending to be exhaustive.
+
+Reports aggregate sample sizes and whether selected public permit numbers
+appear in the official inspection dataset. A positive **Final inspection
+type + Approved/Passed result + valid inspection date** is counted as
+*final inspection evidence only*: **not proof** that a replacement roof
+was actually installed, that it matched a specific work scope, or that a
+roof remains in particular condition. Unknown inspection types/results,
+no returned match, API throttling/unavailability, dataset lag and source
+coverage gaps are not interpreted as completed, missing or failed roofing
+work. It never prints permit numbers, APNs, addresses or contact details.
+
+The tool neither updates A/B/C/D nor stores rows, schedules jobs, makes
+contact, or restarts the dashboard. Network access is limited to one
+operator-triggered GET to the pinned `data.lacity.org` source with TLS,
+redirect rejection and bounded result size. Eight offline no-network tests
+cover joins, permit-number filtering, no-record uncertainty, malformed
+calendar dates, response limits, source receipts and input bounds.
+The inspection dataset is City of LA, **not LA County-wide** coverage.
+
+Run with existing Windows Python and local database after the reviewed
+GitHub branch is updated (no service restart):
+```powershell
+$r=Join-Path $HOME 'FunIndustrial-Roofing-Bulk-V2'
+$db=Join-Path $env:LOCALAPPDATA 'FunIndustrial\RoofingBulkV2\roofing.sqlite3'
+python.exe -B (Join-Path $r 'src\roofing\probe_ladbs_inspections_v8.py') --db $db --per-zip 3
+```
+
 ## Preflight
 
 The guarded deployment reruns prior Node.js tests and the original Python
