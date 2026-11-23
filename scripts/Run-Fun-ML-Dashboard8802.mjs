@@ -11,7 +11,9 @@ import {buildTrendsFocus} from '../src/commerce/google-trends-focus-v1-2.mjs';
 import {SHELL,UI_CSS,UI_CLIENT} from '../src/ui/integrated-hub-shell-v1.mjs';
 import {DASHBOARD_HTML,DASHBOARD_VERSION} from '../src/ui/oneport-dashboard-v1.mjs';
 import {FISRE_WORKSPACE_HTML} from '../src/ui/fisre-workspace-v4.mjs';
-import {parseFisreRequest,runFisrePython,fisreStatus} from '../src/semantic/fisre-live-bridge-v4.mjs';
+import {FISRE_QWEN_CHAT_HTML} from '../src/ui/fisre-qwen-chat-v4.mjs';
+import {createFisreChatEvidence} from '../src/semantic/fisre-chat-evidence-v4.mjs';
+import {parseFisreRequest,validateFisrePayload,runFisrePython,fisreStatus} from '../src/semantic/fisre-live-bridge-v4.mjs';
 import {readFial4DashboardStatus} from '../src/fial/dashboard-status-v4.mjs';
 import {createGroundedChat} from '../src/fial/grounded-chat-v5-2.mjs';
 import {GROUNDED_PANEL,GROUNDED_CLIENT,GROUNDED_VERSION} from '../src/fial/primary-grounded-ui-v5-3.mjs';
@@ -134,16 +136,19 @@ async function groundedChatBody(req){
   const parts=[];let size=0;
   for await(const chunk of req){
     size+=chunk.length;
-    if(size>2048)throw Error('FIAL53_CHAT_BODY_TOO_LARGE');
+    if(size>18500)throw Error('FIAL53_CHAT_BODY_TOO_LARGE');
     parts.push(chunk);
   }
   let value;
   try{value=JSON.parse(Buffer.concat(parts).toString('utf8'))}
   catch{throw Error('FIAL53_CHAT_JSON_REQUIRED')}
   if(!value||typeof value!=='object'||Array.isArray(value)||
-    Object.keys(value).length!==1||typeof value.question!=='string'||
+    Object.keys(value).length<1||Object.keys(value).length>2||
+    Object.keys(value).some(k=>!['question','fisre'].includes(k))||
+    typeof value.question!=='string'||
     value.question.length<4||value.question.length>1200)
     throw Error('FIAL53_CHAT_QUESTION_INVALID');
+  if(value.fisre!==undefined)validateFisrePayload(value.fisre);
   return value;
 }
 async function parseBusinessQuestion(req){
@@ -216,6 +221,12 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         const csp="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src 'self'; img-src 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; form-action 'none'";
         return send(res,200,DASHBOARD_HTML,'text/html; charset=utf-8',
           {'content-security-policy':csp,'x-fi-dashboard-version':DASHBOARD_VERSION});
+      }
+      if(req.method==='GET'&&u.pathname==='/chat/'){
+        // Direct same-origin Qwen + memory; does not proxy through 8798.
+        const csp="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; form-action 'none'";
+        return send(res,200,FISRE_QWEN_CHAT_HTML,'text/html; charset=utf-8',
+          {'content-security-policy':csp});
       }
       // Operator-initiated Semantic Reasoning, served under the existing 8802 host.
       // The current home page, Qwen, REA, ML, worker ports, and operator authority stay unchanged.
@@ -493,7 +504,18 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
           return send(res,403,{error:'FIAL53_EXPLICIT_SAME_ORIGIN_CLICK_REQUIRED'});
         if(req.headers['content-type']!=='application/json')
           return send(res,415,{error:'FIAL53_JSON_REQUIRED'});
-        return send(res,200,await grounded.chat(await groundedChatBody(req)));
+        const body=await groundedChatBody(req);
+        if(body.fisre===undefined)
+          return send(res,200,await grounded.chat({question:body.question}));
+        // Single explicit Send: reviewed FISRE code analysis, then one Qwen
+        // answer grounded in its source-bound report. No autonomous model tools.
+        const analysis=await runFisrePython(body.fisre);
+        const evidence=createFisreChatEvidence(analysis,body.fisre.source);
+        const answer=await grounded.chat({question:body.question,fisreEvidence:evidence});
+        return send(res,200,{...answer,
+          fisre:{status:analysis.proof.status,source_sha256:analysis.source.sha256,
+            replay:analysis.replay.state,cognitive:'proposed_only',
+            independently_proved:false,tool_authority_added:false}});
       }
       if(req.method==='GET'&&u.pathname==='/api/fial/v4/status')
         return send(res,200,await readFial4DashboardStatus());
