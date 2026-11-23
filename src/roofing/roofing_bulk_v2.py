@@ -309,9 +309,13 @@ def ingest(args):
                     if parsed:
                         conn.execute("""INSERT INTO properties VALUES(?,?,?,?,?,?,?,?,?,?,?)
                           ON CONFLICT(county,apn) DO UPDATE SET
-                          city=excluded.city,zip=excluded.zip,address=excluded.address,
-                          address_key=excluded.address_key,year_built=excluded.year_built,
-                          residential=excluded.residential,use_label=excluded.use_label,
+                          city=CASE WHEN excluded.city!='' THEN excluded.city ELSE properties.city END,
+                          zip=CASE WHEN excluded.zip!='' THEN excluded.zip ELSE properties.zip END,
+                          address=CASE WHEN excluded.address!='' THEN excluded.address ELSE properties.address END,
+                          address_key=CASE WHEN excluded.address_key!='' THEN excluded.address_key ELSE properties.address_key END,
+                          year_built=COALESCE(excluded.year_built,properties.year_built),
+                          residential=CASE WHEN excluded.use_label!='' THEN excluded.residential ELSE properties.residential END,
+                          use_label=CASE WHEN excluded.use_label!='' THEN excluded.use_label ELSE properties.use_label END,
                           roll_year=excluded.roll_year,source_id=excluded.source_id
                           WHERE coalesce(excluded.roll_year,0)>=coalesce(properties.roll_year,0)""",parsed)
                 else:
