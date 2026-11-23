@@ -74,5 +74,33 @@ test('bulk UI is on separate route; original production homepage is preserved',a
   assert.equal(unsupported.status,422);
   const invalid=await req('/api/fun/roofing/bulk/markets?county=Other');
   assert.equal(invalid.status,422);
+  const cycleBad=await req('/api/fun/roofing/bulk/formulas?years=5');
+  assert.equal(cycleBad.status,422);
+  const cycleUnknown=await req('/api/fun/roofing/bulk/formulas?random=1');
+  assert.equal(cycleUnknown.status,422);
+  const cycleDuplicateZip=await req('/api/fun/roofing/bulk/formulas?zips=90011,90011');
+  assert.equal(cycleDuplicateZip.status,422);
  }finally{await new Promise(resolve=>server.close(resolve))}
+});
+
+test('parallel rooftop formulas preserve existing V3 equation and use distinct read-only current-vs-historical permit model',async()=>{
+ const clientSrc=await readFile(client,'utf8');
+ const bridge=await readFile(new URL('../src/roofing/roofing-bulk-bridge-v2.mjs',import.meta.url),'utf8');
+ const python=await readFile(new URL('../src/roofing/roofing_dual_formulas_v4.py',import.meta.url),'utf8');
+ assert.match(ROOF_BULK_PAGE,/id="parallel-roof-formulas"/);
+ assert.match(ROOF_BULK_PAGE,/S = clip/);
+ assert.match(ROOF_BULK_PAGE,/Formula B — Observed permit cycle by ZIP/);
+ for(const id of ['formula-zips','formula-years','formula-recent','formula-age',
+                   'formula-kind','run-dual-formulas','formula-body','formula-samples']){
+  assert.ok(ROOF_BULK_PAGE.includes('id="'+id+'"'),id);
+ }
+ assert.match(clientSrc,/renderParallelFormulas/);
+ assert.match(clientSrc,/\/api\/fun\/roofing\/bulk\/formulas/);
+ assert.match(bridge,/export async function bulkDualFormulas/);
+ assert.match(python,/PRAGMA query_only=ON/);
+ assert.match(python,/mode=ro/);
+ assert.match(python,/last_roof_permit_at_least_x_years_ago/);
+ assert.match(python,/recent_repeat_with_gap_at_least_x_years/);
+ assert.match(python,/REPLACEMENT_LIKE/);
+ assert.doesNotMatch(clientSrc,/setInterval|localStorage|WebSocket|eval\(/);
 });
