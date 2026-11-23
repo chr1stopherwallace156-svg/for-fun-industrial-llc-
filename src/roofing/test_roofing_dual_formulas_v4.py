@@ -18,6 +18,7 @@ class DualFormulaTests(unittest.TestCase):
         with contextlib.closing(sqlite3.connect(self.db)) as c, c:
             c.executescript("""
                 CREATE TABLE source_runs(source_id TEXT PRIMARY KEY,state TEXT);
+                CREATE TABLE properties(county TEXT,apn TEXT);
                 CREATE TABLE roofing_selection_receipt_v3(
                     id INTEGER PRIMARY KEY, selected INTEGER, source_count INTEGER);
                 CREATE TABLE roofing_selection_candidates_v3(
