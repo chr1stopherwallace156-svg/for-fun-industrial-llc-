@@ -186,7 +186,9 @@ foreach($file in @(
  'src\roofing\export_roofing_pilot_v1.py',
  'src\roofing\test_export_roofing_pilot_v1.py',
  'src\roofing\roofing_dual_formulas_v4.py',
- 'src\roofing\test_roofing_dual_formulas_v4.py'
+ 'src\roofing\test_roofing_dual_formulas_v4.py',
+ 'src\roofing\roofing_neighbor_context_v5.py',
+ 'src\roofing\test_roofing_neighbor_context_v5.py'
 )){
  $path=Join-Path $Root $file
  RequireFile $path
@@ -199,7 +201,7 @@ foreach($file in @(
 & $Node --test (Join-Path $Root 'test\organized-ui-preview-v1.test.mjs') (Join-Path $Root 'test\roofing-opportunity-v1.test.mjs') (Join-Path $Root 'test\roofing-bulk-v2.test.mjs') (Join-Path $Root 'test\procurement-focus-v1.test.mjs') (Join-Path $Root 'test\roofing-selective-v3.test.mjs')
 if($LASTEXITCODE -ne 0){Hold 'ROOFING_NODE_TESTS_FAILED_NO_PORT_CHANGE'}
 $Python=(Get-Command python.exe -ErrorAction Stop).Source
-& $Python -B -c "import ast,pathlib,sys; [ast.parse(pathlib.Path(p).read_text(encoding='utf-8')) for p in sys.argv[1:]]; print('ROOFING_PYTHON_SYNTAX=PASS')" (Join-Path $Root 'src\roofing\roofing_bulk_v2.py') (Join-Path $Root 'src\roofing\selective_policy_v3.py') (Join-Path $Root 'src\roofing\selective_extract_v3.py') (Join-Path $Root 'src\roofing\test_selective_v3.py') (Join-Path $Root 'src\roofing\export_roofing_pilot_v1.py') (Join-Path $Root 'src\roofing\test_export_roofing_pilot_v1.py') (Join-Path $Root 'src\roofing\roofing_dual_formulas_v4.py') (Join-Path $Root 'src\roofing\test_roofing_dual_formulas_v4.py')
+& $Python -B -c "import ast,pathlib,sys; [ast.parse(pathlib.Path(p).read_text(encoding='utf-8')) for p in sys.argv[1:]]; print('ROOFING_PYTHON_SYNTAX=PASS')" (Join-Path $Root 'src\roofing\roofing_bulk_v2.py') (Join-Path $Root 'src\roofing\selective_policy_v3.py') (Join-Path $Root 'src\roofing\selective_extract_v3.py') (Join-Path $Root 'src\roofing\test_selective_v3.py') (Join-Path $Root 'src\roofing\export_roofing_pilot_v1.py') (Join-Path $Root 'src\roofing\test_export_roofing_pilot_v1.py') (Join-Path $Root 'src\roofing\roofing_dual_formulas_v4.py') (Join-Path $Root 'src\roofing\test_roofing_dual_formulas_v4.py') (Join-Path $Root 'src\roofing\roofing_neighbor_context_v5.py') (Join-Path $Root 'src\roofing\test_roofing_neighbor_context_v5.py')
 if($LASTEXITCODE -ne 0){Hold 'ROOFING_PYTHON_SYNTAX_FAILED_NO_PORT_CHANGE'}
 & $Python -B (Join-Path $Root 'src\roofing\test_roofing_bulk_v2.py')
 if($LASTEXITCODE -ne 0){Hold 'ROOFING_PYTHON_TESTS_FAILED_NO_PORT_CHANGE'}
@@ -209,6 +211,8 @@ if($LASTEXITCODE -ne 0){Hold 'ROOFING_SELECTIVE_TESTS_FAILED_NO_PORT_CHANGE'}
 if($LASTEXITCODE -ne 0){Hold 'ROOFING_PUBLIC_REVIEW_PILOT_TESTS_FAILED_NO_PORT_CHANGE'}
 & $Python -B (Join-Path $Root 'src\roofing\test_roofing_dual_formulas_v4.py')
 if($LASTEXITCODE -ne 0){Hold 'ROOFING_PARALLEL_FORMULAS_TESTS_FAILED_NO_PORT_CHANGE'}
+& $Python -B (Join-Path $Root 'src\roofing\test_roofing_neighbor_context_v5.py')
+if($LASTEXITCODE -ne 0){Hold 'ROOFING_NEIGHBOR_COHORT_TESTS_FAILED_NO_PORT_CHANGE'}
 foreach($port in $Protected){$Before[$port]=Snapshot $port}
 $PreviousProcess=Owner
 if($PreviousProcess){
