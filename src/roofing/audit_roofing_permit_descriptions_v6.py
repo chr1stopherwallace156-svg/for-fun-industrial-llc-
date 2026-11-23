@@ -23,6 +23,7 @@ VERSION="fun-roofing-permit-description-audit-v6"
 ZIPS=("90037","90049","90731","90011")
 SOURCES=("la_permits_pre2010","la_permits_2010_2019","la_permits_2020_present")
 REPAIR=re.compile(r"\b(?:REPAIR(?:S|ED|ING)?|PATCH(?:ING|ED)?|LEAK(?:S|ING)?|MAINTENANCE|ROOF\s*COAT(?:ING)?|FLASHING)\b",re.I)
+NEGATED=re.compile(r"\b(?:NO|NOT|WITHOUT)\s+(?:(?:NEW|FULL|COMPLETE)\s+)?(?:REROOF|RE[- ]ROOF|ROOF\s+(?:REPLACEMENT|REPLACE))\b|\b(?:REROOF|ROOF\s+REPLACEMENT)\s+NOT\s+INCLUDED\b",re.I)
 COMPLETE_NOTE=("No completion status is verified. A permit description mentioning "
                "replacement is not evidence a new roof was installed.")
 
@@ -33,6 +34,8 @@ def date_before(today,years):
 def classify_description(desc):
     replacement=bool(importer.REPLACED.search(desc))
     repair=bool(REPAIR.search(desc))
+    if replacement and NEGATED.search(desc):
+        return "NEGATED_OR_AMBIGUOUS_REPLACEMENT_TERMS_REVIEW"
     if replacement and repair:return "MIXED_REPLACEMENT_AND_REPAIR_TERMS"
     if replacement:return "EXPLICIT_REROOF_OR_REPLACEMENT_TERMS"
     if repair:return "REPAIR_MAINTENANCE_OR_LEAK_TERMS"
@@ -146,17 +149,27 @@ def local_audit(db,root,*,zips=ZIPS,per_group=12,recent_years=5,
             out[original["original_category"]]+=1
             if original["original_import_class"]!=record["stored_class"]:
                 out["classification_disagreement"]+=1
+            if original["original_category"]=="NEGATED_OR_AMBIGUOUS_REPLACEMENT_TERMS_REVIEW":
+                out["negated_or_ambiguous_replacement_language"]+=1
             if record["stored_class"]=="REPLACEMENT_LIKE" and original["original_category"] not in (
-                  "EXPLICIT_REROOF_OR_REPLACEMENT_TERMS","MIXED_REPLACEMENT_AND_REPAIR_TERMS"):
+                  "EXPLICIT_REROOF_OR_REPLACEMENT_TERMS","MIXED_REPLACEMENT_AND_REPAIR_TERMS",
+                  "NEGATED_OR_AMBIGUOUS_REPLACEMENT_TERMS_REVIEW"):
                 out["replacement_keyword_inconsistency"]+=1
         total=Counter()
         for c in audit_counts.values():total.update(c)
         complete=(total["source_record_not_reconciled"]==0
                   and total["classification_disagreement"]==0
-                  and total["replacement_keyword_inconsistency"]==0)
+                  and total["replacement_keyword_inconsistency"]==0
+                  and total["negated_or_ambiguous_replacement_language"]==0)
         return {
            "version":VERSION,
-           "state":"SAMPLED_IMPORT_KEYWORDS_RECONCILED" if complete else "AUDIT_INCONSISTENCY_HOLD",
+           "state":("SAMPLED_IMPORT_KEYWORDS_RECONCILED" if complete else
+                    "SAMPLED_AMBIGUOUS_DESCRIPTION_REVIEW_HOLD" if
+                    total["negated_or_ambiguous_replacement_language"] and
+                    total["source_record_not_reconciled"]==0 and
+                    total["classification_disagreement"]==0 and
+                    total["replacement_keyword_inconsistency"]==0 else
+                    "AUDIT_INCONSISTENCY_HOLD"),
            "sample_method":"purposeful_latest_recent_exact_APN_per_zip_and_import_class_not_random",
            "requested_zips":list(zips),
            "parameters":{"per_zip_and_class_max":per_group,
