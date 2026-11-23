@@ -91,7 +91,12 @@ def parse_date(s):
 def parse_site(value, row):
     address = clean(value, 240)
     city = clean(field(row, CITY_FIELDS), 90)
-    zipcode = re.match(r"\d{5}", clean(field(row, ZIP_FIELDS), 20))
+    # Conflicting same-named ZIP columns are ambiguous. Ignore *all* ZIP
+    # columns for that property, and use a ZIP only when explicitly embedded
+    # in the Assessor's situs / Property Location string below. If absent,
+    # keep an empty ZIP so the property enters the enrichment HOLD queue.
+    zipcode = None if row.get("_zip_conflict") else re.match(
+        r"\d{5}", clean(field(row, ZIP_FIELDS), 20))
     zipvalue = zipcode.group(0) if zipcode else ""
     # Assessor field may contain: 123 MAIN ST, LOS ANGELES, CA 90001.
     m = re.match(r"^(.+?),\s*([^,]+?),?\s+CA\s+(\d{5})(?:-\d{4})?$", address, re.I)
@@ -176,13 +181,15 @@ REQUIRED_CSV_FIELDS = frozenset(
     ("roll_year", "tax_year", "rollyear")
 )
 
-def csv_rows(binary):
+def csv_rows(binary, *, zip_conflict_policy="reject"):
     """Project relevant columns from very wide CSVs in bounded memory.
 
-    Duplicate irrelevant headers are ignored. Two relevant columns with the
-    same normalized header must agree (or be empty) on *every* row; otherwise
-    reject the source rather than invent a property location, age, or permit.
+    Duplicate critical non-ZIP columns must agree. Property ZIP differences
+    may be resolved from an explicit situs address ZIP; otherwise ZIP is held
+    as unknown. Permit ZIP conflicts remain rejected to prevent false joins.
     """
+    if zip_conflict_policy not in ("reject", "hold"):
+        raise ValueError("CSV_ZIP_CONFLICT_POLICY_INVALID")
     # TextIOWrapper owns the binary stream; scoped context also avoids Windows
     # file locks during test cleanup, including on exceptions.
     with io.TextIOWrapper(binary, encoding="utf-8-sig", errors="replace", newline="") as text:
@@ -209,13 +216,28 @@ def csv_rows(binary):
             projected = {}
             for name, indices in positions.items():
                 chosen = ""
+                distinct_site_zips = set()
                 for index in indices:
                     value = cells[index].strip()
                     if not value:
                         continue
+                    if name == "zip_code" and zip_conflict_policy == "hold":
+                        # ZIP+4 and ZIP5 for the same area are equivalent
+                        # for our *five-digit* research-location join.
+                        match = re.fullmatch(r"(\d{5})(?:-\d{4})?", value)
+                        distinct_site_zips.add(match.group(1) if match else "INVALID:"+value)
+                        if not chosen:
+                            chosen = value
+                        continue
                     if chosen and value != chosen:
                         raise ValueError("CSV_CRITICAL_DUPLICATE_CONFLICT_" + name)
                     chosen = value
+                if name == "zip_code" and zip_conflict_policy == "hold" and len(distinct_site_zips) > 1:
+                    # Do not guess which same-named column is the site ZIP.
+                    # parse_site() accepts ZIP only if Property Location has
+                    # an explicit ZIP. Otherwise it remains blank / HOLD.
+                    projected["_zip_conflict"] = "1"
+                    chosen = ""
                 projected[name] = chosen
             yield projected
 
@@ -288,11 +310,14 @@ def ingest(args):
         conn.execute("DELETE FROM permits WHERE source_id=?", (args.source_id,))
     conn.commit()
     inserted = skipped = 0
+    zip_column_conflicts = zip_recovered_from_location = zip_held = 0
     members = 0
     try:
         for name, data in input_members(path):
             members += 1
-            for row_num, row in enumerate(csv_rows(data), 1):
+            for row_num, row in enumerate(
+                    csv_rows(data, zip_conflict_policy=
+                        "hold" if kind.endswith("_properties") else "reject"), 1):
                 if row_num == 1:
                     cols=set(row)
                     has_location=bool(cols.intersection(APN_FIELDS)) or bool(cols.intersection(ADDRESS_FIELDS))
@@ -306,6 +331,12 @@ def ingest(args):
                         raise ValueError("PERMIT_SCHEMA_MISSING_DATE_DESCRIPTION_OR_LOCATION_FIELDS")
                 if kind.endswith("_properties"):
                     parsed = parse_property(row,county,args.source_id,args.roll_year)
+                    if row.get("_zip_conflict"):
+                        zip_column_conflicts += 1
+                        if parsed and parsed[3]:
+                            zip_recovered_from_location += 1
+                        else:
+                            zip_held += 1
                     if parsed:
                         conn.execute("""INSERT INTO properties VALUES(?,?,?,?,?,?,?,?,?,?,?)
                           ON CONFLICT(county,apn) DO UPDATE SET
@@ -344,12 +375,21 @@ def ingest(args):
                 quality["with_site"]<quality["total"]*0.05):
                 raise ValueError("LA_ASSESSOR_REQUIRED_FIELDS_MOSTLY_MISSING_HOLD")
         digest = sha(path)
-        conn.execute("UPDATE source_runs SET state='INGESTED_NOT_COMPLETENESS_VERIFIED',ingested=?,skipped=?,file_sha256=?,filename=?,updated=? WHERE source_id=?",
-                     (inserted,skipped,digest,path.name,dt.datetime.now(dt.timezone.utc).isoformat(),args.source_id))
+        coverage_note = ("ZIP_COLUMN_CONFLICT_ROWS="+str(zip_column_conflicts)+
+                         ";SITUS_ZIP_RECOVERED="+str(zip_recovered_from_location)+
+                         ";ZIP_HELD_UNKNOWN="+str(zip_held)+
+                         ";MUNICIPAL_ROOF_PERMIT_COVERAGE_UNVERIFIED")
+        conn.execute("UPDATE source_runs SET state='INGESTED_NOT_COMPLETENESS_VERIFIED',ingested=?,skipped=?,file_sha256=?,filename=?,updated=?,coverage=? WHERE source_id=?",
+                     (inserted,skipped,digest,path.name,
+                      dt.datetime.now(dt.timezone.utc).isoformat(),coverage_note,args.source_id))
         conn.commit()
         emit({"version":VERSION,"state":"INGESTED_NOT_COMPLETENESS_VERIFIED","source":args.source_id,
               "accepted":inserted,"skipped":skipped,"sha256":digest,"property_or_permit":"properties" if kind.endswith("properties") else "roof_permits",
-              "needs_rebuild":True,"data_not_a_complete_housing_census":True})
+              "needs_rebuild":True,"data_not_a_complete_housing_census":True,
+              "zip_column_conflict_rows":zip_column_conflicts,
+              "zip_recovered_from_property_location":zip_recovered_from_location,
+              "zip_held_unknown":zip_held,
+              "no_zip_was_guessed":True})
     except Exception:
         conn.commit()
         conn.execute("UPDATE source_runs SET state='INCOMPLETE_IMPORT_HOLD',ingested=?,skipped=? WHERE source_id=?",
