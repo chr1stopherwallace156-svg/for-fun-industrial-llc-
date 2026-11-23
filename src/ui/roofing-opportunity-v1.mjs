@@ -28,6 +28,10 @@ export const ROOF_UI_HTML=String.raw`<!doctype html><html lang="en"><head>
 <div class="bar"><button id="roof-filter" class="button" type="button">Apply filters</button>
 <span class="help">No permit found means no match in ingested records; source coverage may be incomplete.</span></div>
 <p id="roof-lead-status" class="help">Loading saved candidates…</p>
+<h3>Target markets by city and ZIP</h3>
+<p class="help">Ranked within the imported property inventory only — not a complete census, not confirmed customer interest, and not a weather-damage prediction.</p>
+<div class="table-scroll market-scroll"><table><thead><tr><th>County</th><th>City / ZIP</th><th>Candidate properties</th><th>No record found</th><th>Old permit (20+ yrs)</th><th>Average review priority</th></tr></thead><tbody id="roof-markets"><tr><td colspan="6">Awaiting property inventory.</td></tr></tbody></table></div>
+<h3>Property review queue</h3>
 <div class="table-scroll"><table><thead><tr><th>Area</th><th>Property address</th><th>Year built</th><th>Recorded roof permit</th><th>Category</th><th>Review priority*</th></tr></thead><tbody id="roof-lead-table"><tr><td colspan="6">No imported property inventory yet.</td></tr></tbody></table></div>
 <p class="footnote">*Priority is a provisional sorting heuristic, not a validated probability of replacement, inspection finding, sale, or profit. Address matches need independent review.</p></section>
 <div class="cols">
