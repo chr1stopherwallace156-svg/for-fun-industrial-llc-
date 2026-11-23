@@ -149,34 +149,34 @@ def analyze(db, *, zips=DEFAULT_ZIPS, years=20, recent_years=5,
         })
         samples = []
         for (z, apn), dates in events.items():
-                if not dates or not base.get(z, {}).get("selected_properties"):
-                    continue
-                dates.sort()
-                stats=grouped[z]
-                stats["apn_exact_permit_matches"] += 1
-                last = dates[-1]
-                gap = (today-last).days / 365.2425
-                if last <= old_cutoff:
-                    stats["gap_at_least_x_years"] += 1
-                recent = [d for d in dates if d >= recent_cutoff]
-                historical = [d for d in dates if d <= old_cutoff]
-                if recent:
-                    stats["recent_permit_properties"] += 1
-                if historical:
-                    stats["historical_permit_properties"] += 1
-                repeat = any(
-                    older <= cutoff(newer, years)
-                    for newer in recent for older in historical
-                )
-                if repeat:
-                    stats["recent_long_gap_repeat_properties"] += 1
-                if len(samples) < 12 and (repeat or last <= old_cutoff):
-                    samples.append({
-                        "zip": z, "apn": apn, "last_roof_related_permit":last.isoformat(),
-                        "years_since_last_recorded_permit":round(gap,1),
-                        "recent_long_gap_repeat_observed":repeat,
-                        "not_proof_of_replacement":True,
-                    })
+            if not dates or not base.get(z, {}).get("selected_properties"):
+                continue
+            dates.sort()
+            stats=grouped[z]
+            stats["apn_exact_permit_matches"] += 1
+            last = dates[-1]
+            gap = (today-last).days / 365.2425
+            if last <= old_cutoff:
+                stats["gap_at_least_x_years"] += 1
+            recent = [d for d in dates if d >= recent_cutoff]
+            historical = [d for d in dates if d <= old_cutoff]
+            if recent:
+                stats["recent_permit_properties"] += 1
+            if historical:
+                stats["historical_permit_properties"] += 1
+            repeat = any(
+                older <= cutoff(newer, years)
+                for newer in recent for older in historical
+            )
+            if repeat:
+                stats["recent_long_gap_repeat_properties"] += 1
+            if len(samples) < 12 and (repeat or last <= old_cutoff):
+                samples.append({
+                    "zip": z, "apn": apn, "last_roof_related_permit":last.isoformat(),
+                    "years_since_last_recorded_permit":round(gap,1),
+                    "recent_long_gap_repeat_observed":repeat,
+                    "not_proof_of_replacement":True,
+                })
         markets=[]
         for z in zips:
             b=base.get(z, {})
@@ -213,7 +213,7 @@ def analyze(db, *, zips=DEFAULT_ZIPS, years=20, recent_years=5,
         return {
             "version":VERSION, "state":"PARALLEL_INDEPENDENT_FORMULAS_READY",
             "read_only":True, "sources_verified":len(REQUIRED_SOURCES),
-            "date_utc":today.isoformat(), "city":city,
+            "as_of_date":today.isoformat(), "city":city,
             "parameters":{"years":years,"recent_years":recent_years,
                           "min_building_age":min_building_age,
                           "permit_kind":kind,"zips":list(zips)},
