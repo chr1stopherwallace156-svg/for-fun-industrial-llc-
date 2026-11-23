@@ -135,7 +135,9 @@ def verify_bridge(case, generated):
         mismatch_fields={"format":{"reason":str(ex)[:160]}}
     original_grade=v102.grade(case,generated)
     oracle=v104.calculate(errors)
-    if result["verified_answer"]!=v104.format_oracle(oracle):
+    if result["verified_answer"]!=v104.format_oracle(oracle) or \
+       not v10.grade_output(errors,result["verified_answer"])["exact_answer"] or \
+       v104.parse_model_claim(result["verified_answer"])!=oracle:
         raise RuntimeError("V105_FORMATTED_ORACLE_INCONSISTENT")
     return {
         "id":case["id"],
@@ -153,7 +155,7 @@ def verify_bridge(case, generated):
         "model_complete_math_correct":original_grade["complete_math_content_correct"],
         "verified_output":result["verified_answer"],
         "verified_answer_mathematically_correct":
-            v10.grade_output(errors,v10.encode_label(errors))["exact_answer"],
+            v10.grade_output(errors,result["verified_answer"])["exact_answer"],
         "verified_output_generated_by_qwen":False,
         "model_weights_updated":False,
         "production_integrated":False,
