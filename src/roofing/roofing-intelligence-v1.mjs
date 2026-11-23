@@ -125,7 +125,34 @@ export function deriveCandidates(state,{countyFilter='all',minAge=20,category='a
     nextAction:'Verify jurisdiction record coverage and offer a lawful inspection'});
  }
  output.sort((a,b)=>b.reviewPriority-a.reviewPriority||a.city.localeCompare(b.city));
- return {total:output.length,rows:output.slice(0,300),limited:output.length>300};
+ const markets=new Map();
+ const counts={noPermitFound:0,lastRoofPermit20Plus:0,recentRoofPermitFound:0};
+ for(const row of output){
+  if(row.category==='NO_PERMIT_FOUND_IN_INGESTED_RECORDS')counts.noPermitFound++;
+  else if(row.category==='LAST_RECORDED_ROOF_PERMIT_20_PLUS')counts.lastRoofPermit20Plus++;
+  else counts.recentRoofPermitFound++;
+  const key=row.county+'|'+row.city.toUpperCase()+'|'+row.zip;
+  let market=markets.get(key);
+  if(!market){
+   market={county:row.county,city:row.city,zip:row.zip,propertyCount:0,
+      noPermitFound:0,lastRoofPermit20Plus:0,recentRoofPermitFound:0,
+      sumPriority:0,oldestYearBuilt:row.yearBuilt};
+   markets.set(key,market);
+  }
+  market.propertyCount++;
+  market.sumPriority+=row.reviewPriority;
+  market.oldestYearBuilt=Math.min(market.oldestYearBuilt,row.yearBuilt);
+  if(row.category==='NO_PERMIT_FOUND_IN_INGESTED_RECORDS')market.noPermitFound++;
+  else if(row.category==='LAST_RECORDED_ROOF_PERMIT_20_PLUS')market.lastRoofPermit20Plus++;
+  else market.recentRoofPermitFound++;
+ }
+ const ranked=[...markets.values()].map(({sumPriority,...m})=>({...m,
+    averagePriority:Math.round(sumPriority/m.propertyCount),
+    evidence:'PROPERTY_INVENTORY_SAMPLE_NOT_MARKET_CENSUS'}))
+  .sort((a,b)=>b.noPermitFound+b.lastRoofPermit20Plus-(a.noPermitFound+a.lastRoofPermit20Plus)||
+    b.averagePriority-a.averagePriority);
+ return {total:output.length,rows:output.slice(0,300),limited:output.length>300,
+    counts,markets:ranked.slice(0,80),totalMarkets:ranked.length};
 }
 export async function roofingSnapshot({root=ROOT,filters={}}={}){
  const d=await load(root);
@@ -137,7 +164,7 @@ export async function roofingSnapshot({root=ROOT,filters={}}={}){
   propertyCount:d.properties.length,roofPermitRecords:d.permits.length,
   byCounty,sourceDirectory:SOURCE_DIRECTORY.map(s=>({...s,run:d.sourceRuns[s.id]||null})),
   forecastAreas:d.weather,leadSummary:{candidateCount:found.total,
-   noPermitFound:found.rows.filter(r=>r.category==='NO_PERMIT_FOUND_IN_INGESTED_RECORDS').length,
+   noPermitFound:found.counts.noPermitFound,
    shown:found.rows.length,limited:found.limited},
   interpretation:'Partial observed records are not proof of roof age, roof condition, or absence of permitted work'};
 }
