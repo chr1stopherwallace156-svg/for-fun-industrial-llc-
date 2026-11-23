@@ -15,7 +15,7 @@ const domains=Object.freeze([
  {id:'optimization',name:'Optuna and OR-Tools optimization',state:'existing_separate_tools_not_auto_executed_in_this_chat',regex:/\b(?:optuna|or.tools|optim(?:ize|ization)|routing|stock level|linear programming|solver)\b/i},
  {id:'engineering',name:'EV wiring, CAD, FreeCAD and WireViz',state:'existing_separate_engineering_tools_not_auto_executed_in_this_chat',regex:/\b(?:freecad|wireviz|graphviz|cad|wiring|schematic|engineering|bom|ev conversion)\b/i},
  {id:'security',name:'Security, PE and file inspection',state:'review_only;existing_tools_separate',regex:/\b(?:security|binary|pe file|executable|inspect file|malware|forensic|reverse engineering)\b/i},
- {id:'tools',name:'REA MCP and approved local tool execution',state:'operator_approval_required;8798_unverified',regex:/\b(?:rea|mcp|tool|agent|available functions|execute|run command)\b/i}
+ {id:'tools',name:'REA MCP and approved local tool execution',state:'two_allowlisted_readonly_8797_with_separate_operator_approval;broader_8798_tooling_degraded_or_unverified',regex:/\b(?:rea|mcp|tool|agent|available functions|execute|run command)\b/i}
 ]);
 export function capabilityInventory(){
  return {version:FABRIC_VERSION,model:'existing_local_qwen_8088',additionalModels:0,
