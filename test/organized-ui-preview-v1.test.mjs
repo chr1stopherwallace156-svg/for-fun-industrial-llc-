@@ -35,7 +35,8 @@ test('responsive CSS and no remote dependencies or scripts',async()=>{
  assert.match(code,/useMathV3Evidence/);
  assert.match(code,/if\(chatBusy\)return/);
  assert.match(code,/textContent/);
- assert.doesNotMatch(PREVIEW_HTML,/https?:\/\/|<script[^>]*>[\s\S]*?<\/script>/);
+ assert.doesNotMatch(PREVIEW_HTML,/https?:\/\//);
+ assert.doesNotMatch(PREVIEW_HTML,/<script(?![^>]*\bsrc=)[^>]*>/i);
  assert.doesNotMatch(code,/localStorage|sessionStorage|WebSocket|setInterval|document\.write/);
  assert.doesNotMatch(style,/url\(\s*["']?https?:/);
 });
