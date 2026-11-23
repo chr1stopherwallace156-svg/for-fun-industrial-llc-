@@ -53,6 +53,7 @@ export function recommendReviewedTool(question){
 
 export function createReviewedDispatch({request=readonlyReaRequest}={}){
  const rea=createVerifiedReaV3({request});
+ let recent=null; // Ephemeral verified read-only observation, not memory.
  return Object.freeze({
   status(){
    const s=rea.status();
@@ -68,6 +69,7 @@ export function createReviewedDispatch({request=readonlyReaRequest}={}){
     externalSideEffectAuthority:false};
   },
   prepare(body){
+   recent=null;
    if(!body||typeof body!=='object'||Array.isArray(body)||
       Object.keys(body).sort().join(',')!=='arguments,name'||
       !actionNames.includes(body.name)||
@@ -76,16 +78,23 @@ export function createReviewedDispatch({request=readonlyReaRequest}={}){
     hold('PREPARE_BODY_NOT_APPROVED');
    return rea.prepare(body);
   },
-  confirm(body){
+  async confirm(body){
    if(!body||typeof body!=='object'||Array.isArray(body)||
       Object.keys(body).sort().join(',')!=='authorizationToken,operatorConfirmed'||
       typeof body.authorizationToken!=='string'||body.operatorConfirmed!==true)
     hold('EXPLICIT_CONFIRMATION_REQUIRED');
-   return rea.execute(body);
+   const result=await rea.execute(body);
+   recent=result?.state==='verified_readonly_result'&&result?.receipt?.verifiedToolIdentity===true&&result?.receipt?.verifiedResultEnvelope===true?
+    Object.freeze({tool:result.receipt.tool,receiptHash:result.receipt.receiptHash,
+      resultPreview:String(result.resultPreview||'').slice(0,2200),
+      state:result.state,verified:true,authorization:'operator_approved_single_readonly_call'}):null;
+   return result;
   },
+  lastEvidence(){return recent?{...recent}:null},
   cancel(body){
    if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).length)
     hold('CANCEL_BODY_NOT_EMPTY');
+   recent=null;
    return rea.cancel();
   },
   recommend:recommendReviewedTool
