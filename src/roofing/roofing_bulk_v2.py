@@ -148,7 +148,10 @@ def db_open(path):
 
 def input_members(path):
     if path.suffix.lower() == ".csv":
-        yield path.name, path.open("rb")
+        # Keep file handles scoped to the consumer. Windows refuses to delete
+        # a TemporaryDirectory if one of its CSV handles remains open.
+        with path.open("rb") as stream:
+            yield path.name, stream
     elif zipfile.is_zipfile(path):
         with zipfile.ZipFile(path) as z:
             members = [m for m in z.infolist() if m.filename.lower().endswith(".csv") and not m.is_dir()]
@@ -332,7 +335,7 @@ def rebuild(args):
             if r["residential"] == 1:
                 priority += 10
             priority = min(100,priority)
-            c.execute("INSERT INTO candidates VALUES(?,?,?,?,?,?,?,?,?,?)",
+            c.execute("INSERT INTO candidates VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                       (r["county"],r["apn"],r["city"],r["zip"],r["address"],year,
                        r["residential"],permit,label,priority,"HISTORICAL_COVERAGE_UNVERIFIED"))
             seen += 1
@@ -343,49 +346,55 @@ def rebuild(args):
 
 def status(args):
     c = db_open(Path(args.db))
-    counts = {}
-    for table in ("properties","permits","candidates"):
-        counts[table] = c.execute("SELECT COUNT(*) FROM "+table).fetchone()[0]
-    source_runs = [dict(x) for x in c.execute("SELECT source_id,kind,county,jurisdiction,state,ingested,skipped,substr(file_sha256,1,16) AS sha_prefix,updated,coverage FROM source_runs ORDER BY source_id")]
-    counties = [dict(x) for x in c.execute("SELECT county,count(*) AS properties, sum(CASE WHEN residential=1 THEN 1 ELSE 0 END) AS classified_residential, sum(CASE WHEN year_built IS NULL THEN 1 ELSE 0 END) AS unknown_year_built FROM properties GROUP BY county")]
-    matched = [dict(x) for x in c.execute("SELECT status,count(*) AS properties FROM candidates GROUP BY status")]
-    emit({"version":VERSION,"counts":counts,"counties":counties,"candidate_categories":matched,"source_runs":source_runs,
-          "data_completeness":"NOT_COUNTYWIDE_VERIFIED","roof_age_claims":False,
-          "api_keys_required_for_public_exports":False,"external_actions":0})
+    try:
+        counts = {}
+        for table in ("properties","permits","candidates"):
+            counts[table] = c.execute("SELECT COUNT(*) FROM "+table).fetchone()[0]
+        source_runs = [dict(x) for x in c.execute("SELECT source_id,kind,county,jurisdiction,state,ingested,skipped,substr(file_sha256,1,16) AS sha_prefix,updated,coverage FROM source_runs ORDER BY source_id")]
+        counties = [dict(x) for x in c.execute("SELECT county,count(*) AS properties, sum(CASE WHEN residential=1 THEN 1 ELSE 0 END) AS classified_residential, sum(CASE WHEN year_built IS NULL THEN 1 ELSE 0 END) AS unknown_year_built FROM properties GROUP BY county")]
+        matched = [dict(x) for x in c.execute("SELECT status,count(*) AS properties FROM candidates GROUP BY status")]
+        emit({"version":VERSION,"counts":counts,"counties":counties,"candidate_categories":matched,"source_runs":source_runs,
+              "data_completeness":"NOT_COUNTYWIDE_VERIFIED","roof_age_claims":False,
+              "api_keys_required_for_public_exports":False,"external_actions":0})
+    finally:
+        c.close()
 
 def candidates(args,markets=False):
     c = db_open(Path(args.db))
-    cond = ["1=1"]; params=[]
-    if args.county != "all":
-        county = COUNTY_MAP.get(args.county.upper())
-        if not county:
-            raise ValueError("COUNTY_INVALID")
-        cond.append("county=?");params.append(county)
-    if args.city:
-        cond.append("city LIKE ?");params.append(args.city[:70]+"%")
-    if args.min_age:
-        cond.append("(year_built IS NULL OR year_built<=?)")
-        params.append(dt.date.today().year-args.min_age)
-    if not args.include_unclassified:
-        cond.append("residential=1")
-    if args.only_no_permit:
-        cond.append("status='NO_ROOF_PERMIT_IN_INGESTED_RECORDS'")
-    where = " AND ".join(cond)
-    if markets:
-        sql = ("""SELECT county,city,zip, count(*) AS candidates,
-              SUM(CASE WHEN status='NO_ROOF_PERMIT_IN_INGESTED_RECORDS' THEN 1 ELSE 0 END) AS no_permit_observed,
-              SUM(CASE WHEN status='ROOF_RELATED_PERMIT_20_PLUS' THEN 1 ELSE 0 END) AS old_roof_permit,
-              ROUND(AVG(priority),1) AS mean_review_priority
-              FROM candidates WHERE """+where+
-              " GROUP BY county,city,zip ORDER BY (no_permit_observed+old_roof_permit) DESC,mean_review_priority DESC LIMIT 100")
-    else:
-        sql = ("SELECT county,apn,city,zip,address,year_built,residential,last_roof_permit,status,priority,evidence "
-               "FROM candidates WHERE "+where+" ORDER BY priority DESC,county,zip,apn LIMIT 100")
-    data = [dict(x) for x in c.execute(sql,params)]
-    emit({"version":VERSION,"rows":data,"universe":"IMPORTED_PARCELS_NOT_ALL_HOUSES_VERIFIED",
-          "roof_condition_unknown":True,"no_permit_proves_no_replacement":False,
-          "unclassified_excluded":not args.include_unclassified})
+    try:
+        cond = ["1=1"]; params=[]
+        if args.county != "all":
+            county = COUNTY_MAP.get(args.county.upper())
+            if not county:
+                raise ValueError("COUNTY_INVALID")
+            cond.append("county=?");params.append(county)
+        if args.city:
+            cond.append("city LIKE ?");params.append(args.city[:70]+"%")
+        if args.min_age:
+            cond.append("(year_built IS NULL OR year_built<=?)")
+            params.append(dt.date.today().year-args.min_age)
+        if not args.include_unclassified:
+            cond.append("residential=1")
+        if args.only_no_permit:
+            cond.append("status='NO_ROOF_PERMIT_IN_INGESTED_RECORDS'")
+        where = " AND ".join(cond)
+        if markets:
+            sql = ("""SELECT county,city,zip, count(*) AS candidates,
+                  SUM(CASE WHEN status='NO_ROOF_PERMIT_IN_INGESTED_RECORDS' THEN 1 ELSE 0 END) AS no_permit_observed,
+                  SUM(CASE WHEN status='ROOF_RELATED_PERMIT_20_PLUS' THEN 1 ELSE 0 END) AS old_roof_permit,
+                  ROUND(AVG(priority),1) AS mean_review_priority
+                  FROM candidates WHERE """+where+
+                  " GROUP BY county,city,zip ORDER BY (no_permit_observed+old_roof_permit) DESC,mean_review_priority DESC LIMIT 100")
+        else:
+            sql = ("SELECT county,apn,city,zip,address,year_built,residential,last_roof_permit,status,priority,evidence "
+                   "FROM candidates WHERE "+where+" ORDER BY priority DESC,county,zip,apn LIMIT 100")
+        data = [dict(x) for x in c.execute(sql,params)]
+        emit({"version":VERSION,"rows":data,"universe":"IMPORTED_PARCELS_NOT_ALL_HOUSES_VERIFIED",
+              "roof_condition_unknown":True,"no_permit_proves_no_replacement":False,
+              "unclassified_excluded":not args.include_unclassified})
 
+    finally:
+        c.close()
 class FixedOriginRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         from urllib.parse import urlsplit
