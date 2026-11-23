@@ -139,6 +139,42 @@ are held; users are not asked to install unknown certificates or weaken HTTPS.
 No new background services, model/REA calls, emails, sales outreach, payments,
 or Elektron changes are authorized.
 
+## Evidence-based 500-property research pilot
+
+After completing the assessor and all three LA City permit sources, run the
+optional read-only `src/roofing/export_roofing_pilot_v1.py` command from the
+reviewed local repository. It selects **four ZIPs** from the user's observed
+market counts: 90011, 90049, 90731 and 90037. Each contributes **125 public
+parcel records** (65 with a latest roof-related permit dated 20+ years ago
+and 60 with no match in imported LA City permit history). Every parcel must
+be a selected residential research candidate and the building must be
+at least 25 years old. It is a deliberately balanced review sample, **not**
+a statistically representative random sample or a list of confirmed needs.
+
+The export:
+- Opens existing SQLite using `mode=ro` and `PRAGMA query_only=ON`.
+- Requires four completed official source receipts and the validated V3
+  selection index; stops on missing or insufficient strata.
+- Excludes any parcel with more recent roof-related permit evidence from
+  these two specific review cohorts. Those excluded from this pilot remain
+  in the database and can be researched separately.
+- Orders each quota deterministically by bounded research score, older
+  construction year, and APN. Scores are not roof-condition or conversion
+  probabilities.
+- Writes exactly 500 records into the user's local roofing `research_exports`
+  directory with source parcel ID, street address, city, ZIP, building year,
+  latest recorded roof-related permit, evidence cohort and next verification.
+  No contact names, telephone numbers, emails or owner identities are stored.
+- Escapes spreadsheet formulas in all CSV fields. No marketing actions,
+  outbound requests, license checks, database mutation, dashboard restart,
+  Qwen calls, procurement mutation, or Elektron changes are made.
+
+A recorded permit may be for roofing work other than a completed replacement;
+a missing match is **not** evidence of never having roof work. LA City permit
+feeds do not provide verified coverage for all municipalities in LA County.
+Review original permit details and property-specific history before treating
+a research sample as a sales opportunity.
+
 ## Preflight
 
 The guarded deployment reruns prior Node.js tests and the original Python
