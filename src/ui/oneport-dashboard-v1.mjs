@@ -32,6 +32,7 @@ export const DASHBOARD_HTML=String.raw`<!doctype html>
     <div class="fi-nav-eyebrow fi-nav-space">CAPABILITIES</div>
     <nav class="fi-nav" aria-label="System capabilities">
       <a href="#ml" data-section="ml"><span class="fi-icon" aria-hidden="true">⌘</span><span>Machine Learning</span></a>
+      <a href="#reasoning" data-section="reasoning"><span class="fi-icon" aria-hidden="true">∑</span><span>Semantic Reasoning</span></a>
       <a href="#workspace" data-section="workspace"><span class="fi-icon" aria-hidden="true">▦</span><span>Original Workspace</span></a>
     </nav>
     <div class="fi-sidebar-bottom">
