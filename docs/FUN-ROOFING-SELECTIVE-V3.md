@@ -175,6 +175,51 @@ feeds do not provide verified coverage for all municipalities in LA County.
 Review original permit details and property-specific history before treating
 a research sample as a sales opportunity.
 
+## Two parallel mathematical models: Existing V3 + permit-cycle V4
+
+The user's original Selective V3 formula remains unchanged, using age
+relevance, old permit flag, no observed permit flag, residential type, and
+evidence completeness for a bounded research-priority score. It does
+**not** estimate actual roof age or roof replacement probability.
+
+The new independent V4 formula reads the indexed property records and actual
+LA City historical permit records **without writing to the database**:
+
+- Choose ZIP codes (1–10 five-digit values), construction age (20–100 years),
+  historical interval `X` (10–50 years), recent window `R` (1–10 years, R < X),
+  and either *roof-related permits* or the narrower *replacement-like
+  description* class (classification is not completion verification).
+- `Gap_i(X)=1` if parcel `i` has an exact APN-matched roof-related
+  permit dated at least X years before the current calculation.
+- `Repeat_i(X,R)=1` if the **same parcel** has both a roof-related permit in
+  the last R years and an earlier recorded roof-related permit at least X
+  years before that newer permit. These are *recorded permit intervals*,
+  not verified reroof cycles.
+- `ZIP_recent_activity_per_1000 = 1000 * selected older parcels with
+  recent APN-exact roof permits / all selected older parcels in ZIP`.
+- `ZIP_observed_repeat_share = 100 * same-parcel long-gap recent repeats /
+  parcels with a recorded permit at least X years old` (null without
+  historical evidence). This is a historical observation subject to
+  record incompleteness and selection bias, **not** a predictive hazard
+  or calibrated replacement probability.
+
+V4 uses exact county+APN matching for observed repeat counts and **does
+not** infer missing roof work from absent permits. V3 may additionally
+include conservative address matching and is reported separately, with
+different evidence strength. Recent permits in this dataset mean
+*recent relative to the last imported file*, not ongoing live monitoring.
+
+The `/roofing/bulk/` dashboard includes two distinct panels and an
+operator-initiated **Calculate both formulas** control. The API is GET-only
+`/api/fun/roofing/bulk/formulas`, bounded by ZIP, interval, recent window,
+and permit classification. It never restarts AI, calls models, emails
+anyone, downloads external records, modifies the indexed data, or changes
+the existing production homepage.
+
+CLI comparison (after the completed official imports):
+
+`python -B src/roofing/roofing_dual_formulas_v4.py --db "%LOCALAPPDATA%/FunIndustrial/RoofingBulkV2/roofing.sqlite3" --years 20 --recent-years 5`
+
 ## Preflight
 
 The guarded deployment reruns prior Node.js tests and the original Python
