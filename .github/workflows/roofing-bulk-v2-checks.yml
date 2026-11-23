@@ -1,0 +1,33 @@
+name: Roofing Bulk V2 regression checks
+on:
+  push:
+    branches:
+      - feature/fun-roofing-bulk-v2-20261123
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-roofing-bulk:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Parse Python source without writing bytecode
+        run: python -c "import ast,pathlib; ast.parse(pathlib.Path('src/roofing/roofing_bulk_v2.py').read_text(encoding='utf-8')); print('ROOF_PYTHON_SYNTAX=PASS')"
+      - name: Test roof matching and source failure handling
+        run: python -B src/roofing/test_roofing_bulk_v2.py
+      - name: Validate server and browser JavaScript syntax
+        run: |
+          node --check scripts/Run-Fun-ML-Dashboard8802.mjs
+          node --check src/ui/roofing-bulk-page-v2.js
+          node --check src/roofing/roofing-bulk-bridge-v2.mjs
+      - name: Test existing dashboard and both roofing modules
+        run: node --test test/organized-ui-preview-v1.test.mjs test/roofing-opportunity-v1.test.mjs test/roofing-bulk-v2.test.mjs
