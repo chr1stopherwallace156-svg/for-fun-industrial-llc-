@@ -184,7 +184,7 @@ REQUIRED_CSV_FIELDS = frozenset(
     ("roll_year", "tax_year", "rollyear")
 )
 
-def csv_rows(binary, *, zip_conflict_policy="reject"):
+def csv_rows(binary, *, zip_conflict_policy="reject", additional_fields=()):
     """Project relevant columns from very wide CSVs in bounded memory.
 
     Duplicate critical non-ZIP columns must agree. Property ZIP differences
@@ -193,6 +193,12 @@ def csv_rows(binary, *, zip_conflict_policy="reject"):
     """
     if zip_conflict_policy not in ("reject", "hold"):
         raise ValueError("CSV_ZIP_CONFLICT_POLICY_INVALID")
+    # Audit-only fields are opt-in: standard imports and existing formulas
+    # continue projecting precisely the same columns as before.
+    if not isinstance(additional_fields,(tuple,list,set,frozenset)) or any(
+            name not in ("status_desc","status_date","cofo_date")
+            for name in additional_fields):
+        raise ValueError("CSV_ADDITIONAL_FIELDS_NOT_ALLOWLISTED")
     # TextIOWrapper owns the binary stream; scoped context also avoids Windows
     # file locks during test cleanup, including on exceptions.
     with io.TextIOWrapper(binary, encoding="utf-8-sig", errors="replace", newline="") as text:
@@ -205,7 +211,7 @@ def csv_rows(binary, *, zip_conflict_policy="reject"):
         positions = {}
         for index, original in enumerate(raw_headers):
             normalized = header(original)
-            if normalized in REQUIRED_CSV_FIELDS:
+            if normalized in REQUIRED_CSV_FIELDS or normalized in additional_fields:
                 positions.setdefault(normalized, []).append(index)
         if not positions:
             raise ValueError("CSV_NO_SUPPORTED_PROPERTY_OR_PERMIT_COLUMNS")
