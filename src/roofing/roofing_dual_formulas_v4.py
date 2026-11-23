@@ -115,7 +115,7 @@ def analyze(db, *, zips=DEFAULT_ZIPS, years=20, recent_years=5,
         base = {r["zip"]: dict(r) for r in conn.execute(base_sql, params)}
         # Exact parcel match only, using existing (county,APN) permit index.
         # Complete-permit source IDs are pinned. No owner/contact fields.
-        event_sql = f"""SELECT s.zip,s.apn,e.source_id,e.permit_id,
+        event_sql = f"""SELECT s.zip,s.apn,s.priority,e.source_id,e.permit_id,
                e.issue_date,e.roof_class
               FROM roofing_selection_candidates_v3 s
               JOIN permits e ON e.county=s.county AND e.apn=s.apn
@@ -124,11 +124,13 @@ def analyze(db, *, zips=DEFAULT_ZIPS, years=20, recent_years=5,
                 AND s.year_built <= ? AND s.zip IN ({placeholders})
               ORDER BY s.zip,s.apn,e.issue_date"""
         events = defaultdict(list)
+        formula_a_scores = {}
         seen = set()
         for row in conn.execute(event_sql, (*PERMIT_SOURCES, *params)):
             if kind == "replacement_like" and row["roof_class"] != "REPLACEMENT_LIKE":
                 continue
             key = (row["zip"], row["apn"])
+            formula_a_scores[key] = row["priority"]
             evidence_key = (row["source_id"], row["permit_id"], *key)
             if evidence_key in seen:
                 continue
@@ -172,7 +174,9 @@ def analyze(db, *, zips=DEFAULT_ZIPS, years=20, recent_years=5,
                 stats["recent_long_gap_repeat_properties"] += 1
             if len(samples) < 12 and (repeat or last <= old_cutoff):
                 samples.append({
-                    "zip": z, "apn": apn, "last_roof_related_permit":last.isoformat(),
+                    "zip": z, "apn": apn,
+                    "formula_a_existing_priority":formula_a_scores.get((z,apn)),
+                    "last_roof_related_permit":last.isoformat(),
                     "years_since_last_recorded_permit":round(gap,1),
                     "recent_long_gap_repeat_observed":repeat,
                     "not_proof_of_replacement":True,
