@@ -73,10 +73,41 @@ class TestV5(unittest.TestCase):
     def test_msbuild_generator_is_isolated_from_old_failed_nmake(self):
         import inspect
         src = inspect.getsource(train.prepare_binary)
-        self.assertIn('cpu-train-build-vs2022-x64', src)
+        self.assertIn('cpu-train-build-vs2022-noasm-v1', src)
         self.assertIn('Visual Studio 17 2022', src)
-        self.assertIn('fresh_log(root,"cmake-configure-vs2022")', src)
-        self.assertIn('fresh_log(root,"cmake-build-vs2022")', src)
+        self.assertIn('fresh_log(root,"cmake-configure-vs2022-noasm")', src)
+        self.assertIn('fresh_log(root,"cmake-build-vs2022-noasm")', src)
+        self.assertIn('prepare_msvc_noasm_overlay(root, source)', src)
+
+    def test_msvc_asm_overlay_preserves_pinned_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pristine = root / "pinned"
+            (pristine / "ggml").mkdir(parents=True)
+            source_file = pristine / "ggml" / "CMakeLists.txt"
+            original = b'cmake_minimum_required(VERSION 3.14)\nproject("ggml" C CXX ASM)\n'
+            source_file.write_bytes(original)
+            overlay = train.prepare_msvc_noasm_overlay(root, pristine)
+            modified = (overlay / "ggml" / "CMakeLists.txt").read_bytes()
+            self.assertEqual(source_file.read_bytes(), original)
+            self.assertIn(b'if(MSVC)', modified)
+            self.assertIn(b'project("ggml" C CXX)\n', modified)
+            self.assertIn(b'else()\n    project("ggml" C CXX ASM)', modified)
+            self.assertEqual(overlay,train.prepare_msvc_noasm_overlay(root, pristine))
+            with open(overlay / "ggml" / "CMakeLists.txt", "ab") as f:
+                f.write(b'\nchanged')
+            with self.assertRaises(RuntimeError):
+                train.prepare_msvc_noasm_overlay(root, pristine)
+
+    def test_msvc_asm_overlay_rejects_unexpected_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            pristine = root / "pinned"
+            (pristine / "ggml").mkdir(parents=True)
+            (pristine / "ggml" / "CMakeLists.txt").write_text(
+                'project("ggml" C CXX)',encoding="utf-8")
+            with self.assertRaises(RuntimeError):
+                train.prepare_msvc_noasm_overlay(root, pristine)
 
     def test_msbuild_requirements_are_verified_before_build(self):
         import inspect
