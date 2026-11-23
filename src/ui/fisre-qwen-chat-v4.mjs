@@ -11,8 +11,13 @@ const extra='<details id="fi-fial53-code-panel" style="margin:12px 0;padding:13p
  '<label for="fi-fial53-ranges">Input domains, one per line</label>'+
  '<textarea id="fi-fial53-ranges" spellcheck="false" style="display:block;width:100%;min-height:65px;background:#0c1825;color:#e6edf5;border:1px solid #537187;border-radius:8px;padding:9px;font:12px Consolas,monospace" placeholder="cost=0:1000&#10;margin=0:0.5"></textarea>'+
  '<p style="font-size:12px;color:#a9c6d0">The model interprets evidence, not an independent proof. External tool approvals remain separate.</p></details>';
+const inventory='<details id="fi-fial53-capability-panel" style="margin:12px 0;padding:13px;border:1px solid #3d5770;border-radius:12px;background:#0d1b29">'+
+ '<summary style="cursor:pointer;font-weight:700">Fun Industrial intelligence domains</summary>'+
+ '<p style="color:#a8bac9">Qwen can use available read-only evidence from the existing modules. The list does not grant execution authority or imply every worker is online.</p>'+
+ '<pre id="fi-fial53-capability-list" style="font:12px/1.6 Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;color:#bad3df">Checking local capability inventory…</pre>'+
+ '</details>';
 const panel=GROUNDED_PANEL
- .replace('<p><button id="fi-fial53-send"',extra+'<p><button id="fi-fial53-send"')
+ .replace('<p><button id="fi-fial53-send"',inventory+extra+'<p><button id="fi-fial53-send"')
  .replace('No tools are requested or executed from this conversation.',
   'An optional local FISRE analyzer reads code as data; no arbitrary code execution or REA actions occur.')
  .replace('No model tool definitions, automatic retries, memory writes, or REA execution.',
