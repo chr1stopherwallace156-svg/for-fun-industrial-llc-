@@ -21,7 +21,7 @@ from pathlib import Path
 from roofing_dual_formulas_v4 import (
     DEFAULT_ZIPS, PERMIT_SOURCES, require_receipts, validate, cutoff
 )
-from roofing_neighbor_context_v5 import neighbor_context
+from roofing_neighbor_context_v5 import neighbor_context, street_block
 
 VERSION="fun-roofing-location-research-report-v9"
 ROOT=Path(os.environ.get("LOCALAPPDATA",str(Path.home()/"AppData"/"Local")))/"FunIndustrial"/"RoofingBulkV2"
@@ -44,6 +44,11 @@ PROPERTY_FIELDS=(
     "other_properties_with_recent_exact_apn_permit",
     "permit_kind","recent_years","historical_x_years",
     "research_label",
+)
+RECENT_PERMIT_FIELDS=(
+    "zip","street_number_block","address","apn",
+    "construction_year","latest_recent_permit_issue_date",
+    "permit_description_class","research_label",
 )
 ZIP_FIELDS=(
     "zip","selected_older_residential_properties",
@@ -170,16 +175,60 @@ def analyze_locations(db,*,zips=DEFAULT_ZIPS,years=20,recent_years=5,
             -row["other_properties_with_recent_exact_apn_permit"],
             -int(row["formula_a_existing_priority"] or 0),
             row["address"],row["apn"]))
+        # The permit-side location list is distinct from candidate properties:
+        # it shows which exact-APN parcels have recorded recent permit activity
+        # *within* the qualifying blocks. No homeowner/person fields.
+        places=",".join("?" for _ in zips)
+        src_places=",".join("?" for _ in PERMIT_SOURCES)
+        evidence_sql=f"""SELECT s.zip,s.apn,s.address,s.year_built,
+                   e.issue_date,e.roof_class
+            FROM roofing_selection_candidates_v3 s
+            JOIN permits e ON e.county=s.county AND e.apn=s.apn
+            WHERE s.disposition='KEEP' AND s.county=? AND s.city=?
+              AND s.year_built<=? AND s.zip IN ({places})
+              AND e.source_id IN ({src_places})
+              AND e.issue_date>=? AND e.issue_date<=?"""
+        evidence_args=("Los Angeles",city,today.year-min_building_age,*zips,
+                      *PERMIT_SOURCES,cutoff(today,recent_years).isoformat(),
+                      today.isoformat())
+        if kind=="replacement_like":
+            evidence_sql+=" AND e.roof_class='REPLACEMENT_LIKE'"
+        activity={}
+        for item in conn.execute(evidence_sql,evidence_args):
+            block_key=street_block(item["address"])
+            if block_key is None:continue
+            named=f"{block_key[1]*100}-{block_key[1]*100+99} {block_key[0]}"
+            group_key=(item["zip"],named)
+            if group_key not in block_index:continue
+            apn_key=(item["zip"],item["apn"])
+            if (apn_key in activity and
+                    activity[apn_key]["latest_recent_permit_issue_date"]>=item["issue_date"]):
+                continue
+            activity[apn_key]={
+                "zip":item["zip"],"street_number_block":named,
+                "address":item["address"],"apn":item["apn"],
+                "construction_year":item["year_built"],
+                "latest_recent_permit_issue_date":item["issue_date"],
+                "permit_description_class":item["roof_class"],
+                "research_label":"RECORDED_RECENT_ROOF_PERMIT_NOT_PROOF_OF_COMPLETED_REPLACEMENT",
+            }
+            if len(activity)>20000:
+                raise ValueError("LOCATION_RECENT_ACTIVITY_REPORT_LIMIT_EXCEEDED")
+        recent_locations=sorted(activity.values(),key=lambda row:(
+            block_index[(row["zip"],row["street_number_block"])]["rank"],
+            -int(row["latest_recent_permit_issue_date"].replace("-","")),
+            row["address"],row["apn"]))
         zip_rows=[]
         for z in zips:
             b=[x for x in blocks if x["zip"]==z]
             zip_rows.append({
                 "zip":z,
-                "selected_older_residential_properties":sum(1 for _ in conn.execute(
-                    """SELECT 1 FROM roofing_selection_candidates_v3
+                "selected_older_residential_properties":conn.execute(
+                    """SELECT COUNT(*) FROM roofing_selection_candidates_v3
                     WHERE county=? AND city=? AND disposition='KEEP'
                       AND zip=? AND year_built<=?""",
-                    ("Los Angeles",city,z,today.year-min_building_age))),
+                    ("Los Angeles",city,z,today.year-min_building_age)
+                ).fetchone()[0],
                 "qualified_100_number_street_blocks":len(b),
                 "qualified_unique_properties":sum(1 for x in properties if x["zip"]==z),
                 "recorded_recent_permit_parcels_in_qualified_blocks":
@@ -199,8 +248,10 @@ def analyze_locations(db,*,zips=DEFAULT_ZIPS,years=20,recent_years=5,
                 "permit_kind":kind,"age_cohort_tolerance":peer_years,
                 "min_similar_age_neighbors":min_peers},
             "zip_rows":zip_rows,"blocks":blocks,"properties":properties,
+            "recent_permit_locations":recent_locations,
             "total_qualified_street_blocks":len(blocks),
             "total_qualified_unique_properties":len(properties),
+            "total_recent_permit_locations_in_qualified_blocks":len(recent_locations),
             "source_permit_coverage_not_complete_countywide":True,
             "no_recorded_permit_does_not_mean_no_roof_work":True,
             "construction_year_is_not_actual_roof_age":True,
@@ -224,6 +275,7 @@ def write_reports(result,output_dir):
         ("zip_market_summary",ZIP_FIELDS,result["zip_rows"]),
         ("ranked_street_blocks",BLOCK_FIELDS,result["blocks"]),
         ("qualified_property_research",PROPERTY_FIELDS,result["properties"]),
+        ("recent_permit_locations",RECENT_PERMIT_FIELDS,result["recent_permit_locations"]),
     )
     try:
         for title,fields,rows in datasets:
@@ -263,6 +315,7 @@ def main():
     print(f"ROOFING_LOCATION_REPORT={result['state']}")
     print(f"QUALIFYING_STREET_BLOCKS={result['total_qualified_street_blocks']}")
     print(f"QUALIFYING_UNIQUE_PROPERTIES={result['total_qualified_unique_properties']}")
+    print(f"RECENT_PERMIT_LOCATIONS={result['total_recent_permit_locations_in_qualified_blocks']}")
     print(f"FILTER_X_YEARS={args.years} BUILDING_MIN_AGE={args.min_building_age} "
           f"RECENT_PERMIT_YEARS={args.recent_years} PERMIT_KIND={args.permit_kind}")
     for row in result["zip_rows"]:
