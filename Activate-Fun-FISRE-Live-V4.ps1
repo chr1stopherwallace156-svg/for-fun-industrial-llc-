@@ -122,6 +122,16 @@ function ReportUpstreamStatus(){
    Write-Warning ('FUN_FISRE_DEPENDENCY='+$p+' STATE=DEGRADED_HTTP_ONLY NO_RESTART')
   }
  }
+ try{
+  $ml=Invoke-RestMethod ($Url+'/api/ml/dashboard/status') -TimeoutSec 6
+  if($ml.state -ceq 'ready' -and $ml.bridge -ceq 'fun-ml-dashboard-v3'){
+   Write-Host 'FUN_QWEN_EXISTING_ML_8801=READY'
+  }else{
+   Write-Warning 'FUN_QWEN_EXISTING_ML_8801=UNAVAILABLE_OR_UNVERIFIED NO_RESTART'
+  }
+ }catch{
+  Write-Warning 'FUN_QWEN_EXISTING_ML_8801=UNAVAILABLE_HTTP NO_RESTART'
+ }
 }
 function StartDashboard([string]$file,[string]$directory,[string]$label){
  $out=Join-Path $Log ($label+'.stdout.log')
