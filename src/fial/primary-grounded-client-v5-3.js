@@ -13,7 +13,22 @@
   article.append(title,content);history.append(article);
   article.scrollIntoView({block:'nearest',behavior:'auto'});
  }
+ async function showCapabilityInventory(){
+  const box=byId('fi-fial53-capability-list');
+  if(!box)return;
+  try{
+   const res=await fetch('/api/fun/capabilities/status',{method:'GET',cache:'no-store'});
+   if(!res.ok)throw Error('HTTP '+res.status);
+   const data=await res.json();
+   if(data.version!=='fun-ai-capability-fabric-v1'||!Array.isArray(data.domains))
+    throw Error('CAPABILITY_LIST_UNVERIFIED');
+   box.textContent=data.domains.slice(0,16).map(x=>
+    String(x.name||x.id).slice(0,100)+' — '+String(x.state||'unknown').slice(0,100)).join('\n')+
+    '\n\nInventory is informational. Operations remain operator-reviewed.';
+  }catch{box.textContent='The local capability inventory is unavailable; no tool availability is assumed.'}
+ }
  async function check(){
+  void showCapabilityInventory();
   try{
    const r=await fetch('/api/fial/grounded/status',{method:'GET',cache:'no-store'});
    if(!r.ok)throw Error('HTTP '+r.status);
@@ -48,7 +63,7 @@
     entry('Qwen',String(result.answer||''));
     status.textContent='Qwen answered · Cognee: '+String(result.memory_state||'unknown')+
      (result.fisre?.status?' · FISRE: '+String(result.fisre.status):'')+
-     ' · no external tools executed';
+     ' · read-only contexts: '+String(result.capabilities_referenced?.length||0)+' · no external tools executed';
    }else if(result.state==='REFERENCE_ONLY_MODEL_EMPTY'){
     entry('Unverified stored memory (Qwen did not answer)',String(result.answer||''));
     status.textContent=String(result.warning||'Qwen returned empty text');
