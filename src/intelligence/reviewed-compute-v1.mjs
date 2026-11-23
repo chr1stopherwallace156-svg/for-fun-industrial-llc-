@@ -214,6 +214,19 @@ export function createReviewedCompute({ml,runSolver=runIsolatedSolver,clock=Date
    pending=null;recent=null;
    return {version:COMPUTE_VERSION,state:'cancelled_no_execution',executedActions:0};
   },
-  lastEvidence(){return recent?{...recent}:null}
+  lastEvidence(){return recent?{...recent}:null},
+  recommend(question){
+   if(typeof question!=='string'||question.length>1200)return null;
+   let kind=null;
+   if(/\b(?:optuna|stock|inventory (?:level|optimization)|reorder level)\b/i.test(question))
+    kind='optuna_inventory';
+   else if(/\b(?:or.tools|ortools|vehicle routing|shortest route|route optimization|route planning)\b/i.test(question))
+    kind='ortools_routing';
+   else if(/\b(?:scikit|machine learning|training dataset|classification|regression model)\b/i.test(question))
+    kind='ml_history';
+   if(!kind)return null;
+   return {kind,state:'suggestion_only',operatorApprovalRequired:true,
+    datasetRequired:true,executionPerformed:false};
+  }
  });
 }
