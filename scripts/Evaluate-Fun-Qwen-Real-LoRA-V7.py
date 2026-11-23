@@ -17,11 +17,11 @@ import subprocess
 import sys
 import time
 
-VERSION="fun-real-qwen-base-vs-lora-inference-v7"
+VERSION="fun-real-qwen-base-vs-lora-answer-evaluation-v7-1"
 ROOT=Path(__file__).resolve().parents[1]
 CONSENT="I_APPROVE_ISOLATED_QWEN_BASE_ADAPTER_EVALUATION"
 MAX_CASES=3
-MAX_GENERATION_TOKENS=96
+MAX_GENERATION_TOKENS=160
 MAX_CHILD_SECONDS=300
 MIN_HOST_FREE_GIB=4.3
 MIN_COMMIT_HEADROOM_GIB=4.0
@@ -42,7 +42,7 @@ ADAPTER=APP/"candidate"/"qwen-fibonacci-smoke.lora.gguf"
 RECEIPT=APP/"receipt.json"
 TRAINING_LOG=APP/"training.log"
 BUILD=APP/"cpu-train-build-vs2022-noasm-v1"
-RUN_DIR=APP/"evaluation-v7"
+RUN_DIR=APP/"evaluation-v71"
 EXPECTED_TRAINING_SHA=v6.EXPECTED_ADAPTER_SHA
 GENERATION_SEED=6427
 
@@ -118,6 +118,50 @@ def initial_resources():
                            " commit="+str(m["commit_headroom_gib"]))
     return m
 
+def qwen_nonthinking_prefill(question):
+    """Explicit non-thinking ChatML prefill, not fork CLI --reasoning toggle.
+
+    In llama-tq completion.cpp, common_chat_templates_apply() is invoked
+    without forwarding params.default_template_kwargs. That makes
+    --reasoning off insufficient in practice: prior V7 outputs began <think>.
+    Bypass that path with the official Qwen3 empty-think prefill.
+    """
+    if not question or any(tag in question for tag in
+                           ("<|im_start|>","<|im_end|>","<think>","</think>")):
+        raise RuntimeError("UNSAFE_OR_EMPTY_BENCHMARK_QUESTION")
+    return (
+        "<|im_start|>system\n"
+        "You are a precise assistant. Answer the question directly and briefly. "
+        "Give only the final answer.\n"
+        "<|im_end|>\n"
+        "<|im_start|>user\n" + question.strip() +
+        "\n/no_think\n<|im_end|>\n"
+        "<|im_start|>assistant\n<think>\n\n</think>\n\n"
+    )
+
+
+def reference_evidence(case, generated):
+    """Deterministic spot evidence; not a general mathematical grading claim."""
+    if "<think>" in generated or "</think>" in generated:
+        return {"mode_valid":False, "reference_match":None,
+                "automated_result":"HOLD_THINKING_OUTPUT"}
+    if case["id"]=="heldout-recurrence":
+        expected=re.search(r"=(\d+)\.",case["reference_answer"])
+        if not expected:
+            raise RuntimeError("RECURRENCE_REFERENCE_UNPARSEABLE")
+        digits=re.sub(r"(?<=\d),(?=\d)","",generated)
+        return {"mode_valid":True,
+                "reference_match":bool(re.search(r"(?<!\d)"+re.escape(expected.group(1))+r"(?!\d)",digits)),
+                "expected_next_value":int(expected.group(1)),
+                "automated_result":"EXPECTED_NUMBER_PRESENT_OR_ABSENT_NOT_PROOF_OF_FULL_REASONING"}
+    if case["id"]=="general-control":
+        return {"mode_valid":True,
+                "reference_match":bool(re.search(r"\bTokyo\b",generated,re.I)),
+                "automated_result":"CONTROL_KEYWORD_PRESENT_OR_ABSENT"}
+    return {"mode_valid":True,"reference_match":None,
+            "automated_result":"MANUAL_REVIEW_REQUIRED_TIES_AND_GENERALIZATION"}
+
+
 def run_case(binary, case, mode, output_root):
     if mode not in ("baseline","adapter"):
         raise RuntimeError("INVALID_MODE")
@@ -128,8 +172,9 @@ def run_case(binary, case, mode, output_root):
     if stdout_file.exists() or stderr_file.exists():
         raise RuntimeError("EVALUATION_LOG_EXISTS_NO_OVERWRITE_"+case["id"]+"_"+mode)
     cmd=[str(binary),"-m",str(MODEL),
-         "-cnv","-st","--reasoning","off",
-         "-p",case["prompt"],"--no-display-prompt","--simple-io",
+         "-no-cnv","-st",
+         "-p",qwen_nonthinking_prefill(case["prompt"]),
+         "--no-display-prompt","--simple-io",
          "-n",str(MAX_GENERATION_TOKENS),"--temp","0",
          "--seed",str(GENERATION_SEED),
          "-ngl","0","-c","512","-b","128","-ub","128","-t","4"]
@@ -181,11 +226,13 @@ def run_case(binary, case, mode, output_root):
         if "loaded 4 tensors from lora file" in stderr:
             raise RuntimeError("BASELINE_UNEXPECTEDLY_LOADED_LORA")
     generated=ANSI.sub("",std)
-    generated=generated.replace(" [end of text]","").strip()
+    generated=generated.replace(" [end of text]","").replace("<|im_end|>","").strip()
     if not generated:
         raise RuntimeError("NO_GENERATED_TEXT_"+case["id"]+"_"+mode)
     if len(generated)>15000:
         raise RuntimeError("UNEXPECTED_EVAL_OUTPUT_SIZE")
+    if "<think>" in generated or "</think>" in generated:
+        raise RuntimeError("QWEN_NONTHINKING_PREFILL_NOT_HONORED_"+case["id"]+"_"+mode)
     return {
         "mode":mode,"case":case["id"],"elapsed_seconds":round(time.monotonic()-start,3),
         "peak_child_private_commit_gib_observed":peak_child_commit,
@@ -229,11 +276,15 @@ def main():
             "reference_answer":case["reference_answer"],
             "baseline":base,
             "adapter":adapted,
+            "baseline_reference_evidence":reference_evidence(case,base["generated_text"]),
+            "adapter_reference_evidence":reference_evidence(case,adapted["generated_text"]),
             "exact_generated_text_changed":base["generated_sha256"]!=adapted["generated_sha256"]
         })
         print("FUN_QWEN_V7_CASE_RESULT="+json.dumps({
             "id":case["id"],"baseline_response":base["generated_text"],
             "adapter_response":adapted["generated_text"],
+            "baseline_reference_evidence":records[-1]["baseline_reference_evidence"],
+            "adapter_reference_evidence":records[-1]["adapter_reference_evidence"],
             "exact_generated_text_changed":records[-1]["exact_generated_text_changed"]},
             sort_keys=True),flush=True)
     if len(records)!=MAX_CASES:
@@ -249,7 +300,9 @@ def main():
         "unchanged_response_count":len(records)-changed,
         "sampling_temperature":0,"sampling_seed":GENERATION_SEED,
         "max_generation_tokens":MAX_GENERATION_TOKENS,
-        "result_qualification":"Observed text differences (or lack thereof) are not a measure of improved factual accuracy.",
+        "nonthinking_prompt_format":"raw_Qwen3_ChatML_empty_think_prefill",
+        "nonthinking_mode_observed_for_all_completed_runs":True,
+        "result_qualification":"Spot checks and exact text differences are preliminary; only two Fibonacci questions and one general control.",
         "fibonacci_generalization_or_improvement_proven":False,
         "full_curriculum_training_done":False,
         "original_model_changed":False,
