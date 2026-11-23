@@ -7,6 +7,14 @@ param(
 )
 $ErrorActionPreference='Stop'
 $Root=Split-Path -Parent $MyInvocation.MyCommand.Path
+if(-not $env:LOCALAPPDATA){throw 'FUN_REALDATA_LOCAL_STORAGE_NOT_CONFIGURED'}
+$driveLetter=([System.IO.Path]::GetPathRoot($env:LOCALAPPDATA)).Substring(0,1)
+$volume=Get-PSDrive -Name $driveLetter -ErrorAction Stop
+$required=if($Source -eq 'la_assessor_2021_2025'){18GB}else{8GB}
+if($null -eq $volume.Free -or [double]$volume.Free -lt [double]$required){
+ throw ('FUN_REALDATA_FREE_DISK_HOLD_DRIVE='+$driveLetter+' REQUIRED_GB='+($required/1GB))
+}
+Write-Host ('FUN_REALDATA_DISK_PRECHECK=PASS FREE_GB='+[math]::Round(($volume.Free/1GB),1))
 $Activate=Join-Path $Root 'Activate-Fun-Roofing-Bulk-V2.ps1'
 if(-not(Test-Path -LiteralPath $Activate)){throw 'FUN_REALDATA_ACTIVATION_SCRIPT_NOT_FOUND'}
 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Activate
