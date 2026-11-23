@@ -70,6 +70,20 @@ class TestV5(unittest.TestCase):
         self.assertLess(train.MAX_CHILD_PRIVATE_COMMIT_GIB,6.0)
         self.assertLessEqual(train.MAX_BUILD_SECONDS,1800)
 
+    def test_msbuild_generator_is_isolated_from_old_failed_nmake(self):
+        import inspect
+        src = inspect.getsource(train.prepare_binary)
+        self.assertIn('cpu-train-build-vs2022-x64', src)
+        self.assertIn('Visual Studio 17 2022', src)
+        self.assertIn('fresh_log(root,"cmake-configure-vs2022")', src)
+        self.assertIn('fresh_log(root,"cmake-build-vs2022")', src)
+
+    def test_msbuild_requirements_are_verified_before_build(self):
+        import inspect
+        src = inspect.getsource(train.requirements)
+        self.assertIn('Microsoft.VisualStudio.Component.VC.Tools.x86.x64', src)
+        self.assertIn('MSVC_2022_CPP_WORKLOAD_NOT_INSTALLED', src)
+
     def test_actual_training_requires_explicit_consent(self):
         self.assertEqual(train.CONSENT,"I_APPROVE_ISOLATED_REAL_QWEN_LORA_TRAINING")
         self.assertIn("GGUF",train.VERSION.upper())
