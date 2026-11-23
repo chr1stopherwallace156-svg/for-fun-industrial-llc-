@@ -7,6 +7,8 @@ import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const exec=promisify(execFile);
 const SCRIPT=fileURLToPath(new URL('./roofing_bulk_v2.py',import.meta.url));
+const SELECTIVE_SCRIPT=fileURLToPath(new URL('./selective_extract_v3.py',import.meta.url));
+export const SELECTIVE_VERSION='fun-roofing-selective-v3';
 const ROOT=process.env.LOCALAPPDATA?join(process.env.LOCALAPPDATA,'FunIndustrial','RoofingBulkV2'):null;
 const DB=ROOT?join(ROOT,'roofing.sqlite3'):null;
 export const BULK_VERSION='fun-roofing-bulk-v2';
@@ -57,12 +59,31 @@ export async function bulkPython(cmd,args=[],{timeout=20000}={}){
  if(data.version!=='fun-roofing-bulk-v2')throw Error('FUN_BULK_WORKER_VERSION_MISMATCH');
  return {...data,stderr:stderr?.slice(0,180)||undefined};
 }
+export async function selectivePython(cmd,args=[],{timeout=30000}={}){
+ if(!ROOT||!DB)throw Error('FUN_SELECTION_LOCALAPPDATA_NOT_CONFIGURED');
+ if(!existsSync(DB))return {version:SELECTIVE_VERSION,state:'NO_DATABASE',
+    selected:0,held:0,excluded:0,rows:[]};
+ const {stdout}=await exec(python(),[SELECTIVE_SCRIPT,'--db',DB,cmd,...args],
+  {windowsHide:true,timeout,maxBuffer:512*1024,
+   env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});
+ const value=stdout.trim().split(/\r?\n/).filter(Boolean).at(-1);
+ if(!value||value.length>512*1024)throw Error('FUN_SELECTION_WORKER_INVALID');
+ const result=JSON.parse(value);
+ if(result.version!==SELECTIVE_VERSION)throw Error('FUN_SELECTION_WORKER_VERSION_MISMATCH');
+ return result;
+}
 export async function bulkOverview(){
  let db;
  try{db=await bulkPython('status')}catch(e){db={version:BULK_VERSION,
    state:'WORKER_UNAVAILABLE',error:String(e.message||e).slice(0,200),
    counts:{properties:0,permits:0,candidates:0},source_runs:[]}}
- return {...db,version:BULK_VERSION,sourceDirectory:ALLOWED_SOURCES,
+ let selection;
+ try{selection=await selectivePython('status')}catch(e){
+  selection={version:SELECTIVE_VERSION,state:'WORKER_UNAVAILABLE',
+    error:String(e.message||e).slice(0,180),selected:0,held:0,excluded:0};
+ }
+ return {...db,version:BULK_VERSION,sourceDirectory:ALLOWED_SOURCES,selection,
+   counts:{...db.counts,candidates:(selection.selected||0)+(selection.held||0)},
    job:active?{source:active.source,pid:active.pid,state:'RUNNING',started:active.started}:latest,
    ...holds(),claimsAboutAllHomes:false,permitHistoryCoverageVerified:false};
 }
@@ -75,9 +96,9 @@ export async function bulkMarkets({county='all',city='',minAge=20,onlyNoPermit=f
  const args=['--county',county,'--min-age',String(minAge)];
  if(city)args.push('--city',city);
  if(onlyNoPermit)args.push('--only-no-permit');
- if(includeUnclassified)args.push('--include-unclassified');
- const result=await bulkPython(detail?'candidates':'markets',args);
- return {...result,version:BULK_VERSION,...holds()};
+ if(includeUnclassified)args.push('--include-holds');
+ const result=await selectivePython(detail?'candidates':'markets',args);
+ return {...result,...holds()};
 }
 export function startBulkSync(sourceId){
  const source=ALLOWED_SOURCES.find(s=>s.id===sourceId);
