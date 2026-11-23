@@ -68,6 +68,13 @@ class QwenLikelihoodV9Tests(unittest.TestCase):
         self.assertNotIn("git clone",source)
         self.assertNotIn("pip install",source)
 
+    def test_tied_model_selection_references_excluded(self):
+        import inspect
+        source=inspect.getsource(v9.make_corpora)
+        self.assertIn('values.count(min(values))==1',source)
+        self.assertIn("V9_MODEL_SELECTION_ERRORS_NOT_PARSEABLE",source)
+        self.assertIn("unambiguous.append(row)",source)
+
     def test_perplexity_runs_sequentially_with_native_lora_attestation(self):
         import inspect
         source=inspect.getsource(v9.run_ppl)
