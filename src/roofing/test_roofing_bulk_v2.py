@@ -196,6 +196,20 @@ class RoofingBulkTests(unittest.TestCase):
             state=c.execute("SELECT state FROM source_runs WHERE source_id='municipal_la_conflict_fixture'").fetchone()[0]
             self.assertEqual(state,"INCOMPLETE_IMPORT_HOLD")
 
+    def test_assessor_first_building_year_alias_is_recognized(self):
+        import csv
+        path=self.root/"assessor_first_building.csv"
+        with path.open("w",encoding="utf-8",newline="") as out:
+            writer=csv.writer(out)
+            writer.writerow(["AIN","Property Location","YearBuilt1",
+                             "Property Use Type","Roll Year"])
+            writer.writerow(["0123456789","123 MAIN ST, LOS ANGELES, CA 90001",
+                             "1978","Single Family Residential","2025"])
+        self.ingest(str(path),"municipal_la_year_alias_fixture","la_properties")
+        with self.connect() as db:
+            row=db.execute("SELECT year_built,address FROM properties").fetchone()
+        self.assertEqual(row,(1978,"123 MAIN ST"))
+
     def test_existing_assessor_archive_is_reused_without_network(self):
         from types import SimpleNamespace
         folder=self.root/"official_downloads"
