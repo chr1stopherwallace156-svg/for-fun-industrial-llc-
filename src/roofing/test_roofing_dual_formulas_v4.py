@@ -74,6 +74,9 @@ class DualFormulaTests(unittest.TestCase):
         self.assertEqual(cycle["historical_permit_properties"],2)
         self.assertEqual(cycle["recent_repeat_with_gap_at_least_x_years"],1)
         self.assertEqual(cycle["historical_to_recent_repeat_share_pct"],50.0)
+        self.assertTrue(any(s["formula_a_existing_priority"] == 90
+                            and s["recent_long_gap_repeat_observed"]
+                            for s in data["public_parcel_id_examples"]))
         self.assertFalse(cycle["rate_not_a_replacement_probability"] is False)
 
     def test_no_recent_repeat_as_a_replacement_claim(self):
