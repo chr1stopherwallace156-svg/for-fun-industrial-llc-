@@ -130,10 +130,16 @@ $mlOk=MLReady
 $previewOk=PreviewReady
 $qwenOk=QwenReady
 $gatewayOk=GatewayReady
-foreach($pair in @(@('CORE',$coreOk),@('QWEN_8088',$qwenOk),@('ML_8801',$mlOk),@('ORGANIZED_8802',$previewOk))){
- $state=if($pair[1]){'READY'}else{'HOLD'}
- Write-Host ('FUN_'+$pair[0]+'='+$state)
- if(!$pair[1]){$Issues.Add($pair[0]+' not verified')}
+$checks=@(
+ @{Name='CORE';Ready=$coreOk},
+ @{Name='QWEN_8088';Ready=$qwenOk},
+ @{Name='ML_8801';Ready=$mlOk},
+ @{Name='ORGANIZED_8802';Ready=$previewOk}
+)
+foreach($check in $checks){
+ $state=if($check.Ready){'READY'}else{'HOLD'}
+ Write-Host ('FUN_'+$check.Name+'='+$state)
+ if(!$check.Ready){$Issues.Add($check.Name+' not verified')}
 }
 foreach($version in @('V1','V2','V3')){
  $name='FunIndustrial-MathResearch'+$version+'-Daily'
@@ -163,4 +169,5 @@ if($Issues.Count -eq 0){Write-Host 'FUN_INDUSTRIAL_EVERYTHING=PASS'}
 else{
  Write-Warning ('FUN_INDUSTRIAL_EVERYTHING=PARTIAL CHECKS='+$Issues.Count)
  foreach($item in $Issues){Write-Warning ('FUN_START_NOTE='+$item)}
+ throw ('FUN_INDUSTRIAL_EVERYTHING_PARTIAL_COMPONENTS='+$Issues.Count)
 }
