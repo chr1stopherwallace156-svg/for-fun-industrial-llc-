@@ -168,17 +168,19 @@ def input_members(path):
         raise ValueError("SUPPORTED_INPUT_IS_CSV_OR_ZIP_CONTAINING_CSV")
 
 def csv_rows(binary):
-    text = io.TextIOWrapper(binary, encoding="utf-8-sig", errors="replace", newline="")
-    reader = csv.DictReader(text)
-    if reader.fieldnames is None:
-        raise ValueError("CSV_HEADER_MISSING")
-    names = [header(n) for n in reader.fieldnames]
-    if len(names) != len(set(names)) or len(names) > 150:
-        raise ValueError("CSV_HEADERS_DUPLICATE_OR_TOO_MANY")
-    for raw in reader:
-        if None in raw:
-            raise ValueError("CSV_ROW_TOO_MANY_COLUMNS")
-        yield {header(k): v for k, v in raw.items()}
+    # TextIOWrapper owns the binary stream; a scoped context ensures Windows
+    # releases each CSV even if parsing throws or iteration is interrupted.
+    with io.TextIOWrapper(binary, encoding="utf-8-sig", errors="replace", newline="") as text:
+        reader = csv.DictReader(text)
+        if reader.fieldnames is None:
+            raise ValueError("CSV_HEADER_MISSING")
+        names = [header(n) for n in reader.fieldnames]
+        if len(names) != len(set(names)) or len(names) > 150:
+            raise ValueError("CSV_HEADERS_DUPLICATE_OR_TOO_MANY")
+        for raw in reader:
+            if None in raw:
+                raise ValueError("CSV_ROW_TOO_MANY_COLUMNS")
+            yield {header(k): v for k, v in raw.items()}
 
 def parse_property(row, county, source_id, fallback_roll):
     address, city, zipcode = parse_site(field(row, ADDRESS_FIELDS), row)
