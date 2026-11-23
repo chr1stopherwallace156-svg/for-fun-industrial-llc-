@@ -26,10 +26,20 @@ foreach($port in $ports){
  $before[$port]=(@(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue|
    ForEach-Object {"$($_.LocalAddress):$($_.OwningProcess)"}|Sort-Object)-join ';')
 }
+# V5 is an isolated CPU trainer; it does not require the inference
+# server to be up. An already-stopped 8088 remains stopped. Some Windows
+# configurations expose two listener rows for the SAME PID (IPv4/IPv6).
 $live=@(Get-NetTCPConnection -LocalPort 8088 -State Listen -ErrorAction SilentlyContinue)
-if($live.Count -ne 1){Hold 'QWEN_8088_NOT_UNIQUELY_LIVE'}
-$liveProcess=Get-CimInstance Win32_Process -Filter ('ProcessId='+$live[0].OwningProcess)
-if(!$liveProcess -or $liveProcess.Name -notlike '*llama-server*'){Hold 'LIVE_QWEN_PROCESS_NOT_VERIFIED'}
+$liveOwners=@($live | ForEach-Object {$_.OwningProcess} | Sort-Object -Unique)
+if($liveOwners.Count -gt 1){Hold 'QWEN_8088_MULTIPLE_OWNER_PROCESSES_REFUSED'}
+if($liveOwners.Count -eq 0){
+ Write-Host 'FUN_REAL_QWEN_V5_LIVE_8088=ALREADY_NOT_LISTENING_LEFT_UNTOUCHED'
+}else{
+ $liveProcess=Get-CimInstance Win32_Process -Filter ('ProcessId='+$liveOwners[0])
+ if(!$liveProcess -or $liveProcess.Name -notlike '*llama-server*'){Hold 'LIVE_QWEN_PROCESS_NOT_VERIFIED'}
+ if(!$liveProcess.CommandLine -or $liveProcess.CommandLine -notlike '*Qwen3-4B-Q4_K_M.gguf*'){Hold 'LIVE_QWEN_COMMAND_LINE_MODEL_UNVERIFIED'}
+ Write-Host ('FUN_REAL_QWEN_V5_LIVE_8088=LISTENING_SAME_PROCESS_PID_'+$liveOwners[0])
+}
 if($Execute -and $Approval -cne $expectedApproval){Hold 'EXPLICIT_EXTERNAL_SOURCE_BUILD_TRAINING_APPROVAL_REQUIRED'}
 Write-Host 'FUN_REAL_QWEN_V5_OFFLINE_TESTS=START'
 & $py -3.12 $tests
