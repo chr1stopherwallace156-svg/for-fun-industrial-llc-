@@ -143,7 +143,8 @@ class V4Tests(unittest.TestCase):
         self.assertTrue(v2_path.is_file(), 'V2 analyzer must be present')
         sys.path.insert(0, str(v2_path.parent))
         from fisre_proof_v2 import inspect, parse_ranges
-        src = source_path.read_text(encoding='utf-8')
+        from fisre_v1 import read_source
+        src, _ = read_source(source_path, Path(__file__).resolve().parents[1])
         vals = parse_ranges(['cost=0:1000', 'margin=0:0.5'])
         report = inspect(src, 'calculate_price', vals)
         report['file'] = 'intelligence-checks/fixtures/fisre_example.py'
@@ -161,7 +162,8 @@ class V4Tests(unittest.TestCase):
         self.assertTrue(v2_path.is_file(), 'V2 analyzer must be present')
         sys.path.insert(0, str(v2_path.parent))
         from fisre_proof_v2 import inspect, parse_ranges
-        src = path.read_text(encoding='utf-8')
+        from fisre_v1 import read_source
+        src, _ = read_source(path, repo)
         report = inspect(src, 'calculate_price', parse_ranges(['cost=0:1000', 'margin=0:1']))
         report['file'] = 'intelligence-checks/fixtures/fisre_example.py'
         good = subprocess.run([sys.executable, str(FILE), report['file'], '--root', str(repo),
@@ -176,6 +178,38 @@ class V4Tests(unittest.TestCase):
                              text=True, capture_output=True, timeout=10)
         self.assertEqual(bad.returncode, 2)
         self.assertEqual(json.loads(bad.stderr)['state'], 'HOLD')
+
+
+    def test_real_v2_cli_explicit_crlf_source_hash_preserved(self):
+        """Byte-level CRLF fixtures must hash identically across CLI and test paths."""
+        import tempfile
+        repo = Path(__file__).resolve().parents[1]
+        sys.path.insert(0, str(repo / 'src' / 'semantic'))
+        from fisre_v1 import read_source
+        from fisre_proof_v2 import inspect, parse_ranges
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            path = root / 'crlf.py'
+            path.write_bytes(b'def calculate_price(cost, margin):\r\n    return cost / (1 - margin)\r\n')
+            src, rel = read_source(path, root)
+            self.assertIn('\r\n', src)
+            domain = parse_ranges(['cost=0:1000', 'margin=0:0.5'])
+            report = inspect(src, 'calculate_price', domain)
+            report['file'] = rel
+            cmd = [sys.executable, str(FILE), rel, '--root', str(root),
+                   '--function', 'calculate_price']
+            good = subprocess.run(cmd, input=json.dumps(report), text=True,
+                                  capture_output=True, timeout=10)
+            self.assertEqual(good.returncode, 0, good.stderr)
+            self.assertEqual(json.loads(good.stdout)['state'], 'SOURCE_BOUND_REPLAY_MATCH')
+            normalized = path.read_text(encoding='utf-8')
+            self.assertNotEqual(src, normalized)
+            invalid = inspect(normalized, 'calculate_price', domain)
+            invalid['file'] = rel
+            bad = subprocess.run(cmd, input=json.dumps(invalid), text=True,
+                                 capture_output=True, timeout=10)
+            self.assertEqual(bad.returncode, 2)
+            self.assertIn('SOURCE_HASH_MISMATCH', bad.stderr)
 
 
 def fixture_without_file():
