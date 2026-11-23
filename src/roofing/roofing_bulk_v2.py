@@ -101,7 +101,10 @@ def parse_site(value, row):
     # Assessor field may contain: 123 MAIN ST, LOS ANGELES, CA 90001.
     m = re.match(r"^(.+?),\s*([^,]+?),?\s+CA\s+(\d{5})(?:-\d{4})?$", address, re.I)
     if m:
-        address, city, zipvalue = m.group(1), city or m.group(2), zipvalue or m.group(3)
+        # Explicit situs ZIP wins over any other column (which could be
+        # a mailing or administrative ZIP). A parcel's location is the
+        # only defensible ZIP for subsequent exact address+ZIP joins.
+        address, city, zipvalue = m.group(1), city or m.group(2), m.group(3)
     elif "," in address:
         parts = [p.strip() for p in address.split(",")]
         if len(parts) >= 2 and re.search(r"\d", parts[0]):
@@ -367,17 +370,24 @@ def ingest(args):
         if kind=="la_properties":
             quality=conn.execute("""SELECT count(*) AS total,
               sum(CASE WHEN year_built IS NOT NULL THEN 1 ELSE 0 END) AS with_year,
+              sum(CASE WHEN address IS NOT NULL AND address!=''
+                THEN 1 ELSE 0 END) AS with_street,
               sum(CASE WHEN address IS NOT NULL AND address!='' AND
-                zip IS NOT NULL AND zip!='' THEN 1 ELSE 0 END) AS with_site
+                zip IS NOT NULL AND zip!='' THEN 1 ELSE 0 END) AS with_site_zip
               FROM properties WHERE source_id=?""",(args.source_id,)).fetchone()
+            # A missing ZIP is held for enrichment, not a reason to claim the
+            # entire official assessor file is malformed. Year and situs
+            # street must still meet basic source-structure sanity checks.
             if quality["total"]>100 and (
                 quality["with_year"]<quality["total"]*0.01 or
-                quality["with_site"]<quality["total"]*0.05):
+                quality["with_street"]<quality["total"]*0.05):
                 raise ValueError("LA_ASSESSOR_REQUIRED_FIELDS_MOSTLY_MISSING_HOLD")
         digest = sha(path)
         coverage_note = ("ZIP_COLUMN_CONFLICT_ROWS="+str(zip_column_conflicts)+
                          ";SITUS_ZIP_RECOVERED="+str(zip_recovered_from_location)+
                          ";ZIP_HELD_UNKNOWN="+str(zip_held)+
+                         ";SITUS_STREET_ROWS="+str(quality["with_street"] if kind=="la_properties" else "NOT_MEASURED")+
+                         ";VALID_SITE_ZIP_ROWS="+str(quality["with_site_zip"] if kind=="la_properties" else "NOT_MEASURED")+
                          ";MUNICIPAL_ROOF_PERMIT_COVERAGE_UNVERIFIED")
         conn.execute("UPDATE source_runs SET state='INGESTED_NOT_COMPLETENESS_VERIFIED',ingested=?,skipped=?,file_sha256=?,filename=?,updated=?,coverage=? WHERE source_id=?",
                      (inserted,skipped,digest,path.name,
