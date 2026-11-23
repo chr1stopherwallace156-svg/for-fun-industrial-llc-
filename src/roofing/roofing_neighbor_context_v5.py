@@ -12,6 +12,7 @@ import re
 import sqlite3
 from bisect import bisect_left, bisect_right
 from collections import Counter, defaultdict
+from heapq import heappush, heapreplace
 
 VERSION = "fun-roofing-street-block-cohorts-v5"
 BLOCK = re.compile(r"^\s*(\d{1,6})\s+(.{3,90}?)\s*$")
@@ -84,6 +85,9 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
     for row in conn.execute(q,args):
         recent_by_zip[row["zip"]].add(str(row["apn"]))
 
+    # Keep only a bounded handful of *research examples*, not a separate
+    # contactable target database. Public APN is an identifier, not a roof age.
+    examples_heap=[]
     out=defaultdict(lambda:{"eligible_properties_no_recent_exact_apn_permit":0,
         "candidates_with_enough_age_similar_street_block_peers":0,
         "candidates_with_at_least_two_recent_peer_permits":0,
@@ -112,6 +116,11 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
             target["blocks_with_qualifying_age_cohort"].add((street,num))
             if recent_peer_count>=2:
                 target["candidates_with_at_least_two_recent_peer_permits"]+=1
+                # Prefer multiple independently recorded neighbor parcels and
+                # relatively dense peer cohorts, deterministically by APN.
+                example=(recent_peer_count,round(recent_peer_count/peers,5),z,str(apn),year,peers)
+                if len(examples_heap)<25:heappush(examples_heap,example)
+                elif example>examples_heap[0]:heapreplace(examples_heap,example)
     results={}
     for z in zips:
         x=out[z]
@@ -147,7 +156,17 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
             "individual_property_damage_or_new_roof_need_verified":False,
             "physical_distance_measured":False,
         }
+    limited_examples=[{
+         "zip":z, "apn":apn, "construction_year":year,
+         "similar_age_same_street_block_neighbors":peers,
+         "other_parcels_with_recent_roof_permits":recent_count,
+         "neighbor_recorded_permit_share_pct":round(100*rate,1),
+         "roof_condition_and_replacement_need":"UNVERIFIED",
+         "physical_distance_measured":False,
+        } for recent_count,rate,z,apn,year,peers
+          in sorted(examples_heap,reverse=True)]
     return {"version":VERSION,
+       "public_research_examples":limited_examples,
        "formula_c_neighborhood_context":{
            "window":"street_number_100_block_not_actual_geographic_distance",
            "not_able_to_infer_leaks_or_worn_shingles":True,
