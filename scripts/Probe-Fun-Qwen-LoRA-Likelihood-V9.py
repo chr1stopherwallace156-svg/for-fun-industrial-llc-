@@ -114,7 +114,7 @@ def make_corpora():
             unambiguous=[]
             for row in candidates:
                 question=row["messages"][0]["content"]
-                match=re.search(r"are respectively (\\d+), (\\d+), (\\d+)\\.",question)
+                match=re.search(r"are respectively (\d+), (\d+), (\d+)\.",question)
                 if not match:
                     raise RuntimeError("V9_MODEL_SELECTION_ERRORS_NOT_PARSEABLE")
                 values=[int(n) for n in match.groups()]
