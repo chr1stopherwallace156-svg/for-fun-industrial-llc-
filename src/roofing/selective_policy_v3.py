@@ -31,7 +31,9 @@ def property_decision(*, year_built=None, land_use="", residential=0,
     if EXPLICIT_NONRESIDENTIAL.search(use) and not re.search(r"\bresidential\b", use, re.I):
         return ("DROP", "KNOWN_NONRESIDENTIAL")
     if yr is not None and yr > today.year - MIN_BUILDING_AGE:
-        return ("DROP", "NEWER_THAN_20_YEARS")
+        # A younger building with no observed roof permit is still a candidate
+        # for later review; newer does not mean it never needs roofing work.
+        return ("HOLD", "NEWER_PROPERTY_LOWER_PRIORITY")
     if not str(apn or "").strip() and not (address and zip_code):
         return ("DROP", "MISSING_PARCEL_AND_LOCATION")
     if not address or not zip_code:
