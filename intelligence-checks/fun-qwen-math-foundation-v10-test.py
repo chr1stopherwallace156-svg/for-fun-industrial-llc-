@@ -39,6 +39,16 @@ class MathFoundationV10Tests(unittest.TestCase):
         self.assertFalse(v.grade_output(errors,
             "MIN_ERROR=18; BEST_WINDOWS=3; TIE=NO; FIBONACCI_GUARANTEE=NO")["exact_answer"])
 
+    def test_arithmetic_proof_is_required_and_checked(self):
+        errors={3:18,5:18,8:29}
+        answer=v.encode_label(errors)
+        self.assertIn("PROOF_D35=0,D38=-11,D58=-11",answer)
+        grade=v.grade_output(errors,answer)
+        self.assertTrue(grade["comparison_proof_correct"])
+        wrong=answer.replace("PROOF_D35=0","PROOF_D35=1")
+        self.assertFalse(v.grade_output(errors,wrong)["exact_answer"])
+        self.assertFalse(v.grade_output(errors,wrong)["comparison_proof_correct"])
+
     def test_unique_split_minimum_and_no_overlap(self):
         rows=v.build()
         self.assertEqual({s:len(rows[s]) for s in rows},
