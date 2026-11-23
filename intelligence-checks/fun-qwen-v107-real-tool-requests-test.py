@@ -147,6 +147,74 @@ class V107RealToolProposalTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError,"V107_V105_REPORT_IDENTITY_OR_SCOPE_MISMATCH"):
                     v.read_prior_v105({"cases":[case()]})
 
+    def test_actual_v105_record_shape_accepted_without_pattern_field(self):
+        # Regression: V10.5 persisted "expected_winners" but never "pattern".
+        # Do not weaken integrity checks or modify the historical report.
+        cases=[]
+        records=[]
+        for i,pattern in enumerate(v.v10.PATTERNS):
+            example=v.v10.make_case("validation",pattern,0)
+            q=example["question"]
+            errors=example["errors"]
+            caseid="v10-validation-"+str(i)
+            cases.append({"id":caseid,"pattern":pattern,"prompt":q,
+                          "errors":errors,"reference_answer":example["answer"]})
+            answer=example["answer"]
+            records.append({
+                "id":caseid,
+                "question":q,
+                "expected_winners":list(pattern),
+                "original_model_response":answer,
+                "model_generation_sha256":hashlib.sha256(answer.encode("utf-8")).hexdigest(),
+                "verified_output":v.v104.verify(errors)["verified_answer"],
+                "verified_answer_mathematically_correct":True,
+            })
+        self.assertTrue(all("pattern" not in r for r in records))
+        historical={
+            "version":"fun-qwen-verified-window-toolbridge-v10-5",
+            "state":"V105_ISOLATED_REAL_QWEN_TO_VERIFIED_MATH_BRIDGE_COMPLETE_NOT_DEPLOYED",
+            "original_model_sha256":v.MODEL_SHA,
+            "case_count":7,
+            "frozen_test_opened":False,
+            "training_or_deployment_performed":False,
+            "original_qwen_weights_modified":False,
+            "native_qwen_baseline_inference_completed":7,
+            "records":records,
+        }
+        with tempfile.TemporaryDirectory() as root:
+            filepath=Path(root)/"toolbridge-report.json"
+            original=json.dumps(historical).encode("utf-8")
+            filepath.write_bytes(original)
+            with patch.object(v,"PREVIOUS",filepath):
+                result=v.read_prior_v105({"cases":cases})
+            self.assertEqual(result["ids"],{x["id"] for x in cases})
+            self.assertEqual(result["sha256"],hashlib.sha256(original).hexdigest())
+
+            historical["records"][0]["expected_winners"]=[99]
+            filepath.write_text(json.dumps(historical),encoding="utf-8")
+            with patch.object(v,"PREVIOUS",filepath):
+                with self.assertRaisesRegex(RuntimeError,"V107_V105_SAVED_RECORD_INCONSISTENT"):
+                    v.read_prior_v105({"cases":cases})
+
+    def test_missing_v105_provenance_is_still_rejected(self):
+        case0=case()
+        with tempfile.TemporaryDirectory() as root:
+            p=Path(root)/"toolbridge-report.json"
+            p.write_text(json.dumps({
+                "version":"fun-qwen-verified-window-toolbridge-v10-5",
+                "state":"V105_ISOLATED_REAL_QWEN_TO_VERIFIED_MATH_BRIDGE_COMPLETE_NOT_DEPLOYED",
+                "original_model_sha256":v.MODEL_SHA,
+                "case_count":7,
+                "frozen_test_opened":False,
+                "training_or_deployment_performed":False,
+                "original_qwen_weights_modified":False,
+                "native_qwen_baseline_inference_completed":7,
+                "records":[],
+            }),encoding="utf-8")
+            with patch.object(v,"PREVIOUS",p):
+                with self.assertRaisesRegex(RuntimeError,"V107_V105_REPORT_ROW_COUNT_INVALID"):
+                    v.read_prior_v105({"cases":[case0]})
+
     def test_selection_excludes_all_21_prior_qwen_cases(self):
         dataset=v.v10.build()
         render=v.v10.render_files(dataset)
