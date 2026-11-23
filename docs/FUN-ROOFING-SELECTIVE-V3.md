@@ -108,6 +108,37 @@ No owner names, emails, or phone numbers are stored or enriched.
 **A zero-property result without a successful source ingest is a data gap,
 not a true count of houses needing roofing work.**
 
+## Windows-native official LA City permit CSV download
+
+On some Windows Python installations, the OpenSSL trust bundle cannot build
+the LA City data portal's HTTPS certificate chain and Python fails with
+`SSL: CERTIFICATE_VERIFY_FAILED` before any permit records are read.
+For an explicit operator-selected `la_permits_*` source, the guarded launch
+script now downloads the allowlisted official `data.lacity.org` CSV with
+Windows-native .NET `HttpClientHandler` and the Windows certificate store.
+The downloader:
+
+- Accepts only the three pinned official LA City export URLs and **HTTPS**.
+- Requires Windows certificate verification (never disables TLS checks).
+- Rejects redirection to a different host, plain HTTP, or too many redirects.
+- Rejects non-CSV responses, HTTP failures, empty or oversized bodies.
+- Streams in 1 MiB buffers to a private incomplete file, records the SHA-256
+  checksum, checks content length when provided, and atomically moves the
+  complete file into the normal Python import cache.
+- Leaves a previously downloaded official CSV intact; no second download
+  and no deletion of the LA assessor archive. An incomplete new attempt
+  cannot replace an existing verified file.
+- Invokes the existing local Python `sync` after a verified source download.
+  Python sees an existing local file and does not retry its failing TLS path.
+  Import/permit matching still require their own source schema, row and
+  selective-index validation to report successful completion.
+
+The native downloader is `Download-Fun-LACity-Permits-WindowsTLS-V1.ps1`,
+called automatically from `Start-Fun-Roofing-RealData-V3.ps1`. Network errors
+are held; users are not asked to install unknown certificates or weaken HTTPS.
+No new background services, model/REA calls, emails, sales outreach, payments,
+or Elektron changes are authorized.
+
 ## Preflight
 
 The guarded deployment reruns prior Node.js tests and the original Python
