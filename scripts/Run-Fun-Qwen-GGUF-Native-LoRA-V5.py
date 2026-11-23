@@ -362,6 +362,12 @@ def main():
          "-ngl","0","-c","128","-b","32","-ub","32",
          "-t","4","-tb","4"]
     metrics=safe_run(cmd,APP/"training.log",MAX_TRAIN_SECONDS,expected_cwd=exe.parent)
+    # A written GGUF by itself is NOT proof of a successful gradient run.
+    # The pinned fork logs this exact completion marker after finishing the
+    # requested number of training windows and writing the LoRA checkpoint.
+    tail=(APP/"training.log").read_bytes()[-250000:]
+    if b"stopped after 2 windows (--stop-after)" not in tail:
+        raise RuntimeError("TWO_REAL_TRAINING_WINDOWS_NOT_ATTESTED_CHECK_TRAINING_LOG")
     adapter=validate_trained_adapter(prefix)
     report={"version":VERSION,"state":"REAL_QWEN_GGUF_ADAPTER_CANDIDATE_NOT_DEPLOYED",
             "actual_pretrained_qwen_gguf_used":True,
@@ -369,6 +375,8 @@ def main():
             "adapter":adapter,"curriculum_training_slice":subset,
             "resource_watch":metrics,"training_backend":"llama-tq GGUF-native CPU",
             "trained_only_late_attention_qv":True,
+            "training_completion_log_verified":True,
+            "actual_lora_tensor_delta_proof_pending":True,
             "live_qwen_server_restarted":False,
             "original_qwen_weights_modified":False,
             "qwen_full_curriculum_training_completed":False,
