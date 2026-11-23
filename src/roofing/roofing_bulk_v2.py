@@ -717,6 +717,10 @@ def inspect(args):
                 "total_header_columns":len(names),
                 "mapped_public_columns":sorted(interesting),
                 "duplicate_mapped_columns":repeats,
+                # Headers are not personal records. Showing original labels
+                # makes duplicate assessor ZIP column provenance auditable.
+                "zip_column_headers":[{"position":i+1,"name":clean(col,90)}
+                    for i,col in enumerate(header_line) if header(col)=="zip_code"],
                 "has_property_id":bool(interesting.intersection(APN_FIELDS)),
                 "has_site_address":bool(interesting.intersection(ADDRESS_FIELDS)),
                 "has_construction_year":bool(interesting.intersection(YEAR_FIELDS)),
