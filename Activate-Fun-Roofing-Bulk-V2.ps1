@@ -179,7 +179,8 @@ foreach($file in @(
  'src\roofing\selective_extract_v3.py',
  'src\roofing\test_selective_v3.py',
  'test\roofing-selective-v3.test.mjs',
- 'Start-Fun-Roofing-RealData-V3.ps1'
+ 'Start-Fun-Roofing-RealData-V3.ps1',
+ 'Download-Fun-LACity-Permits-WindowsTLS-V1.ps1'
 )){
  $path=Join-Path $Root $file
  RequireFile $path
