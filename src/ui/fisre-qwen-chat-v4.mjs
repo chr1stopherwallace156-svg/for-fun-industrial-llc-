@@ -51,7 +51,7 @@ const computeReview='<details id="fi-fial53-compute-panel" style="margin:12px 0;
  '<p><button type="button" id="fi-fial53-compute-explain" hidden>Ask Qwen to explain approved result</button></p>'+
  '<p style="font-size:12px;color:#aec5d2">Isolated Python environment for Optuna and OR-Tools; scikit-learn uses existing 8801. No automatic installation, file edits, external messages or model-weight training. ML history mode trains a local statistical model only after explicit approval.</p></details>';
 const panel=GROUNDED_PANEL
- .replace('<p><button id="fi-fial53-send"',inventory+extra+reaReview+computeReview+'<p><button id="fi-fial53-send"')
+ .replace('<p><button id="fi-fial53-send"',inventory+extra+reaReview+computeReview+'<p><label style="font-size:13px;color:#bdd6e0"><input type="checkbox" id="fi-fial53-math-evidence"> Include verified Mathematical Research V2 evidence in this Qwen answer</label></p><p><button id="fi-fial53-send"')
  .replace('No tools are requested or executed from this conversation.',
   'An optional local FISRE analyzer reads code as data; no arbitrary code execution or REA actions occur.')
  .replace('No model tool definitions, automatic retries, memory writes, or REA execution.',
@@ -62,4 +62,4 @@ export const FISRE_QWEN_CHAT_HTML='<!doctype html><html lang="en"><head><meta ch
  '<title>Fun Industrial · Local Qwen with Semantic Reasoning</title>'+
  '<script src="/api/fial/grounded/client.js" defer></script>'+
  '<style>body{margin:0;padding:14px;background:#0b1420;color:#e6edf5;font:14px/1.5 system-ui,sans-serif}label{display:block;margin:12px 0 5px;color:#bed0dc}textarea{box-sizing:border-box}input{box-sizing:border-box}button{cursor:pointer}button:disabled{opacity:.6}</style>'+
- '</head><body><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;max-width:1100px;margin:0 auto 14px;padding:10px 12px;border:1px solid #315365;border-radius:11px;background:#102237;color:#d5efe8"><strong style="font-size:13px">Fun Industrial · AI workspace</strong><a href="/control/" style="color:#9ef3ce;font-weight:700;font-size:12px">Open Control Deck ↗</a></div>'+panel+'</body></html>';
+ '</head><body><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;max-width:1100px;margin:0 auto 14px;padding:10px 12px;border:1px solid #315365;border-radius:11px;background:#102237;color:#d5efe8"><strong style="font-size:13px">Fun Industrial · AI workspace</strong><a href="/math/" style="color:#9ef3ce;font-weight:700;font-size:12px">Math Research</a> · <a href="/control/" style="color:#9ef3ce;font-weight:700;font-size:12px">Open Control Deck ↗</a></div>'+panel+'</body></html>';
