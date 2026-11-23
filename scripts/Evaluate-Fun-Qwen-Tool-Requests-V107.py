@@ -66,8 +66,10 @@ def read_prior_v105(provenance):
     for row in rows:
         source=by_id[row["id"]]
         answer=row.get("original_model_response")
+        # V10.5 report rows intentionally store expected_winners (not
+        # pattern). Compare that original persisted field to the independently
+        # verified source case; do not rewrite legacy report content.
         if (row.get("question")!=source["prompt"] or
-            row.get("pattern")!=list(source["pattern"]) or
             row.get("expected_winners")!=list(source["pattern"]) or
             not isinstance(answer,str) or
             sha_bytes(answer.encode("utf-8"))!=row.get("model_generation_sha256") or
