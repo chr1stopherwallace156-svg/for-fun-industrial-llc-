@@ -67,11 +67,51 @@ export const ROOF_BULK_PAGE=String.raw`<!doctype html><html lang="en"><head><met
  <div class="source-list" id="source-list"><div class="source-card">Loading source ledger…</div></div>
  <div class="notice"><strong>Not connected automatically:</strong> Other LA County cities and the county itself, plus San Bernardino municipal permit histories, require their own approved data feed. San Bernardino's official property characteristics ZIP uses a special format; a countywide govPIMS CSV can be imported after reviewing its columns.</div>
 </section>
-<section class="panel">
- <div class="overline">04 / MATHEMATICAL MODEL</div><h2>Why a property is prioritized</h2>
- <div class="formula">S = clip(40 × age-relevance + 20 × old-permit indicator + 10 × no-record indicator + 15 × house-evidence + 15 × completeness, 0, 100)</div>
- <div class="two-col"><div><h3>What this can establish</h3><p>A property exists in an official parcel roll; a roof-related permit is recorded; a property is older than a selected age threshold; municipal records have been imported for certain periods.</p></div>
- <div><h3>What it cannot yet establish</h3><p>The roof's actual condition, the absence of work without permits, the complete history of other jurisdictions, whether a home is occupied, or a probability of profitable sales.</p></div></div>
- <p class="foot">Scores are transparent sorting heuristics until qualified inspections and real sales outcomes support model calibration. Before outreach, independently review applicable contractor advertising, privacy, and Do Not Call rules.</p>
+<section class="panel" id="parallel-roof-formulas">
+ <div class="overline">04 / PARALLEL MATHEMATICAL MODELS</div><h2>Two ways to investigate roofing history</h2>
+ <p class="readout">Formula A stays unchanged. Formula B separately measures historical-versus-recent roof-related permits on the same parcel within each ZIP. Neither formula predicts that a roof definitely needs replacing.</p>
+ <div class="two-col">
+  <div><h3>Formula A — Existing property research priority</h3>
+   <div class="formula">S = clip(40 × age-relevance + 20 × old-permit indicator + 10 × no-record indicator + 15 × house-evidence + 15 × completeness, 0, 100)</div>
+   <p>Existing V3 property-age, residential classification, and incomplete-evidence score, left untouched.</p></div>
+  <div><h3>Formula B — Observed permit cycle by ZIP</h3>
+   <div class="formula">Gap X = years since latest roof-related permit ≥ X
+Repeat = same APN has recent and older roof-related permits separated by ≥ X years
+ZIP activity = 1,000 × recent permit parcels ÷ selected older parcels</div>
+   <p>A mathematical comparison of dated permit records. A permit is not proof of roof replacement, and a long recorded gap is not roof age.</p></div>
+ </div>
+ <div class="filter-grid">
+  <label>ZIP codes (comma separated)<input id="formula-zips" value="90011,90049,90731,90037" maxlength="60" inputmode="numeric" aria-label="ZIP codes for parallel formulas"></label>
+  <label>Historical interval X<select id="formula-years">
+    <option value="10">10 years</option><option value="15">15 years</option>
+    <option value="20" selected>20 years</option><option value="25">25 years</option>
+    <option value="30">30 years</option><option value="40">40 years</option>
+   </select></label>
+  <label>Recent permit window<select id="formula-recent">
+    <option value="2">Last 2 years</option><option value="3">Last 3 years</option>
+    <option value="5" selected>Last 5 years</option><option value="10">Last 10 years</option>
+   </select></label>
+  <label>Permit description type<select id="formula-kind">
+    <option value="roof_related">All roof-related permit descriptions</option>
+    <option value="replacement_like">Descriptions suggesting replacement</option>
+   </select></label>
+ </div>
+ <label>Minimum construction age
+ <select id="formula-age"><option value="20">20 years</option><option value="25" selected>25 years</option>
+ <option value="30">30 years</option><option value="40">40 years</option></select></label>
+ <p><button id="run-dual-formulas" class="btn secondary" type="button">Calculate both formulas</button></p>
+ <p class="readout" id="formula-note" role="status">Choose ZIP codes and X years, then calculate. All data stays on this PC; this is a read-only computation.</p>
+ <div class="table-wrap"><table><thead><tr>
+ <th>ZIP</th><th>Formula A: older parcels</th><th>A: mean score</th>
+ <th>B: exact APN matches</th><th>B: latest permit ≥ X years</th>
+ <th>B: recent permit parcels</th><th>B: recent repeat after ≥ X years</th>
+ <th>B: recent permits / 1,000</th></tr></thead>
+ <tbody id="formula-body"><tr><td colspan="8">No comparison calculated yet.</td></tr></tbody>
+ </table></div>
+ <h3>Sample parcels with dated permit evidence</h3>
+ <div class="table-wrap"><table><thead><tr><th>ZIP</th><th>Assessor parcel ID</th>
+ <th>Latest roof-related permit</th><th>Years since record</th><th>Recent long-gap repeat observed?</th></tr></thead>
+ <tbody id="formula-samples"><tr><td colspan="5">Calculate to see up to 12 example parcel IDs.</td></tr></tbody></table></div>
+ <p class="foot">Only exact parcel-ID matches feed Formula B. Formula A may also use supported address matching. Both are local research indicators, never roof-condition or marketing-conversion probabilities. Municipality coverage is incomplete and original permit details should be checked before any follow-up.</p>
 </section>
 </main></div></body></html>`;
