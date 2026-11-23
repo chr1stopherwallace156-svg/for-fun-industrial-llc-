@@ -61,7 +61,8 @@ export const PREVIEW_HTML=String.raw`<!doctype html>
     <article class="pulse"><div class="pulse-label">ML Services <span aria-hidden="true">◈</span></div><strong data-status="ml">Not checked</strong><small>Existing analytic capability</small></article>
    </div>
    <div class="section-heading section-heading-spaced"><div><span class="eyebrow">KEEP MOVING</span><h2>Common destinations</h2></div></div>
-   <div class="simple-links"><a href="#operations?area=buyers"><span>Fleet buyers</span><span>Find verified demand ↗</span></a>
+   <div class="simple-links"><a href="/roofing/"><span>Roofing opportunities</span><span>LA &amp; San Bernardino Counties ↗</span></a>
+   <a href="#operations?area=buyers"><span>Fleet buyers</span><span>Find verified demand ↗</span></a>
     <a href="#operations?area=procurement"><span>Procurement</span><span>Review sourced opportunities ↗</span></a>
     <a href="#commerce"><span>Commerce intelligence</span><span>Trends and product analysis ↗</span></a>
     <a href="#tools"><span>Tools &amp; analytics</span><span>Operator-reviewed actions ↗</span></a></div>
@@ -99,7 +100,7 @@ export const PREVIEW_HTML=String.raw`<!doctype html>
   </section>
 
   <section class="view" data-view="operations" aria-labelledby="operations-heading" hidden>
-   <div class="page-heading"><div><span class="eyebrow">REAL WORK, REAL EVIDENCE</span><h1 id="operations-heading">Operations</h1><p>Find the business information you need without scanning every module.</p></div><a class="btn btn-outline" href="/operations/">Full operations workspace ↗</a></div>
+   <div class="page-heading"><div><span class="eyebrow">REAL WORK, REAL EVIDENCE</span><h1 id="operations-heading">Operations</h1><p>Find the business information you need without scanning every module.</p></div><div class="heading-action"><a class="btn btn-outline" href="/roofing/">Roofing opportunities ↗</a> <a class="btn btn-outline" href="/operations/">Full operations ↗</a></div></div>
    <div class="segment-tabs" role="tablist" aria-label="Operations areas">
     <button type="button" class="segment" data-ops="overview" role="tab" aria-selected="true">Overview</button>
     <button type="button" class="segment" data-ops="buyers" role="tab" aria-selected="false">Fleet Buyers</button>
