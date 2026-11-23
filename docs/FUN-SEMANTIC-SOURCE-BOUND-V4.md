@@ -23,7 +23,7 @@ py -3.12 -m unittest discover -s intelligence-checks -p 'test_fisre*.py' -v
 node --test intelligence-checks/fisre-evidence-v3-case.mjs
 ```
 
-Expected **53 Python tests** (17 V1 + 17 V2 + 19 V4) and **18 Node tests** (V3), for a combined **71 tests**. Two new tests require the actual V2 implementation and the fixture, and are not optional: one checks a safe-domain replay; the other exercises a full subprocess and rejects a tampered proof status. Windows qualification remains pending until the operator runs this on the real PC.
+Expected **54 Python tests** (17 V1 + 17 V2 + 20 V4) and **18 Node tests** (V3), for a combined **72 tests**. Three integration tests require the actual V2 implementation and source files: a safe-domain replay, a full CLI tampered-status rejection, and an explicit CRLF source-hash regression. The test suite uses the production byte-preserving source reader to avoid Windows newline normalization mismatches. Windows qualification remains pending until the operator runs this on the real PC.
 
 ### One-pass pipeline (source unchanged)
 
