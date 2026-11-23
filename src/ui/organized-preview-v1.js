@@ -164,10 +164,61 @@ const AREAS=Object.freeze({
   primary:'Open regulatory evidence',href:'/operations/#fi-regulatory-intelligence',secondary:'Research is not legal approval or filing'
  }
 });
+async function renderProcurementEvidence(host){
+ // Only public, local read-only status is retrieved when Procurement is selected.
+ const section=document.createElement('article');section.className='ops-feature';
+ const eyebrow=document.createElement('span');eyebrow.className='eyebrow';
+ eyebrow.textContent='SOURCED PROCUREMENT EVIDENCE';
+ const h=document.createElement('h2');h.textContent='Procurement';
+ const note=document.createElement('p');note.textContent='Checking verified local procurement records…';
+ const link=document.createElement('a');link.href='/procurement/';
+ link.className='btn btn-primary';link.textContent='Open dedicated procurement view ↗';
+ const evidence=document.createElement('div');evidence.setAttribute('role','status');evidence.setAttribute('aria-live','polite');
+ section.append(eyebrow,h,note,evidence,link);
+ host.replaceChildren(section);
+ function line(key,value){
+  const p=document.createElement('p');
+  const bold=document.createElement('strong');bold.textContent=key+': ';
+  p.append(bold,document.createTextNode(String(value??'unknown')));
+  evidence.append(p);
+ }
+ try{
+  const d=await getJson('/api/operator/procurement/status',11000);
+  if(!host.isConnected||host.dataset.area!=='procurement')return;
+  if(d.version!=='fial5.10-published-procurement-v1'||!Array.isArray(d.verified_current_published_notices))
+   throw Error('Unexpected procurement evidence schema');
+  note.textContent='Official notices, source checks, and qualification holds. No automated bids or submissions.';
+  line('Evidence status',d.state||'Unknown');
+  line('Verified currently published notices',d.verified_current_published_notices.length);
+  line('Verified directly qualified bids',d.counts?.verified_fit_for_elektron??0);
+  line('Last local evidence check',d.as_of_utc||'No stored run');
+  if(d.notice){
+   line('Notice',String(d.notice.title||d.notice.solicitation_id||'Unspecified').slice(0,180));
+   line('Published deadline',d.notice.due_local||'Unknown');
+   line('Portal and supplier qualifications','Require separate verification');
+  }else line('Notice','No notice saved in the procurement ledger');
+  if(d.state==='NOT_ACTIVATED'||!d.verified_current_published_notices.length){
+   const caveat=document.createElement('p');
+   caveat.textContent='No currently verified open procurement notice is confirmed by this ledger. This does not mean no bids exist.';
+   evidence.append(caveat);
+  }
+  const sourceState=(d.sources||[]).slice(0,12);
+  for(const source of sourceState){
+   line('Source '+String(source.id||'').slice(0,70),
+    String(source.state||'Unknown')+' · checked '+String(source.last_checked_utc||'unknown'));
+  }
+ }catch(e){
+  if(!host.isConnected||host.dataset.area!=='procurement')return;
+  note.textContent='Procurement evidence unavailable: '+String(e.message||e).slice(0,180)+
+   '. The module has not been marked healthy.';
+ }
+}
 function setOps(area){
  if(!Object.hasOwn(AREAS,area))area='overview';
  for(const b of document.querySelectorAll('[data-ops]'))b.setAttribute('aria-selected',String(b.dataset.ops===area));
  const d=AREAS[area],host=$('ops-content');host.replaceChildren();
+ host.dataset.area=area;
+ if(area==='procurement'){void renderProcurementEvidence(host);return}
  const wrap=document.createElement('div');wrap.className='ops-overview';
  const a=document.createElement('article');a.className='ops-feature';
  const eyebrow=document.createElement('span');eyebrow.className='eyebrow';eyebrow.textContent='VERIFIED EVIDENCE';
