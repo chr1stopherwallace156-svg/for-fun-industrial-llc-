@@ -110,8 +110,8 @@ ZIP activity = 1,000 × recent permit parcels ÷ selected older parcels</div>
  </table></div>
  <h3>Sample parcels with dated permit evidence</h3>
  <div class="table-wrap"><table><thead><tr><th>ZIP</th><th>Assessor parcel ID</th>
- <th>Latest roof-related permit</th><th>Years since record</th><th>Recent long-gap repeat observed?</th></tr></thead>
- <tbody id="formula-samples"><tr><td colspan="5">Calculate to see up to 12 example parcel IDs.</td></tr></tbody></table></div>
+ <th>Existing V3 research score</th><th>Latest roof-related permit</th><th>Years since record</th><th>Recent long-gap repeat observed?</th></tr></thead>
+ <tbody id="formula-samples"><tr><td colspan="6">Calculate to see up to 12 example parcel IDs.</td></tr></tbody></table></div>
  <p class="foot">Only exact parcel-ID matches feed Formula B. Formula A may also use supported address matching. Both are local research indicators, never roof-condition or marketing-conversion probabilities. Municipality coverage is incomplete and original permit details should be checked before any follow-up.</p>
 </section>
 </main></div></body></html>`;
