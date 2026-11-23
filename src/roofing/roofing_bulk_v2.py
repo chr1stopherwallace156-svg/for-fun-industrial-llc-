@@ -428,6 +428,27 @@ def download(args):
     finally:
         if tmp.exists():tmp.unlink()
 
+def sync(args):
+    """Explicit operator sync: download one whole official file, ingest its rows, rebuild candidate indexes."""
+    if args.source not in SOURCES:
+        raise ValueError("SYNC_SOURCE_NOT_ALLOWLISTED")
+    if args.source == "sb_assessor_characteristics":
+        raise ValueError("SB_NP450_FIXED_WIDTH_PARSER_NOT_VERIFIED_USE_OFFICIAL_GOVPIMS_CSV_IMPORT")
+    from types import SimpleNamespace
+    dl = SimpleNamespace(source=args.source, root=args.root, max_gb=args.max_gb, replace=args.replace)
+    download(dl)
+    url, kind = SOURCES[args.source]
+    extension = ".zip" if url.endswith(".zip") else ".csv"
+    local = Path(args.root) / "official_downloads" / (args.source+extension)
+    ing = SimpleNamespace(file=str(local), db=args.db, source_id=args.source,
+                          kind=kind, county="", jurisdiction="Los Angeles",
+                          roll_year=2025 if args.source=="la_assessor_2021_2025" else None)
+    ingest(ing)
+    rebuild(SimpleNamespace(db=args.db))
+    emit({"version":VERSION,"state":"SYNC_FINISHED_FROM_FULL_EXPORT",
+          "source":args.source,"full_export_requested":True,
+          "countywide_permit_coverage":False})
+
 def inspect(args):
     path=Path(args.file)
     if not path.exists():raise ValueError("INPUT_FILE_MISSING")
@@ -450,6 +471,8 @@ def main():
     i=sub.add_parser("ingest");i.add_argument("--file",required=True);i.add_argument("--source-id",required=True)
     i.add_argument("--kind",choices=["la_properties","sb_properties","la_permits","municipal_permits"])
     i.add_argument("--county",default="");i.add_argument("--jurisdiction",default="");i.add_argument("--roll-year",type=int)
+    y=sub.add_parser("sync");y.add_argument("source",choices=sorted(SOURCES));y.add_argument("--root",default=str(DEFAULT_ROOT))
+    y.add_argument("--replace",action="store_true");y.add_argument("--max-gb",type=float,default=8)
     b=sub.add_parser("rebuild");s=sub.add_parser("status");x=sub.add_parser("inspect");x.add_argument("--file",required=True)
     for name in ("markets","candidates"):
         q=sub.add_parser(name);q.add_argument("--county",default="all")
@@ -461,6 +484,9 @@ def main():
         if not 0.2<=args.max_gb<=32:raise ValueError("MAX_GB_INVALID")
         download(args)
     elif args.cmd=="ingest":ingest(args)
+    elif args.cmd=="sync":
+        if not 0.2<=args.max_gb<=32:raise ValueError("MAX_GB_INVALID")
+        sync(args)
     elif args.cmd=="rebuild":rebuild(args)
     elif args.cmd=="status":status(args)
     elif args.cmd=="inspect":inspect(args)
