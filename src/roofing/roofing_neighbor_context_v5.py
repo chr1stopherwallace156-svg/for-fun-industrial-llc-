@@ -37,7 +37,8 @@ def _subtract_years(day, years):
     except ValueError:return day.replace(year=day.year-years,day=28)
 
 def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
-                     kind, city, peer_years=5, min_peers=5):
+                     kind, city, peer_years=5, min_peers=5,
+                     max_blocks_per_zip=5):
     """Aggregate age-matched peers with recent roof-related permits by block.
 
     Each candidate's peers exclude its own APN. Only cohorts of at least
@@ -45,6 +46,11 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
     """
     if not 0<=peer_years<=15 or not 3<=min_peers<=30:
         raise ValueError("NEIGHBOR_FILTERS_INVALID")
+    # The original API still shows the best five research examples by
+    # default. The independent location-only export can request all blocks.
+    if (not isinstance(max_blocks_per_zip,int) or isinstance(max_blocks_per_zip,bool)
+            or not 1<=max_blocks_per_zip<=1000):
+        raise ValueError("NEIGHBOR_BLOCK_REPORT_LIMIT_INVALID")
     if not isinstance(today,dt.date):raise ValueError("NEIGHBOR_DATE_INVALID")
     placeholders=",".join("?" for _ in zips)
     params=("Los Angeles",city,today.year-min_building_age,*zips)
@@ -148,7 +154,7 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
             value=(strong_subjects,recent_count,round(recent_count/count,5),
                    street,num,block)
             heap=best_blocks[z]
-            if len(heap)<5:heappush(heap,value)
+            if len(heap)<max_blocks_per_zip:heappush(heap,value)
             elif value>heap[0]:heapreplace(heap,value)
     results={}
     for z in zips:
