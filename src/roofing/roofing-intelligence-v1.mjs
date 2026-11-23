@@ -39,10 +39,10 @@ function county(v){
  if(s==='san bernardino'||s==='sb')return 'San Bernardino';
  return null;
 }
-function keyOf(v){
- const normalized=s=>limitText(s,220).toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
- return [county(v.county),normalized(v.city),normalized(v.address)].join('|');
-}
+const normalized=s=>limitText(s,220).toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+function keyOf(v){return [county(v.county),normalized(v.city),normalized(v.address)].join('|')}
+function zipKey(v){return /^\d{5}$/.test(String(v.zip??''))?[county(v.county),v.zip,normalized(v.address)].join('|'):null}
+
 function date(v){
  const s=limitText(v,40);
  return /^\d{4}-\d{2}-\d{2}/.test(s)?s.slice(0,10):null;
@@ -62,7 +62,7 @@ const cleanPermit=(r,sourceId,assumeRoof=false)=>{
  const issued=date(r.issue_date);
  if(!c||city.length<2||address.length<5||!issued)return null;
  if(!assumeRoof&&!roofWords.test(desc))return null;
- return {county:c,city,address,issued,description:desc,source_id:sourceId,
+ return {county:c,city,address,zip:/^\d{5}$/.test(String(r.zip??''))?String(r.zip):'',issued,description:desc,source_id:sourceId,
    permit_id:limitText(r.permit_id,90),imported_assumed_roof:assumeRoof&&!roofWords.test(desc)};
 };
 function empty(){
@@ -102,10 +102,15 @@ function transact(fn,root=ROOT){
 }
 export function deriveCandidates(state,{countyFilter='all',minAge=20,category='all',cityFilter=''}={}){
  const nowYear=new Date().getUTCFullYear();
- const matched=new Map();
+ const matched=new Map(),matchedZip=new Map();
  for(const permit of state.permits){
   const k=keyOf(permit),previous=matched.get(k);
   if(!previous||permit.issued>previous.issued)matched.set(k,permit);
+  const z=zipKey(permit);
+  if(z){
+   const prev=matchedZip.get(z);
+   if(!prev||permit.issued>prev.issued)matchedZip.set(z,permit);
+  }
  }
  const output=[];
  for(const prop of state.properties){
@@ -113,7 +118,9 @@ export function deriveCandidates(state,{countyFilter='all',minAge=20,category='a
   if(cityFilter&&prop.city.toLowerCase().indexOf(cityFilter.toLowerCase())<0)continue;
   const age=nowYear-prop.year_built;
   if(age<minAge)continue;
-  const permit=matched.get(keyOf(prop));
+  // Prefer a matching ZIP+address across neighborhood aliases (e.g. Hollywood vs LA City);
+  // otherwise require same city. Never guess matches from county and street alone.
+  const permit=matchedZip.get(zipKey(prop))??matched.get(keyOf(prop));
   const years=permit?nowYear-Number(permit.issued.slice(0,4)):null;
   const status=!permit?'NO_PERMIT_FOUND_IN_INGESTED_RECORDS':years>=20?
     'LAST_RECORDED_ROOF_PERMIT_20_PLUS':'RECENT_ROOF_PERMIT_FOUND';
@@ -228,6 +235,7 @@ export async function refreshLaCity({root=ROOT,fetchImpl=fetch}={}){
   const entries=data.map(r=>cleanPermit({
    county:'Los Angeles',city:'Los Angeles',
    address:r.primary_address??r.address??'',
+   zip:r.zip_code??r.zip??'',
    issue_date:r.issue_date??r.issue_dt,
    work_description:r.work_desc??r.work_description,
    permit_id:r.permit_nbr??r.permit_number??r.permit_no
