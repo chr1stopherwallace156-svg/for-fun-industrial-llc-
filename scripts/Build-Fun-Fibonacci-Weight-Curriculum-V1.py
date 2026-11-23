@@ -6,13 +6,14 @@ NEVER accesses or modifies the running GGUF model, model server or tokenizer.
 import argparse
 import hashlib
 import json
+import math
 import os
 import random
 import sys
 from pathlib import Path
 
 VERSION = "fun-fibonacci-weight-curriculum-v1"
-FAMILIES = ("recurrence", "zeckendorf", "fibonacci_code", "multiscale", "ratio", "limits")
+FAMILIES = ("recurrence", "zeckendorf", "fibonacci_code", "multiscale", "ratio", "state_space", "information_theory", "entropy", "meta_selection", "limits")
 DEFAULT_OUTPUT = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "FunIndustrial" / "QwenFibonacciWeightsV1" / "curriculum"
 
 
@@ -86,6 +87,35 @@ def make_example(family, i, validation, seed=6427):
         question = f"Evaluate F({n+1})/F({n}) for Fibonacci F(0)=0, F(1)=1. Report six decimal places and explain what it approaches."
         v = fib(n+1) / fib(n)
         answer = f"F({n+1})/F({n}) = {fib(n+1)}/{fib(n)} = {v:.6f}. As n grows the ratio approaches the golden ratio (1+sqrt(5))/2, approximately 1.618034."
+    elif family == "state_space":
+        x = (310+i) if validation else (3+i)
+        y = (23 + 2*i) if validation else (2 + i//3)
+        steps = 3
+        original = (x, y)
+        for _ in range(steps):
+            x, y = x+y, x
+        question = f"Using state vector s=(x,y) and Fibonacci recurrence matrix A=[[1,1],[1,0]], find A^{steps} times starting state {original}. Show the updated state and explain what is Fibonacci-like."
+        answer = f"After {steps} updates the state is (x={x}, y={y}). Every step applies x'=x+y and y'=x. The recurrence matrix has golden-ratio-related eigenvalues, but arbitrary initial states are not the standard Fibonacci sequence."
+    elif family == "information_theory":
+        n = (3001 + i * 5) if validation else (11 + i * 5)
+        binary = format(n, "b")
+        code = fibonacci_code(n)
+        question = f"Compare the length of standard unsigned binary and self-delimiting Fibonacci universal code for positive integer {n}. Report bit lengths and explain when either is preferable."
+        answer = f"Unsigned binary of {n} is {binary}, using {len(binary)} bits; its Fibonacci universal code is {code}, using {len(code)} bits. Fibonacci coding is self-delimiting, while raw binary is not. Neither is universally the best compression choice; compare total framing and the data distribution."
+    elif family == "entropy":
+        a = (210 + i * 3) if validation else (3+i)
+        b = (27 + i * 2) if validation else (7+i//2)
+        p = a / (a+b)
+        entropy = -p * math.log2(p) - (1-p) * math.log2(1-p)
+        question = f"A binary source has observed counts A={a}, B={b}. Compute its plug-in Shannon entropy in bits per symbol, round to four decimals, and explain whether Fibonacci coding guarantees the minimum."
+        answer = f"The estimated probabilities are {a}/{a+b} and {b}/{a+b}. Shannon entropy H=-p log2(p)-(1-p)log2(1-p)={entropy:.4f} bits per symbol. Fibonacci coding does not universally minimize expected code length; compare coding and framing assumptions."
+    elif family == "meta_selection":
+        offset = 130 if validation else 0
+        k = i + offset
+        errors = [(3, (7*k+11)%29+1), (5, (11*k+17)%31+1), (8, (17*k+23)%37+1)]
+        best = min(errors, key=lambda pair:(pair[1], pair[0]))
+        question = f"In validation case {k}, the observed holdout errors for windows 3, 5, 8 are respectively {errors[0][1]}, {errors[1][1]}, {errors[2][1]}. Which window is best by this measurement? Does Fibonacci itself guarantee generalization?"
+        answer = f"Window {best[0]} has the lowest observed error ({best[1]}). This is model selection from measured validation outcomes, not proof that Fibonacci scales generalize; confirm on a separate test set and monitor drift."
     else:
         domains = [
             ("a random Wi-Fi signal", "No. A Fibonacci law cannot be assumed from arbitrary wireless measurements."),
