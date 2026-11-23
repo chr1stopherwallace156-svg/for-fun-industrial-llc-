@@ -39,7 +39,7 @@ COUNTY_MAP = {"LA": "Los Angeles", "LOS ANGELES": "Los Angeles",
               "SB": "San Bernardino", "SAN BERNARDINO": "San Bernardino"}
 ADDRESS_FIELDS = ("address", "situs", "site_address", "property_location", "primary_address", "street_address", "rec_parsit_street_name")
 APN_FIELDS = ("apn", "ain", "assessor_id", "assessor_parcel_number", "rec_parcel_nbr", "pin_nbr", "property_id")
-YEAR_FIELDS = ("year_built", "rec_sfrs_const_year", "building_year_built", "year_property_was_built")
+YEAR_FIELDS = ("year_built", "year_built_1", "year_built1", "yearbuilt1", "rec_sfrs_const_year", "building_year_built", "year_property_was_built")
 ZIP_FIELDS = ("zip", "zip_code", "zipcode", "site_address_zip_code", "rec_parsit_zip1")
 CITY_FIELDS = ("city", "site_city", "rec_parsit_city")
 USE_FIELDS = ("classification", "use_code_1st_digit", "property_use_type", "use_type", "property_type", "rec_land_type", "property_use_code")
