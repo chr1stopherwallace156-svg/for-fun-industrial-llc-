@@ -63,6 +63,10 @@ function LiveNew(){
  $response=Invoke-WebRequest ($Url+'/') -UseBasicParsing -TimeoutSec 8
  $page=Invoke-WebRequest ($Url+'/fisre/') -UseBasicParsing -TimeoutSec 8
  $directChat=Invoke-WebRequest ($Url+'/chat/') -UseBasicParsing -TimeoutSec 8
+ $deck=Invoke-WebRequest ($Url+'/control/') -UseBasicParsing -TimeoutSec 8
+ $deckStatus=Invoke-RestMethod ($Url+'/api/fun/control/status') -TimeoutSec 8
+ $deckJs=Invoke-WebRequest ($Url+'/api/fun/control/client.js') -UseBasicParsing -TimeoutSec 8
+ $deckCss=Invoke-WebRequest ($Url+'/api/fun/control/style.css') -UseBasicParsing -TimeoutSec 8
  $grounded=Invoke-RestMethod ($Url+'/api/fial/grounded/status') -TimeoutSec 8
  $inventory=Invoke-RestMethod ($Url+'/api/fun/capabilities/status') -TimeoutSec 8
  $reaDispatch=Invoke-RestMethod ($Url+'/api/fun/rea/dispatch/status') -TimeoutSec 8
@@ -83,6 +87,22 @@ function LiveNew(){
   $directChat.Content -notmatch 'id="fi-fial53-code"' -or
   $directChat.Content -notmatch 'id="fi-fial53-rea-panel"' -or
   $directChat.Content -notmatch 'id="fi-fial53-compute-panel"' -or
+  $directChat.Content -notmatch 'href="/control/"' -or
+  $deck.StatusCode -ne 200 -or
+  $deck.Headers['x-fi-control-deck-version'] -cne 'fun-control-deck-v1' -or
+  $deck.Content -notmatch 'id="inspector"' -or
+  $deck.Content -notmatch 'id="refresh"' -or
+  $deck.Content -notmatch 'data-device="ps5"' -or
+  $deckJs.StatusCode -ne 200 -or
+  $deckJs.Content -notmatch 'device controls are not installed|Device controls are not installed' -or
+  $deckCss.StatusCode -ne 200 -or
+  $deckCss.Content -notmatch 'FUN_CONTROL_DECK_V1' -or
+  $deckStatus.version -cne 'fun-control-deck-v1' -or
+  $deckStatus.state -cne 'read_only_observation' -or
+  $deckStatus.deviceControlEnabled -ne $false -or
+  $deckStatus.externalActions -ne 0 -or
+  @($deckStatus.devices).Count -ne 4 -or
+  @($deckStatus.devices|Where-Object {$_.controlEnabled -ne $false -or $_.videoEnabled -ne $false}).Count -ne 0 -or
   $grounded.model_interface -cne 'fixed_local_qwen_8088' -or
   $grounded.authority_added -ne $false -or
   $grounded.capability_fabric_version -cne 'fun-ai-capability-fabric-v1' -or
@@ -153,6 +173,9 @@ foreach($p in @(
  'Initialize-Fun-Optimization-V1.ps1',
  'src\intelligence\capability-fabric-v1.mjs',
  'src\ui\fisre-qwen-chat-v4.mjs',
+ 'src\ui\fun-control-deck-v1.mjs',
+ 'src\ui\fun-control-deck-v1.css',
+ 'src\ui\fun-control-deck-v1.js',
  'src\cognition\fisre-evidence-v3.mjs',
  'src\ui\fisre-workspace-v4.mjs',
  'src\ui\fisre-workspace-v4.js',
@@ -166,6 +189,10 @@ Leaf $Py
 if($LASTEXITCODE -ne 0){Hold 'PYTHON_312_NOT_AVAILABLE'}
 & $Node --check $NewRunner
 if($LASTEXITCODE -ne 0){Hold 'DASHBOARD_SYNTAX_INVALID'}
+& $Node --check (Join-Path $Root 'src\ui\fun-control-deck-v1.mjs')
+if($LASTEXITCODE -ne 0){Hold 'CONTROL_DECK_MODULE_SYNTAX_INVALID'}
+& $Node --check (Join-Path $Root 'src\ui\fun-control-deck-v1.js')
+if($LASTEXITCODE -ne 0){Hold 'CONTROL_DECK_CLIENT_SYNTAX_INVALID'}
 & $Node --check (Join-Path $Root 'src\semantic\fisre-live-bridge-v4.mjs')
 if($LASTEXITCODE -ne 0){Hold 'FISRE_BRIDGE_SYNTAX_INVALID'}
 foreach($p in $Protected){$Before[$p]=Snapshot $p}
@@ -187,6 +214,7 @@ if($original){
  Write-Host 'FUN_QWEN_CAPABILITY_FABRIC=12_DOMAINS_READONLY_ROUTING'
  Write-Host 'FUN_REA_DISPATCH=EXACT_READONLY_PREPARE_CONFIRM_SEPARATE_CLICKS'
  Write-Host 'FUN_QWEN_ML_OPTIMIZATION=REVIEWED_5_MODES_SAME_8802'
+ Write-Host 'FUN_CONTROL_DECK=READONLY_UI_ACTIVE_AT_8802_CONTROL'
    return
   }
   Write-Host 'FUN_FISRE_EXISTING_8802=UPGRADING_SAME_KNOWN_PROCESS'
@@ -229,6 +257,7 @@ try{
  Write-Host 'FUN_QWEN_CAPABILITY_FABRIC=12_DOMAINS_READONLY_ROUTING'
  Write-Host 'FUN_REA_DISPATCH=EXACT_READONLY_PREPARE_CONFIRM_SEPARATE_CLICKS'
  Write-Host 'FUN_QWEN_ML_OPTIMIZATION=REVIEWED_5_MODES_SAME_8802'
+ Write-Host 'FUN_CONTROL_DECK=READONLY_UI_ACTIVE_AT_8802_CONTROL'
  Write-Host 'FUN_FISRE_PROOF=BOUNDED_RATIONAL_WITH_SOURCE_REPLAY'
  Write-Host 'FUN_FISRE_COGNITION=PROPOSED_ONLY'
  Write-Host 'FUN_FISRE_TOOL_AUTHORITY=UNCHANGED'
