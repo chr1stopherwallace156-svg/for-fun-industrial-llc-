@@ -23,7 +23,7 @@ class DualFormulaTests(unittest.TestCase):
                     id INTEGER PRIMARY KEY, selected INTEGER, source_count INTEGER);
                 CREATE TABLE roofing_selection_candidates_v3(
                     county TEXT,zip TEXT,apn TEXT,city TEXT,year_built INTEGER,
-                    priority INTEGER,disposition TEXT);
+                    priority INTEGER,disposition TEXT,address TEXT);
                 CREATE TABLE permits(
                     county TEXT,apn TEXT,source_id TEXT,permit_id TEXT,
                     issue_date TEXT,roof_class TEXT);
@@ -32,7 +32,7 @@ class DualFormulaTests(unittest.TestCase):
                 [(src, "INGESTED_NOT_COMPLETENESS_VERIFIED")
                  for src in mod.REQUIRED_SOURCES])
             c.execute("INSERT INTO roofing_selection_receipt_v3 VALUES (1,1946966,4)")
-            c.executemany("INSERT INTO roofing_selection_candidates_v3 VALUES (?,?,?,?,?,?,?)", [
+            c.executemany("INSERT INTO roofing_selection_candidates_v3(county,zip,apn,city,year_built,priority,disposition) VALUES (?,?,?,?,?,?,?)", [
                 ("Los Angeles","90011","APN1","LOS ANGELES CA",1980,90,"KEEP"),
                 ("Los Angeles","90011","APN2","LOS ANGELES CA",1980,85,"KEEP"),
                 ("Los Angeles","90011","APN3","LOS ANGELES CA",1975,80,"KEEP"),
