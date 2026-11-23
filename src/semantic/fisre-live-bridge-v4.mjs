@@ -11,6 +11,16 @@ const MAX_IN=24000,MAX_OUT=400000,MAX_ERR=1400,TIMEOUT=20000;
 const fail=x=>{throw Error('FISRE_LIVE_'+x)};
 let activeWorker=false; // Single bounded analysis at a time; no background queue.
 
+export function validateFisrePayload(v){
+ if(!v||typeof v!=='object'||Array.isArray(v)||
+    Object.keys(v).length!==3||!['source','function','ranges'].every(k=>Object.hasOwn(v,k))||
+    typeof v.source!=='string'||!v.source.trim()||Buffer.byteLength(v.source,'utf8')>16000||
+    typeof v.function!=='string'||!v.function.trim()||v.function.length>64||
+    !Array.isArray(v.ranges)||v.ranges.length<1||v.ranges.length>16||
+    v.ranges.some(x=>typeof x!=='string'||x.length>220))fail('INPUT_SCHEMA_INVALID');
+ return v;
+}
+
 export async function parseFisreRequest(req){
  if(req.headers['content-type']!=='application/json')fail('JSON_CONTENT_TYPE_REQUIRED');
  let total=0;const chunks=[];
@@ -21,13 +31,7 @@ export async function parseFisreRequest(req){
  }
  let v;
  try{v=JSON.parse(Buffer.concat(chunks).toString('utf8'))}catch{fail('INVALID_JSON')}
- if(!v||typeof v!=='object'||Array.isArray(v)||
-    Object.keys(v).length!==3||!['source','function','ranges'].every(k=>Object.hasOwn(v,k))||
-    typeof v.source!=='string'||!v.source.trim()||Buffer.byteLength(v.source,'utf8')>16000||
-    typeof v.function!=='string'||!v.function.trim()||v.function.length>64||
-    !Array.isArray(v.ranges)||v.ranges.length<1||v.ranges.length>16||
-    v.ranges.some(x=>typeof x!=='string'||x.length>220))fail('INPUT_SCHEMA_INVALID');
- return v;
+ return validateFisrePayload(v);
 }
 
 export function runFisrePython(payload,{spawnProcess=spawn}={}){
