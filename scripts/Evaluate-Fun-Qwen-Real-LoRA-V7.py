@@ -94,6 +94,10 @@ def inspect_existing_binary():
 def ensure_binary():
     if not BUILD.is_dir() or not (BUILD/"CMakeCache.txt").is_file():
         raise RuntimeError("PINNED_V5_BUILD_CONFIGURATION_NOT_FOUND")
+    # V7.1 is strictly offline. Do not permit v5.prepare_source to clone
+    # a missing remote dependency (even if the binary is already present).
+    if not (APP/"llama-tq-pinned-source"/".git").is_dir():
+        raise RuntimeError("PINNED_SOURCE_NOT_AVAILABLE_NO_DOWNLOAD")
     # Validate the pinned original and overlay before executing build.
     source=v5.prepare_source(APP)
     v5.prepare_msvc_noasm_overlay(APP,source)
@@ -256,7 +260,7 @@ def main():
     if RUN_DIR.exists():
         raise RuntimeError("EVALUATION_OUTPUT_EXISTS_NO_OVERWRITE")
     RUN_DIR.mkdir(parents=True)
-    print("FUN_QWEN_V7_INPUTS="+json.dumps({
+    print("FUN_QWEN_V71_INPUTS="+json.dumps({
         "state":"VERIFIED_REAL_QWEN_GGUF_AND_LEARNED_LORA",
         "model_sha256":evidence["model_sha256"],
         "adapter_sha256":evidence["adapter_sha256"],
@@ -265,10 +269,10 @@ def main():
         "cases":len(evidence["cases"]),
         "live_server_changes":False,"network_access":False},sort_keys=True),flush=True)
     binary=ensure_binary()
-    print("FUN_QWEN_V7_EVALUATION_BINARY="+str(binary),flush=True)
+    print("FUN_QWEN_V71_EVALUATION_BINARY="+str(binary),flush=True)
     records=[]
     for case in evidence["cases"]:
-        print("FUN_QWEN_V7_CASE="+case["id"],flush=True)
+        print("FUN_QWEN_V71_CASE="+case["id"],flush=True)
         base=run_case(binary,case,"baseline",RUN_DIR)
         adapted=run_case(binary,case,"adapter",RUN_DIR)
         records.append({
@@ -280,7 +284,7 @@ def main():
             "adapter_reference_evidence":reference_evidence(case,adapted["generated_text"]),
             "exact_generated_text_changed":base["generated_sha256"]!=adapted["generated_sha256"]
         })
-        print("FUN_QWEN_V7_CASE_RESULT="+json.dumps({
+        print("FUN_QWEN_V71_CASE_RESULT="+json.dumps({
             "id":case["id"],"baseline_response":base["generated_text"],
             "adapter_response":adapted["generated_text"],
             "baseline_reference_evidence":records[-1]["baseline_reference_evidence"],
@@ -313,9 +317,9 @@ def main():
     out=RUN_DIR/"evaluation-report.json"
     with out.open("x",encoding="utf-8") as f:
         json.dump(report,f,indent=2,sort_keys=True,ensure_ascii=False)
-    print("FUN_QWEN_V7_RESULT="+json.dumps({k:v for k,v in report.items() if k!="records"},
+    print("FUN_QWEN_V71_RESULT="+json.dumps({k:v for k,v in report.items() if k!="records"},
            sort_keys=True),flush=True)
-    print("FUN_QWEN_V7_REPORT="+str(out),flush=True)
+    print("FUN_QWEN_V71_REPORT="+str(out),flush=True)
 
 if __name__=="__main__":
     try:
