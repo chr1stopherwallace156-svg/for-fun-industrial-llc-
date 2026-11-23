@@ -77,9 +77,16 @@ def base_identity(base_dir):
     # are NOT evidence that the running GGUF uses the same model revision.
     expected = {"model_type": "qwen3", "num_hidden_layers": 36,
                 "hidden_size": 2560, "num_attention_heads": 32,
-                "num_key_value_heads": 8, "vocab_size": 151936}
+                "num_key_value_heads": 8, "vocab_size": 151936,
+                "intermediate_size": 9728, "head_dim": 128,
+                "max_position_embeddings": 40960, "rope_theta": 1000000}
     if any(config.get(k) != v for k, v in expected.items()):
         return {"state": "BASE_MODEL_ARCHITECTURE_UNEXPECTED"}
+    # A full-precision source checkpoint, not a separately quantized AWQ
+    # checkpoint, is required by the current CUDA-oriented QLoRA trainer.
+    # Matching shapes/rope alone still cannot prove the original GGUF lineage.
+    if config.get("quantization_config") is not None:
+        return {"state": "PREQUANTIZED_AWQ_CHECKPOINT_REFUSED_FOR_THIS_TRAINER"}
     index = root / "model.safetensors.index.json"
     if index.exists():
         try:
