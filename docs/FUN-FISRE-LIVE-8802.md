@@ -69,3 +69,26 @@ Domains reported inside the existing chat: code/math, Cognee memory, business, g
 `GET /api/fun/capabilities/status` provides the read-only inventory. `GET /api/fial/grounded/status` includes `capability_fabric_version=fun-ai-capability-fabric-v1`. The deployment checks these on 8802 startup and prints `FUN_QWEN_CAPABILITY_FABRIC=12_DOMAINS_READONLY_ROUTING`.
 
 To use it, open `http://127.0.0.1:8802/#chat` and ask Qwen, for example, "What can Fun Industrial do for grants, EV engineering and optimization, and which modules can currently act?" The answer must distinguish existing modules and read-only evidence from actual verified execution authority. Click **Fun Industrial intelligence domains** inside the chat for the inventory; this never launches an action.
+
+## In-chat operator-reviewed REA dispatcher (limited initial scope)
+
+The current one-port Qwen chat includes **Reviewed REA tools · separate approval**. This uses a fixed adapter to the existing REA MCP service **127.0.0.1:8797** and reuses the existing `createVerifiedReaV3` two-step review and single-use authorization token. It does not depend on the separate degraded 8798 UI.
+
+Only these **two explicitly reviewed read-only operations** can be prepared here:
+
+- `inspect_analysis_settings`, exact arguments `{}`; inspect configured REA analysis settings.
+- `binary_session`, exact arguments `{}`; inspect the binary provider/session status.
+
+In Qwen chat, asking about REA settings or binary providers yields **a deterministic suggestion only**. The operator must then open the tool review panel and **click Prepare inspection**; 8802 reads the live 8797 status and tool catalogue, verifies the exact tool's schema, and creates a 120-second pending authorization. **Confirm exact read-only call** is a distinct second click and consumes the token, even on ambiguous failure. No automatic retries. Cancel explicitly invalidates the pending token. No agent-generated arguments, no arbitrary REA tool names, no tool execution from the Qwen model, and no file operations.
+
+A verified result can be read in the same panel with a receipt hash; **Ask Qwen to explain the approved observation** sends only a short, labeled, untrusted snapshot of the operator-approved result into the *existing local Qwen* prompt. The observation is ephemeral in 8802 memory and not written to persistent cognitive memory. Qwen cannot repeat or modify the tool call itself. Backend maintains existing one-port origin/click requirements. If the REA provider or its exact tool is unavailable, preparation refuses execution. This integration does **not** repair 8798 or assert all 229 REA tool calls are available.
+
+Routes under the existing 8802 loopback listener:
+- `GET /api/fun/rea/dispatch/status` — local dispatcher capability/approval state, with provider usability not verified until preparation.
+- `POST /api/fun/rea/dispatch/prepare` — separately clicked operator review of exact allowlisted tool and `{}`.
+- `POST /api/fun/rea/dispatch/confirm` — separate click with matching single-use token and `operatorConfirmed=true`.
+- `POST /api/fun/rea/dispatch/cancel` — cancellation, `{}` only.
+
+**Not connected for direct execution:** general ML training, OR-Tools/Optuna solves, FreeCAD/WireViz rendering, arbitrary file and PE analysis, financial transfers, external submissions, Shopify writes, or the remaining REA tools. They require tool-specific schema verification, target review, per-effect permissions, and operator approval. Merely listing them in the 12-domain capability inventory is not evidence that Qwen can operate them.
+
+Deployment remains operator-initiated via `Activate-Fun-FISRE-Live-V4.ps1`, and checks the presence of this review panel and the `fun-ai-reviewed-rea-dispatch-v1` route before changing the active dashboard. The success marker includes `FUN_REA_DISPATCH=EXACT_READONLY_PREPARE_CONFIRM_SEPARATE_CLICKS`.
