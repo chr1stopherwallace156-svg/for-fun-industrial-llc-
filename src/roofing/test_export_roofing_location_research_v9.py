@@ -122,20 +122,25 @@ class RoofingLocationExportTests(unittest.TestCase):
         r=self.get()
         files=loc.write_reports(r,self.output)
         self.assertEqual(set(files),
-              {"zip_market_summary","ranked_street_blocks","qualified_property_research"})
+              {"zip_market_summary","ranked_street_blocks","qualified_property_research",
+               "recent_permit_locations"})
         with Path(files["ranked_street_blocks"]).open(encoding="utf-8-sig",newline="") as fp:
             b=list(csv.DictReader(fp))
         with Path(files["qualified_property_research"]).open(encoding="utf-8-sig",newline="") as fp:
             ps=list(csv.DictReader(fp))
+        with Path(files["recent_permit_locations"]).open(encoding="utf-8-sig",newline="") as fp:
+            recent=list(csv.DictReader(fp))
+        self.assertEqual(len(recent),2)
+        self.assertEqual({item["apn"] for item in recent},{"APN2","APN3"})
+        self.assertTrue(all("NOT_PROOF_OF_COMPLETED" in item["research_label"] for item in recent))
+        self.assertFalse(any("email" in k or "phone" in k or "owner" in k for k in recent[0]))
         self.assertEqual(len(b),1)
         self.assertEqual(len(ps),4)
         self.assertEqual(ps[0]["street_number_block"],"100-199 OAK ST")
         self.assertTrue(all(p["address"].endswith("OAK ST") for p in ps))
         self.assertFalse(any("owner" in k or "email" in k or "phone" in k
                       for k in ps[0]))
-        self.assertFalse(any(p["recent_subject_exact_apn_permit_observed"]
-                      for p in r["properties"])) if "recent_subject_exact_apn_permit_observed" in r["properties"][0] else None
-        self.assertEqual(before,self.db.read_bytes())
+         self.assertEqual(before,self.db.read_bytes())
 
     def test_incomplete_source_and_invalid_age_hold(self):
         with self.assertRaisesRegex(ValueError,"BUILDING_AGE_MUST_BE_20_TO_100"):
