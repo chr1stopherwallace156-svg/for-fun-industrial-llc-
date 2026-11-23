@@ -53,7 +53,7 @@ function RunnerPath([string]$commandLine){
 function Live(){
  $p=Owner
  if(!$p -or ([string]$p.CommandLine).IndexOf($Runner,[StringComparison]::OrdinalIgnoreCase) -lt 0){Hold 'NEW_8802_OWNER_NOT_VERIFIED'}
- $home=Invoke-WebRequest ($Url+'/') -UseBasicParsing -TimeoutSec 8
+ $homepageResponse=Invoke-WebRequest ($Url+'/') -UseBasicParsing -TimeoutSec 8
  $page=Invoke-WebRequest ($Url+'/math/v3/') -UseBasicParsing -TimeoutSec 8
  $client=Invoke-WebRequest ($Url+'/api/fun/math/v3/client.js') -UseBasicParsing -TimeoutSec 8
  $status=Invoke-RestMethod ($Url+'/api/fun/math/v3/status') -TimeoutSec 8
@@ -62,7 +62,7 @@ function Live(){
  $chatJs=Invoke-WebRequest ($Url+'/api/fial/grounded/client.js') -UseBasicParsing -TimeoutSec 8
  $qwen=Invoke-RestMethod ($Url+'/api/fial/grounded/status') -TimeoutSec 8
  $v2=Invoke-RestMethod ($Url+'/api/fun/math/status') -TimeoutSec 8
- if($home.StatusCode -ne 200 -or $home.Content -notmatch 'Mathematical Discovery V3' -or
+ if($homepageResponse.StatusCode -ne 200 -or $homepageResponse.Content -notmatch 'Mathematical Discovery V3' -or
     $page.StatusCode -ne 200 -or $page.Headers['x-fi-math-version'] -cne 'fun-math-v3-readonly-8802' -or
     $client.Content -notmatch 'useMathV3Evidence' -or
     $status.ready -ne $true -or $status.version -cne 'fun-math-v3-readonly-8802' -or
