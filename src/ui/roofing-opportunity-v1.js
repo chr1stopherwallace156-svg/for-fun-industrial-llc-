@@ -85,6 +85,19 @@ function params(){
 async function leads(){
  const p=params();
  const d=await jsonGet('/api/fun/roofing/leads?'+p.toString());
+ const marketTable=el('roof-markets');marketTable.replaceChildren();
+ if(!(d.markets||[]).length){
+  const tr=node('tr'),td=node('td','No property inventory matched the selected filters.');
+  td.colSpan=6;tr.append(td);marketTable.append(tr);
+ }else{
+  for(const area of d.markets.slice(0,20)){
+   const tr=node('tr');
+   for(const value of [area.county,area.city+' '+(area.zip||''),area.propertyCount,
+     area.noPermitFound,area.lastRoofPermit20Plus,area.averagePriority])
+     tr.append(node('td',value));
+   marketTable.append(tr);
+  }
+ }
  const table=el('roof-lead-table');table.replaceChildren();
  replaceText('roof-lead-status',
    d.total+' eligible property records in the imported inventory. '+(d.limited?'Showing first 300.':'Showing all.')+
