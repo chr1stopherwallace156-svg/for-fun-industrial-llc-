@@ -42,11 +42,11 @@ class FibonacciWeightCurriculumTests(unittest.TestCase):
         a = build.generate()
         b = build.generate()
         self.assertEqual(a, b)
-        self.assertEqual(len(a["train"]), 576)
-        self.assertEqual(len(a["validation"]), 192)
+        self.assertEqual(len(a["train"]), 960)
+        self.assertEqual(len(a["validation"]), 320)
         p = lambda part: [x["messages"][0]["content"] for x in a[part]]
-        self.assertEqual(len(set(p("train"))), 576)
-        self.assertEqual(len(set(p("validation"))), 192)
+        self.assertEqual(len(set(p("train"))), 960)
+        self.assertEqual(len(set(p("validation"))), 320)
         self.assertFalse(set(p("train")) & set(p("validation")))
         self.assertEqual({x["family"] for x in a["train"]}, set(build.FAMILIES))
         self.assertEqual({x["family"] for x in a["validation"]}, set(build.FAMILIES))
@@ -54,8 +54,8 @@ class FibonacciWeightCurriculumTests(unittest.TestCase):
     def test_maximum_bounded_generated_rows_no_prompt_overlap(self):
         a = build.generate(train_per_family=160, validation_per_family=64)
         p = lambda part: [x["messages"][0]["content"] for x in a[part]]
-        self.assertEqual(len(set(p("train"))), 160 * 6)
-        self.assertEqual(len(set(p("validation"))), 64 * 6)
+        self.assertEqual(len(set(p("train"))), 160 * 10)
+        self.assertEqual(len(set(p("validation"))), 64 * 10)
         self.assertFalse(set(p("train")) & set(p("validation")))
 
     def test_generate_and_verify_hashed_curriculum(self):
@@ -64,8 +64,8 @@ class FibonacciWeightCurriculumTests(unittest.TestCase):
             meta = build.write_dataset(folder, build.generate(12, 8), 6427)
             self.assertFalse(meta["model_weights_modified"])
             data = train.verify_dataset(folder)
-            self.assertEqual(len(data["train"]), 12 * 6)
-            self.assertEqual(len(data["validation"]), 8 * 6)
+            self.assertEqual(len(data["train"]), 12 * 10)
+            self.assertEqual(len(data["validation"]), 8 * 10)
             with self.assertRaises(FileExistsError):
                 build.write_dataset(folder, build.generate(12, 8), 6427)
             file = folder / "train.jsonl"
