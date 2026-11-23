@@ -29,6 +29,6 @@ tr:hover td{background:#1c3143}.foot{color:#839fae;font-size:11px;margin:14px 0 
 #parallel-roof-formulas>.two-col{align-items:start;margin:8px 0 20px}
 #parallel-roof-formulas .formula{white-space:pre-line;min-height:145px;margin:8px 0}
 #parallel-roof-formulas>label{font-size:11px;color:#b3ccd1;font-weight:700;display:block;max-width:360px;margin:14px 0 2px}
-#parallel-roof-formulas>label select{display:block;width:100%;min-height:42px;margin-top:6px;background:#0b1b2b;color:var(--text);border:1px solid #456173;border-radius:9px;padding:9px}
+#parallel-roof-formulas>label select,#parallel-roof-formulas>label input{display:block;width:100%;min-height:42px;margin-top:6px;background:#0b1b2b;color:var(--text);border:1px solid #456173;border-radius:9px;padding:9px}
 #parallel-roof-formulas .table-wrap+ h3{margin-top:24px;font-size:14px}
 #parallel-roof-formulas .table-wrap td{font-variant-numeric:tabular-nums}
