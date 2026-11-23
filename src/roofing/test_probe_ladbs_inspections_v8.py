@@ -129,6 +129,35 @@ class InspectionJoinProbeTests(unittest.TestCase):
         self.assertIsNone(v8.canonical_permit("ABC' OR 1=1--"))
         self.assertIsNone(v8.canonical_permit("1; DROP TABLE"))
         self.assertEqual(v8.canonical_permit("24016-10000-00001"),"24016-10000-00001")
+    def test_historical_issue_cutoff_excludes_newer_permit_without_changing_default(self):
+        # Newest-permit default includes this after-cutoff record; the
+        # historical sample excludes it and still checks eligible 2025 IDs.
+        with contextlib.closing(sqlite3.connect(self.db)) as c,c:
+            c.execute("INSERT INTO permits VALUES (?,?,?,?,?,?)",
+                      ("Los Angeles","100001","26016-10000-00009",
+                       "2026-11-02",SOURCE,"REPLACEMENT_LIKE"))
+        default,url_now=self.run_probe([])
+        old,url_old=self.run_probe([],issued_before="2026-10-01")
+        self.assertEqual(default["aggregate"]["selected_exact_permit_ids"],4)
+        self.assertEqual(old["aggregate"]["selected_exact_permit_ids"],3)
+        self.assertEqual(old["latest_eligible_issue_date"],"2026-09-30")
+        self.assertEqual(old["issued_before_exclusive"],"2026-10-01")
+        now_where=urllib.parse.parse_qs(urllib.parse.urlsplit(url_now).query)["$where"][0]
+        old_where=urllib.parse.parse_qs(urllib.parse.urlsplit(url_old).query)["$where"][0]
+        self.assertIn("26016-10000-00009",now_where)
+        self.assertNotIn("26016-10000-00009",old_where)
+        self.assertIn("24016-10000-00001",old_where)
+
+    def test_historical_cutoff_rejects_invalid_and_future_values(self):
+        for value,reason in (
+            ("2026-02-30","INSPECTION_ISSUE_CUTOFF_INVALID"),
+            ("2026-11-24","INSPECTION_ISSUE_CUTOFF_OUT_OF_RANGE"),
+            ("2026/10/01","INSPECTION_ISSUE_CUTOFF_INVALID"),
+            ("2019-01-01","INSPECTION_ISSUE_CUTOFF_OUT_OF_RANGE"),
+        ):
+            with self.subTest(value=value),self.assertRaisesRegex(ValueError,reason):
+                v8.probe(self.db,issued_before=value,today=TODAY,fetch=lambda _:[])
+
     def test_query_is_leap_safe_for_february_29(self):
         # Date-window boundary must not throw for leap-day today.
         result,_=self.run_probe([],today=dt.date(2028,2,29))
