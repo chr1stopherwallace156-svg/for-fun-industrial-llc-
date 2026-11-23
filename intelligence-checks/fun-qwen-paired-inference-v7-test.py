@@ -16,7 +16,7 @@ class V7Tests(unittest.TestCase):
         self.assertEqual(mod.MAX_CASES,3)
 
     def test_bounded_generation(self):
-        self.assertLessEqual(mod.MAX_GENERATION_TOKENS,96)
+        self.assertLessEqual(mod.MAX_GENERATION_TOKENS,160)
         self.assertLessEqual(mod.MAX_CHILD_SECONDS,300)
         self.assertGreaterEqual(mod.MIN_HOST_FREE_GIB,4.0)
         self.assertGreaterEqual(mod.MIN_COMMIT_HEADROOM_GIB,4.0)
@@ -54,6 +54,30 @@ class V7Tests(unittest.TestCase):
         self.assertIn('EXPLICIT_ISOLATED_EVALUATION_APPROVAL_REQUIRED',s)
         self.assertIn('EVALUATION_OUTPUT_EXISTS_NO_OVERWRITE',s)
         self.assertIn('RUN_DIR/"evaluation-report.json"',s)
+
+    def test_qwen3_nonthinking_prefill_and_raw_completion(self):
+        prompt=mod.qwen_nonthinking_prefill("What comes next?")
+        self.assertTrue(prompt.startswith("<|im_start|>system\\n"))
+        self.assertIn("/no_think",prompt)
+        self.assertTrue(prompt.endswith("<|im_start|>assistant\\n<think>\\n\\n</think>\\n\\n"))
+        import inspect
+        body=inspect.getsource(mod.run_case)
+        self.assertIn('"-no-cnv"',body)
+        self.assertIn('qwen_nonthinking_prefill(case["prompt"])',body)
+        self.assertIn('QWEN_NONTHINKING_PREFILL_NOT_HONORED',body)
+
+    def test_reference_evidence_requires_complete_answers(self):
+        recurrence={"id":"heldout-recurrence","reference_answer":"The next value is 3087+41838=44925. This is a recurrence."}
+        yes=mod.reference_evidence(recurrence,"The answer is 44,925.")
+        self.assertEqual(yes["reference_match"],True)
+        no=mod.reference_evidence(recurrence,"It should add the terms.")
+        self.assertEqual(no["reference_match"],False)
+        bad=mod.reference_evidence(recurrence,"<think>reasoning</think>44925")
+        self.assertIsNone(bad["reference_match"])
+        control={"id":"general-control","reference_answer":"Tokyo"}
+        self.assertTrue(mod.reference_evidence(control,"Tokyo.")["reference_match"])
+        tie={"id":"heldout-model-selection","reference_answer":"Window 3 or 5 tied"}
+        self.assertIsNone(mod.reference_evidence(tie,"Windows 3 and 5 are tied.")["reference_match"])
 
     def test_heldout_question_ids(self):
         import inspect
