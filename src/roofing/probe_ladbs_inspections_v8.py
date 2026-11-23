@@ -53,19 +53,23 @@ def _official_fetch(url):
     except (UnicodeError,json.JSONDecodeError) as exc:
         raise ValueError("INSPECTION_REMOTE_INVALID_JSON") from exc
 
+def max_eligible_issue_date(today,issued_before=None):
+    """Return inclusive upper bound; optional cutoff is strictly exclusive."""
+    if issued_before is None:
+        return today
+    if not isinstance(issued_before,str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}",issued_before):
+        raise ValueError("INSPECTION_ISSUE_CUTOFF_INVALID")
+    try:
+        boundary=dt.date.fromisoformat(issued_before)
+    except ValueError as exc:
+        raise ValueError("INSPECTION_ISSUE_CUTOFF_INVALID") from exc
+    if not dt.date(2020,1,2)<=boundary<=today:
+        raise ValueError("INSPECTION_ISSUE_CUTOFF_OUT_OF_RANGE")
+    return boundary-dt.timedelta(days=1)
+
 def probe(db,*,zips=ZIPS,per_zip=3,today=None,issued_before=None,fetch=None):
     today=today or dt.date.today()
-    if issued_before is None:
-        max_issue_date=today
-    else:
-        if not isinstance(issued_before,str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}",issued_before):
-            raise ValueError("INSPECTION_ISSUE_CUTOFF_INVALID")
-        try:boundary=dt.date.fromisoformat(issued_before)
-        except ValueError as exc:
-            raise ValueError("INSPECTION_ISSUE_CUTOFF_INVALID") from exc
-        if not dt.date(2020,1,2)<=boundary<=today:
-            raise ValueError("INSPECTION_ISSUE_CUTOFF_OUT_OF_RANGE")
-        max_issue_date=boundary-dt.timedelta(days=1)
+    max_issue_date=max_eligible_issue_date(today,issued_before)
     if not isinstance(per_zip,int) or not 1<=per_zip<=MAX_PER_ZIP:
         raise ValueError("INSPECTION_SAMPLE_PER_ZIP_LIMIT")
     if not 1<=len(zips)<=4 or len(zips)!=len(set(zips)) or any(
