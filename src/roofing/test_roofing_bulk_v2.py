@@ -196,6 +196,36 @@ class RoofingBulkTests(unittest.TestCase):
             state=c.execute("SELECT state FROM source_runs WHERE source_id='municipal_la_conflict_fixture'").fetchone()[0]
             self.assertEqual(state,"INCOMPLETE_IMPORT_HOLD")
 
+    def test_existing_assessor_archive_is_reused_without_network(self):
+        from types import SimpleNamespace
+        folder=self.root/"official_downloads"
+        folder.mkdir()
+        saved=folder/"la_assessor_2021_2025.zip"
+        saved.write_bytes(b"previously-downloaded-archive")
+        result=captured(roof.download, SimpleNamespace(
+            root=str(self.root),source="la_assessor_2021_2025",
+            replace=False,max_gb=8))
+        self.assertEqual(result["state"],"EXISTING_FILE_RETAINED")
+        self.assertEqual(result["bytes"],len(b"previously-downloaded-archive"))
+        self.assertEqual(saved.read_bytes(),b"previously-downloaded-archive")
+
+    def test_inspect_shows_only_mapped_headers_never_assessor_record_values(self):
+        from types import SimpleNamespace
+        import csv
+        path=self.root/"inspect_only.csv"
+        with path.open("w",encoding="utf-8",newline="") as output:
+            writer=csv.writer(output)
+            writer.writerow(["AIN","Year Built","Year-Built","Owner Name","Property Location"])
+            writer.writerow(["0000000123","1984","1984",
+                             "PRIVATE_TEST_PERSON","100 EXAMPLE ST, LOS ANGELES, CA 90001"])
+        result=captured(roof.inspect,SimpleNamespace(file=str(path)))
+        member=result["csv_members"][0]
+        self.assertEqual(member["total_header_columns"],5)
+        self.assertIn("year_built",member["duplicate_mapped_columns"])
+        self.assertTrue(member["has_construction_year"])
+        self.assertNotIn("PRIVATE_TEST_PERSON",str(result))
+        self.assertNotIn("0000000123",str(result))
+
     def test_csv_reader_streams_rows(self):
         self.seed()
         rows=captured(roof.candidates,SimpleNamespace(
