@@ -57,3 +57,15 @@ The user can ask a question and optionally attach Python source, exact function 
 **This is runtime orchestration/integration, not changing Qwen's neural weights.** The model has access to qualified tools via fixed, reviewed application logic, not by granting itself shell authority. A `PROVED` result remains scoped to the restricted exact-rational mathematics; a validated replay is not an independent mathematical proof.
 
 The new deployment marker is `FUN_QWEN_FISRE_CHAT=UNIFIED_8802_DIRECT_8088`. After running the activation script, visit `http://127.0.0.1:8802/#chat`. The activation script will adopt an existing matching integrated dashboard without restarting it, or replace only the existing identified 8802 Node process and attempt rollback to the reviewed old dashboard if activation fails.
+
+## Unified AI capability fabric (12-domain inventory)
+
+The primary **Local AI Chat** on 8802 uses the *same* Qwen model, and now receives a bounded, query-sensitive capability inventory (`fun-ai-capability-fabric-v1`) plus available **read-only cached evidence** for grants, executive/outcomes, ML health, and Shopify/Trends. The pre-existing Qwen context adapters also cover business frameworks, regulatory research, fleet buyers, procurement, commercial fit, bid readiness and funding-demand evidence. FISRE has been integrated into the chat for operator-supplied Python source and ranges.
+
+Domains reported inside the existing chat: code/math, Cognee memory, business, grants, fleet and purchasing, operations/outcomes, ML, commerce, optimization, engineering, security/PE, and REA/local tools.
+
+**This inventory is not automatic execution of every module.** Optimization, CAD/EV engineering, security inspection, model training, REA tools and filesystem effects are **not** silently executed from prompts. Their existing capabilities are catalogued, and tool execution continues to require the approved operator flow and healthy dependencies. No new model, process daemon, network port, code-authoring permission, or Elektron integration has been installed. A degraded unified-tools backend at 8798 remains an independent availability concern.
+
+`GET /api/fun/capabilities/status` provides the read-only inventory. `GET /api/fial/grounded/status` includes `capability_fabric_version=fun-ai-capability-fabric-v1`. The deployment checks these on 8802 startup and prints `FUN_QWEN_CAPABILITY_FABRIC=12_DOMAINS_READONLY_ROUTING`.
+
+To use it, open `http://127.0.0.1:8802/#chat` and ask Qwen, for example, "What can Fun Industrial do for grants, EV engineering and optimization, and which modules can currently act?" The answer must distinguish existing modules and read-only evidence from actual verified execution authority. Click **Fun Industrial intelligence domains** inside the chat for the inventory; this never launches an action.
