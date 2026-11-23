@@ -24,3 +24,11 @@ tr:hover td{background:#1c3143}.foot{color:#839fae;font-size:11px;margin:14px 0 
 @media(max-width:1150px){.filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.source-list{grid-template-columns:1fr}}
 @media(max-width:750px){.layout{display:block}.sidebar{height:auto;position:static;padding:13px 17px}.brand{margin:0;padding:0;border:0}.sidebar nav{display:flex;overflow:auto;margin-top:8px}.sidebar nav a{white-space:nowrap}.side-bottom{display:none}main{padding:27px 16px 60px}.hero h1{font-size:34px}}
 @media(max-width:520px){.filter-grid,.metrics,.two-col{grid-template-columns:1fr}.section-header>.btn{width:100%}.hero>.btn{width:100%}.metric{padding:14px}.metric strong{font-size:19px}}
+
+/* Distinct, independently parameterized read-only roofing formulas. */
+#parallel-roof-formulas>.two-col{align-items:start;margin:8px 0 20px}
+#parallel-roof-formulas .formula{white-space:pre-line;min-height:145px;margin:8px 0}
+#parallel-roof-formulas>label{font-size:11px;color:#b3ccd1;font-weight:700;display:block;max-width:360px;margin:14px 0 2px}
+#parallel-roof-formulas>label select{display:block;width:100%;min-height:42px;margin-top:6px;background:#0b1b2b;color:var(--text);border:1px solid #456173;border-radius:9px;padding:9px}
+#parallel-roof-formulas .table-wrap+ h3{margin-top:24px;font-size:14px}
+#parallel-roof-formulas .table-wrap td{font-variant-numeric:tabular-nums}
