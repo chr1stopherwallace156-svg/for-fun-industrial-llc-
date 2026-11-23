@@ -24,8 +24,19 @@ class RoofingBulkTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
         self.db = str(self.root / "warehouse.sqlite3")
+        self._open_connections = []
+
+    def connect(self):
+        connection = sqlite3.connect(self.db)
+        self._open_connections.append(connection)
+        return connection
 
     def tearDown(self):
+        # Connection context managers commit/rollback, but don't close.
+        # Windows refuses to remove a temp folder with an open SQLite file.
+        for connection in reversed(self._open_connections):
+            connection.close()
+        self._open_connections.clear()
         self.tmp.cleanup()
 
     def write_csv(self, name, rows):
@@ -70,7 +81,7 @@ class RoofingBulkTests(unittest.TestCase):
 
     def test_no_permit_candidates_survive_in_both_counties(self):
         self.seed()
-        conn=sqlite3.connect(self.db)
+        conn=self.connect()
         rows=conn.execute("SELECT county,apn,status FROM candidates").fetchall()
         self.assertEqual(len(rows),4)
         found={r[1]:r[2] for r in rows}
@@ -114,18 +125,18 @@ class RoofingBulkTests(unittest.TestCase):
 
     def test_invalid_permit_does_not_enter_evidence(self):
         self.seed()
-        conn=sqlite3.connect(self.db)
+        conn=self.connect()
         self.assertEqual(conn.execute("SELECT count(*) FROM permits").fetchone()[0],2)
         self.assertEqual(roof.parse_date("02/30/2026"),None)
         self.assertEqual(roof.parse_date("2026-11-01"),"2026-11-01")
 
     def test_unverified_source_is_not_exposed_after_broken_import(self):
         self.seed()
-        conn=sqlite3.connect(self.db)
+        conn=self.connect()
         conn.execute("UPDATE source_runs SET state='INCOMPLETE_IMPORT_HOLD' WHERE source_id='municipal_la_permits_fixture'")
         conn.commit();conn.close()
         captured(roof.rebuild,SimpleNamespace(db=self.db))
-        db=sqlite3.connect(self.db)
+        db=self.connect()
         states=[x[0] for x in db.execute("SELECT status FROM candidates ORDER BY apn")]
         self.assertTrue(all(x=="NO_ROOF_PERMIT_IN_INGESTED_RECORDS" for x in states))
 
