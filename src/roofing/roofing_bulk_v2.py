@@ -646,15 +646,35 @@ def sync(args):
           "selection":summary,"countywide_permit_coverage":False})
 
 def inspect(args):
+    """Read only CSV header lines, never property rows or homeowner identities."""
     path=Path(args.file)
-    if not path.exists():raise ValueError("INPUT_FILE_MISSING")
+    if not path.is_file():
+        raise ValueError("INPUT_FILE_MISSING")
     info=[]
-    for name, binary in input_members(path):
-        with binary:
-            text=io.TextIOWrapper(binary,encoding="utf-8-sig",errors="replace",newline="")
-            header_line=next(csv.reader(text),[])
-        info.append({"member":name,"columns":[header(c) for c in header_line[:120]]})
-        if len(info)>=25:break
+    from contextlib import closing
+    with closing(input_members(path)) as members:
+        for name, binary in members:
+            # Do not close an underlying archive member before yielding control
+            # back to the ZIP iterator; the wrapper is scoped to this member.
+            with io.TextIOWrapper(binary,encoding="utf-8-sig",
+                                errors="replace",newline="") as text:
+                header_line=next(csv.reader(text),[])
+            names=[header(c) for c in header_line]
+            interesting={x for x in names if x in REQUIRED_CSV_FIELDS}
+            repeats=sorted({x for x in interesting if names.count(x)>1})
+            info.append({
+                "member":Path(name).name[:140],
+                "total_header_columns":len(names),
+                "mapped_public_columns":sorted(interesting),
+                "duplicate_mapped_columns":repeats,
+                "has_property_id":bool(interesting.intersection(APN_FIELDS)),
+                "has_site_address":bool(interesting.intersection(ADDRESS_FIELDS)),
+                "has_construction_year":bool(interesting.intersection(YEAR_FIELDS)),
+                "has_roll_year":bool(interesting.intersection(("roll_year","tax_year","rollyear"))),
+                "no_record_values_or_owner_information":True,
+            })
+            if len(info)>=25:
+                break
     emit({"version":VERSION,"file":path.name,"csv_members":info,
           "owner_data_not_extracted":True,"requires_explicit_ingest":True})
 
