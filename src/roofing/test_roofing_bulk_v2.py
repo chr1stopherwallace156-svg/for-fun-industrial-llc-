@@ -2,6 +2,8 @@
 import contextlib
 import csv
 import io
+import gc
+import warnings
 import json
 import sqlite3
 import sys
@@ -141,6 +143,25 @@ class RoofingBulkTests(unittest.TestCase):
         db=self.connect()
         states=[x[0] for x in db.execute("SELECT status FROM candidates ORDER BY apn")]
         self.assertTrue(all(x=="NO_ROOF_PERMIT_IN_INGESTED_RECORDS" for x in states))
+
+    def test_csv_reader_closes_stream_without_resource_warnings(self):
+        path=self.write_csv("stream_handle.csv",[
+            {"address":"100 TEST ST","city":"LOS ANGELES"}
+        ])
+        with warnings.catch_warnings(record=True) as notices:
+            warnings.simplefilter("always", ResourceWarning)
+            members=list(roof.input_members(Path(path)))
+            # Iterate the stream while it is still inside the source context.
+            # Exhausting the generator closes its scoped binary handle.
+            rows=[]
+            for _, stream in members:
+                rows.extend(roof.csv_rows(stream))
+            del stream
+            del members
+            gc.collect()
+        self.assertEqual(rows,[{"address":"100 TEST ST","city":"LOS ANGELES"}])
+        self.assertFalse([w for w in notices if issubclass(w.category,ResourceWarning)],
+                         "CSV reader left a file handle open")
 
     def test_csv_reader_streams_rows(self):
         self.seed()
