@@ -117,6 +117,10 @@ function PreviewLive([string]$ExpectedRunner){
    $bulkStatus.selection.version -cne 'fun-roofing-selective-v3' -or
    $bulkPage.Content -notmatch 'id="selection-selected"' -or
    $bulkPage.Content -notmatch 'id="parallel-roof-formulas"' -or
+   $bulkPage.Content -notmatch 'id="formula-peer-years"' -or
+   $bulkPage.Content -notmatch 'id="formula-min-peers"' -or
+   $bulkPage.Content -notmatch 'id="neighbor-example-body"' -or
+   $bulkJs.Content -notmatch 'neighborhood_research_examples' -or
    $bulkJs.Content -notmatch 'renderParallelFormulas' -or
    $bulkStatus.elektronTouched -ne $false -or
    $bulkStatus.automatedOutreach -ne 0 -or
