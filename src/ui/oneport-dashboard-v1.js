@@ -14,6 +14,7 @@ const VIEWS=Object.freeze({
  regulatory:{name:'Regulatory & Evidence',type:'ops',anchor:'fi-regulatory-intelligence',description:'Regulatory monitoring, dated source records and economic indicators.'},
  commerce:{name:'Commerce',type:'legacy',mode:'commerce',description:'Search trends and Shopify research with explicit refresh controls.'},
  ml:{name:'Machine Learning',type:'legacy',mode:'ml',description:'Bounded local analytics and operator-approved model training.'},
+ reasoning:{name:'Semantic Reasoning',type:'reasoning',description:'Analyze Python source, prove bounded mathematical properties, replay source and create unverified cognitive evidence.'},
  workspace:{name:'Original Workspace',type:'legacy',mode:'workspace',description:'Existing dashboard interface preserved for advanced and legacy workflows.'}
 });
 const keys=Object.keys(VIEWS);
@@ -74,6 +75,7 @@ function show(){
    }
   }else if(view.type==='chat')frame=safeFrame('chat','/unified/?view=chat&embedded=1','Local AI Chat');
   else if(view.type==='tools')frame=safeFrame('tools','/unified/?view=tools&embedded=1','Tools & REA review');
+  else if(view.type==='reasoning')frame=safeFrame('reasoning','/fisre/?embedded=1','Semantic Reasoning');
   else frame=safeFrame('legacy','/workspace/?view='+view.mode+'&embedded=1','Original workspace');
   frame.hidden=false;
   frame.addEventListener('load',()=>{frame.dataset.loaded='true'},{once:true});
