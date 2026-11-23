@@ -114,6 +114,8 @@ function PreviewLive([string]$ExpectedRunner){
    $bulkCss.StatusCode -ne 200 -or $bulkCss.Content -notmatch 'source-card' -or
    $bulkJs.StatusCode -ne 200 -or $bulkJs.Content -notmatch 'operator-sync-full-export' -or
    $bulkStatus.version -cne 'fun-roofing-bulk-v2' -or
+   $bulkStatus.selection.version -cne 'fun-roofing-selective-v3' -or
+   $bulkPage.Content -notmatch 'id="selection-selected"' -or
    $bulkStatus.elektronTouched -ne $false -or
    $bulkStatus.automatedOutreach -ne 0 -or
    $procPage.StatusCode -ne 200 -or
@@ -172,7 +174,10 @@ foreach($file in @(
  'test\roofing-bulk-v2.test.mjs',
  'src\ui\procurement-focus-v1.mjs',
  'test\procurement-focus-v1.test.mjs',
- 'src\ui\oneport-dashboard-v1.js'
+ 'src\ui\oneport-dashboard-v1.js',
+ 'src\roofing\selective_policy_v3.py',
+ 'src\roofing\selective_extract_v3.py',
+ 'src\roofing\test_selective_v3.py'
 )){
  $path=Join-Path $Root $file
  RequireFile $path
@@ -186,6 +191,8 @@ if($LASTEXITCODE -ne 0){Hold 'ROOFING_NODE_TESTS_FAILED_NO_PORT_CHANGE'}
 $Python=(Get-Command python.exe -ErrorAction Stop).Source
 & $Python -B (Join-Path $Root 'src\roofing\test_roofing_bulk_v2.py')
 if($LASTEXITCODE -ne 0){Hold 'ROOFING_PYTHON_TESTS_FAILED_NO_PORT_CHANGE'}
+& $Python -B (Join-Path $Root 'src\roofing\test_selective_v3.py')
+if($LASTEXITCODE -ne 0){Hold 'ROOFING_SELECTIVE_TESTS_FAILED_NO_PORT_CHANGE'}
 foreach($port in $Protected){$Before[$port]=Snapshot $port}
 $PreviousProcess=Owner
 if($PreviousProcess){
