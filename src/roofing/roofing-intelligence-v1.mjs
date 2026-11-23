@@ -131,7 +131,8 @@ export function deriveCandidates(state,{countyFilter='all',minAge=20,category='a
     yearBuilt:prop.year_built,buildingAge:age,lastRecordedPermit:permit?.issued??null,
     lastPermitSource:permit?.source_id??null,category:status,reviewPriority:score,
     roofAgeKnown:false,roofConditionKnown:false,
-    evidenceStatus:!permit?'ABSENCE_IN_PARTIAL_INGESTED_RECORDS_NOT_PROOF':'MATCHED_BY_ADDRESS_REQUIRES_VERIFICATION',
+    evidenceStatus:!permit?'ABSENCE_IN_PARTIAL_INGESTED_RECORDS_NOT_PROOF':
+      permit.imported_assumed_roof?'OPERATOR_ASSUMED_ROOF_CATEGORY_NEEDS_VERIFICATION':'MATCHED_BY_ADDRESS_REQUIRES_VERIFICATION',
     nextAction:'Verify jurisdiction record coverage and offer a lawful inspection'});
  }
  output.sort((a,b)=>b.reviewPriority-a.reviewPriority||a.city.localeCompare(b.city));
@@ -189,7 +190,7 @@ export async function importRoofData(body,{root=ROOT}={}){
     body.rows.length<1||body.rows.length>MAX_IMPORT)
    throw Error('ROOF_IMPORT_SCHEMA_OR_BATCH_LIMIT');
  const sourceId=limitText(body.sourceId||'operator_csv',60);
- if(!/^[a-z0-9_-]{3,60}$/.test(sourceId))throw Error('ROOF_SOURCE_ID_INVALID');
+ if(!/^[a-z0-9_-]{3,60}$/.test(sourceId)||['__proto__','prototype','constructor'].includes(sourceId))throw Error('ROOF_SOURCE_ID_INVALID');
  const parsed=body.rows.map(row=>{
   if(!row||typeof row!=='object'||Array.isArray(row)||Object.keys(row).length>14)
    throw Error('ROOF_ROW_UNEXPECTED_FIELDS');
