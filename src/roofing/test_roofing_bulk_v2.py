@@ -221,6 +221,19 @@ class RoofingBulkTests(unittest.TestCase):
         self.assertEqual(selection["selected"],0)
         self.assertEqual(selection["held"],1)
 
+    def test_single_untrusted_zip_column_never_overrides_explicit_situs_zip(self):
+        import csv
+        path=self.root/"site_wins_over_different_column.csv"
+        with path.open("w",encoding="utf-8",newline="") as out:
+            w=csv.writer(out)
+            w.writerow(["AIN","Property Location","ZIP CODE","Year Built","Property Use Type"])
+            w.writerow(["0001002003","100 SAMPLE ST, LOS ANGELES, CA 90001",
+                        "90210","1984","Single Family Residential"])
+        result=self.ingest(str(path),"municipal_la_site_over_column_fixture","la_properties")
+        self.assertEqual(result["accepted"],1)
+        with self.connect() as db:
+            self.assertEqual(db.execute("SELECT zip FROM properties").fetchone()[0],"90001")
+
     def test_same_zip_five_digits_and_zip_four_agree(self):
         import csv
         path=self.root/"equivalent_zip_formats.csv"
