@@ -89,6 +89,19 @@ class RoofingBulkTests(unittest.TestCase):
         state=Path(self.db).read_bytes()
         self.assertNotIn(b"person@example.com",state)
 
+    def test_san_bernardino_arcgis_uses_only_public_property_fields(self):
+        sample={"attributes":{"ParcelNumber":"001234567","Jurisdiction":"Victorville",
+            "AssessClass":"Single Family Residential",
+            "OwnerName":"PROTECTED_PERSONAL_VALUE"}}
+        parsed=roof.parse_arcgis_sb_feature(sample)
+        self.assertEqual(parsed[0],"San Bernardino")
+        self.assertEqual(parsed[1],"001234567")
+        self.assertEqual(parsed[2],"Victorville")
+        self.assertEqual(parsed[6],None)
+        self.assertEqual(parsed[7],1)
+        self.assertNotIn("PROTECTED_PERSONAL_VALUE",str(parsed))
+        self.assertIn("sb_arcgis_parcels",roof.SOURCES)
+
     def test_fixed_official_sources_and_nonauthoritative_status(self):
         self.assertIn("la_assessor_2021_2025",roof.SOURCES)
         self.assertIn("la_permits_pre2010",roof.SOURCES)
