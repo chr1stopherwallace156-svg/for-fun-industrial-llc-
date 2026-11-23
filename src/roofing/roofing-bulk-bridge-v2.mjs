@@ -75,7 +75,8 @@ export async function selectivePython(cmd,args=[],{timeout=30000}={}){
  return result;
 }
 export async function bulkDualFormulas({zips='90011,90049,90731,90037',
-  years=20,recentYears=5,minBuildingAge=25,permitKind='roof_related'}={}){
+  years=20,recentYears=5,minBuildingAge=25,permitKind='roof_related',
+  peerYears=5,minPeers=5}={}){
  if(!ROOT||!DB||!existsSync(DB))
    throw Error('ROOF_BULK_DUAL_FORMULA_LOCAL_DATABASE_REQUIRED');
  if(typeof zips!=='string'||zips.length>60||!
@@ -85,11 +86,14 @@ export async function bulkDualFormulas({zips='90011,90049,90731,90037',
     !Number.isSafeInteger(recentYears)||recentYears<1||recentYears>10||
     recentYears>=years||
     !Number.isSafeInteger(minBuildingAge)||minBuildingAge<20||minBuildingAge>100||
+    !Number.isSafeInteger(peerYears)||peerYears<0||peerYears>15||
+    !Number.isSafeInteger(minPeers)||minPeers<3||minPeers>30||
     !['roof_related','replacement_like'].includes(permitKind))
    throw Error('ROOF_BULK_DUAL_FORMULA_FILTER_HOLD');
  const args=[DUAL_SCRIPT,'--db',DB,'--zips',zips,'--years',String(years),
    '--recent-years',String(recentYears),'--min-building-age',String(minBuildingAge),
-   '--permit-kind',permitKind];
+   '--permit-kind',permitKind,'--peer-years',String(peerYears),
+   '--min-peers',String(minPeers)];
  const {stdout}=await exec(python(),args,{windowsHide:true,timeout:90000,
    maxBuffer:512*1024,env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});
  const parsed=JSON.parse(stdout.trim().split(/\r?\n/).filter(Boolean).at(-1));
