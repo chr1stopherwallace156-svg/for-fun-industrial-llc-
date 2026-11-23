@@ -1,6 +1,6 @@
 # FUN MATH V3 FULL INTEGRATION: V3 research + reviewed 8802 dashboard handoff.
 # Starts no AI or REA workers, no Elektron access. Updates only known 8802 Node owner.
-[CmdletBinding()]param()
+[CmdletBinding()]param([switch]$DashboardOnly)
 $ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 $Root=$PSScriptRoot
@@ -114,11 +114,20 @@ foreach($file in $nodeFiles){
 if($LASTEXITCODE -ne 0){Hold 'V3_PYTHON_TESTS_FAILED'}
 & $Node --test (Join-Path $Root 'test\math-v3-dashboard.test.mjs')
 if($LASTEXITCODE -ne 0){Hold 'V3_NODE_TESTS_FAILED'}
-# Run only separate research worker and then schedule 07:30; do not touch V1 or V2 tasks.
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Worker -RunOnce
-if($LASTEXITCODE -ne 0){Hold 'V3_WORKER_RUN_FAILED'}
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Worker -InstallSchedule
-if($LASTEXITCODE -ne 0){Hold 'V3_SCHEDULE_FAILED'}
+# Dashboard-only repair leaves the already-passed research analysis and scheduled task unchanged.
+if($DashboardOnly){
+ $existing=Join-Path $env:LOCALAPPDATA 'FunIndustrial\MathResearchV3\latest_report.json'
+ Leaf $existing
+ $task=Get-ScheduledTask -TaskName 'FunIndustrial-MathResearchV3-Daily' -ErrorAction SilentlyContinue
+ if(!$task){Hold 'V3_DAILY_TASK_MISSING_DASHBOARD_ONLY_REFUSED'}
+ Write-Host 'FUN_MATH_V3_WORKER=EXISTING_RESEARCH_REUSED'
+ Write-Host 'FUN_MATH_V3_SCHEDULE=EXISTING_TASK_UNCHANGED'
+}else{
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Worker -RunOnce
+ if($LASTEXITCODE -ne 0){Hold 'V3_WORKER_RUN_FAILED'}
+ & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Worker -InstallSchedule
+ if($LASTEXITCODE -ne 0){Hold 'V3_SCHEDULE_FAILED'}
+}
 foreach($port in $Protected){$Before[$port]=Snapshot $port}
 $OldProcess=Owner
 if($OldProcess){
