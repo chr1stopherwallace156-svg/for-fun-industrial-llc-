@@ -164,7 +164,10 @@ export function createReviewedCompute({ml,runSolver=runIsolatedSolver,clock=Date
     argumentsVerified:true,operatorConfirmationRequired:true,executedActions:0},
    executedActions:0,authorityGranted:false};
  };
- const confirm=async ({authorizationToken,operatorConfirmed}={})=>{
+ const confirm=async (body={})=>{
+  if(!obj(body)||Object.keys(body).sort().join(',')!=='authorizationToken,operatorConfirmed')
+   hold('CONFIRM_SCHEMA_INVALID');
+  const {authorizationToken,operatorConfirmed}=body;
   if(busy)hold('BUSY');
   if(operatorConfirmed!==true||!equalToken(authorizationToken,pending?.token))
    hold('NO_EXACT_EXPLICIT_APPROVAL');
@@ -183,7 +186,7 @@ export function createReviewedCompute({ml,runSolver=runIsolatedSolver,clock=Date
       hold('ML_RESULT_NOT_ATTESTED');
    }else value=await runSolver(item.payload);
    const preview=JSON.stringify(value);
-   if(preview.length>120000)hold('RESULT_TOO_LARGE');
+   if(preview.length>500000)hold('RESULT_TOO_LARGE');
    const receipt={version:COMPUTE_VERSION,kind:item.payload.kind,
     inputSha256:item.hash,resultSha256:createHash('sha256').update(preview).digest('hex'),
     source:item.payload.kind.startsWith('ml_')?'existing_ml_8801':'isolated_python_solver',
@@ -193,7 +196,7 @@ export function createReviewedCompute({ml,runSolver=runIsolatedSolver,clock=Date
    receipt.receiptHash=hash(receipt);
    completed++;
    recent={kind:receipt.kind,state:receipt.state,receiptHash:receipt.receiptHash,
-    evidencePreview:preview.slice(0,3700),operatorApproved:true};
+    evidencePreview:preview.slice(0,2400),operatorApproved:true};
    return {version:COMPUTE_VERSION,state:'verified_local_result',
     receipt,resultPreview:preview.slice(0,9500),truncated:preview.length>9500,
     executedActions:1,approvedByOperator:true};
