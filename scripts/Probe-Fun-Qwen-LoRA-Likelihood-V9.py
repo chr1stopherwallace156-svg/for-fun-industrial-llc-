@@ -106,7 +106,22 @@ def make_corpora():
     holdout=dataset["validation"]
     corpora={}
     for family in ("recurrence","meta_selection"):
-        rows=[row for row in holdout if row["family"]==family][:ROWS_PER_DOMAIN]
+        candidates=[row for row in holdout if row["family"]==family]
+        if family=="meta_selection":
+            # In the original generator, ties are represented by a single
+            # lowest-error winner, even though both windows can be optimal.
+            # Do not score that ambiguous wording as a definitive reference.
+            unambiguous=[]
+            for row in candidates:
+                question=row["messages"][0]["content"]
+                match=re.search(r"are respectively (\\d+), (\\d+), (\\d+)\\.",question)
+                if not match:
+                    raise RuntimeError("V9_MODEL_SELECTION_ERRORS_NOT_PARSEABLE")
+                values=[int(n) for n in match.groups()]
+                if values.count(min(values))==1:
+                    unambiguous.append(row)
+            candidates=unambiguous
+        rows=candidates[:ROWS_PER_DOMAIN]
         if len(rows)!=ROWS_PER_DOMAIN:
             raise RuntimeError("V9_VALIDATION_DOMAIN_TOO_SMALL_"+family)
         pairs=[(r["messages"][0]["content"],r["messages"][1]["content"]) for r in rows]
