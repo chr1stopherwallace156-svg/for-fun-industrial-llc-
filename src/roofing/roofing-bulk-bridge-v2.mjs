@@ -1,0 +1,112 @@
+// FUN_ROOFING_BULK_V2 bridge. SQLite reports and operator-approved full data sync only.
+// No keys in frontend, no REA, marketing actions, mailbox, Elektron access, polling or proxy fetch.
+import {spawn,execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {existsSync,openSync,closeSync,mkdirSync} from 'node:fs';
+import {join,resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+const exec=promisify(execFile);
+const SCRIPT=fileURLToPath(new URL('./roofing_bulk_v2.py',import.meta.url));
+const ROOT=process.env.LOCALAPPDATA?join(process.env.LOCALAPPDATA,'FunIndustrial','RoofingBulkV2'):null;
+const DB=ROOT?join(ROOT,'roofing.sqlite3'):null;
+export const BULK_VERSION='fun-roofing-bulk-v2';
+const ALLOWED_SOURCES=Object.freeze([
+  {id:'la_assessor_2021_2025',title:'Los Angeles County assessor parcel roll 2021–2025',
+    type:'property_inventory',coverage:'All county parcels in downloaded years (not all individual houses)',
+    source:'https://www.arcgis.com/home/item.html?id=70d93266f45a4080a97b285a471493cd',
+    mode:'FULL_EXPORT_SYNC',requiresKey:false},
+  {id:'la_permits_pre2010',title:'LA City issued building permits before 2010',
+    type:'roofing_permit_source',coverage:'LA City only, not countywide',
+    source:'https://data.lacity.org/d/e67z-kt2n',mode:'FULL_EXPORT_SYNC',requiresKey:false},
+  {id:'la_permits_2010_2019',title:'LA City issued building permits 2010–2019',
+    type:'roofing_permit_source',coverage:'LA City only, not countywide',
+    source:'https://data.lacity.org/d/dyxf-7hc4',mode:'FULL_EXPORT_SYNC',requiresKey:false},
+  {id:'la_permits_2020_present',title:'LA City issued building permits 2020–present',
+    type:'roofing_permit_source',coverage:'LA City only, not countywide',
+    source:'https://data.lacity.org/d/pi9x-tg5x',mode:'FULL_EXPORT_SYNC',requiresKey:false},
+  {id:'sb_assessor_characteristics',title:'San Bernardino assessor property characteristics / govPIMS',
+    type:'property_inventory',coverage:'Countywide file available; source format requires NP450 layout adapter or approved govPIMS CSV',
+    source:'https://arc.sbcounty.gov/property-information/',mode:'MANUAL_CSV_OR_FIXED_WIDTH_HOLD',requiresKey:false},
+  {id:'sb_and_la_municipal_permits',title:'Other cities / unincorporated county permits',
+    type:'roofing_permit_source',coverage:'Requires separate jurisdiction-specific feeds and documented coverage',
+    source:null,mode:'MUNICIPAL_ACCESS_REQUIRED',requiresKey:'varies'}
+]);
+let active=null;
+let latest=null;
+const python=()=>process.env.FUN_ROOFING_PYTHON||'python.exe';
+function holds(){return {modelExecutions:0,reaExecutions:0,automatedOutreach:0,externalPayments:0,elektronTouched:false}}
+export function bulkCatalog(){return {version:BULK_VERSION,sources:ALLOWED_SOURCES,
+  keyStatus:'NO_API_KEY_NEEDED_FOR_PUBLIC_LA_FULL_EXPORTS',
+  configuredSocrataToken:Boolean(process.env.SOCRATA_APP_TOKEN),
+  tokenValueNeverReturned:true,...holds()}}
+export async function bulkPython(cmd,args=[],{timeout=20000}={}){
+ if(!ROOT||!DB)throw Error('FUN_BULK_LOCALAPPDATA_NOT_CONFIGURED');
+ if(!existsSync(DB)&&cmd!=='sync')return {version:BULK_VERSION,state:'NO_DATABASE_YET',
+    counts:{properties:0,permits:0,candidates:0},rows:[],source_runs:[]};
+ const argv=[SCRIPT,'--db',DB,cmd,...args];
+ const {stdout,stderr}=await exec(python(),argv,{windowsHide:true,timeout,maxBuffer:512*1024,
+   env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});
+ const lines=stdout.trim().split(/\r?\n/).filter(Boolean);
+ const last=lines.at(-1);
+ if(!last||last.length>512*1024)throw Error('FUN_BULK_WORKER_JSON_INVALID');
+ const data=JSON.parse(last);
+ if(data.version!=='fun-roofing-bulk-v2')throw Error('FUN_BULK_WORKER_VERSION_MISMATCH');
+ return {...data,stderr:stderr?.slice(0,180)||undefined};
+}
+export async function bulkOverview(){
+ let db;
+ try{db=await bulkPython('status')}catch(e){db={version:BULK_VERSION,
+   state:'WORKER_UNAVAILABLE',error:String(e.message||e).slice(0,200),
+   counts:{properties:0,permits:0,candidates:0},source_runs:[]}}
+ return {...db,version:BULK_VERSION,sourceDirectory:ALLOWED_SOURCES,
+   job:active?{source:active.source,pid:active.pid,state:'RUNNING',started:active.started}:latest,
+   ...holds(),claimsAboutAllHomes:false,permitHistoryCoverageVerified:false};
+}
+const countyAllowed=new Set(['all','Los Angeles','San Bernardino']);
+export async function bulkMarkets({county='all',city='',minAge=20,onlyNoPermit=false,includeUnclassified=true,detail=false}={}){
+ if(!countyAllowed.has(county)||!Number.isInteger(minAge)||minAge<0||minAge>120||
+    typeof city!=='string'||city.length>70||!/^[a-zA-Z0-9 \-']*$/.test(city)||
+    typeof onlyNoPermit!=='boolean'||typeof includeUnclassified!=='boolean')
+   throw Error('ROOF_BULK_FILTER_SCHEMA');
+ const args=['--county',county,'--min-age',String(minAge)];
+ if(city)args.push('--city',city);
+ if(onlyNoPermit)args.push('--only-no-permit');
+ if(includeUnclassified)args.push('--include-unclassified');
+ const result=await bulkPython(detail?'candidates':'markets',args);
+ return {...result,version:BULK_VERSION,...holds()};
+}
+export function startBulkSync(sourceId){
+ const source=ALLOWED_SOURCES.find(s=>s.id===sourceId);
+ if(!source||source.mode!=='FULL_EXPORT_SYNC')throw Error('ROOF_BULK_SOURCE_NOT_AUTOMATABLE');
+ if(active)throw Error('ROOF_BULK_ONE_SYNC_AT_A_TIME');
+ if(!ROOT)throw Error('FUN_BULK_LOCALAPPDATA_NOT_CONFIGURED');
+ mkdirSync(ROOT,{recursive:true});
+ const logs=join(ROOT,'logs');mkdirSync(logs,{recursive:true});
+ const now=new Date().toISOString().replace(/[:.]/g,'-');
+ const output=join(logs,sourceId+'-'+now+'.stdout.log');
+ const error=join(logs,sourceId+'-'+now+'.stderr.log');
+ const out=openSync(output,'wx',0o600),err=openSync(error,'wx',0o600);
+ let child;
+ try{
+  child=spawn(python(),['-u',SCRIPT,'--db',DB,'sync',sourceId,'--root',ROOT],
+    {cwd:ROOT,stdio:['ignore',out,err],windowsHide:true,
+     env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});
+ }finally{closeSync(out);closeSync(err)}
+ const started=new Date().toISOString();
+ active={source:sourceId,pid:child.pid||null,started};
+ latest={source:sourceId,pid:child.pid||null,state:'LAUNCHING',started,
+   logs:{stdout:output,stderr:error}};
+ child.on('error',e=>{
+   latest={...latest,state:'FAILED_TO_LAUNCH',error:String(e.message).slice(0,170),
+     ended:new Date().toISOString()};
+   active=null;
+ });
+ child.on('exit',(code,signal)=>{
+   latest={...latest,state:code===0?'COMPLETED_CHECK_SOURCE_STATUS':'FAILED_CHECK_LOGS',
+     exitCode:code,signal,ended:new Date().toISOString()};
+   active=null;
+ });
+ return {version:BULK_VERSION,state:'OPERATOR_SYNC_REQUESTED',source:sourceId,
+   workerPid:child.pid||null,reportedComplete:false,sourceDataNotYetVerified:true,
+   ...holds()};
+}
