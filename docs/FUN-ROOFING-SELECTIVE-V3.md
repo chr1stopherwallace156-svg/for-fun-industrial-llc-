@@ -390,9 +390,13 @@ cap triggers an uncertainty hold instead of pretending to be exhaustive.
 Reports aggregate sample sizes and whether selected public permit numbers
 appear in the official inspection dataset. A positive **Final inspection
 type + Approved/Passed result + valid inspection date** is counted as
-*final inspection evidence only*: **not proof** that a replacement roof
+*approved final-inspection evidence only*: **not proof** that a replacement roof
 was actually installed, that it matched a specific work scope, or that a
-roof remains in particular condition. Unknown inspection types/results,
+roof remains in particular condition. Separate counters record `Permit Finaled` in the official inspection
+result and `permit_status` fields, without treating that wording as an
+`Approved` or `Passed` final inspection result. The same permit may occur
+in more than one evidence counter; do not sum these as distinct projects.
+Unknown inspection types/results,
 no returned match, API throttling/unavailability, dataset lag and source
 coverage gaps are not interpreted as completed, missing or failed roofing
 work. It never prints permit numbers, APNs, addresses or contact details.
@@ -400,7 +404,7 @@ work. It never prints permit numbers, APNs, addresses or contact details.
 The tool neither updates A/B/C/D nor stores rows, schedules jobs, makes
 contact, or restarts the dashboard. Network access is limited to one
 operator-triggered GET to the pinned `data.lacity.org` source with TLS,
-redirect rejection and bounded result size. Eight offline no-network tests
+redirect rejection and bounded result size. Nine offline no-network tests
 cover joins, permit-number filtering, no-record uncertainty, malformed
 calendar dates, response limits, source receipts and input bounds.
 The inspection dataset is City of LA, **not LA County-wide** coverage.
