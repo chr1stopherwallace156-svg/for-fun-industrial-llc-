@@ -151,6 +151,20 @@ async function renderParallelFormulas(){
   sampleBody.append(row);
  }
  if(!sampleBody.childElementCount){const tr=node('tr'),td=node('td','No older permit examples found in the selected markets');td.colSpan=6;tr.append(td);sampleBody.append(tr)}
+ const neighborhoodBody=$('neighbor-example-body');neighborhoodBody.replaceChildren();
+ for(const item of (result.neighborhood_research_examples||[]).slice(0,25)){
+  const row=node('tr');
+  for(const value of [item.zip,item.apn,item.construction_year,
+     item.similar_age_same_street_block_neighbors,item.other_parcels_with_recent_roof_permits,
+     String(item.neighbor_recorded_permit_share_pct)+'%',
+     item.roof_condition_and_replacement_need]){
+   row.append(node('td',value));
+  }
+  neighborhoodBody.append(row);
+ }
+ if(!neighborhoodBody.childElementCount){const row=node('tr'),
+   cell=node('td','No cohorts met the minimum comparable-peer and recent-permit requirements.');
+   cell.colSpan=7;row.append(cell);neighborhoodBody.append(row)}
  display('formula-note','Three separate methods calculated from four imported sources. '
   +'Formula A remains unchanged; B uses same-parcel intervals of '+years
   +' years; C compares same-street 100-number blocks with construction years within ±'
