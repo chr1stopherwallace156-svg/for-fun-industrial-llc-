@@ -36,3 +36,7 @@ For future full starts (after initial deployment), replace the old V2 startup co
 - The PC must report successful deployment before claiming the running system was upgraded.
 - A source-bound replay using the same V2 solver is **not** an independent mathematical proof or publisher authentication.
 - Only manually pasted, reviewed source is supported. Arbitrary local-file browsing from the dashboard is intentionally unsupported.
+
+## Existing upstream service health
+
+The deployment verifies the **local 8802 shell and FISRE module** before declaring the new feature active. Read-only status checks for independent ML and unified-chat upstreams run afterward for diagnostics only. If either responds with HTTP 502, the deployment prints a `FUN_FISRE_DEPENDENCY=... STATE=DEGRADED_HTTP_ONLY NO_RESTART` warning, rather than failing or restarting those workers. The affected existing module may still be unavailable until its own service is recovered. A healthy FISRE deployment is **not** a claim that all unrelated modules are healthy.
