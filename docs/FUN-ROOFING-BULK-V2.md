@@ -21,11 +21,15 @@ The source tables store APN, ZIP, jurisdiction, street address (if legitimately 
    https://data.lacity.org/d/dyxf-7hc4
 4. **Los Angeles City issued building permits, 2020–present**, \`pi9x-tg5x\`:
    https://data.lacity.org/d/pi9x-tg5x
-5. **San Bernardino County assessor property characteristics**, official:
+5. **San Bernardino County official ArcGIS parcel FeatureServer**, full public layer:
+   https://services.arcgis.com/aA3snZwJfFkVyDuP/arcgis/rest/services/Parcels_for_San_Bernardino_County/FeatureServer/0
+   The importer pages through the entire published layer (1,000 features per page; max 1,600 pages) and stores **only parcel number, jurisdiction, classification and source metadata**, never protected owner names. This layer does **not** contain site street addresses or year built, so it cannot independently produce address-level roof-age leads. The imported parcels remain candidates with incomplete physical details until an authorized characteristic/address source is joined.
+
+6. **San Bernardino County assessor property characteristics**, official:
    https://arc.sbcounty.gov/property-information/
    The county provides a property-characteristics ZIP (NP450) and a bulk export in its **govPIMS** property portal https://arcpropertyinfo.sbcounty.gov/ .
    The published ZIP can be downloaded, but NP450 is a special **fixed-width format**. The automated importer deliberately refuses to treat it as CSV. Export a legitimate CSV from govPIMS or obtain an authorized conversion and inspect its schema before ingestion. Protected personal records must not be bypassed.
-6. **Other municipal and county permitting authorities**: official published CSV/export or formally approved data access must be set up for each jurisdiction. No universal roof permit API key exists.
+7. **Other municipal and county permitting authorities**: official published CSV/export or formally approved data access must be set up for each jurisdiction. No universal roof permit API key exists.
 
 The LA open-data full SODA3 public CSV exports use \`https://data.lacity.org/api/v3/views/<ID>/export.csv\`; they do not require an API key. The old SODA1 rows export retires in December 2026. An optional developer app token can be supplied as the process environment variable \`SOCRATA_APP_TOKEN\` if an authorized user obtains one. Neither the dashboard nor source-control files display or store token contents.
 
@@ -40,7 +44,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Start-Fun-Everything-B
 The launcher validates the known Windows core, ML and gateway, then tests and activates the 8802 UI only if the full bulk source is not already active. Tests are run before stopping the previous verified dashboard process, and rollback is attempted if the new 8802 fails validation. All other ports and ELEKTRON remain untouched.
 
 After activation open \`http://127.0.0.1:8802/roofing/bulk/\`.
-Use the four source buttons to **download full published files** one by one. The server starts one local import job at a time; **the click does not mean the download has completed**. Use **Check import status** to see the latest job, and inspect source-run row counts and status.
+Use the five source buttons to **download full published files** one by one. The server starts one local import job at a time; **the click does not mean the download has completed**. Use **Check import status** to see the latest job, and inspect source-run row counts and status.
 
 The PC's 16 GB RAM is preserved by streaming CSV/ZIP files with bounded buffers into a locally indexed SQLite database. Full files can occupy multiple gigabytes of disk, and downloads are capped by default at 8 GB per file; official files exceeding limits fail safely. Full imports are not guaranteed to succeed until the real source formats are inspected and the desktop run is verified.
 
@@ -56,6 +60,7 @@ python.exe .\src\roofing\roofing_bulk_v2.py sync la_assessor_2021_2025
 python.exe .\src\roofing\roofing_bulk_v2.py sync la_permits_pre2010
 python.exe .\src\roofing\roofing_bulk_v2.py sync la_permits_2010_2019
 python.exe .\src\roofing\roofing_bulk_v2.py sync la_permits_2020_present
+python.exe .\src\roofing\roofing_bulk_v2.py sync sb_arcgis_parcels
 python.exe .\src\roofing\roofing_bulk_v2.py markets --min-age 20 --include-unclassified
 python.exe .\src\roofing\roofing_bulk_v2.py candidates --only-no-permit --include-unclassified
 \`\`\`
@@ -94,6 +99,6 @@ System installation: API endpoints, local worker and safeguards verified on PC.
 
 Data installation: each official file fully downloaded (with byte count and SHA-256), ingested and source status marked \`INGESTED_NOT_COMPLETENESS_VERIFIED\`; candidates rebuilt; per-county row counts reviewed.
 
-Countywide coverage: **not achieved by this branch alone**. Requires full SB parcel population mapping and permit source acquisition from LA and SB incorporated cities and unincorporated agencies, source continuity audits and municipal gap reporting. No output should be advertised as "every house" before that independent reconciliation.
+Countywide coverage: **not achieved by this branch alone**. The official SB ArcGIS parcel IDs can be paginated from the whole published layer, but they lack roof age and street address. Completing countywide address-level coverage requires full SB parcel enrichment and permit source acquisition from LA and SB incorporated cities and unincorporated agencies, source continuity audits and municipal gap reporting. No output should be advertised as "every house" before that independent reconciliation.
 
 Keep original dashboard, Qwen, Math V3 and REA permissions unchanged.
