@@ -155,7 +155,22 @@ def local_audit(db,root,*,zips=ZIPS,per_group=12,recent_years=5,
                   "EXPLICIT_REROOF_OR_REPLACEMENT_TERMS","MIXED_REPLACEMENT_AND_REPAIR_TERMS",
                   "NEGATED_OR_AMBIGUOUS_REPLACEMENT_TERMS_REVIEW"):
                 out["replacement_keyword_inconsistency"]+=1
-        total=Counter()
+        # Counter[key] reads as zero when missing, but dict(Counter) omits
+        # absent zero-valued keys. Export a stable numeric schema so both
+        # zero-disagreement tests and operator reports work on Windows.
+        metric_names=(
+            "sample_requested","matched_original","source_record_not_reconciled",
+            "sample_stored_REPLACEMENT_LIKE",
+            "sample_stored_ROOF_RELATED_NOT_PROVEN_REPLACED",
+            "EXPLICIT_REROOF_OR_REPLACEMENT_TERMS",
+            "MIXED_REPLACEMENT_AND_REPAIR_TERMS",
+            "REPAIR_MAINTENANCE_OR_LEAK_TERMS",
+            "OTHER_ROOF_RELATED_LANGUAGE",
+            "NEGATED_OR_AMBIGUOUS_REPLACEMENT_TERMS_REVIEW",
+            "classification_disagreement","replacement_keyword_inconsistency",
+            "negated_or_ambiguous_replacement_language",
+        )
+        total=Counter({key:0 for key in metric_names})
         for c in audit_counts.values():total.update(c)
         complete=(total["source_record_not_reconciled"]==0
                   and total["classification_disagreement"]==0
@@ -178,7 +193,8 @@ def local_audit(db,root,*,zips=ZIPS,per_group=12,recent_years=5,
            "official_archive_sha256_verified":True,
            "verified_sources":active_sources,
            "source_counts":{s:dict(by_source[s]) for s in active_sources},
-           "zip_counts":{z:dict(audit_counts[z]) for z in zips},
+           "zip_counts":{z:{key:int(audit_counts[z][key])
+                            for key in metric_names} for z in zips},
            "aggregate":dict(total),
            "replacement_keyword_is_not_completion_proof":True,
            "unmatched_permit_means_no_roof_work":False,
