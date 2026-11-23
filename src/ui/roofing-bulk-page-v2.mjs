@@ -82,23 +82,15 @@ ZIP activity = 1,000 × recent permit parcels ÷ selected older parcels</div>
  </div>
  <div class="filter-grid">
   <label>ZIP codes (comma separated)<input id="formula-zips" value="90011,90049,90731,90037" maxlength="60" inputmode="numeric" aria-label="ZIP codes for parallel formulas"></label>
-  <label>Historical interval X<select id="formula-years">
-    <option value="10">10 years</option><option value="15">15 years</option>
-    <option value="20" selected>20 years</option><option value="25">25 years</option>
-    <option value="30">30 years</option><option value="40">40 years</option>
-   </select></label>
-  <label>Recent permit window<select id="formula-recent">
-    <option value="2">Last 2 years</option><option value="3">Last 3 years</option>
-    <option value="5" selected>Last 5 years</option><option value="10">Last 10 years</option>
-   </select></label>
+  <label>Historical interval X (years)<input type="number" id="formula-years" min="10" max="50" step="1" value="20"></label>
+  <label>Recent permit window (years)<input type="number" id="formula-recent" min="1" max="10" step="1" value="5"></label>
   <label>Permit description type<select id="formula-kind">
     <option value="roof_related">All roof-related permit descriptions</option>
     <option value="replacement_like">Descriptions suggesting replacement</option>
    </select></label>
  </div>
- <label>Minimum construction age
- <select id="formula-age"><option value="20">20 years</option><option value="25" selected>25 years</option>
- <option value="30">30 years</option><option value="40">40 years</option></select></label>
+ <label>Minimum construction age (years)
+ <input type="number" id="formula-age" min="20" max="100" step="1" value="25"></label>
  <p><button id="run-dual-formulas" class="btn secondary" type="button">Calculate both formulas</button></p>
  <p class="readout" id="formula-note" role="status">Choose ZIP codes and X years, then calculate. All data stays on this PC; this is a read-only computation.</p>
  <div class="table-wrap"><table><thead><tr>
