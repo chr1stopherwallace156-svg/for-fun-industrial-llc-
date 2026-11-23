@@ -123,7 +123,7 @@ The report clearly discloses:
 
 ## Files and preserved state
 
-This experiment adds code and 18 offline test cases to the existing
+This experiment adds code and 20 offline test cases to the existing
 repository branch. It does not write to, edit or overwrite prior V10,
 V10.1, V10.5 or V10.6 data. New reports are written only after
 explicit operator approval to a fresh directory:
@@ -148,7 +148,7 @@ Explicitly approved genuine isolated model-request trial:
 
     powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Run-Fun-Qwen-Tool-Requests-V107.ps1 -Execute -Approval I_APPROVE_ISOLATED_QWEN_V107_TOOL_REQUEST_EXPERIMENT
 
-The PowerShell runner first performs 18 offline safety tests. It
+The PowerShell runner first performs 20 offline safety tests. It
 checks the same protected listener ownership before and after
 inference. It never restarts/changes those live services.
 
