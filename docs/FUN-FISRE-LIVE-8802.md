@@ -40,3 +40,20 @@ For future full starts (after initial deployment), replace the old V2 startup co
 ## Existing upstream service health
 
 The deployment verifies the **local 8802 shell and FISRE module** before declaring the new feature active. Read-only status checks for independent ML and unified-chat upstreams run afterward for diagnostics only. If either responds with HTTP 502, the deployment prints a `FUN_FISRE_DEPENDENCY=... STATE=DEGRADED_HTTP_ONLY NO_RESTART` warning, rather than failing or restarting those workers. The affected existing module may still be unavailable until its own service is recovered. A healthy FISRE deployment is **not** a claim that all unrelated modules are healthy.
+
+## Unified Qwen chat integration — installed code (operator activation required)
+
+This branch now integrates FISRE **into the same 8802 Qwen conversation path**, not just the separate Semantic Reasoning tab. The existing **Local AI Chat** sidebar link now opens `/chat/?embedded=1` directly on port 8802. It no longer requires the separate (currently degraded) 8798 chat proxy. The separate Tools/REA review route remains unchanged and may still show degraded until 8798 is recovered.
+
+The chat uses **the existing Qwen3-4B server on 127.0.0.1:8088**, existing optional read-only Cognee retrieval through 8789, and the same already-qualified Python FISRE proof subprocess. No second model, new network port, training, new process daemon, GPU, or replacement of the spatial homepage is required.
+
+The user can ask a question and optionally attach Python source, exact function name, and rational numeric ranges in the **same chat message**. One deliberate click triggers this bounded sequence:
+
+1. 8802 validates the code fields; if no code was attached, the usual Qwen chat path is unchanged.
+2. A single bounded, local, ephemeral FISRE subprocess inspects the supplied source text, runs V2 exact-rational divisor checking and V4 source-bound replay, and constructs a V3 in-memory **proposed** cognitive claim. The submitted code is not imported or executed.
+3. A shortened evidence report (source hash, function relationships, hypotheses, mathematical status, domain, witness and code excerpt labeled *untrusted data*) is included in the existing grounded Qwen prompt, so **that same Qwen produces the answer**.
+4. Results remain scoped to the current chat. There are no automatic code fixes, code runs, REA actions, external commands, permanent memories, or model-weight updates.
+
+**This is runtime orchestration/integration, not changing Qwen's neural weights.** The model has access to qualified tools via fixed, reviewed application logic, not by granting itself shell authority. A `PROVED` result remains scoped to the restricted exact-rational mathematics; a validated replay is not an independent mathematical proof.
+
+The new deployment marker is `FUN_QWEN_FISRE_CHAT=UNIFIED_8802_DIRECT_8088`. After running the activation script, visit `http://127.0.0.1:8802/#chat`. The activation script will adopt an existing matching integrated dashboard without restarting it, or replace only the existing identified 8802 Node process and attempt rollback to the reviewed old dashboard if activation fails.
