@@ -285,6 +285,46 @@ Seven isolated tests validate the street-block proxy, multiple recent peer
 permits, construction-year tolerances, minimum peer counts, source isolation,
 unique block deduplication, and A/B/C integration.
 
+## V6 source-description audit of roof-permit keyword classifications
+
+Run `src/roofing/audit_roofing_permit_descriptions_v6.py` independently of
+the dashboard and source imports. It reads the existing local SQLite in
+`mode=ro`, requests 12 recent exact-APN permit IDs per ZIP per existing
+classification (`REPLACEMENT_LIKE` and other roof-related descriptions),
+then streams the relevant official LA City permit archives. ZIPs default to
+90037, 90049, 90731, and 90011; recent window defaults to five years.
+This is a **purposefully stratified latest-permit sample**, not a random
+sample, a census, a statistical replacement rate, or a formal classifier
+accuracy estimate. In sparse source/ZIP groups fewer than 12 records
+may exist.
+
+Every archive used must match the exact filename and SHA-256 recorded by
+the prior completed import receipt. A failed/missing source or mismatched
+hash makes the check fail closed; no source is downloaded again. Original
+work-description records are matched back to stored permit IDs; the audit
+counts explicit reroof/replacement text, mixed repair/replacement terms,
+repair/maintenance/leak terms, other roof-related language, and potentially
+negated replacement text (e.g. "no reroof"), separately. It also checks
+whether the current stored keyword classification agrees with the archived
+work description.
+
+**Important:** A matching description **never** establishes issuance status,
+project completion, the roof's installation date, deterioration, need for
+replacement, or a homeowner's intent. Ambiguous negations require manual
+review. No address, owner/contact fields, raw descriptions, or permit IDs are
+printed or saved by the audit. The tool returns aggregate category counts,
+source/ZIP sample sizes, and explicit holds. It does not modify the roofing
+database, existing three formulas, local dashboard, Qwen, REA or Elektron.
+
+Operator command (PowerShell after updating the reviewed local branch):
+```powershell
+$r=Join-Path $HOME 'FunIndustrial-Roofing-Bulk-V2'
+$db=Join-Path $env:LOCALAPPDATA 'FunIndustrial\RoofingBulkV2\roofing.sqlite3'
+$root=Join-Path $env:LOCALAPPDATA 'FunIndustrial\RoofingBulkV2'
+& python.exe -B (Join-Path $r 'src\roofing\audit_roofing_permit_descriptions_v6.py') --db $db --root $root
+```
+A nonzero exit and `*_HOLD` is a real audit hold, not a missing roofing need.
+
 ## Preflight
 
 The guarded deployment reruns prior Node.js tests and the original Python
