@@ -112,8 +112,10 @@ def make_case(split, pattern, ordinal):
     low,high=RANGES[split]
     salt=sum((i+1)*w*73 for i,w in enumerate(pattern))
     salt+= {"train":0,"validation":176312,"test":465983}[split]
-    rng=random.Random(SEED+salt+ordinal*13007)
-    base=rng.randint(low,high)
+    # Each ordinal gets a distinct minimum within its split/pattern.
+    # Step 7 is coprime to our 88/89-point base intervals, preventing
+    # same-pattern duplicate triples without silent deduplication.
+    base=low + ((ordinal*7+salt)%(high-low+1))
     gap=GAPS[(ordinal+len(pattern))%len(GAPS)]
     errors={}
     for i,w in enumerate(WINDOWS):
