@@ -66,12 +66,12 @@ def make_example(family, i, validation, seed=6427):
         question = f"A sequence obeys x[n+2]=x[n+1]+x[n]. If two adjacent values are {a} and {b}, what is the next value? Show the rule."
         answer = f"The next value is {a}+{b}={a+b}. This recurrence is Fibonacci-like; arbitrary starting values do not make it the standard Fibonacci sequence."
     elif family == "zeckendorf":
-        n = rng.randint(3001, 25000) if validation else rng.randint(15, 3000)
+        n = (3001 + i * 7) if validation else (15 + i * 7)
         parts = components(n)
         question = f"Write the positive integer {n} as a sum of distinct nonconsecutive Fibonacci numbers (Zeckendorf form)."
         answer = f"{n} = " + " + ".join(map(str, parts)) + ". These are distinct nonconsecutive Fibonacci weights."
     elif family == "fibonacci_code":
-        n = rng.randint(3001, 25000) if validation else rng.randint(15, 3000)
+        n = (3001 + i * 7) if validation else (15 + i * 7)
         question = f"Using Fibonacci universal coding (Zeckendorf bits low-to-high plus final terminating 1), encode integer {n}. Return the exact bit string."
         answer = f"The Fibonacci code for {n} is {fibonacci_code(n)}. The final '11' terminates this positive integer codeword."
     elif family == "multiscale":
@@ -82,7 +82,7 @@ def make_example(family, i, validation, seed=6427):
         question = f"For the ordered measurements {vals}, calculate trailing means at Fibonacci window sizes 3, 5, and 8. Round each to two decimals."
         answer = f"The trailing 3-, 5-, and 8-measurement means are {a:.2f}, {b:.2f}, and {c:.2f}, respectively. Fibonacci windows are one feature choice, not guaranteed optimal."
     elif family == "ratio":
-        n = rng.randint(21, 32) if validation else rng.randint(7, 20)
+        n = (211 + i) if validation else (7 + i)
         question = f"Evaluate F({n+1})/F({n}) for Fibonacci F(0)=0, F(1)=1. Report six decimal places and explain what it approaches."
         v = fib(n+1) / fib(n)
         answer = f"F({n+1})/F({n}) = {fib(n+1)}/{fib(n)} = {v:.6f}. As n grows the ratio approaches the golden ratio (1+sqrt(5))/2, approximately 1.618034."
@@ -111,7 +111,7 @@ def make_example(family, i, validation, seed=6427):
 
 
 def generate(train_per_family=96, validation_per_family=32, seed=6427):
-    if not (8 <= train_per_family <= 400 and 8 <= validation_per_family <= 200):
+    if not (8 <= train_per_family <= 160 and 8 <= validation_per_family <= 64):
         raise ValueError("BOUNDED_DATASET_SIZES_REQUIRED")
     rows = {"train": [], "validation": []}
     for family in FAMILIES:
