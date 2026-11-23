@@ -43,6 +43,10 @@ def make(path, nonzero_b=True, wrong_target=False):
         cursor+=len(data)
     raw+=bytes((-len(raw))%32)
     raw+=b"".join(x[2] for x in items)
+    # The parser deliberately refuses implausibly small adapter files.
+    # The synthetic fixtures are padded beyond that minimum; bytes are
+    # appended after the referenced tensors, never before their offsets.
+    raw+=bytes(max(0,1024-len(raw)))
     path.write_bytes(raw)
 
 class AuditV6(unittest.TestCase):
