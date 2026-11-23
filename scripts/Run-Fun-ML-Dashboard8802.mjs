@@ -319,8 +319,8 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
           includeUnclassified,detail:u.pathname.endsWith('/candidates')}));
       }
       if(req.method==='GET'&&u.pathname==='/api/fun/roofing/bulk/formulas'){
-        if(u.searchParams.size>5) return send(res,422,{error:'ROOF_DUAL_FORMULA_TOO_MANY_FILTERS'});
-        const allowed=new Set(['zips','years','recentYears','minBuildingAge','permitKind']);
+        if(u.searchParams.size>7) return send(res,422,{error:'ROOF_DUAL_FORMULA_TOO_MANY_FILTERS'});
+        const allowed=new Set(['zips','years','recentYears','minBuildingAge','permitKind','peerYears','minPeers']);
         for(const key of u.searchParams.keys())if(!allowed.has(key))
           return send(res,422,{error:'ROOF_DUAL_FORMULA_UNKNOWN_FILTER'});
         const integer=(name,def)=>{
@@ -331,6 +331,7 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         const zips=u.searchParams.get('zips')||'90011,90049,90731,90037';
         const years=integer('years',20),recentYears=integer('recentYears',5);
         const minBuildingAge=integer('minBuildingAge',25);
+        const peerYears=integer('peerYears',5),minPeers=integer('minPeers',5);
         const permitKind=u.searchParams.get('permitKind')||'roof_related';
         if(zips.length>60||!/^\d{5}(,\d{5}){0,9}$/.test(zips)||
           new Set(zips.split(',')).size!==zips.split(',').length||
@@ -338,10 +339,12 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
           !Number.isSafeInteger(recentYears)||recentYears<1||recentYears>10||
           recentYears>=years||!Number.isSafeInteger(minBuildingAge)||
           minBuildingAge<20||minBuildingAge>100||
+          !Number.isSafeInteger(peerYears)||peerYears<0||peerYears>15||
+          !Number.isSafeInteger(minPeers)||minPeers<3||minPeers>30||
           !['roof_related','replacement_like'].includes(permitKind))
           return send(res,422,{error:'ROOF_DUAL_FORMULA_FILTER_VALIDATION_HOLD'});
         return send(res,200,await bulkDualFormulas({zips,years,recentYears,
-          minBuildingAge,permitKind}));
+          minBuildingAge,permitKind,peerYears,minPeers}));
       }
       if(req.method==='POST'&&u.pathname==='/api/fun/roofing/bulk/sync'){
         if(!acceptedActionOrigin(req)||req.headers['x-fi-roofing-bulk-click']!=='operator-sync-full-export'||
