@@ -110,7 +110,7 @@ def make_example(family, i, validation, seed=6427):
         question = f"A binary source has observed counts A={a}, B={b}. Compute its plug-in Shannon entropy in bits per symbol, round to four decimals, and explain whether Fibonacci coding guarantees the minimum."
         answer = f"The estimated probabilities are {a}/{a+b} and {b}/{a+b}. Shannon entropy H=-p log2(p)-(1-p)log2(1-p)={entropy:.4f} bits per symbol. Fibonacci coding does not universally minimize expected code length; compare coding and framing assumptions."
     elif family == "meta_selection":
-        offset = 130 if validation else 0
+        offset = 500 if validation else 0
         k = i + offset
         errors = [(3, (7*k+11)%29+1), (5, (11*k+17)%31+1), (8, (17*k+23)%37+1)]
         best = min(errors, key=lambda pair:(pair[1], pair[0]))
