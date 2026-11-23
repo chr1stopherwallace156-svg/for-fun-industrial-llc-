@@ -64,6 +64,7 @@ function LiveNew(){
  $page=Invoke-WebRequest ($Url+'/fisre/') -UseBasicParsing -TimeoutSec 8
  $directChat=Invoke-WebRequest ($Url+'/chat/') -UseBasicParsing -TimeoutSec 8
  $grounded=Invoke-RestMethod ($Url+'/api/fial/grounded/status') -TimeoutSec 8
+ $inventory=Invoke-RestMethod ($Url+'/api/fun/capabilities/status') -TimeoutSec 8
  $client=Invoke-WebRequest ($Url+'/api/fisre/client.js') -UseBasicParsing -TimeoutSec 8
  $status=Invoke-RestMethod ($Url+'/api/fisre/status') -TimeoutSec 8
  # FISRE and the dashboard shell are local 8802 routes. Existing ML and chat
@@ -80,6 +81,10 @@ function LiveNew(){
   $directChat.Content -notmatch 'id="fi-fial53-code"' -or
   $grounded.model_interface -cne 'fixed_local_qwen_8088' -or
   $grounded.authority_added -ne $false -or
+  $grounded.capability_fabric_version -cne 'fun-ai-capability-fabric-v1' -or
+  $inventory.version -cne 'fun-ai-capability-fabric-v1' -or
+  @($inventory.domains).Count -ne 12 -or
+  $inventory.permissionsUnchanged -ne $true -or
   $client.StatusCode -ne 200 -or $client.Content -notmatch 'operator-click' -or
   $status.version -cne 'fun-fisre-live-v4' -or
   $status.state -cne 'available_operator_click_only' -or
@@ -151,6 +156,7 @@ if($original){
    Write-Host 'FUN_FISRE_LIVE_V4=PASS ADOPTED_INTEGRATED_8802=TRUE'
    Write-Host ('FUN_FISRE_URL='+$Url+'/#chat')
    Write-Host 'FUN_QWEN_FISRE_CHAT=UNIFIED_8802_DIRECT_8088'
+ Write-Host 'FUN_QWEN_CAPABILITY_FABRIC=12_DOMAINS_READONLY_ROUTING'
    return
   }
   Write-Host 'FUN_FISRE_EXISTING_8802=UPGRADING_SAME_KNOWN_PROCESS'
@@ -190,6 +196,7 @@ try{
  Write-Host ('FUN_FISRE_URL='+$Url+'/#chat')
  Write-Host 'FUN_FISRE_SOURCE_ANALYSIS=ACTIVE_ON_OPERATOR_CLICK'
  Write-Host 'FUN_QWEN_FISRE_CHAT=UNIFIED_8802_DIRECT_8088'
+ Write-Host 'FUN_QWEN_CAPABILITY_FABRIC=12_DOMAINS_READONLY_ROUTING'
  Write-Host 'FUN_FISRE_PROOF=BOUNDED_RATIONAL_WITH_SOURCE_REPLAY'
  Write-Host 'FUN_FISRE_COGNITION=PROPOSED_ONLY'
  Write-Host 'FUN_FISRE_TOOL_AUTHORITY=UNCHANGED'
