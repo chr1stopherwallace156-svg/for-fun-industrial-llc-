@@ -22,7 +22,7 @@ APPROVAL = "I_APPROVE_QWEN_FIBONACCI_WEIGHT_TRAINING"
 MIN_FREE_GPU_GIB = 12
 MIN_FREE_HOST_GIB = 5
 DEPS = ("torch", "transformers", "peft", "bitsandbytes", "accelerate", "safetensors")
-FAMILIES = {"recurrence", "zeckendorf", "fibonacci_code", "multiscale", "ratio", "limits"}
+FAMILIES = {"recurrence", "zeckendorf", "fibonacci_code", "multiscale", "ratio", "state_space", "information_theory", "entropy", "meta_selection", "limits"}
 
 
 def free_host_bytes():
