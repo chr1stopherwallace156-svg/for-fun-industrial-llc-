@@ -295,52 +295,54 @@ def ingest(args):
 
 def rebuild(args):
     c = db_open(Path(args.db))
-    c.execute("DELETE FROM candidates")
-    c.commit()
-    cursor = c.execute("""SELECT county,apn,city,zip,address,address_key,year_built,residential FROM properties
-      WHERE source_id IN (SELECT source_id FROM source_runs WHERE state='INGESTED_NOT_COMPLETENESS_VERIFIED')""")
-    current_year = dt.date.today().year
-    seen = 0
-    while rows := cursor.fetchmany(1500):
-        for r in rows:
-            by_apn = c.execute(
-                """SELECT MAX(issue_date) AS d FROM permits
-                   WHERE county=? AND apn=?
-                   AND source_id IN (
-                      SELECT source_id FROM source_runs
-                      WHERE state='INGESTED_NOT_COMPLETENESS_VERIFIED'
-                   )""",
-                (r["county"], r["apn"]),
-            ).fetchone()["d"] if not r["apn"].startswith("ADDRESS-") else None
-            by_address = c.execute(
-                """SELECT MAX(issue_date) AS d FROM permits
-                   WHERE county=? AND zip=? AND address_key=?
-                   AND source_id IN (
-                      SELECT source_id FROM source_runs
-                      WHERE state='INGESTED_NOT_COMPLETENESS_VERIFIED'
-                   )""",
-                (r["county"], r["zip"], r["address_key"]),
-            ).fetchone()["d"] if r["zip"] and r["address_key"] else None
-            permit = max(filter(None,(by_apn,by_address)),default=None)
-            year = r["year_built"]
-            age = current_year-year if year else None
-            if permit and current_year-int(permit[:4]) < 20:
-                label = "RECENT_ROOF_RELATED_PERMIT"
-            elif permit:
-                label = "ROOF_RELATED_PERMIT_20_PLUS"
-            else:
-                label = "NO_ROOF_PERMIT_IN_INGESTED_RECORDS"
-            # This is a transparent ordering heuristic, never a calibrated probability.
-            priority = (min(50,max(0,age or 0)) if age else 0) + (35 if label=="ROOF_RELATED_PERMIT_20_PLUS" else 20 if not permit else 0)
-            if r["residential"] == 1:
-                priority += 10
-            priority = min(100,priority)
-            c.execute("INSERT INTO candidates VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-                      (r["county"],r["apn"],r["city"],r["zip"],r["address"],year,
-                       r["residential"],permit,label,priority,"HISTORICAL_COVERAGE_UNVERIFIED"))
-            seen += 1
+    try:
+        c.execute("DELETE FROM candidates")
         c.commit()
-    c.close()
+        cursor = c.execute("""SELECT county,apn,city,zip,address,address_key,year_built,residential FROM properties
+          WHERE source_id IN (SELECT source_id FROM source_runs WHERE state='INGESTED_NOT_COMPLETENESS_VERIFIED')""")
+        current_year = dt.date.today().year
+        seen = 0
+        while rows := cursor.fetchmany(1500):
+            for r in rows:
+                by_apn = c.execute(
+                    """SELECT MAX(issue_date) AS d FROM permits
+                       WHERE county=? AND apn=?
+                       AND source_id IN (
+                          SELECT source_id FROM source_runs
+                          WHERE state='INGESTED_NOT_COMPLETENESS_VERIFIED'
+                       )""",
+                    (r["county"], r["apn"]),
+                ).fetchone()["d"] if not r["apn"].startswith("ADDRESS-") else None
+                by_address = c.execute(
+                    """SELECT MAX(issue_date) AS d FROM permits
+                       WHERE county=? AND zip=? AND address_key=?
+                       AND source_id IN (
+                          SELECT source_id FROM source_runs
+                          WHERE state='INGESTED_NOT_COMPLETENESS_VERIFIED'
+                       )""",
+                    (r["county"], r["zip"], r["address_key"]),
+                ).fetchone()["d"] if r["zip"] and r["address_key"] else None
+                permit = max(filter(None,(by_apn,by_address)),default=None)
+                year = r["year_built"]
+                age = current_year-year if year else None
+                if permit and current_year-int(permit[:4]) < 20:
+                    label = "RECENT_ROOF_RELATED_PERMIT"
+                elif permit:
+                    label = "ROOF_RELATED_PERMIT_20_PLUS"
+                else:
+                    label = "NO_ROOF_PERMIT_IN_INGESTED_RECORDS"
+                # This is a transparent ordering heuristic, never a calibrated probability.
+                priority = (min(50,max(0,age or 0)) if age else 0) + (35 if label=="ROOF_RELATED_PERMIT_20_PLUS" else 20 if not permit else 0)
+                if r["residential"] == 1:
+                    priority += 10
+                priority = min(100,priority)
+                c.execute("INSERT INTO candidates VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                          (r["county"],r["apn"],r["city"],r["zip"],r["address"],year,
+                           r["residential"],permit,label,priority,"HISTORICAL_COVERAGE_UNVERIFIED"))
+                seen += 1
+            c.commit()
+    finally:
+        c.close()
     emit({"version":VERSION,"state":"CANDIDATES_BUILT","count":seen,
           "not_verified_20_year_roof_age":True,"no_outreach":True})
 
