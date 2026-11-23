@@ -86,6 +86,12 @@ class NeighborCohortTests(unittest.TestCase):
         self.assertFalse(z["physical_distance_measured"])
         self.assertTrue(d["formula_c_neighborhood_context"]["not_able_to_infer_leaks_or_worn_shingles"])
         self.assertEqual(d["version"],VERSION)
+        self.assertTrue(d["public_research_examples"])
+        self.assertLessEqual(len(d["public_research_examples"]),25)
+        self.assertTrue(all(x["roof_condition_and_replacement_need"]=="UNVERIFIED"
+                            and x["other_parcels_with_recent_roof_permits"]>=2
+                            and not x["physical_distance_measured"]
+                            for x in d["public_research_examples"]))
         self.assertEqual(d["formula_c_neighborhood_context"]["zips"]["90049"]["candidates_with_two_or_more_recent_peer_roof_permits"],0)
 
     def test_age_window_and_short_recent_window_remove_neighbor_signal(self):
@@ -115,6 +121,8 @@ class NeighborCohortTests(unittest.TestCase):
         self.assertTrue(d["formula_c_not_a_roof_damage_prediction"])
         self.assertIn("formula_b_permit_cycle",d["markets"][0])
         self.assertIn("formula_c_neighborhood",d["markets"][0])
+        self.assertTrue(d["neighborhood_research_examples"])
+        self.assertEqual(d["neighborhood_research_examples"][0]["roof_condition_and_replacement_need"],"UNVERIFIED")
         with contextlib.closing(sqlite3.connect(self.db)) as c:
             after=c.execute("SELECT count(*),sum(priority) FROM roofing_selection_candidates_v3").fetchone()
         self.assertEqual(before,after)
