@@ -73,7 +73,7 @@ function show(){
    }else if(frame.dataset.loaded==='true'){
     try{frame.contentWindow?.location.replace('#')}catch{}
    }
-  }else if(view.type==='chat')frame=safeFrame('chat','/unified/?view=chat&embedded=1','Local AI Chat');
+  }else if(view.type==='chat')frame=safeFrame('chat','/chat/?embedded=1','Local AI Chat · Qwen + FISRE');
   else if(view.type==='tools')frame=safeFrame('tools','/unified/?view=tools&embedded=1','Tools & REA review');
   else if(view.type==='reasoning')frame=safeFrame('reasoning','/fisre/?embedded=1','Semantic Reasoning');
   else frame=safeFrame('legacy','/workspace/?view='+view.mode+'&embedded=1','Original workspace');
