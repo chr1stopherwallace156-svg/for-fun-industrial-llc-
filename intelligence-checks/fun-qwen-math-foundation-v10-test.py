@@ -90,9 +90,9 @@ class MathFoundationV10Tests(unittest.TestCase):
             v.brier_set_score(errors,{3:1.4,5:1.0,8:0.0})
 
     def test_answer_only_nll_and_hard_negative_margin(self):
-        self.assertAlmostEqual(v.normalized_answer_nll([-math.log(0.5)] if False else
-                         [math.log(0.5),math.log(0.5)]),math.log(2))
-        self.assertEqual(v.hard_negative_margin(-0.2,[-0.6,-0.9]),0.39999999999999997)
+        self.assertAlmostEqual(v.normalized_answer_nll(
+            [math.log(0.5),math.log(0.5)]),math.log(2))
+        self.assertAlmostEqual(v.hard_negative_margin(-0.2,[-0.6,-0.9]),0.4)
         with self.assertRaisesRegex(ValueError,"TOKEN_LOG_PROBABILITIES"):
             v.normalized_answer_nll([0.1])
         with self.assertRaisesRegex(ValueError,"LOG_SCORE_MARGIN"):
