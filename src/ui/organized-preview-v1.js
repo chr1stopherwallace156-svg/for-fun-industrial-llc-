@@ -156,7 +156,7 @@ const AREAS=Object.freeze({
  procurement:{
   title:'Procurement',
   desc:'Official opportunity research, qualification gates, and upcoming bids where independently verified.',
-  primary:'Open procurement research',href:'/operations/#fi-purchase-demand',secondary:'Bid readiness must be independently verified'
+  primary:'Open procurement evidence',href:'/procurement/',secondary:'Published notice evidence is not an approved bid'
  },
  compliance:{
   title:'Regulatory & compliance',
