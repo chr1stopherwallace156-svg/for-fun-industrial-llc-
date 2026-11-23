@@ -27,6 +27,18 @@ export const ROOF_BULK_PAGE=String.raw`<!doctype html><html lang="en"><head><met
  <article class="metric"><span>Candidates indexed</span><strong id="total-candidates">—</strong><small>Ranked, not confirmed roofing needs</small></article>
  <article class="metric"><span>Data completeness</span><strong id="data-completeness">Not verified</strong><small>Varies by jurisdiction and source history</small></article>
 </section>
+<section class="panel" id="selection-status">
+ <div class="section-header"><div><div class="overline">SELECTIVE EXTRACTION / V3</div><h2>Keep what matters. Hold unknowns. Discard verified irrelevance.</h2>
+ <p>Automatic after each successful full-source import. Only necessary parcel identifiers, locality, construction year and roof permit match enter the targeting index.</p></div></div>
+ <div class="metrics" aria-label="Filtered roofing candidates">
+  <article class="metric"><span>Ready for review</span><strong id="selection-selected">—</strong><small>Older plausible houses in verified imported property records</small></article>
+  <article class="metric"><span>Enrichment holds</span><strong id="selection-held">—</strong><small>Missing address, age or residential classification; not silently discarded</small></article>
+  <article class="metric"><span>Filtered exclusions</span><strong id="selection-excluded">—</strong><small>Definite non-house uses or newer-than-20-year properties</small></article>
+  <article class="metric"><span>Extraction state</span><strong id="selection-state">Not started</strong><small>Run automatically when an official source finishes indexing</small></article>
+ </div>
+ <p class="readout" id="selection-receipt" role="status">No validated selective extraction receipt yet.</p>
+ <p class="foot">No permit found means no match in the records ingested, not proof of missing or aging roofing. Historical municipal coverage remains incomplete until verified for each city.</p>
+</section>
 <section class="panel" id="market-panel">
  <div class="section-header"><div><div class="overline">01 / MARKET TARGETING</div><h2>Where to focus</h2>
  <p>Rank locations using actual ingested parcel data. Keep properties with no matching permit eligible.</p></div><button class="btn secondary" id="load-markets" type="button">Refresh results ↻</button></div>
@@ -36,7 +48,7 @@ export const ROOF_BULK_PAGE=String.raw`<!doctype html><html lang="en"><head><met
   <label>Minimum building age<select id="filter-age"><option value="0">Any age / unknown</option><option value="15">15+ years</option><option value="20" selected>20+ years / unknown</option><option value="25">25+ years / unknown</option><option value="30">30+ years / unknown</option><option value="40">40+ years / unknown</option></select></label>
   <label>Roofing permit<select id="filter-permit"><option value="all">Include every category</option><option value="none">No roof permit found</option></select></label>
  </div>
- <label class="check"><input type="checkbox" id="include-unclassified" checked> Include parcels not confidently classified residential</label>
+ <label class="check"><input type="checkbox" id="include-unclassified"> Include records held for address/age/house-type verification</label>
  <p class="readout" id="market-note" role="status">Connect a full parcel inventory to populate results.</p>
  <div class="table-wrap"><table><thead><tr><th>County</th><th>City / ZIP</th><th>Candidate parcels</th><th>No matching roof permit</th><th>Last observed roof permit 20+ years</th><th>Mean review priority</th></tr></thead><tbody id="market-body"><tr><td colspan="6">No indexed parcels yet</td></tr></tbody></table></div>
  <p class="foot">Markets are ranked only within the imported inventory. This is not a housing census, roof inspection, or a likelihood-of-purchase model.</p>
@@ -57,7 +69,7 @@ export const ROOF_BULK_PAGE=String.raw`<!doctype html><html lang="en"><head><met
 </section>
 <section class="panel">
  <div class="overline">04 / MATHEMATICAL MODEL</div><h2>Why a property is prioritized</h2>
- <div class="formula">Priority = f(building age, recorded roof-work age, property category, evidence completeness)</div>
+ <div class="formula">S = clip(40 × age-relevance + 20 × old-permit indicator + 10 × no-record indicator + 15 × house-evidence + 15 × completeness, 0, 100)</div>
  <div class="two-col"><div><h3>What this can establish</h3><p>A property exists in an official parcel roll; a roof-related permit is recorded; a property is older than a selected age threshold; municipal records have been imported for certain periods.</p></div>
  <div><h3>What it cannot yet establish</h3><p>The roof's actual condition, the absence of work without permits, the complete history of other jurisdictions, whether a home is occupied, or a probability of profitable sales.</p></div></div>
  <p class="foot">Scores are transparent sorting heuristics until qualified inspections and real sales outcomes support model calibration. Before outreach, independently review applicable contractor advertising, privacy, and Do Not Call rules.</p>
