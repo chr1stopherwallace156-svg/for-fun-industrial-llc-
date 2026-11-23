@@ -325,6 +325,51 @@ $root=Join-Path $env:LOCALAPPDATA 'FunIndustrial\RoofingBulkV2'
 ```
 A nonzero exit and `*_HOLD` is a real audit hold, not a missing roofing need.
 
+## V7 — separate read-only permit status evidence (Formula D research)
+
+The independently sampled permit-status check is
+`src/roofing/audit_roofing_permit_status_v7.py`. It leaves A, B and C
+unchanged and does not claim to determine a roof's replacement need.
+It samples up to **30 latest records per ZIP per existing permit-description
+classification** (up to 240 for the four study ZIPs), selecting only imported
+roof permits joined by exact APN to eligible older Los Angeles parcels.
+
+The status audit validates the original local official CSV archive's
+SHA-256 against its completed import receipt, then reads only additional
+`STATUS_DESC`, `STATUS_DATE`, `COFO_DATE` columns and the previously
+projected public permit identifiers/descriptions needed for reconciliation.
+The ordinary import retains its unchanged CSV field projection.
+
+Categories include **Permit Finaled**, **CofO Issued**, **Issued but not
+finaled**, **Expired/Cancelled/Revoked**, **Other/unrecognized**, and
+**Missing**. Exact normalized status labels drive the categories; uncertain
+labels remain **Other/unrecognized**, never promoted by substring or
+inference. Status and occupancy date inconsistencies trigger an explicit
+review hold, and the script keeps raw status text, street addresses and
+permit/APN identifiers out of its report. A `COFO_DATE` is reported as a
+separate evidence indicator; it does not establish actual roof replacement.
+Even `Permit Finaled` requires verifying inspection and project scope
+before asserting the roof work was completed.
+
+The check does not infer roof age, deterioration, leaks, permit-program
+completeness, or any homeowner sales interest. The source data is from
+LA City permits and **does not cover all LA County jurisdictions**.
+The sample is purposefully selected by recency and existing permit class,
+not a random sample or census. Independent formal verification requires
+checking relevant inspection records and their permitted work scope.
+
+PowerShell (read-only; does not restart the dashboard):
+```powershell
+$r=Join-Path $HOME 'FunIndustrial-Roofing-Bulk-V2'
+$root=Join-Path $env:LOCALAPPDATA 'FunIndustrial\RoofingBulkV2'
+python.exe -B (Join-Path $r 'src\roofing\audit_roofing_permit_status_v7.py') --db (Join-Path $root 'roofing.sqlite3') --root $root
+```
+
+Nine offline tests cover the hash gate, source receipts, APN mismatch,
+status categories, ambiguity, COFO nonfinal inconsistency, future/invalid
+status date and refusal to copy private fields into output. The normal
+one-port service and Elektron are not affected by an audit.
+
 ## Preflight
 
 The guarded deployment reruns prior Node.js tests and the original Python
