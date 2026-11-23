@@ -159,6 +159,43 @@ class RoofingBulkTests(unittest.TestCase):
         self.assertFalse([w for w in notices if issubclass(w.category,ResourceWarning)],
                          "CSV reader left a file handle open")
 
+    def test_wide_county_assessor_export_projects_only_needed_columns(self):
+        # Real roll exports contain hundreds of irrelevant columns; some normalize
+        # to the same header. They must not block public parcel ingestion.
+        columns=["AIN", "Property Location", "Year Built", "Property Use Type", "Roll Year"]
+        columns += ["Extra Field "+str(n) for n in range(200)]
+        columns += ["Extra-Field 12", "EXTRA FIELD 12", "Year-Built"]
+        row=["0012345678", "100 SAMPLE ST, LOS ANGELES, CA 90001",
+             "1984", "Single Family Residential", "2025"]
+        row += ["ignored"] * 200
+        row += ["ignored", "ignored", "1984"]
+        path=self.write_csv("assessor_wide.csv", [dict(zip(
+            [str(i)+"::"+x for i,x in enumerate(columns)],row))])
+        # DictWriter above is a fixture convenience; write actual duplicate CSV
+        # headers, including two variants of Year Built.
+        import csv
+        with open(path,"w",encoding="utf-8",newline="") as out:
+            w=csv.writer(out);w.writerow(columns);w.writerow(row)
+        self.ingest(path,"municipal_la_wide_fixture","la_properties")
+        with self.connect() as c:
+            record=c.execute("SELECT apn,year_built,zip,address FROM properties").fetchone()
+        self.assertEqual(record,("0012345678",1984,"90001","100 SAMPLE ST"))
+
+    def test_conflicting_duplicate_assessor_field_is_held_not_guessed(self):
+        import csv
+        path=str(self.root/"duplicate_conflict.csv")
+        with open(path,"w",encoding="utf-8",newline="") as out:
+            w=csv.writer(out)
+            w.writerow(["AIN","Property Location","Year Built","Year-Built"])
+            w.writerow(["0012345678","100 SAMPLE ST, LOS ANGELES, CA 90001",
+                        "1984","1994"])
+        with self.assertRaisesRegex(ValueError,"CSV_CRITICAL_DUPLICATE_CONFLICT_year_built"):
+            self.ingest(path,"municipal_la_conflict_fixture","la_properties")
+        with self.connect() as c:
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM properties").fetchone()[0],0)
+            state=c.execute("SELECT state FROM source_runs WHERE source_id='municipal_la_conflict_fixture'").fetchone()[0]
+            self.assertEqual(state,"INCOMPLETE_IMPORT_HOLD")
+
     def test_csv_reader_streams_rows(self):
         self.seed()
         rows=captured(roof.candidates,SimpleNamespace(
