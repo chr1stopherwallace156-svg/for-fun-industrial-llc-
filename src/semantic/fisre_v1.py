@@ -10,6 +10,7 @@ import ast
 import hashlib
 import json
 import os
+import re
 import stat
 import sys
 from fractions import Fraction
@@ -402,20 +403,39 @@ def main(argv=None):
     parser.add_argument("file", help=".py file relative to --root")
     parser.add_argument("--root", default=".", help="root directory containing target file")
     parser.add_argument("--probe", help="top-level pure arithmetic function to evaluate")
-    parser.add_argument("--inputs", help="JSON object of parameter values")
+    parser.add_argument("--inputs", help="JSON object (shell quoting may vary)")
+    parser.add_argument("--var", action="append", default=[], metavar="NAME=NUMBER", help="repeatable shell-safe numeric input (recommended on PowerShell)")
     args = parser.parse_args(argv)
     try:
         root = Path(args.root).resolve(strict=True)
         src, rel = read_source(Path(args.file), root)
         report = analyze_text(src, rel)
         if args.probe is not None:
-            if args.inputs is None or len(args.inputs) > 1200:
-                hold("PROBE_JSON_REQUIRED")
-            try:
-                inputs = json.loads(args.inputs)
-            except json.JSONDecodeError:
-                hold("PROBE_JSON_INVALID")
+            if args.inputs is not None and args.var:
+                hold("PROBE_INPUT_MODES_MUTUALLY_EXCLUSIVE")
+            if args.inputs is not None:
+                if len(args.inputs) > 1200:
+                    hold("PROBE_JSON_TOO_LARGE")
+                try:
+                    inputs = json.loads(args.inputs)
+                except json.JSONDecodeError:
+                    hold("PROBE_JSON_INVALID")
+            elif args.var:
+                if len(args.var) > MAX_INPUTS:
+                    hold("PROBE_TOO_MANY_VARS")
+                inputs = {}
+                for item in args.var:
+                    if len(item) > 200 or "=" not in item:
+                        hold("PROBE_VAR_SYNTAX_INVALID")
+                    name, number = item.split("=", 1)
+                    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", name) or not number or name in inputs:
+                        hold("PROBE_VAR_NAME_OR_DUPLICATE")
+                    inputs[name] = number
+            else:
+                hold("PROBE_INPUTS_REQUIRED")
             report["arithmetic_probe"] = probe_expression(src, args.probe, inputs)
+        elif args.var or args.inputs is not None:
+            hold("PROBE_REQUIRED_FOR_INPUTS")
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0
     except (ValueError, OSError, RecursionError) as error:
