@@ -257,6 +257,17 @@ def ingest(args):
         for name, data in input_members(path):
             members += 1
             for row_num, row in enumerate(csv_rows(data), 1):
+                if row_num == 1:
+                    cols=set(row)
+                    has_location=bool(cols.intersection(APN_FIELDS)) or bool(cols.intersection(ADDRESS_FIELDS))
+                    if kind.endswith("_properties"):
+                        if not has_location:
+                            raise ValueError("PROPERTY_SCHEMA_MISSING_PARCEL_AND_LOCATION_FIELDS")
+                        if kind=="la_properties" and not cols.intersection(YEAR_FIELDS):
+                            raise ValueError("LA_ASSESSOR_YEAR_BUILT_COLUMN_NOT_RECOGNIZED")
+                    elif (not cols.intersection(DATE_FIELDS) or
+                          not cols.intersection(DESC_FIELDS) or not has_location):
+                        raise ValueError("PERMIT_SCHEMA_MISSING_DATE_DESCRIPTION_OR_LOCATION_FIELDS")
                 if kind.endswith("_properties"):
                     parsed = parse_property(row,county,args.source_id,args.roll_year)
                     if parsed:
@@ -280,6 +291,18 @@ def ingest(args):
                     conn.commit()
         if not members:
             raise ValueError("NO_CSV_MEMBERS")
+        if inserted == 0:
+            raise ValueError("SOURCE_ZERO_RECOGNIZED_RECORDS_HOLD")
+        if kind=="la_properties":
+            quality=conn.execute("""SELECT count(*) AS total,
+              sum(CASE WHEN year_built IS NOT NULL THEN 1 ELSE 0 END) AS with_year,
+              sum(CASE WHEN address IS NOT NULL AND address!='' AND
+                zip IS NOT NULL AND zip!='' THEN 1 ELSE 0 END) AS with_site
+              FROM properties WHERE source_id=?""",(args.source_id,)).fetchone()
+            if quality["total"]>100 and (
+                quality["with_year"]<quality["total"]*0.01 or
+                quality["with_site"]<quality["total"]*0.05):
+                raise ValueError("LA_ASSESSOR_REQUIRED_FIELDS_MOSTLY_MISSING_HOLD")
         digest = sha(path)
         conn.execute("UPDATE source_runs SET state='INGESTED_NOT_COMPLETENESS_VERIFIED',ingested=?,skipped=?,file_sha256=?,filename=?,updated=? WHERE source_id=?",
                      (inserted,skipped,digest,path.name,dt.datetime.now(dt.timezone.utc).isoformat(),args.source_id))
