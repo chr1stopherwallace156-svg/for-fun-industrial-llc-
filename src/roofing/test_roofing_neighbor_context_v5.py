@@ -93,6 +93,10 @@ class NeighborCohortTests(unittest.TestCase):
                             and not x["physical_distance_measured"]
                             for x in d["public_research_examples"]))
         self.assertEqual(d["formula_c_neighborhood_context"]["zips"]["90049"]["candidates_with_two_or_more_recent_peer_roof_permits"],0)
+        self.assertEqual(z["unique_street_blocks_with_two_or_more_age_matched_recent_peer_permits"],1)
+        self.assertEqual(len(d["distinct_block_research_examples"]["90011"]),1)
+        self.assertEqual(len(d["distinct_block_research_examples"]["90049"]),0)
+        self.assertEqual(d["distinct_block_research_examples"]["90011"][0]["distinct_recent_exact_apn_permit_parcels_in_block"],2)
 
     def test_age_window_and_short_recent_window_remove_neighbor_signal(self):
         strict=self.read(peer_years=0)
@@ -112,6 +116,27 @@ class NeighborCohortTests(unittest.TestCase):
         self.assertIsNone(z["age_matched_peer_permit_window_share_pct"])
         self.assertIsNone(z["peer_activity_relative_to_zip_reference_ratio"])
 
+    def test_multiple_overlapping_candidate_windows_count_one_block_until_another_real_block_qualifies(self):
+        baseline=self.read()
+        b=baseline["formula_c_neighborhood_context"]["zips"]["90011"]
+        self.assertGreater(b["candidates_with_two_or_more_recent_peer_roof_permits"],1)
+        self.assertEqual(b["unique_street_blocks_with_two_or_more_age_matched_recent_peer_permits"],1)
+        with contextlib.closing(sqlite3.connect(self.db)) as c, c:
+            c.executemany(
+                "INSERT INTO roofing_selection_candidates_v3 VALUES (?,?,?,?,?,?,?,?)",
+                [("Los Angeles","90011","PINE"+str(j),"LOS ANGELES CA",
+                  1980,82,"KEEP",str(301+j)+" PINE ST") for j in range(6)])
+            c.executemany("INSERT INTO permits VALUES (?,?,?,?,?,?)",[
+                ("Los Angeles","PINE1","la_permits_2020_present","PINE1","2025-02-01","REPLACEMENT_LIKE"),
+                ("Los Angeles","PINE2","la_permits_2020_present","PINE2","2024-06-01","REPLACEMENT_LIKE"),
+            ])
+        d=self.read()
+        result=d["formula_c_neighborhood_context"]["zips"]["90011"]
+        self.assertEqual(result["unique_street_blocks_with_two_or_more_age_matched_recent_peer_permits"],2)
+        names=[b["street_number_block"] for b in d["distinct_block_research_examples"]["90011"]]
+        self.assertIn("100-199 OAK ST",names)
+        self.assertIn("300-399 PINE ST",names)
+
     def test_parallel_report_keeps_a_b_and_includes_c_read_only(self):
         with contextlib.closing(sqlite3.connect(self.db)) as c:
             before=c.execute("SELECT count(*),sum(priority) FROM roofing_selection_candidates_v3").fetchone()
@@ -121,6 +146,8 @@ class NeighborCohortTests(unittest.TestCase):
         self.assertTrue(d["formula_c_not_a_roof_damage_prediction"])
         self.assertIn("formula_b_permit_cycle",d["markets"][0])
         self.assertIn("formula_c_neighborhood",d["markets"][0])
+        self.assertIn("distinct_block_research_examples",d)
+        self.assertEqual(len(d["distinct_block_research_examples"]["90011"]),1)
         self.assertTrue(d["neighborhood_research_examples"])
         self.assertEqual(d["neighborhood_research_examples"][0]["roof_condition_and_replacement_need"],"UNVERIFIED")
         with contextlib.closing(sqlite3.connect(self.db)) as c:
