@@ -64,8 +64,9 @@ function LiveNew(){
  $page=Invoke-WebRequest ($Url+'/fisre/') -UseBasicParsing -TimeoutSec 8
  $client=Invoke-WebRequest ($Url+'/api/fisre/client.js') -UseBasicParsing -TimeoutSec 8
  $status=Invoke-RestMethod ($Url+'/api/fisre/status') -TimeoutSec 8
- $hub=Invoke-RestMethod ($Url+'/api/fun/hub/status') -TimeoutSec 8
- $chat=Invoke-RestMethod ($Url+'/api/unified/status') -TimeoutSec 8
+ # FISRE and the dashboard shell are local 8802 routes. Existing ML and chat
+ # statuses may legitimately return 502 when their independent worker is down.
+ # Their health must not block installation of a separate, read-only module.
  if($response.StatusCode -ne 200 -or
   $response.Headers['x-fi-dashboard-version'] -cne 'fun-industrial-one-port-spatial-ux-v2' -or
   $response.Content -notmatch 'data-section="reasoning"' -or
@@ -76,9 +77,24 @@ function LiveNew(){
   $status.version -cne 'fun-fisre-live-v4' -or
   $status.state -cne 'available_operator_click_only' -or
   $status.toolAuthorityAdded -ne $false -or
-  $status.newListener -ne $false -or
-  $hub.state -cne 'ready' -or $chat.state -cne 'ready'){
+  $status.newListener -ne $false){
   Hold 'NEW_8802_HEALTH_OR_AUTHORITY_INVALID'
+ }
+}
+function ReportUpstreamStatus(){
+ # Observational only: do not call /api/start, POST prompts, restart workers,
+ # or fail an otherwise healthy FISRE deployment for unrelated 502 responses.
+ foreach($p in @('/api/fun/hub/status','/api/unified/status')){
+  try{
+   $up=Invoke-RestMethod ($Url+$p) -TimeoutSec 5 -ErrorAction Stop
+   if($up.state -ceq 'ready'){
+    Write-Host ('FUN_FISRE_DEPENDENCY='+$p+' STATE=READY')
+   }else{
+    Write-Warning ('FUN_FISRE_DEPENDENCY='+$p+' STATE=DEGRADED_RETURNED_STATUS')
+   }
+  }catch{
+   Write-Warning ('FUN_FISRE_DEPENDENCY='+$p+' STATE=DEGRADED_HTTP_ONLY NO_RESTART')
+  }
  }
 }
 function StartDashboard([string]$file,[string]$directory,[string]$label){
@@ -120,6 +136,7 @@ if($original){
  if($newOwner){
   LiveNew
   ProtectedUnchanged
+  ReportUpstreamStatus
   Write-Host 'FUN_FISRE_LIVE_V4=PASS ADOPTED_EXISTING_8802=TRUE'
   Write-Host ('FUN_FISRE_URL='+$Url+'/#reasoning')
   Write-Host 'FUN_FISRE_TOOL_AUTHORITY=UNCHANGED'
@@ -155,6 +172,7 @@ try{
  }
  if(!$ready){Hold ('8802_START_FAILED_'+$last)}
  ProtectedUnchanged
+ ReportUpstreamStatus
  Write-Host 'FUN_FISRE_LIVE_V4=PASS'
  Write-Host ('FUN_FISRE_URL='+$Url+'/#reasoning')
  Write-Host 'FUN_FISRE_SOURCE_ANALYSIS=ACTIVE_ON_OPERATOR_CLICK'
