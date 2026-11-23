@@ -15,7 +15,7 @@ from pathlib import Path
 
 from audit_roofing_permit_descriptions_v6 import date_before
 from probe_ladbs_inspections_v8 import (
-    MAX_PER_ZIP, SOURCE, ZIPS, canonical_permit
+    MAX_PER_ZIP, SOURCE, ZIPS, canonical_permit, max_eligible_issue_date
 )
 
 def permit_shape(value):
@@ -28,10 +28,11 @@ def permit_shape(value):
         for ch in str(value or "")[:80]
     )
 
-def report(db, *, per_zip=3, today=None):
+def report(db, *, per_zip=3, today=None, issued_before=None):
     if not isinstance(per_zip,int) or not 1<=per_zip<=MAX_PER_ZIP:
         raise ValueError("INSPECTION_SHAPE_INVALID_SAMPLE_LIMIT")
     today=today or dt.date.today()
+    max_issue_date=max_eligible_issue_date(today,issued_before)
     path=Path(db)
     if not path.is_file():
         raise ValueError("INSPECTION_SHAPE_DATABASE_MISSING")
@@ -55,7 +56,7 @@ def report(db, *, per_zip=3, today=None):
                 AND e.issue_date>=? AND e.issue_date<=?
                 ORDER BY e.issue_date DESC,e.permit_id ASC LIMIT ?""",
                 (z,SOURCE,date_before(today,5).isoformat(),
-                 today.isoformat(),per_zip)).fetchall()
+                 max_issue_date.isoformat(),per_zip)).fetchall()
             months=sorted({str(row["issue_date"])[:7] for row in rows})
             shapes=Counter(permit_shape(row["permit_id"]) for row in rows)
             accepted=sum(canonical_permit(row["permit_id"]) is not None
@@ -75,8 +76,10 @@ def main():
         description="Read-only permit number shape check for unmatched V8 records")
     parser.add_argument("--db",required=True)
     parser.add_argument("--per-zip",type=int,default=3)
+    parser.add_argument("--issued-before",default=None)
     args=parser.parse_args()
-    for result in report(args.db,per_zip=args.per_zip):
+    for result in report(args.db,per_zip=args.per_zip,
+                         issued_before=args.issued_before):
         shapes=";".join(
             f"{shape}:{count}"
             for shape,count in result["permit_shapes"].items()
