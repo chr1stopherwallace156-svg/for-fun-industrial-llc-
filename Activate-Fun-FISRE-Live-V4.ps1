@@ -84,7 +84,9 @@ function LiveNew(){
   $status.version -cne 'fun-fisre-live-v4' -or
   $status.state -cne 'available_operator_click_only' -or
   $status.toolAuthorityAdded -ne $false -or
-  $status.newListener -ne $false){
+  $status.newListener -ne $false -or
+  $status.chatCodeReasoning -ne $true -or
+  $status.qwenChatIntegration -cne 'same_8802_grounded_8088_with_fisre_evidence'){
   Hold 'NEW_8802_HEALTH_OR_AUTHORITY_INVALID'
  }
 }
@@ -141,8 +143,16 @@ if($original){
  $newOwner=([string]$original.CommandLine).IndexOf($NewRunner,[StringComparison]::OrdinalIgnoreCase) -ge 0
  if(!$oldOwner -and !$newOwner){Hold '8802_OWNER_NOT_REVIEWED'}
  if($newOwner){
-  # A previously deployed instance cannot import changed source in-place.
-  # Upgrade only the known 8802 process; fallback is reviewed Spatial UX V2.
+  # Adopt an already healthy integrated chat; otherwise replace only 8802.
+  $currentReady=$false
+  try{LiveNew;ProtectedUnchanged;$currentReady=$true}catch{}
+  if($currentReady){
+   ReportUpstreamStatus
+   Write-Host 'FUN_FISRE_LIVE_V4=PASS ADOPTED_INTEGRATED_8802=TRUE'
+   Write-Host ('FUN_FISRE_URL='+$Url+'/#chat')
+   Write-Host 'FUN_QWEN_FISRE_CHAT=UNIFIED_8802_DIRECT_8088'
+   return
+  }
   Write-Host 'FUN_FISRE_EXISTING_8802=UPGRADING_SAME_KNOWN_PROCESS'
  }
 }
@@ -177,7 +187,7 @@ try{
  ProtectedUnchanged
  ReportUpstreamStatus
  Write-Host 'FUN_FISRE_LIVE_V4=PASS'
- Write-Host ('FUN_FISRE_URL='+$Url+'/#reasoning')
+ Write-Host ('FUN_FISRE_URL='+$Url+'/#chat')
  Write-Host 'FUN_FISRE_SOURCE_ANALYSIS=ACTIVE_ON_OPERATOR_CLICK'
  Write-Host 'FUN_QWEN_FISRE_CHAT=UNIFIED_8802_DIRECT_8088'
  Write-Host 'FUN_FISRE_PROOF=BOUNDED_RATIONAL_WITH_SOURCE_REPLAY'
