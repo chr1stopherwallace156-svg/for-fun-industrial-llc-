@@ -102,7 +102,7 @@ def analyze(db, *, zips=DEFAULT_ZIPS, years=20, recent_years=5,
         conn.execute("PRAGMA busy_timeout=35000")
         require_receipts(conn)
         placeholders = ",".join("?" for _ in zips)
-        params = ("Los Angeles", city, min_building_age and today.year-min_building_age, *zips)
+        params = ("Los Angeles", city, today.year - min_building_age, *zips)
         # Existing formula A is untouched. Read its stored V3 scores directly,
         # instead of recomputing or replacing the user's proven index.
         base_sql = f"""SELECT zip,COUNT(*) AS selected_properties,
@@ -125,14 +125,12 @@ def analyze(db, *, zips=DEFAULT_ZIPS, years=20, recent_years=5,
               ORDER BY s.zip,s.apn,e.issue_date"""
         events = defaultdict(list)
         seen = set()
-        duplicates = 0
         for row in conn.execute(event_sql, (*PERMIT_SOURCES, *params)):
             if kind == "replacement_like" and row["roof_class"] != "REPLACEMENT_LIKE":
                 continue
             key = (row["zip"], row["apn"])
             evidence_key = (row["source_id"], row["permit_id"], *key)
             if evidence_key in seen:
-                duplicates += 1
                 continue
             seen.add(evidence_key)
             try:
@@ -148,25 +146,17 @@ def analyze(db, *, zips=DEFAULT_ZIPS, years=20, recent_years=5,
             "apn_exact_permit_matches":0, "gap_at_least_x_years":0,
             "recent_permit_properties":0, "historical_permit_properties":0,
             "recent_long_gap_repeat_properties":0, "unmatched_apn_properties":0,
-            "last_record_gap_years_sum":0.0,
         })
         samples = []
-        for zip_code in zips:
-            selected = base.get(zip_code, {}).get("selected_properties", 0)
-            if not selected:
-                continue
-            for (z, apn), dates in events.items():
-                if z != zip_code:
-                    continue
-                if not dates:
+        for (z, apn), dates in events.items():
+                if not dates or not base.get(z, {}).get("selected_properties"):
                     continue
                 dates.sort()
                 stats=grouped[z]
                 stats["apn_exact_permit_matches"] += 1
                 last = dates[-1]
                 gap = (today-last).days / 365.2425
-                stats["last_record_gap_years_sum"] += gap
-                if last <= old_cutoff:
+                 if last <= old_cutoff:
                     stats["gap_at_least_x_years"] += 1
                 recent = [d for d in dates if d >= recent_cutoff]
                 historical = [d for d in dates if d <= old_cutoff]
@@ -175,11 +165,7 @@ def analyze(db, *, zips=DEFAULT_ZIPS, years=20, recent_years=5,
                 if historical:
                     stats["historical_permit_properties"] += 1
                 repeat = any(
-                    newer >= cutoff(today, 0) if False else False for newer in ()
-                )  # overwritten below; avoids date arithmetic shortcuts.
-                repeat = any(
-                    newer >= cutoff(today, recent_years)
-                    and older <= cutoff(newer, years)
+                    older <= cutoff(newer, years)
                     for newer in recent for older in historical
                 )
                 if repeat:
