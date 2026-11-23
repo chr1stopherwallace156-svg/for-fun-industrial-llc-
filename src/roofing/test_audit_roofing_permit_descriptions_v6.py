@@ -116,6 +116,9 @@ class PermitDescriptionAuditTests(unittest.TestCase):
         self.assertEqual(result["state"],"SAMPLED_AMBIGUOUS_DESCRIPTION_REVIEW_HOLD")
         self.assertEqual(result["aggregate"]["negated_or_ambiguous_replacement_language"],1)
         self.assertEqual(result["aggregate"]["classification_disagreement"],0)
+        self.assertEqual(result["aggregate"]["replacement_keyword_inconsistency"],0)
+        self.assertEqual(result["zip_counts"]["90037"]["source_record_not_reconciled"],0)
+        self.assertEqual(result["zip_counts"]["90049"]["sample_requested"],0)
         self.assertEqual(audit.classify_description("NO ROOF REPLACEMENT"),
                          "NEGATED_OR_AMBIGUOUS_REPLACEMENT_TERMS_REVIEW")
         self.assertEqual(audit.classify_description("REROOF NOT INCLUDED"),
