@@ -438,8 +438,11 @@ def parse_arcgis_sb_feature(feature):
     city = clean(a.get("Jurisdiction"), 90)
     classification = clean(a.get("AssessClass") or a.get("AssessDescription"), 75)
     residential = 1 if RESIDENTIAL.search(classification) else 0
+    # Public GIS layer gives no assessment roll year, so do not invent one.
+    # Later official property-characteristic CSV can enrich these APNs without
+    # being rejected as "older" than a falsely assigned 2026 roll.
     return ("San Bernardino", apn, city, "", "", "", None, residential,
-            classification, dt.date.today().year, "sb_arcgis_parcels")
+            classification, None, "sb_arcgis_parcels")
 
 def fetch_sb_arcgis_page(query, *, timeout=40):
     """Fixed official origin, bounded JSON response and no follow-to-unknown-host redirect."""
