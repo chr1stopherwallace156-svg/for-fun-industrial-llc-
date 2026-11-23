@@ -66,6 +66,7 @@ function LiveNew(){
  $grounded=Invoke-RestMethod ($Url+'/api/fial/grounded/status') -TimeoutSec 8
  $inventory=Invoke-RestMethod ($Url+'/api/fun/capabilities/status') -TimeoutSec 8
  $reaDispatch=Invoke-RestMethod ($Url+'/api/fun/rea/dispatch/status') -TimeoutSec 8
+ $compute=Invoke-RestMethod ($Url+'/api/fun/compute/status') -TimeoutSec 8
  $client=Invoke-WebRequest ($Url+'/api/fisre/client.js') -UseBasicParsing -TimeoutSec 8
  $status=Invoke-RestMethod ($Url+'/api/fisre/status') -TimeoutSec 8
  # FISRE and the dashboard shell are local 8802 routes. Existing ML and chat
@@ -81,6 +82,7 @@ function LiveNew(){
   $directChat.Content -notmatch 'id="fi-fial53-grounded"' -or
   $directChat.Content -notmatch 'id="fi-fial53-code"' -or
   $directChat.Content -notmatch 'id="fi-fial53-rea-panel"' -or
+  $directChat.Content -notmatch 'id="fi-fial53-compute-panel"' -or
   $grounded.model_interface -cne 'fixed_local_qwen_8088' -or
   $grounded.authority_added -ne $false -or
   $grounded.capability_fabric_version -cne 'fun-ai-capability-fabric-v1' -or
@@ -91,6 +93,10 @@ function LiveNew(){
   $reaDispatch.operatorApprovalRequired -ne $true -or
   $reaDispatch.modelCanExecute -ne $false -or
   @($reaDispatch.approvedTools).Count -ne 2 -or
+  $compute.version -cne 'fun-reviewed-compute-v1' -or
+  $compute.operatorApprovalRequired -ne $true -or
+  $compute.modelCanExecute -ne $false -or
+  @($compute.modes).Count -ne 5 -or
   $client.StatusCode -ne 200 -or $client.Content -notmatch 'operator-click' -or
   $status.version -cne 'fun-fisre-live-v4' -or
   $status.state -cne 'available_operator_click_only' -or
@@ -132,6 +138,9 @@ foreach($p in @(
  'src\semantic\fisre_source_v4.py',
  'src\semantic\fisre-live-bridge-v4.mjs',
  'src\intelligence\operator-reviewed-dispatch-v1.mjs',
+ 'src\intelligence\reviewed-compute-v1.mjs',
+ 'scripts\Run-Fun-Approved-Optimization-V1.py',
+ 'Initialize-Fun-Optimization-V1.ps1',
  'src\intelligence\capability-fabric-v1.mjs',
  'src\ui\fisre-qwen-chat-v4.mjs',
  'src\cognition\fisre-evidence-v3.mjs',
@@ -167,6 +176,7 @@ if($original){
    Write-Host 'FUN_QWEN_FISRE_CHAT=UNIFIED_8802_DIRECT_8088'
  Write-Host 'FUN_QWEN_CAPABILITY_FABRIC=12_DOMAINS_READONLY_ROUTING'
  Write-Host 'FUN_REA_DISPATCH=EXACT_READONLY_PREPARE_CONFIRM_SEPARATE_CLICKS'
+ Write-Host 'FUN_QWEN_ML_OPTIMIZATION=REVIEWED_5_MODES_SAME_8802'
    return
   }
   Write-Host 'FUN_FISRE_EXISTING_8802=UPGRADING_SAME_KNOWN_PROCESS'
@@ -208,6 +218,7 @@ try{
  Write-Host 'FUN_QWEN_FISRE_CHAT=UNIFIED_8802_DIRECT_8088'
  Write-Host 'FUN_QWEN_CAPABILITY_FABRIC=12_DOMAINS_READONLY_ROUTING'
  Write-Host 'FUN_REA_DISPATCH=EXACT_READONLY_PREPARE_CONFIRM_SEPARATE_CLICKS'
+ Write-Host 'FUN_QWEN_ML_OPTIMIZATION=REVIEWED_5_MODES_SAME_8802'
  Write-Host 'FUN_FISRE_PROOF=BOUNDED_RATIONAL_WITH_SOURCE_REPLAY'
  Write-Host 'FUN_FISRE_COGNITION=PROPOSED_ONLY'
  Write-Host 'FUN_FISRE_TOOL_AUTHORITY=UNCHANGED'
