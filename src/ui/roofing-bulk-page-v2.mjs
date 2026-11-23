@@ -115,6 +115,14 @@ ZIP activity = 1,000 × recent permit parcels ÷ selected older parcels</div>
  <div class="table-wrap"><table><thead><tr><th>ZIP</th><th>Assessor parcel ID</th>
  <th>Existing V3 research score</th><th>Latest roof-related permit</th><th>Years since record</th><th>Recent long-gap repeat observed?</th></tr></thead>
  <tbody id="formula-samples"><tr><td colspan="6">Calculate to see up to 12 example parcel IDs.</td></tr></tbody></table></div>
+ <h3>Formula C — parcel examples for neighborhood verification</h3>
+ <p>Examples show recorded roofing-permit activity on comparable nearby parcels—not evidence that the listed property's roof is leaking, worn, or due for replacement.</p>
+ <div class="table-wrap"><table><thead><tr>
+  <th>ZIP</th><th>Public parcel ID</th><th>Construction year</th><th>Similar-age peers</th>
+  <th>Other parcels with recent roof permits</th><th>Peer permit share</th>
+  <th>Subject roof condition</th></tr></thead>
+  <tbody id="neighbor-example-body"><tr><td colspan="7">Calculate to inspect capped comparable-neighbor research examples.</td></tr></tbody>
+ </table></div>
  <p class="foot">Only exact parcel-ID matches feed Formulas B and C. Formula A may also use supported address matching. The three methods provide separate research signals, never proof of leaks, worn shingles, roof age or commercial conversion. Municipal coverage is incomplete; verify original permit details before follow-up.</p>
 </section>
 </main></div></body></html>`;
