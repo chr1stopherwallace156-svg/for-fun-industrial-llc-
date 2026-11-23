@@ -1,0 +1,457 @@
+#!/usr/bin/env python3
+"""Fun Industrial Roofing Bulk V2: official full exports -> local SQLite; no sales outreach.
+
+All downloads are explicit commands to fixed official URLs. No API key is needed for
+public SODA3 full exports. Use SOCRATA_APP_TOKEN from environment if one was issued.
+This tool does not guess missing permit coverage or roof condition.
+"""
+import argparse
+import csv
+import datetime as dt
+import hashlib
+import io
+import json
+import os
+import re
+import shutil
+import sqlite3
+import sys
+import time
+import urllib.request
+import zipfile
+from pathlib import Path
+
+VERSION = "fun-roofing-bulk-v2"
+DEFAULT_ROOT = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "FunIndustrial" / "RoofingBulkV2"
+SOURCES = {
+    "la_assessor_2021_2025": ("https://apps.gis.lacounty.gov/static/hub/Assessor/Assessor_Parcel_Roll_2021_2025.zip", "la_properties"),
+    "la_permits_pre2010": ("https://data.lacity.org/api/v3/views/e67z-kt2n/export.csv?accessType=DOWNLOAD", "la_permits"),
+    "la_permits_2010_2019": ("https://data.lacity.org/api/v3/views/dyxf-7hc4/export.csv?accessType=DOWNLOAD", "la_permits"),
+    "la_permits_2020_present": ("https://data.lacity.org/api/v3/views/pi9x-tg5x/export.csv?accessType=DOWNLOAD", "la_permits"),
+    "sb_assessor_characteristics": ("https://arc.sbcounty.gov/wp-content/uploads/sites/70/arcforms/PIMSPropertyCharacteristics_20260617_7928_205.zip", "sb_properties"),
+}
+ROOF = re.compile(r"\b(?:REROOF(?:ING)?|RE[\s-]ROOF(?:ING)?|ROOF(?:ING)?|SHINGLE|SHINGLES)\b", re.I)
+REPLACED = re.compile(r"\b(?:REROOF(?:ING)?|RE[\s-]ROOF(?:ING)?|ROOF\s*(?:REPLACEMENT|REPLACE)|REPLACE\s*(?:THE\s*)?ROOF)\b", re.I)
+RESIDENTIAL = re.compile(r"(?:SINGLE[\s_-]*FAMILY|^SFR$|^R1$|RESIDENTIAL|1[\s_-]*FAMILY|ONE[\s_-]*FAMILY)", re.I)
+COUNTY_MAP = {"LA": "Los Angeles", "LOS ANGELES": "Los Angeles",
+              "SB": "San Bernardino", "SAN BERNARDINO": "San Bernardino"}
+ADDRESS_FIELDS = ("address", "situs", "site_address", "property_location", "primary_address", "street_address")
+APN_FIELDS = ("apn", "ain", "assessor_id", "assessor_parcel_number", "rec_parcel_nbr", "pin_nbr")
+YEAR_FIELDS = ("year_built", "rec_sfrs_const_year", "building_year_built", "year_property_was_built")
+ZIP_FIELDS = ("zip", "zip_code", "zipcode", "site_address_zip_code", "rec_parsit_zip1")
+CITY_FIELDS = ("city", "site_city", "rec_parsit_city", "city_tax_rate_area")
+USE_FIELDS = ("property_use_type", "use_type", "property_type", "rec_land_type", "property_use_code")
+DATE_FIELDS = ("issue_date", "issue_dt", "issue_date_1", "issued", "permit_issue_date")
+DESC_FIELDS = ("work_desc", "work_description", "description", "permit_description", "work_type")
+PERMIT_FIELDS = ("permit_nbr", "permit_number", "permit_no", "permit_id")
+
+def emit(obj):
+    print(json.dumps(obj, sort_keys=True, ensure_ascii=True, separators=(",", ":")))
+
+def clean(s, limit=240):
+    return re.sub(r"[\x00-\x1f\x7f]+", " ", str(s or "")).strip()[:limit]
+
+def norm(s):
+    return re.sub(r"\s+", " ", re.sub(r"[^A-Z0-9 ]", " ", clean(s).upper())).strip()
+
+def header(s):
+    return re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", str(s).lower())).strip("_")
+
+def field(row, names):
+    for name in names:
+        v = row.get(name, "")
+        if v is not None and str(v).strip():
+            return str(v).strip()
+    return ""
+
+def int_year(s):
+    text = clean(s, 20).replace(",", "")
+    if not re.fullmatch(r"\d{4}", text):
+        return None
+    n = int(text)
+    return n if 1800 <= n <= dt.date.today().year else None
+
+def parse_date(s):
+    match = re.match(r"^(\d{4})-(\d{2})-(\d{2})", clean(s, 32))
+    if match:
+        try:
+            return dt.date(int(match[1]), int(match[2]), int(match[3])).isoformat()
+        except ValueError:
+            pass
+    return None
+
+def parse_site(value, row):
+    address = clean(value, 240)
+    city = clean(field(row, CITY_FIELDS), 90)
+    zipcode = re.match(r"\d{5}", clean(field(row, ZIP_FIELDS), 20))
+    zipvalue = zipcode.group(0) if zipcode else ""
+    # Assessor field may contain: 123 MAIN ST, LOS ANGELES, CA 90001.
+    m = re.match(r"^(.+?),\s*([^,]+?),?\s+CA\s+(\d{5})(?:-\d{4})?$", address, re.I)
+    if m:
+        address, city, zipvalue = m.group(1), city or m.group(2), zipvalue or m.group(3)
+    elif "," in address:
+        parts = [p.strip() for p in address.split(",")]
+        if len(parts) >= 2 and re.search(r"\d", parts[0]):
+            address = parts[0]
+            if not city:
+                city = parts[1].replace(" CA", "").strip()
+    if not zipvalue:
+        z = re.search(r"\b(\d{5})(?:-\d{4})?\s*$", address)
+        if z:
+            zipvalue = z.group(1)
+            address = address[:z.start()].strip(" ,")
+    return clean(address, 180), clean(city, 90), zipvalue
+
+def db_open(path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    c = sqlite3.connect(str(path), timeout=60)
+    c.row_factory = sqlite3.Row
+    c.execute("PRAGMA journal_mode=WAL")
+    c.execute("PRAGMA busy_timeout=60000")
+    c.execute("PRAGMA temp_store=FILE")
+    c.execute("PRAGMA synchronous=NORMAL")
+    c.executescript("""
+      CREATE TABLE IF NOT EXISTS properties(
+        county TEXT NOT NULL, apn TEXT NOT NULL, city TEXT, zip TEXT,
+        address TEXT, address_key TEXT, year_built INTEGER, residential INTEGER,
+        use_label TEXT, roll_year INTEGER, source_id TEXT NOT NULL,
+        PRIMARY KEY(county,apn));
+      CREATE INDEX IF NOT EXISTS properties_market ON properties(county,city,zip);
+      CREATE INDEX IF NOT EXISTS properties_address ON properties(county,zip,address_key);
+      CREATE TABLE IF NOT EXISTS permits(
+        source_id TEXT NOT NULL, permit_id TEXT NOT NULL, county TEXT NOT NULL,
+        jurisdiction TEXT NOT NULL, apn TEXT, zip TEXT, address_key TEXT,
+        issue_date TEXT NOT NULL, roof_class TEXT NOT NULL,
+        PRIMARY KEY(source_id,permit_id));
+      CREATE INDEX IF NOT EXISTS permits_apn ON permits(county,apn,issue_date);
+      CREATE INDEX IF NOT EXISTS permits_address ON permits(county,zip,address_key,issue_date);
+      CREATE TABLE IF NOT EXISTS source_runs(
+        source_id TEXT PRIMARY KEY, kind TEXT NOT NULL, county TEXT NOT NULL,
+        jurisdiction TEXT NOT NULL, state TEXT NOT NULL, ingested INTEGER NOT NULL DEFAULT 0,
+        skipped INTEGER NOT NULL DEFAULT 0, file_sha256 TEXT, filename TEXT,
+        updated TEXT, coverage TEXT NOT NULL DEFAULT 'NOT_VERIFIED');
+      CREATE TABLE IF NOT EXISTS candidates(
+        county TEXT NOT NULL, apn TEXT NOT NULL, city TEXT, zip TEXT, address TEXT,
+        year_built INTEGER, residential INTEGER, last_roof_permit TEXT,
+        status TEXT NOT NULL, priority INTEGER NOT NULL, evidence TEXT NOT NULL,
+        PRIMARY KEY(county,apn));
+      CREATE INDEX IF NOT EXISTS candidates_market ON candidates(county,city,zip,status,priority);
+    """)
+    return c
+
+def input_members(path):
+    if path.suffix.lower() == ".csv":
+        yield path.name, path.open("rb")
+    elif zipfile.is_zipfile(path):
+        with zipfile.ZipFile(path) as z:
+            members = [m for m in z.infolist() if m.filename.lower().endswith(".csv") and not m.is_dir()]
+            if not members:
+                raise ValueError("ZIP_HAS_NO_CSV_MEMBER: source needs a documented fixed-width or GIS adapter")
+            if len(members) > 100 or sum(m.file_size for m in members) > 12 * 1024**3:
+                raise ValueError("ZIP_UNCOMPRESSED_LIMIT")
+            for item in members:
+                if item.file_size > 12 * 1024**3 or ".." in item.filename or item.filename.startswith("/"):
+                    raise ValueError("ZIP_MEMBER_UNSAFE")
+                with z.open(item) as data:
+                    yield item.filename, data
+    else:
+        raise ValueError("SUPPORTED_INPUT_IS_CSV_OR_ZIP_CONTAINING_CSV")
+
+def csv_rows(binary):
+    text = io.TextIOWrapper(binary, encoding="utf-8-sig", errors="replace", newline="")
+    reader = csv.DictReader(text)
+    if reader.fieldnames is None:
+        raise ValueError("CSV_HEADER_MISSING")
+    names = [header(n) for n in reader.fieldnames]
+    if len(names) != len(set(names)) or len(names) > 150:
+        raise ValueError("CSV_HEADERS_DUPLICATE_OR_TOO_MANY")
+    for raw in reader:
+        if None in raw:
+            raise ValueError("CSV_ROW_TOO_MANY_COLUMNS")
+        yield {header(k): v for k, v in raw.items()}
+
+def parse_property(row, county, source_id, fallback_roll):
+    address, city, zipcode = parse_site(field(row, ADDRESS_FIELDS), row)
+    apn = norm(field(row, APN_FIELDS)).replace(" ", "")
+    if not apn and (not address or not zipcode):
+        return None
+    if not apn:
+        apn = "ADDRESS-" + hashlib.sha256((county+"|"+zipcode+"|"+norm(address)).encode()).hexdigest()[:32]
+    year = int_year(field(row, YEAR_FIELDS))
+    roll = int_year(field(row, ("roll_year", "tax_year", "rollyear"))) or fallback_roll
+    use = clean(field(row, USE_FIELDS), 80)
+    classification = 1 if RESIDENTIAL.search(use) else 0
+    # 0 means unclassified, NOT 'known nonresidential'.
+    return county, apn, city, zipcode, address, norm(address), year, classification, use, roll, source_id
+
+def parse_permit(row, county, jurisdiction, source_id, row_num):
+    desc = clean(field(row, DESC_FIELDS), 500)
+    if not ROOF.search(desc):
+        return None
+    issued = parse_date(field(row, DATE_FIELDS))
+    if not issued:
+        return None
+    address, city, zipcode = parse_site(field(row, ADDRESS_FIELDS), row)
+    apn = norm(field(row, APN_FIELDS)).replace(" ", "")
+    if not apn and not (address and zipcode):
+        return None
+    permit_id = clean(field(row, PERMIT_FIELDS), 120)
+    if not permit_id:
+        permit_id = hashlib.sha256((county+"|"+issued+"|"+zipcode+"|"+norm(address)+"|"+desc+"|"+str(row_num)).encode()).hexdigest()
+    return source_id, permit_id, county, jurisdiction, apn, zipcode, norm(address), issued, "REPLACEMENT_LIKE" if REPLACED.search(desc) else "ROOF_RELATED_NOT_PROVEN_REPLACED"
+
+def sha(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as inp:
+        while block := inp.read(1024 * 1024):
+            digest.update(block)
+    return digest.hexdigest()
+
+def ingest(args):
+    path = Path(args.file).expanduser().resolve()
+    if not path.is_file():
+        raise ValueError("INPUT_FILE_MISSING")
+    if args.source_id not in SOURCES and not re.fullmatch(r"municipal_[a-z0-9_-]{3,50}", args.source_id):
+        raise ValueError("SOURCE_ID_MUST_BE_VERIFIED_OR_EXPLICIT_MUNICIPAL_ID")
+    kind = args.kind or (SOURCES.get(args.source_id) or (None,))[1] if args.source_id in SOURCES else args.kind
+    if kind not in ("la_properties", "sb_properties", "la_permits", "municipal_permits"):
+        raise ValueError("INGEST_KIND_INVALID")
+    county = "Los Angeles" if kind.startswith("la_") else args.county
+    county = COUNTY_MAP.get(clean(county).upper())
+    if not county:
+        raise ValueError("COUNTY_REQUIRED")
+    jurisdiction = "Los Angeles" if kind == "la_permits" else clean(args.jurisdiction, 90)
+    if kind == "municipal_permits" and not jurisdiction:
+        raise ValueError("JURISDICTION_REQUIRED")
+    if args.source_id in SOURCES and kind != SOURCES[args.source_id][1]:
+        raise ValueError("SOURCE_KIND_MISMATCH")
+    if kind.startswith("la_") and county != "Los Angeles":
+        raise ValueError("COUNTY_MISMATCH")
+    conn = db_open(Path(args.db))
+    started = dt.datetime.now(dt.timezone.utc).isoformat()
+    conn.execute("INSERT INTO source_runs(source_id,kind,county,jurisdiction,state,updated) VALUES(?,?,?,?,?,?) ON CONFLICT(source_id) DO UPDATE SET state=excluded.state,updated=excluded.updated,ingested=0,skipped=0,coverage='NOT_VERIFIED'",
+                 (args.source_id,kind,county,jurisdiction,"INGEST_IN_PROGRESS",started))
+    conn.commit()
+    inserted = skipped = 0
+    members = 0
+    try:
+        for name, data in input_members(path):
+            members += 1
+            for row_num, row in enumerate(csv_rows(data), 1):
+                if kind.endswith("_properties"):
+                    parsed = parse_property(row,county,args.source_id,args.roll_year)
+                    if parsed:
+                        conn.execute("""INSERT INTO properties VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                          ON CONFLICT(county,apn) DO UPDATE SET
+                          city=excluded.city,zip=excluded.zip,address=excluded.address,
+                          address_key=excluded.address_key,year_built=excluded.year_built,
+                          residential=excluded.residential,use_label=excluded.use_label,
+                          roll_year=excluded.roll_year,source_id=excluded.source_id
+                          WHERE coalesce(excluded.roll_year,0)>=coalesce(properties.roll_year,0)""",parsed)
+                else:
+                    parsed = parse_permit(row,county,jurisdiction,args.source_id,row_num)
+                    if parsed:
+                        conn.execute("INSERT OR REPLACE INTO permits VALUES(?,?,?,?,?,?,?,?,?)",parsed)
+                if parsed: inserted += 1
+                else: skipped += 1
+                if row_num % 10000 == 0:
+                    conn.commit()
+                    conn.execute("UPDATE source_runs SET ingested=?,skipped=?,updated=? WHERE source_id=?",
+                                 (inserted,skipped,dt.datetime.now(dt.timezone.utc).isoformat(),args.source_id))
+                    conn.commit()
+        if not members:
+            raise ValueError("NO_CSV_MEMBERS")
+        digest = sha(path)
+        conn.execute("UPDATE source_runs SET state='INGESTED_NOT_COMPLETENESS_VERIFIED',ingested=?,skipped=?,file_sha256=?,filename=?,updated=? WHERE source_id=?",
+                     (inserted,skipped,digest,path.name,dt.datetime.now(dt.timezone.utc).isoformat(),args.source_id))
+        conn.commit()
+        emit({"version":VERSION,"state":"INGESTED_NOT_COMPLETENESS_VERIFIED","source":args.source_id,
+              "accepted":inserted,"skipped":skipped,"sha256":digest,"property_or_permit":"properties" if kind.endswith("properties") else "roof_permits",
+              "needs_rebuild":True,"data_not_a_complete_housing_census":True})
+    except Exception:
+        conn.commit()
+        conn.execute("UPDATE source_runs SET state='INCOMPLETE_IMPORT_HOLD',ingested=?,skipped=? WHERE source_id=?",
+                     (inserted,skipped,args.source_id))
+        conn.commit()
+        raise
+    finally:
+        conn.close()
+
+def rebuild(args):
+    c = db_open(Path(args.db))
+    c.execute("DELETE FROM candidates")
+    c.commit()
+    cursor = c.execute("SELECT county,apn,city,zip,address,address_key,year_built,residential FROM properties")
+    current_year = dt.date.today().year
+    seen = 0
+    while rows := cursor.fetchmany(1500):
+        for r in rows:
+            by_apn = c.execute("SELECT MAX(issue_date) AS d FROM permits WHERE county=? AND apn=?", (r["county"],r["apn"])).fetchone()["d"] if not r["apn"].startswith("ADDRESS-") else None
+            by_address = c.execute("SELECT MAX(issue_date) AS d FROM permits WHERE county=? AND zip=? AND address_key=?", 
+                                   (r["county"],r["zip"],r["address_key"])).fetchone()["d"] if r["zip"] and r["address_key"] else None
+            permit = max(filter(None,(by_apn,by_address)),default=None)
+            year = r["year_built"]
+            age = current_year-year if year else None
+            if permit and current_year-int(permit[:4]) < 20:
+                label = "RECENT_ROOF_RELATED_PERMIT"
+            elif permit:
+                label = "ROOF_RELATED_PERMIT_20_PLUS"
+            else:
+                label = "NO_ROOF_PERMIT_IN_INGESTED_RECORDS"
+            # This is a transparent ordering heuristic, never a calibrated probability.
+            priority = (min(50,max(0,age or 0)) if age else 0) + (35 if label=="ROOF_RELATED_PERMIT_20_PLUS" else 20 if not permit else 0)
+            if r["residential"] == 1:
+                priority += 10
+            priority = min(100,priority)
+            c.execute("INSERT INTO candidates VALUES(?,?,?,?,?,?,?,?,?,?)",
+                      (r["county"],r["apn"],r["city"],r["zip"],r["address"],year,
+                       r["residential"],permit,label,priority,"HISTORICAL_COVERAGE_UNVERIFIED"))
+            seen += 1
+        c.commit()
+    c.close()
+    emit({"version":VERSION,"state":"CANDIDATES_BUILT","count":seen,
+          "not_verified_20_year_roof_age":True,"no_outreach":True})
+
+def status(args):
+    c = db_open(Path(args.db))
+    counts = {}
+    for table in ("properties","permits","candidates"):
+        counts[table] = c.execute("SELECT COUNT(*) FROM "+table).fetchone()[0]
+    source_runs = [dict(x) for x in c.execute("SELECT source_id,kind,county,jurisdiction,state,ingested,skipped,substr(file_sha256,1,16) AS sha_prefix,updated,coverage FROM source_runs ORDER BY source_id")]
+    counties = [dict(x) for x in c.execute("SELECT county,count(*) AS properties, sum(CASE WHEN residential=1 THEN 1 ELSE 0 END) AS classified_residential, sum(CASE WHEN year_built IS NULL THEN 1 ELSE 0 END) AS unknown_year_built FROM properties GROUP BY county")]
+    matched = [dict(x) for x in c.execute("SELECT status,count(*) AS properties FROM candidates GROUP BY status")]
+    emit({"version":VERSION,"counts":counts,"counties":counties,"candidate_categories":matched,"source_runs":source_runs,
+          "data_completeness":"NOT_COUNTYWIDE_VERIFIED","roof_age_claims":False,
+          "api_keys_required_for_public_exports":False,"external_actions":0})
+
+def candidates(args,markets=False):
+    c = db_open(Path(args.db))
+    cond = ["1=1"]; params=[]
+    if args.county != "all":
+        county = COUNTY_MAP.get(args.county.upper())
+        if not county:
+            raise ValueError("COUNTY_INVALID")
+        cond.append("county=?");params.append(county)
+    if args.city:
+        cond.append("city LIKE ?");params.append(args.city[:70]+"%")
+    if args.min_age:
+        cond.append("(year_built IS NULL OR year_built<=?)")
+        params.append(dt.date.today().year-args.min_age)
+    if not args.include_unclassified:
+        cond.append("residential=1")
+    if args.only_no_permit:
+        cond.append("status='NO_ROOF_PERMIT_IN_INGESTED_RECORDS'")
+    where = " AND ".join(cond)
+    if markets:
+        sql = ("""SELECT county,city,zip, count(*) AS candidates,
+              SUM(CASE WHEN status='NO_ROOF_PERMIT_IN_INGESTED_RECORDS' THEN 1 ELSE 0 END) AS no_permit_observed,
+              SUM(CASE WHEN status='ROOF_RELATED_PERMIT_20_PLUS' THEN 1 ELSE 0 END) AS old_roof_permit,
+              ROUND(AVG(priority),1) AS mean_review_priority
+              FROM candidates WHERE """+where+
+              " GROUP BY county,city,zip ORDER BY (no_permit_observed+old_roof_permit) DESC,mean_review_priority DESC LIMIT 100")
+    else:
+        sql = ("SELECT county,apn,city,zip,address,year_built,residential,last_roof_permit,status,priority,evidence "
+               "FROM candidates WHERE "+where+" ORDER BY priority DESC,county,zip,apn LIMIT 100")
+    data = [dict(x) for x in c.execute(sql,params)]
+    emit({"version":VERSION,"rows":data,"universe":"IMPORTED_PARCELS_NOT_ALL_HOUSES_VERIFIED",
+          "roof_condition_unknown":True,"no_permit_proves_no_replacement":False,
+          "unclassified_excluded":not args.include_unclassified})
+
+class FixedOriginRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        from urllib.parse import urlsplit
+        old, new = urlsplit(req.full_url), urlsplit(newurl)
+        if old.scheme != "https" or new.scheme != "https" or new.hostname != old.hostname:
+            raise ValueError("SOURCE_REDIRECT_OUTSIDE_APPROVED_HOST")
+        return super().redirect_request(req,fp,code,msg,headers,newurl)
+
+def download(args):
+    if args.source not in SOURCES:
+        raise ValueError("SOURCE_ID_NOT_IN_ALLOWLIST")
+    url,kind = SOURCES[args.source]
+    from urllib.parse import urlsplit
+    host = urlsplit(url).hostname
+    if host not in ("data.lacity.org","apps.gis.lacounty.gov","arc.sbcounty.gov"):
+        raise ValueError("SOURCE_HOST_NOT_ALLOWLISTED")
+    folder = Path(args.root) / "official_downloads"
+    folder.mkdir(parents=True,exist_ok=True)
+    ext = ".zip" if urlsplit(url).path.endswith(".zip") else ".csv"
+    target = folder / (args.source+ext)
+    tmp = folder / (args.source+".incomplete")
+    if target.exists() and not args.replace:
+        emit({"version":VERSION,"state":"EXISTING_FILE_RETAINED","path":str(target),
+              "bytes":target.stat().st_size,"source":args.source,"kind":kind})
+        return
+    req = urllib.request.Request(url,headers={"User-Agent":"FunIndustrialRoofingBulk/2.0 (official public data research)","Accept":"text/csv,application/zip,application/octet-stream,*/*"})
+    token = os.environ.get("SOCRATA_APP_TOKEN")
+    if token and host=="data.lacity.org":
+        req.add_header("X-App-Token",token)
+    total=0;limit=int(args.max_gb*1024**3);digest=hashlib.sha256()
+    opener = urllib.request.build_opener(FixedOriginRedirect())
+    try:
+        with opener.open(req,timeout=120) as response, tmp.open("wb") as out:
+            if response.status != 200:
+                raise ValueError("SOURCE_HTTP_"+str(response.status))
+            content_type=response.headers.get("content-type","").lower()
+            if "html" in content_type or "json" in content_type:
+                raise ValueError("SOURCE_RESPONSE_NOT_DATA")
+            expected=int(response.headers.get("content-length","0") or 0)
+            if expected>limit:raise ValueError("SOURCE_EXCEEDS_MAX_GB")
+            while part:=response.read(1024*1024):
+                total+=len(part)
+                if total>limit:raise ValueError("SOURCE_EXCEEDS_MAX_GB")
+                out.write(part);digest.update(part)
+        if total<30:raise ValueError("EMPTY_SOURCE")
+        if ext==".zip" and not zipfile.is_zipfile(tmp):
+            raise ValueError("ZIP_SIGNATURE_INVALID")
+        if ext==".csv" and not tmp.open("rb").read(256).strip():
+            raise ValueError("CSV_EMPTY")
+        tmp.replace(target)
+        emit({"version":VERSION,"state":"DOWNLOADED_UNINGESTED","source":args.source,
+              "kind":kind,"file":str(target),"bytes":total,"sha256":digest.hexdigest(),
+              "completeness":"UNVERIFIED_UNTIL_IMPORT"})
+    finally:
+        if tmp.exists():tmp.unlink()
+
+def inspect(args):
+    path=Path(args.file)
+    if not path.exists():raise ValueError("INPUT_FILE_MISSING")
+    info=[]
+    for name, binary in input_members(path):
+        with binary:
+            text=io.TextIOWrapper(binary,encoding="utf-8-sig",errors="replace",newline="")
+            header_line=next(csv.reader(text),[])
+        info.append({"member":name,"columns":[header(c) for c in header_line[:120]]})
+        if len(info)>=25:break
+    emit({"version":VERSION,"file":path.name,"csv_members":info,
+          "owner_data_not_extracted":True,"requires_explicit_ingest":True})
+
+def main():
+    p=argparse.ArgumentParser(description="Full official property and permit data -> disk-backed SQLite. No scraping or outreach.")
+    p.add_argument("--db",default=str(DEFAULT_ROOT/"roofing.sqlite3"))
+    sub=p.add_subparsers(dest="cmd",required=True)
+    d=sub.add_parser("download");d.add_argument("source",choices=sorted(SOURCES));d.add_argument("--root",default=str(DEFAULT_ROOT))
+    d.add_argument("--replace",action="store_true");d.add_argument("--max-gb",type=float,default=8)
+    i=sub.add_parser("ingest");i.add_argument("--file",required=True);i.add_argument("--source-id",required=True)
+    i.add_argument("--kind",choices=["la_properties","sb_properties","la_permits","municipal_permits"])
+    i.add_argument("--county",default="");i.add_argument("--jurisdiction",default="");i.add_argument("--roll-year",type=int)
+    b=sub.add_parser("rebuild");s=sub.add_parser("status");x=sub.add_parser("inspect");x.add_argument("--file",required=True)
+    for name in ("markets","candidates"):
+        q=sub.add_parser(name);q.add_argument("--county",default="all")
+        q.add_argument("--city",default="");q.add_argument("--min-age",type=int,default=20)
+        q.add_argument("--include-unclassified",action="store_true")
+        q.add_argument("--only-no-permit",action="store_true")
+    args=p.parse_args()
+    if args.cmd=="download":
+        if not 0.2<=args.max_gb<=32:raise ValueError("MAX_GB_INVALID")
+        download(args)
+    elif args.cmd=="ingest":ingest(args)
+    elif args.cmd=="rebuild":rebuild(args)
+    elif args.cmd=="status":status(args)
+    elif args.cmd=="inspect":inspect(args)
+    else:candidates(args,args.cmd=="markets")
+if __name__=="__main__":
+    try:main()
+    except (OSError,ValueError,sqlite3.Error,RuntimeError,zipfile.BadZipFile) as error:
+        print("FUN_ROOFING_BULK_HOLD="+str(error)[:280],file=sys.stderr)
+        sys.exit(1)
