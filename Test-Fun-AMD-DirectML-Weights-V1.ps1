@@ -26,8 +26,12 @@ $branch=git -C $Root branch --show-current
 if($LASTEXITCODE -ne 0 -or $branch -cne $ExpectedBranch){Fail 'WRONG_REPO_BRANCH'}
 if(@(git -C $Root status --porcelain=v1 --untracked-files=all).Count){Fail 'LOCAL_CHANGES_REQUIRE_REVIEW'}
 $Py=(Get-Command py.exe -ErrorAction Stop).Source
-& $Py -3.12 -c 'import sys;assert sys.version_info[:2]==(3,12);print("PYTHON_312=PASS")'
-if($LASTEXITCODE -ne 0){Fail 'PYTHON_312_UNAVAILABLE'}
+# Windows PowerShell 5.1 strips nested quotes when forwarding python -c
+# program text to native executables. Query the actual interpreter directly
+# instead of embedding Python code with quoted string literals.
+$PythonVersion=(& $Py -3.12 --version 2>&1 | Out-String).Trim()
+if($LASTEXITCODE -ne 0 -or $PythonVersion -notmatch '^Python 3\.12\.'){Fail 'PYTHON_312_UNAVAILABLE'}
+Write-Host 'PYTHON_312=PASS'
 
 $before=@{}
 foreach($port in @(11434,8088,8801,8802,8797,8798)){
@@ -64,9 +68,11 @@ if(!(Test-Path -LiteralPath $Marker)){
   # Existing global torch 2.15.0+cpu is never changed.
   & $VenvPy -m pip install --disable-pip-version-check 'torch-directml==0.2.5.dev240914'
   if($LASTEXITCODE -ne 0){Fail 'DIRECTML_DEPENDENCY_INSTALL_FAILED'}
-  # Ensure a real isolated package import. This does not run GPU computations.
-  & $VenvPy -c 'import torch,torch_directml;print("DIRECTML_ISOLATED_TORCH="+str(torch.__version__));print("DIRECTML_DEVICE_COUNT="+str(torch_directml.device_count()))'
-  if($LASTEXITCODE -ne 0){Fail 'DIRECTML_IMPORT_FAILED'}
+  # Do not use native -c with nested string quotes on Windows PowerShell.
+  # The Python probe below performs real imports and tests GPU autograd.
+  # Checking installed packages here requires no executable Python -c text.
+  & $VenvPy -m pip show torch-directml
+  if($LASTEXITCODE -ne 0){Fail 'DIRECTML_PACKAGE_NOT_INSTALLED'}
   [IO.File]::WriteAllText($Marker,'Fun Industrial: isolated torch-directml pinned environment, v1')
 }
 if(!(Test-Path -LiteralPath $VenvPy)){Fail 'VENV_PYTHON_MISSING_POST_INSTALL'}
