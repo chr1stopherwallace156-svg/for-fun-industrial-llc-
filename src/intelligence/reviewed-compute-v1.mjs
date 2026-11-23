@@ -107,7 +107,7 @@ function runIsolatedSolver(payload,{spawnProcess=spawn}={}){
        answer.exact_verification!==true||answer.solver!=='optuna_tpe_with_exhaustive_discrete_verification'||
        Math.abs(cost(answer.exact_best_stock)/demand.length-answer.exact_best_avg_cost)>0.0000015)
       return finish(Error('FUN_COMPUTE_INVENTORY_RECHECK_FAILED'));
-   }else{
+   }else if(payload.kind==='ortools_routing'){
     const matrix=payload.spec.cost_matrix,route=answer.route;
     if(!Array.isArray(route)||route.length!==matrix.length+1||
        route[0]!==0||route.at(-1)!==0||
