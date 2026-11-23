@@ -31,8 +31,9 @@ jobs:
           node --check scripts/Run-Fun-ML-Dashboard8802.mjs
           node --check src/ui/roofing-bulk-page-v2.js
           node --check src/roofing/roofing-bulk-bridge-v2.mjs
+          python -c "import ast,pathlib; [ast.parse(pathlib.Path(p).read_text()) for p in ('src/roofing/selective_policy_v3.py','src/roofing/selective_extract_v3.py')]"
           node --check src/ui/procurement-focus-v1.mjs
           node --check src/ui/organized-preview-v1.js
           node --check src/ui/oneport-dashboard-v1.js
       - name: Test existing dashboard and both roofing modules
-        run: node --test test/organized-ui-preview-v1.test.mjs test/roofing-opportunity-v1.test.mjs test/roofing-bulk-v2.test.mjs test/procurement-focus-v1.test.mjs
+        run: node --test test/organized-ui-preview-v1.test.mjs test/roofing-opportunity-v1.test.mjs test/roofing-bulk-v2.test.mjs test/procurement-focus-v1.test.mjs test/roofing-selective-v3.test.mjs
