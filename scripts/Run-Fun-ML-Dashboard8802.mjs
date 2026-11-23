@@ -18,6 +18,8 @@ import {researchV3Snapshot,researchV3Evidence as researchV3EvidenceAdapter,resea
 import {MATH_V3_HTML} from '../src/ui/math-v3-page.mjs';
 import {PREVIEW_HTML,PREVIEW_VERSION} from '../src/ui/organized-preview-v1.mjs';
 import {previewQwenHealth} from '../src/ui/organized-preview-health-v1.mjs';
+import {ROOF_UI_HTML} from '../src/ui/roofing-opportunity-v1.mjs';
+import {roofingSnapshot,roofingLeads,importRoofData,refreshLaCity,refreshNws} from '../src/roofing/roofing-intelligence-v1.mjs';
 import {createFisreChatEvidence} from '../src/semantic/fisre-chat-evidence-v4.mjs';
 import {capabilityInventory} from '../src/intelligence/capability-fabric-v1.mjs';
 import {createReviewedDispatch} from '../src/intelligence/operator-reviewed-dispatch-v1.mjs';
@@ -59,6 +61,8 @@ const MATH_CLIENT=new URL('../src/ui/math-research-v2.js',import.meta.url);
 const MATH_V3_CLIENT=new URL('../src/ui/math-v3-page.js',import.meta.url);
 const PREVIEW_CSS=new URL('../src/ui/organized-preview-v1.css',import.meta.url);
 const PREVIEW_CLIENT=new URL('../src/ui/organized-preview-v1.js',import.meta.url);
+const ROOF_CSS=new URL('../src/ui/roofing-opportunity-v1.css',import.meta.url);
+const ROOF_CLIENT=new URL('../src/ui/roofing-opportunity-v1.js',import.meta.url);
 const ONEPORT_TILT=new URL('../src/ui/vendor/vanilla-tilt-1.8.1.js',import.meta.url);
 const ONEPORT_EMBED=new URL('../src/ui/oneport-embedded-v1.css',import.meta.url);
 const ONEPORT_EMBED_CLIENT=new URL('../src/ui/oneport-embedded-operations-v1.js',import.meta.url);
@@ -241,6 +245,19 @@ async function parseCompetenceSupplement(req,mode){
   return obj.draft;
  throw Error('FIAL56_SUPPLEMENT_SCHEMA_INVALID');
 }
+async function roofingBody(req,maxBytes=700000){
+ const parts=[];let bytes=0;
+ for await(const part of req){
+  bytes+=part.length;
+  if(bytes>maxBytes)throw Error('ROOF_IMPORT_OVERSIZE');
+  parts.push(part);
+ }
+ let value;
+ try{value=JSON.parse(Buffer.concat(parts).toString('utf8'))}
+ catch{throw Error('ROOF_REQUEST_INVALID_JSON')}
+ if(!value||typeof value!=='object'||Array.isArray(value))throw Error('ROOF_REQUEST_BODY_INVALID');
+ return value;
+}
 async function emptyCommerceBody(req){
   let length=0;const chunks=[];
   for await(const chunk of req){length+=chunk.length;if(length>64)throw Error('COMMERCE_REQUEST_TOO_LARGE');chunks.push(chunk)}
@@ -269,6 +286,42 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         return send(res,400,{error:'ML_HUB_REQUEST_TARGET_INVALID'});
       const u=new URL(req.url,ORIGIN);
       if(u.search.length>2048||u.pathname.includes('..'))return send(res,400,{error:'ML_HUB_INVALID_PATH'});
+      // Property-opportunity research; operator-only refresh and explicit CSV import.
+      // No Qwen, REA, external messaging, bid submissions, or model actions.
+      if(req.method==='GET'&&u.pathname==='/roofing/'){
+        const csp="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'none'; font-src 'none'; frame-src 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'; form-action 'none'";
+        return send(res,200,ROOF_UI_HTML,'text/html; charset=utf-8',
+          {'content-security-policy':csp,'x-fi-roofing-version':'fun-roofing-opportunity-v1'});
+      }
+      if(req.method==='GET'&&u.pathname==='/api/fun/roofing/style.css')
+        return send(res,200,await readFile(ROOF_CSS,'utf8'),'text/css; charset=utf-8');
+      if(req.method==='GET'&&u.pathname==='/api/fun/roofing/client.js')
+        return send(res,200,await readFile(ROOF_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      if(req.method==='GET'&&u.pathname==='/api/fun/roofing/status')
+        return send(res,200,await roofingSnapshot());
+      if(req.method==='GET'&&u.pathname==='/api/fun/roofing/leads'){
+        const args={countyFilter:u.searchParams.get('county')||'all',cityFilter:(u.searchParams.get('city')||'').slice(0,80),
+          category:u.searchParams.get('category')||'all',minAge:Number(u.searchParams.get('minAge')||20)};
+        if(!['all','San Bernardino','Los Angeles'].includes(args.countyFilter)||
+           !Number.isSafeInteger(args.minAge)||args.minAge<15||args.minAge>80||
+           !['all','NO_PERMIT_FOUND_IN_INGESTED_RECORDS','LAST_RECORDED_ROOF_PERMIT_20_PLUS','RECENT_ROOF_PERMIT_FOUND'].includes(args.category))
+          return send(res,422,{error:'ROOF_QUERY_FILTERS_INVALID'});
+        return send(res,200,await roofingLeads({filters:args}));
+      }
+      if(req.method==='POST'&&['/api/fun/roofing/import','/api/fun/roofing/refresh-la','/api/fun/roofing/refresh-weather'].includes(u.pathname)){
+        const action=u.pathname.split('/').at(-1);
+        if(!acceptedActionOrigin(req)||req.headers['x-fi-roofing-click']!=='operator-'+action||
+           (req.headers['sec-fetch-site']&&!['same-origin','none'].includes(req.headers['sec-fetch-site'])))
+          return send(res,403,{error:'ROOF_EXPLICIT_OPERATOR_CLICK_REQUIRED'});
+        if(req.headers['content-type']!=='application/json')
+          return send(res,415,{error:'ROOF_JSON_REQUIRED'});
+        const body=await roofingBody(req,action==='import'?700000:128);
+        if(action==='import')return send(res,200,await importRoofData(body));
+        if(Object.keys(body).length!==0)return send(res,422,{error:'ROOF_REFRESH_EMPTY_BODY_REQUIRED'});
+        return send(res,200,action==='refresh-la'?await refreshLaCity():await refreshNws());
+      }
+      if(u.pathname==='/roofing/'||u.pathname.startsWith('/api/fun/roofing/'))
+        return send(res,404,{error:'ROOF_ROUTE_NOT_SUPPORTED'});
       // Opt-in organized interface preview. Production homepage and routes remain unchanged.
       if(req.method==='GET'&&u.pathname==='/ui-preview/'){
         const csp="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-src 'self'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'self'";
