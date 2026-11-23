@@ -111,10 +111,14 @@ test('parallel rooftop formulas preserve existing V3 equation and use distinct r
  assert.match(python,/REPLACEMENT_LIKE/);
  assert.match(ROOF_BULK_PAGE,/Formula C — Similar-age neighbors/);
  assert.match(ROOF_BULK_PAGE,/id="neighbor-example-body"/);
+ assert.match(ROOF_BULK_PAGE,/id="unique-block-body"/);
+ assert.match(ROOF_BULK_PAGE,/C: unique qualifying street blocks/);
  assert.match(ROOF_BULK_PAGE,/C: 2\+ recent peer permits/);
  assert.match(clientSrc,/peerYears:String\(peerYears\)/);
  assert.match(clientSrc,/candidates_with_two_or_more_recent_peer_roof_permits/);
  assert.match(clientSrc,/neighborhood_research_examples/);
+ assert.match(clientSrc,/distinct_block_research_examples/);
+ assert.match(clientSrc,/unique_street_blocks_with_two_or_more_age_matched_recent_peer_permits/);
  assert.match(bridge,/--min-peers/);
  assert.match(python,/neighbor_context\(conn/);
  const street=await readFile(new URL('../src/roofing/roofing_neighbor_context_v5.py',import.meta.url),'utf8');
