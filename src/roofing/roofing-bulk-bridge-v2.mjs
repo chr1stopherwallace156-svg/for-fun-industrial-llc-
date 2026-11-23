@@ -8,6 +8,8 @@ import {fileURLToPath} from 'node:url';
 const exec=promisify(execFile);
 const SCRIPT=fileURLToPath(new URL('./roofing_bulk_v2.py',import.meta.url));
 const SELECTIVE_SCRIPT=fileURLToPath(new URL('./selective_extract_v3.py',import.meta.url));
+const DUAL_SCRIPT=fileURLToPath(new URL('./roofing_dual_formulas_v4.py',import.meta.url));
+export const DUAL_FORMULA_VERSION='fun-roofing-parallel-formulas-v4';
 export const SELECTIVE_VERSION='fun-roofing-selective-v3';
 const ROOT=process.env.LOCALAPPDATA?join(process.env.LOCALAPPDATA,'FunIndustrial','RoofingBulkV2'):null;
 const DB=ROOT?join(ROOT,'roofing.sqlite3'):null;
@@ -71,6 +73,29 @@ export async function selectivePython(cmd,args=[],{timeout=30000}={}){
  const result=JSON.parse(value);
  if(result.version!==SELECTIVE_VERSION)throw Error('FUN_SELECTION_WORKER_VERSION_MISMATCH');
  return result;
+}
+export async function bulkDualFormulas({zips='90011,90049,90731,90037',
+  years=20,recentYears=5,minBuildingAge=25,permitKind='roof_related'}={}){
+ if(!ROOT||!DB||!existsSync(DB))
+   throw Error('ROOF_BULK_DUAL_FORMULA_LOCAL_DATABASE_REQUIRED');
+ if(typeof zips!=='string'||zips.length>60||!
+    /^\d{5}(,\d{5}){0,9}$/.test(zips)||
+    new Set(zips.split(',')).size!==zips.split(',').length||
+    !Number.isSafeInteger(years)||years<10||years>50||
+    !Number.isSafeInteger(recentYears)||recentYears<1||recentYears>10||
+    recentYears>=years||
+    !Number.isSafeInteger(minBuildingAge)||minBuildingAge<20||minBuildingAge>100||
+    !['roof_related','replacement_like'].includes(permitKind))
+   throw Error('ROOF_BULK_DUAL_FORMULA_FILTER_HOLD');
+ const args=[DUAL_SCRIPT,'--db',DB,'--zips',zips,'--years',String(years),
+   '--recent-years',String(recentYears),'--min-building-age',String(minBuildingAge),
+   '--permit-kind',permitKind];
+ const {stdout}=await exec(python(),args,{windowsHide:true,timeout:90000,
+   maxBuffer:512*1024,env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});
+ const parsed=JSON.parse(stdout.trim().split(/\r?\n/).filter(Boolean).at(-1));
+ if(parsed.version!==DUAL_FORMULA_VERSION||parsed.state!=='PARALLEL_INDEPENDENT_FORMULAS_READY')
+   throw Error('ROOF_BULK_DUAL_FORMULA_RESULT_UNVERIFIED');
+ return {...parsed,...holds()};
 }
 export async function bulkOverview(){
  let db;
