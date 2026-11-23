@@ -41,6 +41,12 @@ export function createFisreChatEvidence(result,source){
   evidence.divisions=checks.slice(0,3);
   text=JSON.stringify(evidence);
  }
+ if(text.length>3650){
+  evidence.source_excerpt_not_executable='[long source omitted; hash retained]';
+  evidence.functions=functions.slice(0,1);
+  evidence.divisions=checks.slice(0,1);
+  text=JSON.stringify(evidence);
+ }
  if(text.length>3650)hold('EVIDENCE_TOO_LARGE');
  return text;
 }
