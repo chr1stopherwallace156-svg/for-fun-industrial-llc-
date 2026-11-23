@@ -209,7 +209,7 @@ const SEARCH=[
  ['Tools & ML','REA and local analytics','#tools'],
  ['System','Health status and advanced workspace','#system'],
  ['Fleet buyers','Buyer evidence and demand','#operations?area=buyers'],
- ['Roofing opportunities','Countywide permit evidence and NWS forecast','/roofing/'],
+ ['Roofing opportunities','Countywide permit evidence and NWS forecast','/roofing/bulk/'],
  ['Procurement','Source-linked bid research','#operations?area=procurement'],
  ['Compliance','Regulatory status and evidence','#operations?area=compliance'],
  ['V3 mathematical lab','All candidate equation scores','/math/v3/'],
