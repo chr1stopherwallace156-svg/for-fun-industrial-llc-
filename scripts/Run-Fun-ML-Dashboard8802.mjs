@@ -14,6 +14,7 @@ import {FISRE_WORKSPACE_HTML} from '../src/ui/fisre-workspace-v4.mjs';
 import {FISRE_QWEN_CHAT_HTML} from '../src/ui/fisre-qwen-chat-v4.mjs';
 import {createFisreChatEvidence} from '../src/semantic/fisre-chat-evidence-v4.mjs';
 import {capabilityInventory} from '../src/intelligence/capability-fabric-v1.mjs';
+import {createReviewedDispatch} from '../src/intelligence/operator-reviewed-dispatch-v1.mjs';
 import {parseFisreRequest,validateFisrePayload,runFisrePython,fisreStatus} from '../src/semantic/fisre-live-bridge-v4.mjs';
 import {readFial4DashboardStatus} from '../src/fial/dashboard-status-v4.mjs';
 import {createGroundedChat} from '../src/fial/grounded-chat-v5-2.mjs';
@@ -133,6 +134,20 @@ function acceptedHost(req){
 function acceptedActionOrigin(req){
   return ['http://127.0.0.1:8802','http://localhost:8802'].includes(String(req.headers.origin||''));
 }
+async function reviewedDispatchBody(req){
+  const parts=[];let size=0;
+  for await(const chunk of req){
+    size+=chunk.length;
+    if(size>1024)throw Error('FUN_REA_DISPATCH_BODY_TOO_LARGE');
+    parts.push(chunk);
+  }
+  let value;
+  try{value=JSON.parse(Buffer.concat(parts).toString('utf8'))}
+  catch{throw Error('FUN_REA_DISPATCH_JSON_INVALID')}
+  if(!value||typeof value!=='object'||Array.isArray(value))
+    throw Error('FUN_REA_DISPATCH_SCHEMA_INVALID');
+  return value;
+}
 async function groundedChatBody(req){
   const parts=[];let size=0;
   for await(const chunk of req){
@@ -144,8 +159,9 @@ async function groundedChatBody(req){
   try{value=JSON.parse(Buffer.concat(parts).toString('utf8'))}
   catch{throw Error('FIAL53_CHAT_JSON_REQUIRED')}
   if(!value||typeof value!=='object'||Array.isArray(value)||
-    Object.keys(value).length<1||Object.keys(value).length>2||
-    Object.keys(value).some(k=>!['question','fisre'].includes(k))||
+    Object.keys(value).length<1||Object.keys(value).length>3||
+    Object.keys(value).some(k=>!['question','fisre','explainApprovedRea'].includes(k))||
+    (value.explainApprovedRea!==undefined&&value.explainApprovedRea!==true)||
     typeof value.question!=='string'||
     value.question.length<4||value.question.length>1200)
     throw Error('FIAL53_CHAT_QUESTION_INVALID');
@@ -202,7 +218,7 @@ async function emptyCommerceBody(req){
   const value=Buffer.concat(chunks).toString('utf8').trim();
   if(value!=='{}')throw Error('COMMERCE_EMPTY_JSON_REQUIRED');
 }
-export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=createCommerceIntelligence(),grounded=null,
+export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=createCommerceIntelligence(),grounded=null,reviewedDispatch=null,
  readPage=pageFrom,proxy=proxyTo,readWidget=()=>readFile(ML_WIDGET,'utf8'),
  readCommerceWidget=()=>readFile(COMMERCE_WIDGET,'utf8'),
  executiveStatus=readExecutiveStatus,realStatus=readRealStatus,
@@ -211,6 +227,7 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
  procurementStatus=readProcurementStatus,fitStatus=readFitStatus,
  bidStatus=readReadinessStatus,buyerStatus=readBuyerStatus,demandStatus=readDemandStatus,
  readUiClient=()=>readFile(UI_CLIENT,'utf8'),readUiStyle=()=>readFile(UI_CSS,'utf8')}={}){
+  const dispatch=reviewedDispatch??createReviewedDispatch();
   const activeGrounded=grounded??createGroundedChat({capabilityReaders:{
     grants:readFial4DashboardStatus,operations:executiveStatus,outcomes:outcomeStatus,
     ml:()=>ml.status(),commerce:()=>commerce.status()
@@ -246,6 +263,22 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         return send(res,200,fisreStatus());
       if(req.method==='GET'&&u.pathname==='/api/fun/capabilities/status')
         return send(res,200,capabilityInventory());
+      if(req.method==='GET'&&u.pathname==='/api/fun/rea/dispatch/status'){
+        return send(res,200,dispatch.status());
+      }
+      if(req.method==='POST'&&['/api/fun/rea/dispatch/prepare','/api/fun/rea/dispatch/confirm','/api/fun/rea/dispatch/cancel'].includes(u.pathname)){
+        const action=u.pathname.split('/').at(-1);
+        if(!acceptedActionOrigin(req)||req.headers['x-fi-rea-review']!=='operator-'+action||
+           (req.headers['sec-fetch-site']&&!['same-origin','none'].includes(req.headers['sec-fetch-site'])))
+          return send(res,403,{error:'FUN_REA_SEPARATE_OPERATOR_CLICK_REQUIRED'});
+        if(req.headers['content-type']!=='application/json')
+          return send(res,415,{error:'FUN_REA_DISPATCH_JSON_REQUIRED'});
+        const args=await reviewedDispatchBody(req);
+        if(action==='prepare')return send(res,200,await dispatch.prepare(args));
+        if(action==='confirm')return send(res,200,await dispatch.confirm(args));
+        return send(res,200,dispatch.cancel(args));
+      }
+
       if(req.method==='POST'&&u.pathname==='/api/fisre/analyze'){
         if(!acceptedActionOrigin(req)||req.headers['x-fi-fisre']!=='operator-click')
           return send(res,403,{error:'FISRE_EXPLICIT_OPERATOR_CLICK_REQUIRED'});
@@ -513,14 +546,24 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         if(req.headers['content-type']!=='application/json')
           return send(res,415,{error:'FIAL53_JSON_REQUIRED'});
         const body=await groundedChatBody(req);
-        if(body.fisre===undefined)
-          return send(res,200,await activeGrounded.chat({question:body.question}));
-        // Single explicit Send: reviewed FISRE code analysis, then one Qwen
-        // answer grounded in its source-bound report. No autonomous model tools.
+        let approvedReaEvidence=null;
+        if(body.explainApprovedRea===true){
+          const receipt=dispatch.lastEvidence();
+          if(!receipt||receipt.verified!==true)
+            throw Error('FUN_REA_NO_OPERATOR_APPROVED_RESULT_TO_EXPLAIN');
+          approvedReaEvidence=JSON.stringify(receipt);
+        }
+        const reviewedToolSuggestion=dispatch.recommend(body.question);
+        if(body.fisre===undefined){
+          const answer=await activeGrounded.chat({question:body.question,reaEvidence:approvedReaEvidence});
+          return send(res,200,{...answer,reviewedToolSuggestion});
+        }
+        // Single explicit Send: FISRE source proof, then one Qwen response
+        // grounded in bounded evidence. No autonomous model tool execution.
         const analysis=await runFisrePython(body.fisre);
         const evidence=createFisreChatEvidence(analysis,body.fisre.source);
-        const answer=await activeGrounded.chat({question:body.question,fisreEvidence:evidence});
-        return send(res,200,{...answer,
+        const answer=await activeGrounded.chat({question:body.question,fisreEvidence:evidence,reaEvidence:approvedReaEvidence});
+        return send(res,200,{...answer,reviewedToolSuggestion,
           fisre:{status:analysis.proof.status,source_sha256:analysis.source.sha256,
             replay:analysis.replay.state,cognitive:'proposed_only',
             independently_proved:false,tool_authority_added:false}});
