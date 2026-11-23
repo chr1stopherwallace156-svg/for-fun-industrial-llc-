@@ -125,5 +125,61 @@ class FisreTests(unittest.TestCase):
         self.assertEqual(report['call_edges'][0]['callee'], 'calculate_price')
 
 
+    def test_powershell_safe_cli_vars(self):
+        import contextlib
+        import io
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            code = mod.main([
+                'intelligence-checks/fixtures/fisre_example.py',
+                '--root', str(HERE.parent),
+                '--probe', 'calculate_price',
+                '--var', 'cost=100',
+                '--var', 'margin=0.25',
+            ])
+        self.assertEqual(code, 0, stderr.getvalue())
+        report = json.loads(stdout.getvalue())
+        self.assertEqual(report['arithmetic_probe']['result_rational'], '400/3')
+        self.assertFalse(report['arithmetic_probe']['inspected_code_executed'])
+
+    def test_cli_rejects_duplicate_and_conflicting_var_inputs(self):
+        import contextlib
+        import io
+        for flags, expected in [
+            (['--var', 'cost=100', '--var', 'cost=200'], 'PROBE_VAR_NAME_OR_DUPLICATE'),
+            (['--inputs', '{}', '--var', 'cost=100'], 'PROBE_INPUT_MODES_MUTUALLY_EXCLUSIVE'),
+            (['--var', 'bad=1;echo'], 'NUMERIC_INPUT_INVALID'),
+        ]:
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                code = mod.main([
+                    'intelligence-checks/fixtures/fisre_example.py',
+                    '--root', str(HERE.parent),
+                    '--probe', 'calculate_price',
+                    *flags,
+                ])
+            self.assertEqual(code, 2)
+            self.assertEqual(json.loads(stderr.getvalue())['state'], 'HOLD')
+            self.assertIn(expected, stderr.getvalue())
+
+    def test_cli_var_division_by_zero_holds(self):
+        import contextlib
+        import io
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(stderr):
+            code = mod.main([
+                'intelligence-checks/fixtures/fisre_example.py',
+                '--root', str(HERE.parent),
+                '--probe', 'calculate_price',
+                '--var', 'cost=100',
+                '--var', 'margin=1',
+            ])
+        self.assertEqual(code, 2)
+        self.assertIn('FISRE_HOLD_DIVISION_BY_ZERO', stderr.getvalue())
+
+
+
 if __name__ == '__main__':
     unittest.main()
