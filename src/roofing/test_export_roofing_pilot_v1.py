@@ -98,6 +98,7 @@ class PublicReviewPilotTests(unittest.TestCase):
         self.assertEqual(pilot.csv_safe("+MALICIOUS"),"'+MALICIOUS")
         self.assertEqual(pilot.csv_safe("@SUM(1,2)"),"'@SUM(1,2)")
         self.assertEqual(pilot.csv_safe("Normal Street"),"Normal Street")
+        self.assertEqual(pilot.csv_safe("00123456789"),"'00123456789")
         self.assertEqual(pilot.twenty_year_cutoff(dt.date(2024,2,29)),"2004-02-29")
 
     def test_bad_quotas_fail_before_database_access(self):
