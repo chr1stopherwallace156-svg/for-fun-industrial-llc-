@@ -106,30 +106,40 @@ async function renderParallelFormulas(){
  const recentYears=Number($('formula-recent').value);
  const minBuildingAge=Number($('formula-age').value);
  const permitKind=$('formula-kind').value;
+ const peerYears=Number($('formula-peer-years').value);
+ const minPeers=Number($('formula-min-peers').value);
  if(!/^\d{5}(,\d{5}){0,9}$/.test(zips)||
     new Set(zips.split(',')).size!==zips.split(',').length||
     !Number.isInteger(years)||years<10||years>50||
     !Number.isInteger(recentYears)||recentYears<1||recentYears>10||recentYears>=years||
     !Number.isInteger(minBuildingAge)||minBuildingAge<20||minBuildingAge>100||
+    !Number.isInteger(peerYears)||peerYears<0||peerYears>15||
+    !Number.isInteger(minPeers)||minPeers<3||minPeers>30||
     !['roof_related','replacement_like'].includes(permitKind)){
    display('formula-note','Invalid filters. Use 1–10 distinct five-digit ZIP codes, a 10–50 year interval, a shorter recent window and permitted description types.');
    return;
  }
- display('formula-note','Calculating both independent methods on local indexed assessor and permit records…');
+ display('formula-note','Calculating three separate methods from local assessor and roof-permit records…');
  const query=new URLSearchParams({zips,years:String(years),recentYears:String(recentYears),
-   minBuildingAge:String(minBuildingAge),permitKind});
+   minBuildingAge:String(minBuildingAge),permitKind,peerYears:String(peerYears),
+   minPeers:String(minPeers)});
  const result=await request('/api/fun/roofing/bulk/formulas?'+query.toString());
  const body=$('formula-body');body.replaceChildren();
  for(const market of result.markets||[]){
-  const a=market.formula_a_existing,b=market.formula_b_permit_cycle;
+  const a=market.formula_a_existing,b=market.formula_b_permit_cycle,
+   c=market.formula_c_neighborhood||{};
   const cells=[market.zip,a.selected_older_residential_properties,
    a.mean_review_priority??'Unavailable',b.exact_apn_match_properties,
    b.last_roof_permit_at_least_x_years_ago,b.recent_permit_properties,
    b.recent_repeat_with_gap_at_least_x_years,
-   b.recent_roof_permit_activity_per_1000??'Not enough data'];
+   b.recent_roof_permit_activity_per_1000??'Not enough data',
+   c.candidates_with_enough_age_similar_street_block_peers??'Unverified',
+   c.candidates_with_two_or_more_recent_peer_roof_permits??'Unverified',
+   c.peer_activity_relative_to_zip_reference_ratio==null?'Insufficient evidence':
+    c.peer_activity_relative_to_zip_reference_ratio+'×'];
   const row=node('tr');for(const value of cells)row.append(node('td',value));body.append(row);
  }
- if(!body.childElementCount){const row=node('tr'),cell=node('td','No verified matches');cell.colSpan=8;row.append(cell);body.append(row)}
+ if(!body.childElementCount){const row=node('tr'),cell=node('td','No verified matches');cell.colSpan=11;row.append(cell);body.append(row)}
  const sampleBody=$('formula-samples');sampleBody.replaceChildren();
  for(const item of result.public_parcel_id_examples||[]){
   const row=node('tr');
@@ -141,10 +151,11 @@ async function renderParallelFormulas(){
   sampleBody.append(row);
  }
  if(!sampleBody.childElementCount){const tr=node('tr'),td=node('td','No older permit examples found in the selected markets');td.colSpan=6;tr.append(td);sampleBody.append(tr)}
- display('formula-note','Both mathematical methods calculated from four imported official sources. '
-  +'Formula A is unchanged; Formula B uses exact parcel ID matches for a '+years
-  +'-year historical interval and '+recentYears
-  +'-year recent window. Roof age, replacement and permit completeness remain unverified.');
+ display('formula-note','Three separate methods calculated from four imported sources. '
+  +'Formula A remains unchanged; B uses same-parcel intervals of '+years
+  +' years; C compares same-street 100-number blocks with construction years within ±'
+  +peerYears+' and at least '+minPeers+' peers. This is a proxy, not measured '
+  +'physical distance or evidence of roof damage.');
 }
 async function execute(button,callback){
  if(busy)return;busy=true;const all=[...document.querySelectorAll('button')];
