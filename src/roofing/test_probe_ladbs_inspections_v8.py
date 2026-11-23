@@ -83,6 +83,21 @@ class InspectionJoinProbeTests(unittest.TestCase):
         self.assertNotIn("24016-10000-00004",query["$where"][0])
         self.assertNotIn("24016-10000-00005",query["$where"][0])
         self.assertNotIn("24016-10000-00006",query["$where"][0])
+    def test_permit_finaled_result_and_status_do_not_equal_approved_final(self):
+        report,_=self.run_probe([
+          {"permit":"24016-10000-00001","inspection":"Final",
+           "inspection_result":"Permit Finaled","permit_status":"Permit Finaled",
+           "inspection_date":"2025-06-01T00:00:00"},
+          {"permit":"24016-10000-00002","inspection":"Foundation",
+           "inspection_result":"Approved","permit_status":"Permit Finaled",
+           "inspection_date":"2025-06-02T00:00:00"},
+        ])
+        totals=report["aggregate"]
+        self.assertEqual(totals["has_final_inspection_type_with_approved_result"],0)
+        self.assertEqual(totals["has_final_type_with_permit_finaled_result"],1)
+        self.assertEqual(totals["has_permit_finaled_status"],2)
+        self.assertTrue(report["permit_finaled_text_is_separate_from_inspection_approval"])
+
     def test_date_must_be_real_for_final_approval(self):
         r,_=self.run_probe([
           {"permit":"24016-10000-00001","inspection":"Final",
