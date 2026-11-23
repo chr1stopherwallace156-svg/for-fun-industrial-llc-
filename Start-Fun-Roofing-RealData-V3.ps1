@@ -50,6 +50,11 @@ if($extension){
   $py=(Get-Command python.exe -ErrorAction Stop).Source
   & $py -B (Join-Path $Root 'src\roofing\roofing_bulk_v2.py') inspect --file $cached
   if($LASTEXITCODE -ne 0){throw 'FUN_REALDATA_CACHED_SOURCE_SCHEMA_HOLD'}
+  if($Source -eq 'la_assessor_2021_2025'){
+   & $py -B (Join-Path $Root 'src\roofing\roofing_bulk_v2.py') probe-assessor --file $cached --sample-rows 1500
+   if($LASTEXITCODE -ne 0){throw 'FUN_REALDATA_CACHED_ASSESSOR_SAMPLE_HOLD'}
+   Write-Host 'FUN_REALDATA_ASSESSOR_SAMPLE_VALIDATED=TRUE_FULL_IMPORT_STILL_UNVERIFIED'
+  }
  }
 }
 $body=@{source=$Source}|ConvertTo-Json -Compress
