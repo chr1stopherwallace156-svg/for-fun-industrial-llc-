@@ -16,6 +16,7 @@ import urllib.parse
 import urllib.request
 from collections import Counter
 from pathlib import Path
+from audit_roofing_permit_descriptions_v6 import date_before
 
 SOURCE="la_permits_2020_present"
 DATASET="9w5z-rg2h"
@@ -77,7 +78,7 @@ def probe(db,*,zips=ZIPS,per_zip=3,today=None,fetch=None):
                 AND e.source_id=? AND e.roof_class='REPLACEMENT_LIKE'
                 AND e.issue_date>=? AND e.issue_date<=?
                 ORDER BY e.issue_date DESC,e.permit_id ASC LIMIT ?""",
-                (z,SOURCE,dt.date(today.year-5,today.month,min(today.day,28)).isoformat(),
+                (z,SOURCE,date_before(today,5).isoformat(),
                  today.isoformat(),per_zip)).fetchall()
             for r in rows:
                 number=canonical_permit(r["permit_id"])
@@ -116,8 +117,16 @@ def probe(db,*,zips=ZIPS,per_zip=3,today=None,fetch=None):
         kind=re.sub(r"\s+"," ",str(row.get("inspection") or "").strip().upper())
         result=re.sub(r"\s+"," ",str(row.get("inspection_result") or "").strip().upper())
         date=str(row.get("inspection_date") or "").strip()
-        if kind in ALLOWED_TYPES and result in ALLOWED_APPROVAL and re.fullmatch(
-              r"\d{4}-\d{2}-\d{2}(?:T.*)?",date):
+        # A syntactically valid, real calendar date is necessary; a result
+        # with no inspection date must never become "approved final" evidence.
+        date_match=re.match(r"^(\d{4}-\d{2}-\d{2})(?:T.*)?$",date)
+        date_valid=False
+        if date_match:
+            try:
+                dt.date.fromisoformat(date_match.group(1))
+                date_valid=True
+            except ValueError:pass
+        if kind in ALLOWED_TYPES and result in ALLOWED_APPROVAL and date_valid:
             candidate_final_approvals.add(number)
         elif kind in ALLOWED_TYPES:
             aggregate["final_type_without_verified_approval"]+=1
@@ -159,5 +168,7 @@ def main():
 if __name__=="__main__":
     try:main()
     except (ValueError,OSError,sqlite3.Error,urllib.error.URLError) as exc:
-        print("FUN_INSPECTION_V8_HOLD="+str(exc)[:160])
+        # Avoid echoing URLs, permit IDs or filesystem paths in errors.
+        reason=str(exc) if isinstance(exc,ValueError) else type(exc).__name__
+        print("FUN_INSPECTION_V8_HOLD="+reason[:120])
         raise SystemExit(1)
