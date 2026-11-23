@@ -185,19 +185,36 @@ def status(db_path):
           'interpretation':'Permit history incomplete; no-match is not evidence of no roof replacement'}
     finally:c.close()
 
-def markets(db_path,*,include_holds=False,limit=60,detail=False):
+def markets(db_path,*,include_holds=False,limit=60,detail=False,county='all',city='',min_age=20,only_no_permit=False):
     path=Path(db_path)
     if not path.is_file():return {'version':VERSION,'state':'NO_DATABASE','rows':[]}
     c=connect(path)
     try:
         if not c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='roofing_selection_candidates_v3'").fetchone():
             return {'version':VERSION,'state':'NOT_RUN','rows':[]}
-        where='' if include_holds else "WHERE disposition='KEEP'"
+        if county not in ('all','Los Angeles','San Bernardino'):
+            raise ValueError('SELECTION_COUNTY_INVALID')
+        if not isinstance(min_age,int) or not 0<=min_age<=120:
+            raise ValueError('SELECTION_AGE_FILTER_INVALID')
+        if not isinstance(city,str) or len(city)>70:
+            raise ValueError('SELECTION_CITY_FILTER_INVALID')
+        rules=["1=1"]; params=[]
+        if not include_holds:rules.append("disposition='KEEP'")
+        if county!='all':
+            rules.append("county=?");params.append(county)
+        if city:
+            rules.append("city LIKE ?");params.append(city+'%')
+        if min_age:
+            rules.append("(year_built IS NULL OR year_built <= ?)")
+            params.append(dt.date.today().year-min_age)
+        if only_no_permit:
+            rules.append("permit_status='NO_MATCH_IN_IMPORTED_PERMIT_HISTORY'")
+        where='WHERE '+' AND '.join(rules)
         if detail:
             rows=c.execute(f"""SELECT county,apn,city,zip,address,year_built,
                last_roof_permit,priority,disposition,reason,permit_status AS status
                FROM roofing_selection_candidates_v3 {where}
-               ORDER BY priority DESC,county,zip LIMIT ?""",(min(100,max(1,limit)),)).fetchall()
+               ORDER BY priority DESC,county,zip LIMIT ?""",(*params,min(100,max(1,limit)))).fetchall()
         else:
             rows=c.execute(f"""SELECT county,city,zip,COUNT(*) AS candidates,
                 SUM(CASE WHEN permit_status='NO_MATCH_IN_IMPORTED_PERMIT_HISTORY'
@@ -207,7 +224,7 @@ def markets(db_path,*,include_holds=False,limit=60,detail=False):
                 ROUND(AVG(priority),1) AS mean_review_priority
                FROM roofing_selection_candidates_v3 {where}
                GROUP BY county,city,zip ORDER BY candidates DESC,mean_review_priority DESC
-               LIMIT ?""",(min(100,max(1,limit)),)).fetchall()
+               LIMIT ?""",(*params,min(100,max(1,limit)))).fetchall()
         return {'version':VERSION,'state':'READY','rows':[dict(r) for r in rows],
             'read_only':True,'completeness':'MUNICIPAL_PERMIT_HISTORY_UNVERIFIED'}
     finally:c.close()
@@ -219,11 +236,17 @@ def main():
     cmds.add_parser('status')
     for cmd in ('markets','candidates'):
         p=cmds.add_parser(cmd);p.add_argument('--include-holds',action='store_true')
+        p.add_argument('--county',default='all')
+        p.add_argument('--city',default='')
+        p.add_argument('--min-age',type=int,default=20)
+        p.add_argument('--only-no-permit',action='store_true')
     p=cmds.add_parser('apply');p.add_argument('--prune-confirmed-exclusions',action='store_true')
     args=parser.parse_args()
     if args.cmd=='apply':out=select(args.db,drop_irrelevant=args.prune_confirmed_exclusions)
     elif args.cmd=='status':out=status(args.db)
-    else:out=markets(args.db,include_holds=args.include_holds,detail=args.cmd=='candidates')
+    else:out=markets(args.db,include_holds=args.include_holds,detail=args.cmd=='candidates',
+      county=args.county,city=args.city,min_age=args.min_age,
+      only_no_permit=args.only_no_permit)
     print(json.dumps(out,sort_keys=True))
 
 if __name__=='__main__':
