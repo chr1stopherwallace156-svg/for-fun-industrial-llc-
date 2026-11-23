@@ -31,7 +31,10 @@ CSV_COLUMNS = (
 def csv_safe(value):
     """Prevent public-data strings from becoming spreadsheet formulas."""
     result = str(value if value is not None else "").replace("\x00", "").replace("\r", " ").replace("\n", " ").strip()
-    if result and result[0] in "=+-@":
+    # In spreadsheet software, original parcel IDs with leading zeros must
+    # remain text. The protective apostrophe also blocks formula execution.
+    if result and (result[0] in "=+-@" or
+                   (len(result) > 1 and result[0] == "0" and result.isdecimal())):
         return "'" + result
     return result
 
