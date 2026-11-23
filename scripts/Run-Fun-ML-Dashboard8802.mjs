@@ -333,6 +333,7 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         const minBuildingAge=integer('minBuildingAge',25);
         const permitKind=u.searchParams.get('permitKind')||'roof_related';
         if(zips.length>60||!/^\d{5}(,\d{5}){0,9}$/.test(zips)||
+          new Set(zips.split(',')).size!==zips.split(',').length||
           !Number.isSafeInteger(years)||years<10||years>50||
           !Number.isSafeInteger(recentYears)||recentYears<1||recentYears>10||
           recentYears>=years||!Number.isSafeInteger(minBuildingAge)||
