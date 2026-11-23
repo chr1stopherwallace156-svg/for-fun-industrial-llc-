@@ -202,7 +202,7 @@ def main():
                   host_free_before_gib=round(before,2), host_free_after_gib=round(free_ram_gib(),2),
                   actual_peak_vram_bytes=None,
                   max_host_memory_usage_verified=False,
-                  model_training_not_started=True)
+                  full_qwen_model_training_not_started=True)
     print(json.dumps(result, sort_keys=True))
 
 
