@@ -36,7 +36,7 @@ class TestDeterministicProofV103(unittest.TestCase):
         o=m.oracle(self.case(40,40,40))
         self.assertEqual(o["expected"]["BEST_WINDOWS"],(3,5,8))
         self.assertTrue(o["expected"]["TIE"])
-        self.assertEqual(o["expected"]["D35"],0)
+        self.assertEqual(o["expected"]["PROOF_D35"],0)
         self.assertEqual(o["expected"]["D38"],0)
         self.assertEqual(o["expected"]["D58"],0)
 
