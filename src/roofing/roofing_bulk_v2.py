@@ -300,11 +300,24 @@ def rebuild(args):
     seen = 0
     while rows := cursor.fetchmany(1500):
         for r in rows:
-            by_apn = c.execute("SELECT MAX(issue_date) AS d FROM permits WHERE county=? AND apn=? AND
-             source_id IN (SELECT source_id FROM source_runs WHERE state='INGESTED_NOT_COMPLETENESS_VERIFIED')", (r["county"],r["apn"])).fetchone()["d"] if not r["apn"].startswith("ADDRESS-") else None
-            by_address = c.execute("SELECT MAX(issue_date) AS d FROM permits WHERE county=? AND zip=? AND address_key=? AND
-                                   source_id IN (SELECT source_id FROM source_runs WHERE state='INGESTED_NOT_COMPLETENESS_VERIFIED')", 
-                                   (r["county"],r["zip"],r["address_key"])).fetchone()["d"] if r["zip"] and r["address_key"] else None
+            by_apn = c.execute(
+                """SELECT MAX(issue_date) AS d FROM permits
+                   WHERE county=? AND apn=?
+                   AND source_id IN (
+                      SELECT source_id FROM source_runs
+                      WHERE state='INGESTED_NOT_COMPLETENESS_VERIFIED'
+                   )""",
+                (r["county"], r["apn"]),
+            ).fetchone()["d"] if not r["apn"].startswith("ADDRESS-") else None
+            by_address = c.execute(
+                """SELECT MAX(issue_date) AS d FROM permits
+                   WHERE county=? AND zip=? AND address_key=?
+                   AND source_id IN (
+                      SELECT source_id FROM source_runs
+                      WHERE state='INGESTED_NOT_COMPLETENESS_VERIFIED'
+                   )""",
+                (r["county"], r["zip"], r["address_key"]),
+            ).fetchone()["d"] if r["zip"] and r["address_key"] else None
             permit = max(filter(None,(by_apn,by_address)),default=None)
             year = r["year_built"]
             age = current_year-year if year else None
