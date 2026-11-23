@@ -140,7 +140,7 @@ class RoofingLocationExportTests(unittest.TestCase):
         self.assertTrue(all(p["address"].endswith("OAK ST") for p in ps))
         self.assertFalse(any("owner" in k or "email" in k or "phone" in k
                       for k in ps[0]))
-         self.assertEqual(before,self.db.read_bytes())
+        self.assertEqual(before,self.db.read_bytes())
 
     def test_incomplete_source_and_invalid_age_hold(self):
         with self.assertRaisesRegex(ValueError,"BUILDING_AGE_MUST_BE_20_TO_100"):
