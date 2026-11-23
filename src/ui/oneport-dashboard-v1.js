@@ -73,7 +73,8 @@ function show(){
    }else if(frame.dataset.loaded==='true'){
     try{frame.contentWindow?.location.replace('#')}catch{}
    }
-  }else if(view.type==='procurement')frame=safeFrame('procurement','/procurement/','Procurement Evidence');
+  }else if(view.type==='procurement'){
+   frame=safeFrame('procurement','/procurement/','Procurement Evidence');
   }else if(view.type==='chat')frame=safeFrame('chat','/chat/?embedded=1','Local AI Chat · Qwen + FISRE');
   else if(view.type==='tools')frame=safeFrame('tools','/unified/?view=tools&embedded=1','Tools & REA review');
   else if(view.type==='reasoning')frame=safeFrame('reasoning','/fisre/?embedded=1','Semantic Reasoning');
