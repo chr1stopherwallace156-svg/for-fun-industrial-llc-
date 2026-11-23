@@ -172,12 +172,25 @@ def resume():
         raise RuntimeError("V8_NONZERO_LORA_NOT_VERIFIED")
     if audit["adapter_sha256"]==EXPECTED_V5_SHA:
         raise RuntimeError("V8_TRAINED_ADAPTER_IDENTICAL_TO_START")
+    source_b=v6.inspect_adapter(V5_LORA,EXPECTED_V5_SHA)["learned_b_tensors"]
     for name, b in audit["learned_b_tensors"].items():
-        prior=source_b = v6.inspect_adapter(V5_LORA,EXPECTED_V5_SHA)["learned_b_tensors"][name]
+        prior=source_b[name]
         if abs(b["max_abs"]-prior["max_abs"])<1e-12 and abs(b["l2_norm"]-prior["l2_norm"])<1e-12:
             # A hash change could be metadata-only; B tensor changes
             # provide direct evidence of adapter learning.
             raise RuntimeError("V8_NO_MEASURABLE_B_TENSOR_CHANGE_"+name)
+    # Verify the original input checkpoint triplet, original GGUF and
+    # training slice remain byte-identical after the isolated child finished.
+    for original in check["original_resume_files"]:
+        p=V5_LORA if original["name"]==V5_LORA.name else (
+            Path(str(V5_LORA)+".opt") if original["name"].endswith(".opt")
+            else Path(str(V5_LORA)+".state"))
+        if digest(p)!=original["sha256"]:
+            raise RuntimeError("V8_ORIGINAL_CHECKPOINT_CHANGED_"+original["name"])
+    if digest(v5.LIVE_GGUF)!=EXPECTED_GGUF_SHA:
+        raise RuntimeError("V8_OFFICIAL_QWEN_GGUF_CHANGED")
+    if digest(TRAIN_FILE)!=EXPECTED_DATA_SHA:
+        raise RuntimeError("V8_ORIGINAL_TRAINING_SLICE_CHANGED")
     result={"version":VERSION,
             "state":"PASS_REAL_QWEN_LORA_V8_CONTINUED_CANDIDATE_NOT_DEPLOYED",
             "source_adapter_sha256":EXPECTED_V5_SHA,
