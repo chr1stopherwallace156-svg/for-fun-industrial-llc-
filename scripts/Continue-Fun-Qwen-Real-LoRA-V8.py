@@ -83,9 +83,21 @@ def verify_v5():
     if state["epoch"]!=0 or not (1 <= state["datapoints_done"] <= 32):
         raise RuntimeError("V5_RESUME_POSITION_UNEXPECTED")
     dataset=v5.dataset_verified()
-    slice_info=v5.write_small_training_slice(dataset,TRAIN_FILE)
-    if slice_info["sha256"]!=EXPECTED_DATA_SHA or slice_info["records"]!=30:
+    if not TRAIN_FILE.is_file() or TRAIN_FILE.is_symlink() or TRAIN_FILE.stat().st_size>100_000:
+        raise RuntimeError("ORIGINAL_TRAINING_SLICE_MISSING_OR_UNTRUSTED")
+    # Verify byte identity with V5 WITHOUT creating or replacing any file
+    # during either preflight or training.
+    with TRAIN_FILE.open("rb") as f:
+        slice_data=f.read(100_001)
+    if hashlib.sha256(slice_data).hexdigest()!=EXPECTED_DATA_SHA:
         raise RuntimeError("ORIGINAL_TRAINING_SLICE_NOT_SAME_AS_V5")
+    rows=[json.loads(line) for line in slice_data.decode("utf-8").splitlines()]
+    if len(rows)!=30 or any(set(row)!={"messages"} for row in rows):
+        raise RuntimeError("ORIGINAL_TRAINING_SLICE_STRUCTURE_INVALID")
+    train_prompts={r["messages"][0]["content"] for r in dataset["train"]}
+    if any(r["messages"][0]["content"] not in train_prompts for r in rows):
+        raise RuntimeError("ORIGINAL_TRAINING_SLICE_NOT_TRAIN_DATA")
+    slice_info={"sha256":EXPECTED_DATA_SHA,"records":len(rows)}
     if not TRAINER.is_file() or TRAINER.is_symlink():
         raise RuntimeError("ORIGINAL_PINNED_LLAMA_FINETUNE_BINARY_MISSING")
     return {"official_gguf_sha256":model_hash,
