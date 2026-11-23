@@ -66,6 +66,8 @@ function PreviewReady(){
  if(!$h){return $false}
  $roof=Json 'http://127.0.0.1:8802/api/fun/roofing/status'
  $bulk=Json 'http://127.0.0.1:8802/api/fun/roofing/bulk/status'
+ $procPage=$null
+ try{$procPage=Invoke-WebRequest 'http://127.0.0.1:8802/procurement/' -UseBasicParsing -TimeoutSec 6}catch{}
  $roofPage=$null
  try{$roofPage=Invoke-WebRequest 'http://127.0.0.1:8802/roofing/bulk/' -UseBasicParsing -TimeoutSec 6}catch{}
  return ($h.StatusCode -eq 200 -and
@@ -77,7 +79,9 @@ function PreviewReady(){
   $null -ne $bulk -and $bulk.version -ceq 'fun-roofing-bulk-v2' -and
   $bulk.automatedOutreach -eq 0 -and $bulk.elektronTouched -eq $false -and
   $null -ne $roofPage -and $roofPage.StatusCode -eq 200 -and
-  $roofPage.Headers['x-fi-roofing-version'] -ceq 'fun-roofing-bulk-v2')
+  $roofPage.Headers['x-fi-roofing-version'] -ceq 'fun-roofing-bulk-v2' -and
+  $null -ne $procPage -and $procPage.StatusCode -eq 200 -and
+  $procPage.Headers['x-fi-procurement-view'] -ceq 'fun-procurement-focus-v1')
 }
 function GatewayReady(){
  $l=@(Get-NetTCPConnection -State Listen -LocalPort 8443 -ErrorAction SilentlyContinue)
@@ -175,6 +179,7 @@ Write-Host 'FUN_ORGANIZED_UI=http://127.0.0.1:8802/ui-preview/'
 Write-Host 'FUN_CHAT=http://127.0.0.1:8802/ui-preview/#chat'
 Write-Host 'FUN_RESEARCH=http://127.0.0.1:8802/math/v3/'
 Write-Host 'FUN_ROOFING_BULK_V2_URL=http://127.0.0.1:8802/roofing/bulk/'
+Write-Host 'FUN_PROCUREMENT_URL=http://127.0.0.1:8802/procurement/'
 if($Issues.Count -eq 0){Write-Host 'FUN_INDUSTRIAL_EVERYTHING=PASS'}
 else{
  Write-Warning ('FUN_INDUSTRIAL_EVERYTHING=PARTIAL CHECKS='+$Issues.Count)
