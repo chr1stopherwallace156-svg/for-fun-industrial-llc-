@@ -74,11 +74,11 @@ function GatewayReady(){
  $l=@(Get-NetTCPConnection -State Listen -LocalPort 8443 -ErrorAction SilentlyContinue)
  return $l.Count -gt 0
 }
-function RunStep([string]$name,[string]$file,[string[]]$args){
+function RunStep([string]$name,[string]$file,[string[]]$stepArgs){
  try{
   ScriptFile $file
   Write-Host ('FUN_EVERYTHING_STARTING='+$name)
-  $parameters=@('-NoProfile','-ExecutionPolicy','Bypass','-File',$file)+$args
+  $parameters=@('-NoProfile','-ExecutionPolicy','Bypass','-File',$file)+$stepArgs
   & powershell.exe @parameters
   if($LASTEXITCODE -ne 0){throw ('STEP_EXIT_'+$LASTEXITCODE)}
   Write-Host ('FUN_EVERYTHING_STEP_'+$name+'=PASS')
