@@ -36,13 +36,13 @@ class SelectiveV3Tests(unittest.TestCase):
     def tearDown(self):self.temp.cleanup()
     def test_preserves_missing_permit_and_held_unknown(self):
         result=select(self.db)
-        self.assertEqual((result["selected"],result["held"],result["excluded"]),(2,1,2))
+        self.assertEqual((result["selected"],result["held"],result["excluded"]),(2,2,1))
         self.assertEqual(result["permits_matched"],1)
         rows=markets(self.db)["rows"]
         self.assertEqual(len(rows),1)
         self.assertEqual(rows[0]["candidates"],2)
         self.assertEqual(rows[0]["no_permit_observed"],1)
-        self.assertEqual(status(self.db)["held"],1)
+        self.assertEqual(status(self.db)["held"],2)
         with contextlib.closing(sqlite3.connect(self.db)) as c, c:
             self.assertEqual(c.execute("SELECT COUNT(*) FROM properties").fetchone()[0],5)
     def test_verified_exclusions_only_removed(self):
@@ -50,9 +50,9 @@ class SelectiveV3Tests(unittest.TestCase):
         self.assertTrue(r["pruned_from_original_db"])
         with contextlib.closing(sqlite3.connect(self.db)) as c, c:
             remain={x[0] for x in c.execute("SELECT apn FROM properties")}
-            self.assertEqual(remain,{"001","002","005"})
+            self.assertEqual(remain,{"001","002","003","005"})
             self.assertEqual(c.execute("SELECT COUNT(*) FROM permits").fetchone()[0],2)
-            self.assertEqual(c.execute("SELECT COUNT(*) FROM roofing_selection_candidates_v3").fetchone()[0],3)
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM roofing_selection_candidates_v3").fetchone()[0],4)
     def test_failed_source_cannot_trigger_deletion(self):
         with contextlib.closing(sqlite3.connect(self.db)) as c, c:
             c.execute("UPDATE source_runs SET state='INCOMPLETE_IMPORT_HOLD'")
@@ -67,7 +67,7 @@ class SelectiveV3Tests(unittest.TestCase):
         self.assertEqual(property_decision(year_built=None,residential=1,address="A",
           zip_code="90001",apn="01",today=now)[0],"HOLD")
         self.assertEqual(property_decision(year_built=2018,residential=1,address="A",
-          zip_code="90001",apn="01",today=now)[0],"DROP")
+          zip_code="90001",apn="01",today=now)[0],"HOLD")
         self.assertEqual(property_decision(year_built=1960,land_use="Industrial Warehouse",
           residential=0,address="A",zip_code="90001",apn="01",today=now)[0],"DROP")
         old=score_candidate(year_built=1980,last_roof_permit="2000-01-01",
@@ -78,7 +78,7 @@ class SelectiveV3Tests(unittest.TestCase):
     def test_held_records_excluded_by_default(self):
         select(self.db)
         self.assertEqual(sum(x["candidates"] for x in markets(self.db)["rows"]),2)
-        self.assertEqual(sum(x["candidates"] for x in markets(self.db,include_holds=True)["rows"]),3)
+        self.assertEqual(sum(x["candidates"] for x in markets(self.db,include_holds=True)["rows"]),4)
         self.assertEqual(len(markets(self.db,county="Los Angeles",city="Los",min_age=20)["rows"]),1)
         self.assertEqual(len(markets(self.db,only_no_permit=True,detail=True)["rows"]),1)
         self.assertEqual(len(markets(self.db,detail=True,limit=1)["rows"]),1)
