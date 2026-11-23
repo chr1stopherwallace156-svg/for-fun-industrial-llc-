@@ -88,10 +88,13 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
     # Keep only a bounded handful of *research examples*, not a separate
     # contactable target database. Public APN is an identifier, not a roof age.
     examples_heap=[]
+    # At most five distinct qualifying street blocks retained per requested ZIP.
+    best_blocks=defaultdict(list)
     out=defaultdict(lambda:{"eligible_properties_no_recent_exact_apn_permit":0,
         "candidates_with_enough_age_similar_street_block_peers":0,
         "candidates_with_at_least_two_recent_peer_permits":0,
         "blocks_with_qualifying_age_cohort":set(),
+        "blocks_with_two_or_more_recent_peer_permits":set(),
         "peer_permits_across_candidate_windows":0,
         "peers_across_candidate_windows":0})
     for (z,street,num),group in blocks.items():
@@ -100,6 +103,8 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
         recent_flags=[1 if apn in recent_by_zip[z] else 0 for _,apn in group]
         prefix=[0]
         for flag in recent_flags:prefix.append(prefix[-1]+flag)
+        strong_subjects=0
+        eligible_subjects=0
         for i,(year,apn) in enumerate(group):
             if apn in recent_by_zip[z]:
                 continue
@@ -111,16 +116,40 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
             if peers<min_peers:continue
             recent_peer_count=prefix[hi]-prefix[lo] # candidate itself is not recent
             target["candidates_with_enough_age_similar_street_block_peers"]+=1
+            eligible_subjects+=1
             target["peers_across_candidate_windows"]+=peers
             target["peer_permits_across_candidate_windows"]+=recent_peer_count
             target["blocks_with_qualifying_age_cohort"].add((street,num))
             if recent_peer_count>=2:
                 target["candidates_with_at_least_two_recent_peer_permits"]+=1
+                strong_subjects+=1
+                target["blocks_with_two_or_more_recent_peer_permits"].add((street,num))
                 # Prefer multiple independently recorded neighbor parcels and
                 # relatively dense peer cohorts, deterministically by APN.
                 example=(recent_peer_count,round(recent_peer_count/peers,5),z,str(apn),year,peers)
                 if len(examples_heap)<25:heappush(examples_heap,example)
                 elif example>examples_heap[0]:heapreplace(examples_heap,example)
+        if strong_subjects:
+            recent_count=sum(recent_flags)
+            count=len(group)
+            block={
+                "zip":z,"street_number_block":f"{num*100}-{num*100+99} {street}",
+                "distinct_selected_old_parcels_in_block":count,
+                "distinct_recent_exact_apn_permit_parcels_in_block":recent_count,
+                "qualifying_age_similar_subjects":eligible_subjects,
+                "subjects_with_two_or_more_recent_peer_permits":strong_subjects,
+                "construction_year_min":years_list[0],
+                "construction_year_max":years_list[-1],
+                "not_verified_actual_geographic_adjacent_homes":True,
+                "not_evidence_of_leak_or_roof_failure":True,
+            }
+            # Count a 100-number block ONCE, regardless of how many
+            # overlapping subject windows qualify within that block.
+            value=(strong_subjects,recent_count,round(recent_count/count,5),
+                   street,num,block)
+            heap=best_blocks[z]
+            if len(heap)<5:heappush(heap,value)
+            elif value>heap[0]:heapreplace(heap,value)
     results={}
     for z in zips:
         x=out[z]
@@ -147,6 +176,9 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
                 x["candidates_with_at_least_two_recent_peer_permits"],
             "blocks_with_qualifying_age_cohort":
                 len(x["blocks_with_qualifying_age_cohort"]),
+            "unique_street_blocks_with_two_or_more_age_matched_recent_peer_permits":
+                len(x["blocks_with_two_or_more_recent_peer_permits"]),
+            "candidate_windows_not_independent_street_blocks":True,
             "age_matched_peer_permit_window_share_pct":
                 round(peer_share,2) if peer_share is not None else None,
             "zip_referenced_recent_apn_permit_share_pct":
@@ -165,8 +197,13 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
          "physical_distance_measured":False,
         } for recent_count,rate,z,apn,year,peers
           in sorted(examples_heap,reverse=True)]
+    unique_block_examples={
+        z:[entry[-1] for entry in sorted(best_blocks[z],reverse=True)]
+        for z in zips
+    }
     return {"version":VERSION,
        "public_research_examples":limited_examples,
+       "distinct_block_research_examples":unique_block_examples,
        "formula_c_neighborhood_context":{
            "window":"street_number_100_block_not_actual_geographic_distance",
            "not_able_to_infer_leaks_or_worn_shingles":True,
