@@ -40,6 +40,18 @@ if($existing.Count -gt 0 -and $state.selection.state -eq 'READY'){
  Write-Host 'FUN_REALDATA_NO_REDUNDANT_DOWNLOAD=TRUE'
  exit 0
 }
+# Previously downloaded official file: inspect only CSV header names, not records.
+$archiveDir=Join-Path (Join-Path $env:LOCALAPPDATA 'FunIndustrial\RoofingBulkV2') 'official_downloads'
+$extension=if($Source -eq 'la_assessor_2021_2025'){'zip'}elseif($Source -like 'la_permits_*'){'csv'}else{''}
+if($extension){
+ $cached=Join-Path $archiveDir ($Source+'.'+$extension)
+ if(Test-Path -LiteralPath $cached -PathType Leaf){
+  Write-Host ('FUN_REALDATA_REUSE_CACHED_ARCHIVE_BYTES='+(Get-Item -LiteralPath $cached).Length)
+  $py=(Get-Command python.exe -ErrorAction Stop).Source
+  & $py -B (Join-Path $Root 'src\roofing\roofing_bulk_v2.py') inspect --file $cached
+  if($LASTEXITCODE -ne 0){throw 'FUN_REALDATA_CACHED_SOURCE_SCHEMA_HOLD'}
+ }
+}
 $body=@{source=$Source}|ConvertTo-Json -Compress
 $headers=@{'Origin'=$Base;'x-fi-roofing-bulk-click'='operator-sync-full-export'}
 $params=@{Method='Post';Uri=($Base+'/api/fun/roofing/bulk/sync');
