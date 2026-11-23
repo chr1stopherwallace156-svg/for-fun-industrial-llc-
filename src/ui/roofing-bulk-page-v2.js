@@ -133,14 +133,14 @@ async function renderParallelFormulas(){
  const sampleBody=$('formula-samples');sampleBody.replaceChildren();
  for(const item of result.public_parcel_id_examples||[]){
   const row=node('tr');
-  for(const value of [item.zip,item.apn,item.last_roof_related_permit,
+  for(const value of [item.zip,item.apn,item.formula_a_existing_priority??'Unknown',item.last_roof_related_permit,
        item.years_since_last_recorded_permit,
        item.recent_long_gap_repeat_observed?'Yes — permit records only':'No']){
     row.append(node('td',value));
   }
   sampleBody.append(row);
  }
- if(!sampleBody.childElementCount){const tr=node('tr'),td=node('td','No older permit examples found in the selected markets');td.colSpan=5;tr.append(td);sampleBody.append(tr)}
+ if(!sampleBody.childElementCount){const tr=node('tr'),td=node('td','No older permit examples found in the selected markets');td.colSpan=6;tr.append(td);sampleBody.append(tr)}
  display('formula-note','Both mathematical methods calculated from four imported official sources. '
   +'Formula A is unchanged; Formula B uses exact parcel ID matches for a '+years
   +'-year historical interval and '+recentYears
