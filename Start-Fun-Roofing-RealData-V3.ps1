@@ -45,6 +45,21 @@ $archiveDir=Join-Path (Join-Path $env:LOCALAPPDATA 'FunIndustrial\RoofingBulkV2'
 $extension=if($Source -eq 'la_assessor_2021_2025'){'zip'}elseif($Source -like 'la_permits_*'){'csv'}else{''}
 if($extension){
  $cached=Join-Path $archiveDir ($Source+'.'+$extension)
+ # Python on some Windows hosts uses an OpenSSL CA store that cannot verify
+ # official LA City's certificate. Fetch the fixed public CSV with Windows'
+ # native certificate validation before letting the Python importer reuse it.
+ if($Source -like 'la_permits_*' -and
+    -not(Test-Path -LiteralPath $cached -PathType Leaf)){
+  $windowsDownload=Join-Path $Root 'Download-Fun-LACity-Permits-WindowsTLS-V1.ps1'
+  if(-not(Test-Path -LiteralPath $windowsDownload -PathType Leaf)){
+   throw 'FUN_LACITY_WINDOWS_TLS_DOWNLOADER_MISSING'
+  }
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $windowsDownload -Source $Source
+  if($LASTEXITCODE -ne 0){
+   throw 'FUN_LACITY_WINDOWS_CERT_VERIFIED_DOWNLOAD_FAILED_NO_IMPORT_STARTED'
+  }
+  Write-Host 'FUN_LACITY_WINDOWS_TLS_DOWNLOAD=COMPLETED_IMPORT_STILL_PENDING'
+ }
  if(Test-Path -LiteralPath $cached -PathType Leaf){
   Write-Host ('FUN_REALDATA_REUSE_CACHED_ARCHIVE_BYTES='+(Get-Item -LiteralPath $cached).Length)
   $py=(Get-Command python.exe -ErrorAction Stop).Source
