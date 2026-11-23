@@ -370,6 +370,33 @@ status categories, ambiguity, COFO nonfinal inconsistency, future/invalid
 status date and refusal to copy private fields into output. The normal
 one-port service and Elektron are not affected by an audit.
 
+## Historical inspection eligibility cutoff after 12 newest permits had no matches
+
+The initial V8 12-permit sample across 90037, 90049, 90731 and 90011
+was uniformly issued in November 2026. All 12 permit numbers passed the
+local format gate, but none matched the separately published inspections
+dataset. This is **not** evidence that the permits were never inspected:
+inspection data can lag recent issuance. A direct identifier mismatch or
+source coverage issue also remains possible.
+
+Use `--issued-before 2026-10-01` to select the latest eligible permits
+with issue dates **on or before 2026-09-30**, without changing the default
+V8 sample. This is an **exclusive** date boundary. The existing five-year
+lower bound stays in effect. Historical results remain a convenience
+sample, not a coverage estimate or proof of completion.
+
+For the exact same masked ID-shape and issuance-month diagnostic, the
+read-only `diagnose_inspection_permit_shapes_v8.py` also accepts
+`--issued-before 2026-10-01`. Neither script rewrites the original
+SQLite database, dashboard, or roof-neighborhood formulas. The remote
+probe continues to use only the fixed verified HTTPS source, strict
+permit-ID matching, limited rows and data size, and no row persistence.
+
+Run both sequentially, if desired (read-only, one command line):
+```powershell
+$r=Join-Path $HOME 'FunIndustrial-Roofing-Bulk-V2';$db=Join-Path $env:LOCALAPPDATA 'FunIndustrial\RoofingBulkV2\roofing.sqlite3';& python.exe -B (Join-Path $r 'src\roofing\diagnose_inspection_permit_shapes_v8.py') --db $db --per-zip 3 --issued-before 2026-10-01;if($LASTEXITCODE -ne 0){throw 'HISTORICAL_SHAPE_HOLD'};& python.exe -B (Join-Path $r 'src\roofing\probe_ladbs_inspections_v8.py') --db $db --per-zip 3 --issued-before 2026-10-01
+```
+
 ## V8 — independent LA building-inspection matching preflight
 
 The official LA City Building and Safety Inspections dataset
