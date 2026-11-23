@@ -73,8 +73,12 @@ def base_identity(base_dir):
     # Qwen3-4B differs from Qwen3-4B-Instruct-2507 and other Qwen revisions.
     # Reject non-Qwen3 family and smaller base checkpoints. User must verify
     # their GGUF provenance/revision before attempting adapter conversion.
-    if config.get("model_type") != "qwen3" or int(config.get("num_hidden_layers", 0)) < 30 or \
-            int(config.get("hidden_size", 0)) < 2000:
+    # Match Qwen/Qwen3-4B's published dimensions; matching dimensions alone
+    # are NOT evidence that the running GGUF uses the same model revision.
+    expected = {"model_type": "qwen3", "num_hidden_layers": 36,
+                "hidden_size": 2560, "num_attention_heads": 32,
+                "num_key_value_heads": 8, "vocab_size": 151936}
+    if any(config.get(k) != v for k, v in expected.items()):
         return {"state": "BASE_MODEL_ARCHITECTURE_UNEXPECTED"}
     index = root / "model.safetensors.index.json"
     if index.exists():
