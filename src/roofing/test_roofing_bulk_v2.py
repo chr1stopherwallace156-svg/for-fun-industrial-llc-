@@ -181,6 +181,98 @@ class RoofingBulkTests(unittest.TestCase):
             record=c.execute("SELECT apn,year_built,zip,address FROM properties").fetchone()
         self.assertEqual(record,("0012345678",1984,"90001","100 SAMPLE ST"))
 
+    def test_conflicting_assessor_zips_use_only_explicit_situs_zip(self):
+        import csv
+        path=self.root/"conflicting_zip_situs.csv"
+        with path.open("w",encoding="utf-8",newline="") as out:
+            w=csv.writer(out)
+            w.writerow(["AIN","Property Location","ZIP CODE","ZIP_CODE",
+                        "Year Built","Property Use Type","Roll Year"])
+            w.writerow(["0001002003","100 SAMPLE ST, LOS ANGELES, CA 90001",
+                        "90001","90210","1984","Single Family Residential","2025"])
+        result=self.ingest(str(path),"municipal_la_zip_situs_fixture","la_properties")
+        self.assertEqual(result["accepted"],1)
+        self.assertEqual(result["zip_column_conflict_rows"],1)
+        self.assertEqual(result["zip_recovered_from_property_location"],1)
+        self.assertEqual(result["zip_held_unknown"],0)
+        with self.connect() as db:
+            data=db.execute("SELECT apn,address,zip FROM properties").fetchone()
+        self.assertEqual(data,("0001002003","100 SAMPLE ST","90001"))
+        selected=roof.materialize_roof_targets(self.db,drop_irrelevant=False)
+        self.assertEqual(selected["selected"],1)
+
+    def test_unverified_zip_is_held_and_not_used_for_permit_matching(self):
+        import csv
+        path=self.root/"conflicting_zip_without_situs.csv"
+        with path.open("w",encoding="utf-8",newline="") as out:
+            w=csv.writer(out)
+            w.writerow(["AIN","Property Location","City","ZIP CODE","ZIP_CODE",
+                        "Year Built","Property Use Type","Roll Year"])
+            w.writerow(["0001002003","100 SAMPLE ST","Los Angeles",
+                        "90001","90210","1984","Single Family Residential","2025"])
+        result=self.ingest(str(path),"municipal_la_zip_hold_fixture","la_properties")
+        self.assertEqual(result["accepted"],1)
+        self.assertEqual(result["zip_column_conflict_rows"],1)
+        self.assertEqual(result["zip_recovered_from_property_location"],0)
+        self.assertEqual(result["zip_held_unknown"],1)
+        with self.connect() as db:
+            self.assertEqual(db.execute("SELECT zip FROM properties").fetchone()[0],"")
+        selection=roof.materialize_roof_targets(self.db,drop_irrelevant=False)
+        self.assertEqual(selection["selected"],0)
+        self.assertEqual(selection["held"],1)
+
+    def test_same_zip_five_digits_and_zip_four_agree(self):
+        import csv
+        path=self.root/"equivalent_zip_formats.csv"
+        with path.open("w",encoding="utf-8",newline="") as out:
+            w=csv.writer(out)
+            w.writerow(["AIN","Property Location","ZIP CODE","ZIP_CODE",
+                        "Year Built","Property Use Type"])
+            w.writerow(["0001002003","100 SAMPLE ST","90001","90001-1234",
+                        "1984","Single Family Residential"])
+        result=self.ingest(str(path),"municipal_la_zip_format_fixture","la_properties")
+        self.assertEqual(result["zip_column_conflict_rows"],0)
+        with self.connect() as db:
+            self.assertEqual(db.execute("SELECT zip FROM properties").fetchone()[0],"90001")
+
+    def test_permit_zip_conflict_still_fails_to_prevent_false_match(self):
+        import csv
+        path=self.root/"conflicting_permit_zips.csv"
+        with path.open("w",encoding="utf-8",newline="") as out:
+            w=csv.writer(out)
+            w.writerow(["Permit Nbr","Primary Address","ZIP CODE","ZIP_CODE",
+                        "Issue Date","Work Desc"])
+            w.writerow(["P001","100 SAMPLE ST","90001","90210",
+                        "2020-01-01","REROOF"])
+        with self.assertRaisesRegex(ValueError,"CSV_CRITICAL_DUPLICATE_CONFLICT_zip_code"):
+            self.ingest(str(path),"municipal_la_permit_zip_conflict_fixture",
+                        "municipal_permits","Los Angeles","Los Angeles")
+        with self.connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM permits").fetchone()[0],0)
+
+    def test_large_assessor_zip_uncertainty_is_hold_not_source_failure(self):
+        import csv
+        path=self.root/"conflicting_zips_many_rows.csv"
+        with path.open("w",encoding="utf-8",newline="") as out:
+            w=csv.writer(out)
+            w.writerow(["AIN","Property Location","City","ZIP CODE","ZIP_CODE",
+                        "Year Built","Property Use Type"])
+            for i in range(125):
+                w.writerow([str(i+123456).zfill(10),str(i+100)+" SAMPLE ST",
+                            "Los Angeles","90001","90210","1975",
+                            "Single Family Residential"])
+        result=self.ingest(str(path),"municipal_la_many_zip_conflict_fixture","la_properties")
+        self.assertEqual(result["accepted"],125)
+        self.assertEqual(result["zip_column_conflict_rows"],125)
+        self.assertEqual(result["zip_held_unknown"],125)
+        with self.connect() as db:
+            coverage=db.execute("SELECT coverage FROM source_runs WHERE source_id=?",
+                ("municipal_la_many_zip_conflict_fixture",)).fetchone()[0]
+        self.assertIn("VALID_SITE_ZIP_ROWS=0",coverage)
+        selection=roof.materialize_roof_targets(self.db,drop_irrelevant=False)
+        self.assertEqual(selection["selected"],0)
+        self.assertEqual(selection["held"],125)
+
     def test_conflicting_duplicate_assessor_field_is_held_not_guessed(self):
         import csv
         path=str(self.root/"duplicate_conflict.csv")
