@@ -1,4 +1,5 @@
 """Realistic offline tests: bounded selected targets, held unknowns and safe pruning."""
+import contextlib
 import datetime as dt
 import sqlite3
 import tempfile
@@ -11,7 +12,7 @@ class SelectiveV3Tests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()
         self.db=Path(self.temp.name)/"roofing.sqlite3"
-        with sqlite3.connect(self.db) as c:
+        with contextlib.closing(sqlite3.connect(self.db)) as c, c:
             c.executescript("""CREATE TABLE properties(
               county TEXT,apn TEXT,city TEXT,zip TEXT,address TEXT,address_key TEXT,
               year_built INTEGER,residential INTEGER,use_label TEXT,roll_year INTEGER,
@@ -42,22 +43,22 @@ class SelectiveV3Tests(unittest.TestCase):
         self.assertEqual(rows[0]["candidates"],2)
         self.assertEqual(rows[0]["no_permit_observed"],1)
         self.assertEqual(status(self.db)["held"],1)
-        with sqlite3.connect(self.db) as c:
+        with contextlib.closing(sqlite3.connect(self.db)) as c, c:
             self.assertEqual(c.execute("SELECT COUNT(*) FROM properties").fetchone()[0],5)
     def test_verified_exclusions_only_removed(self):
         r=select(self.db,drop_irrelevant=True)
         self.assertTrue(r["pruned_from_original_db"])
-        with sqlite3.connect(self.db) as c:
+        with contextlib.closing(sqlite3.connect(self.db)) as c, c:
             remain={x[0] for x in c.execute("SELECT apn FROM properties")}
             self.assertEqual(remain,{"001","002","005"})
             self.assertEqual(c.execute("SELECT COUNT(*) FROM permits").fetchone()[0],2)
             self.assertEqual(c.execute("SELECT COUNT(*) FROM roofing_selection_candidates_v3").fetchone()[0],3)
     def test_failed_source_cannot_trigger_deletion(self):
-        with sqlite3.connect(self.db) as c:
+        with contextlib.closing(sqlite3.connect(self.db)) as c, c:
             c.execute("UPDATE source_runs SET state='INCOMPLETE_IMPORT_HOLD'")
         with self.assertRaisesRegex(ValueError,"NO_COMPLETED_SOURCE"):
             select(self.db,drop_irrelevant=True)
-        with sqlite3.connect(self.db) as c:
+        with contextlib.closing(sqlite3.connect(self.db)) as c, c:
             self.assertEqual(c.execute("SELECT COUNT(*) FROM properties").fetchone()[0],5)
     def test_policy_rejects_only_proven_outside_scope(self):
         now=dt.date(2026,11,23)
