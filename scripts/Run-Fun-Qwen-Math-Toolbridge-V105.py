@@ -69,8 +69,9 @@ def select_unseen_validation():
         prompt=user["content"]
         label=answer["content"]
         ident="v10-validation-"+str(i)
-        parsed=v104.checked_errors(v10.argmin_set({3:0,5:0,8:0}) and
-                                   v103_parse(prompt)) # typed from trusted prompt
+        # Trusted validation record is the authority. Qwen's generated text
+        # never supplies input numbers to the deterministic oracle.
+        parsed=v104.checked_errors(v103_parse(prompt))
         oracle_errors={int(w):v for w,v in oracle["errors"].items()}
         if parsed!=oracle_errors or oracle.get("question")!=prompt or \
            tuple(oracle.get("best_windows",[]))!=v10.argmin_set(parsed) or \
