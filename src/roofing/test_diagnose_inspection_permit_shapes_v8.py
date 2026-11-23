@@ -70,6 +70,20 @@ class PermitShapeDiagnosticTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"INSPECTION_SHAPE_SOURCE_NOT_COMPLETED"):
             diag.report(self.db,today=TODAY)
 
+    def test_historical_cutoff_uses_same_selection_window_as_inspection_probe(self):
+        with contextlib.closing(sqlite3.connect(self.db)) as conn,conn:
+            conn.execute("UPDATE permits SET issue_date='2026-11-07' WHERE apn='P2' "
+                         "AND roof_class='REPLACEMENT_LIKE'")
+        current=diag.report(self.db,today=TODAY,per_zip=3)
+        older=diag.report(self.db,today=TODAY,per_zip=3,issued_before="2026-10-01")
+        self.assertEqual(current[0]["selected"],2)
+        self.assertEqual(current[0]["issue_months"],["2025-01","2026-11"])
+        self.assertEqual(older[0]["selected"],1)
+        self.assertEqual(older[0]["issue_months"],["2025-01"])
+        self.assertEqual(older[0]["permit_shapes"],{"99999-99999-99999":1})
+        with self.assertRaisesRegex(ValueError,"INSPECTION_ISSUE_CUTOFF_INVALID"):
+            diag.report(self.db,today=TODAY,issued_before="wrong")
+
     def test_mask_never_emits_literal_id_characters(self):
         self.assertEqual(diag.permit_shape("23ABC 30-44"),"99AAA_99-99")
         self.assertEqual(diag.permit_shape("00!"),"99?")
