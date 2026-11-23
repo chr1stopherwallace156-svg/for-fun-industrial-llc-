@@ -238,8 +238,32 @@ def requirements():
     cmake = subprocess.run(["cmake","--version"],capture_output=True,text=True,timeout=15)
     if cmake.returncode:
         raise RuntimeError("CMAKE_UNAVAILABLE")
-    # Build configuration itself detects missing MSVC Build Tools.
-    return {"git":True,"cmake":cmake.stdout.splitlines()[0] if cmake.stdout else "available"}
+    # The earlier attempt selected NMake but had no cl.exe. Use CMake's
+    # Visual Studio generator, which finds MSVC without editing global PATH.
+    root = Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"))
+    vswhere = root / "Microsoft Visual Studio" / "Installer" / "vswhere.exe"
+    if not vswhere.is_file():
+        raise RuntimeError("MSVC_2022_CPP_BUILD_TOOLS_MISSING_VSWHERE")
+    check = subprocess.run(
+        [str(vswhere), "-version", "[17.0,18.0)", "-products", "*",
+         "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+         "-property", "installationPath"],
+        capture_output=True, text=True, timeout=20)
+    if check.returncode or not check.stdout.strip():
+        raise RuntimeError("MSVC_2022_CPP_WORKLOAD_NOT_INSTALLED")
+    installation = Path(check.stdout.strip().splitlines()[0])
+    if not installation.is_dir():
+        raise RuntimeError("MSVC_2022_INSTALLATION_PATH_INVALID")
+    return {"git":True,
+            "cmake":cmake.stdout.splitlines()[0] if cmake.stdout else "available",
+            "msvc_2022":str(installation)}
+
+def fresh_log(root, name):
+    for i in range(1, 50):
+        path = root / (name + "-run" + str(i) + ".log")
+        if not path.exists():
+            return path
+    raise RuntimeError("ISOLATED_BUILD_LOG_LIMIT_REACHED")
 
 def prepare_source(root):
     target = root/"llama-tq-pinned-source"
@@ -259,21 +283,24 @@ def prepare_source(root):
     return target
 
 def prepare_binary(root, source):
-    build = root/"cpu-train-build"
+    # Use fresh VS 2022 directory. Do NOT reuse the failed NMake cache in
+    # cpu-train-build, and do not delete or rewrite other build artifacts.
+    build = root/"cpu-train-build-vs2022-x64"
     bins = list(build.glob("**/llama-finetune.exe")) if build.exists() else []
     if bins:
         return bins[0]
     # Explicit CPU-only: no DirectML/CUDA/Vulkan backend, no modification
     # to existing .runtime or global Python. This builds an external research
     # fork under a new isolated directory.
-    safe_run(["cmake","-S",str(source),"-B",str(build),
+    safe_run(["cmake","-G","Visual Studio 17 2022","-A","x64",
+              "-S",str(source),"-B",str(build),
               "-DGGML_CUDA=OFF","-DGGML_VULKAN=OFF",
               "-DLLAMA_BUILD_TESTS=OFF","-DLLAMA_BUILD_EXAMPLES=ON",
-              "-DGGML_NATIVE=OFF"],root/"cmake-configure.log",
-             300,expected_cwd=root)
+              "-DLLAMA_BUILD_SERVER=OFF","-DGGML_NATIVE=OFF"],
+             fresh_log(root,"cmake-configure-vs2022"),300,expected_cwd=root)
     safe_run(["cmake","--build",str(build),"--config","Release",
               "--target","llama-finetune","--parallel","2"],
-             root/"cmake-build.log",MAX_BUILD_SECONDS,expected_cwd=root)
+             fresh_log(root,"cmake-build-vs2022"),MAX_BUILD_SECONDS,expected_cwd=root)
     bins = list(build.glob("**/llama-finetune.exe"))
     if len(bins)!=1:
         raise RuntimeError("TRAINER_BINARY_NOT_FOUND_AFTER_BUILD")
@@ -332,7 +359,8 @@ def main():
         raise RuntimeError("RAEM_INSUFFICIENT_FREE_RAM_OR_COMMIT_HEADROOM")
     if shutil.disk_usage(APP.parent).free < 6 * 1024**3:
         raise RuntimeError("INSUFFICIENT_FREE_DISK_FOR_PINNED_BUILD_AND_ADAPTER")
-    requirements()
+    build_tools = requirements()
+    print("FUN_QWEN_V5_COMPILER="+json.dumps(build_tools,sort_keys=True),flush=True)
     if APP.exists() and not APP.is_dir():
         raise RuntimeError("ISOLATED_ROOT_NOT_DIRECTORY")
     APP.mkdir(parents=True,exist_ok=True)
