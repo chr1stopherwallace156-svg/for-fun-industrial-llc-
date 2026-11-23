@@ -53,8 +53,19 @@ def _official_fetch(url):
     except (UnicodeError,json.JSONDecodeError) as exc:
         raise ValueError("INSPECTION_REMOTE_INVALID_JSON") from exc
 
-def probe(db,*,zips=ZIPS,per_zip=3,today=None,fetch=None):
+def probe(db,*,zips=ZIPS,per_zip=3,today=None,issued_before=None,fetch=None):
     today=today or dt.date.today()
+    if issued_before is None:
+        max_issue_date=today
+    else:
+        if not isinstance(issued_before,str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}",issued_before):
+            raise ValueError("INSPECTION_ISSUE_CUTOFF_INVALID")
+        try:boundary=dt.date.fromisoformat(issued_before)
+        except ValueError as exc:
+            raise ValueError("INSPECTION_ISSUE_CUTOFF_INVALID") from exc
+        if not dt.date(2020,1,2)<=boundary<=today:
+            raise ValueError("INSPECTION_ISSUE_CUTOFF_OUT_OF_RANGE")
+        max_issue_date=boundary-dt.timedelta(days=1)
     if not isinstance(per_zip,int) or not 1<=per_zip<=MAX_PER_ZIP:
         raise ValueError("INSPECTION_SAMPLE_PER_ZIP_LIMIT")
     if not 1<=len(zips)<=4 or len(zips)!=len(set(zips)) or any(
@@ -79,7 +90,7 @@ def probe(db,*,zips=ZIPS,per_zip=3,today=None,fetch=None):
                 AND e.issue_date>=? AND e.issue_date<=?
                 ORDER BY e.issue_date DESC,e.permit_id ASC LIMIT ?""",
                 (z,SOURCE,date_before(today,5).isoformat(),
-                 today.isoformat(),per_zip)).fetchall()
+                 max_issue_date.isoformat(),per_zip)).fetchall()
             for r in rows:
                 number=canonical_permit(r["permit_id"])
                 if number is None:continue
@@ -162,6 +173,8 @@ def probe(db,*,zips=ZIPS,per_zip=3,today=None,fetch=None):
        "version":VERSION,"state":"BOUNDED_INSPECTION_JOIN_OBSERVED",
        "official_dataset":DATASET,"sample_method":"latest_replacement_like_exact_APN_matched_issued_2020_source_not_random",
        "zips":list(zips),"aggregate":dict(aggregate),
+       "issued_before_exclusive":issued_before,
+       "latest_eligible_issue_date":max_issue_date.isoformat(),
        "zip_counts":{z:dict(by_zip[z]) for z in zips},
        "exact_permit_number_matching":True,
        "source_is_full_county_coverage":False,
@@ -176,8 +189,11 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument("--db",required=True)
     p.add_argument("--per-zip",type=int,default=3)
+    p.add_argument("--issued-before",default=None,
+        help="Exclusive YYYY-MM-DD issue-date cutoff for historical verification")
     a=p.parse_args()
-    print(json.dumps(probe(a.db,per_zip=a.per_zip),sort_keys=True,separators=(",",":")))
+    print(json.dumps(probe(a.db,per_zip=a.per_zip,issued_before=a.issued_before),
+                     sort_keys=True,separators=(",",":")))
 
 if __name__=="__main__":
     try:main()
