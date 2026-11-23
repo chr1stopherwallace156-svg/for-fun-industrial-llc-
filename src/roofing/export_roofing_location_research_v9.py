@@ -124,6 +124,8 @@ def analyze_locations(db,*,zips=DEFAULT_ZIPS,years=20,recent_years=5,
         candidates=neighbor["qualified_property_research_rows"]
         if len(candidates)!=sum(zstats[z]["candidates_with_two_or_more_recent_peer_roof_permits"] for z in zips):
             raise ValueError("LOCATION_PROPERTY_COHORT_TOTAL_MISMATCH")
+        if len(candidates)!=sum(b["qualified_properties"] for b in blocks):
+            raise ValueError("LOCATION_BLOCK_TO_PROPERTY_TOTAL_MISMATCH")
         seen=set()
         properties=[]
         old=cutoff(today,years).isoformat()
@@ -214,6 +216,8 @@ def analyze_locations(db,*,zips=DEFAULT_ZIPS,years=20,recent_years=5,
             }
             if len(activity)>20000:
                 raise ValueError("LOCATION_RECENT_ACTIVITY_REPORT_LIMIT_EXCEEDED")
+        if len(activity)!=sum(b["recent_permit_parcels_in_street_block"] for b in blocks):
+            raise ValueError("LOCATION_BLOCK_TO_RECENT_PERMIT_TOTAL_MISMATCH")
         recent_locations=sorted(activity.values(),key=lambda row:(
             block_index[(row["zip"],row["street_number_block"])]["rank"],
             -int(row["latest_recent_permit_issue_date"].replace("-","")),
