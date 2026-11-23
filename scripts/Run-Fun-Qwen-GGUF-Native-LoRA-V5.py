@@ -95,17 +95,26 @@ def private_commit_gib(pid):
         _fields_ = fields
     PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
     PROCESS_VM_READ = 0x10
-    h = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION|PROCESS_VM_READ, False, pid)
+    open_process = ctypes.windll.kernel32.OpenProcess
+    open_process.argtypes = [ctypes.wintypes.DWORD, ctypes.wintypes.BOOL, ctypes.wintypes.DWORD]
+    open_process.restype = ctypes.wintypes.HANDLE
+    close_handle = ctypes.windll.kernel32.CloseHandle
+    close_handle.argtypes = [ctypes.wintypes.HANDLE]
+    close_handle.restype = ctypes.wintypes.BOOL
+    get_counters = ctypes.windll.psapi.GetProcessMemoryInfo
+    get_counters.argtypes = [ctypes.wintypes.HANDLE, ctypes.c_void_p, ctypes.wintypes.DWORD]
+    get_counters.restype = ctypes.wintypes.BOOL
+    h = open_process(PROCESS_QUERY_LIMITED_INFORMATION|PROCESS_VM_READ, False, pid)
     if not h:
         return None
     try:
         p = PMC()
         p.cb = ctypes.sizeof(p)
-        if not ctypes.windll.psapi.GetProcessMemoryInfo(h, ctypes.byref(p), p.cb):
+        if not get_counters(h, ctypes.byref(p), p.cb):
             return None
         return gib(p.PrivateUsage)
     finally:
-        ctypes.windll.kernel32.CloseHandle(h)
+        close_handle(h)
 
 def checked_hash(path, expected):
     if not path.is_file() or path.is_symlink():
@@ -177,7 +186,8 @@ def safe_run(command, log_path, max_seconds, expected_cwd=None, memory_watch=Tru
     with log_path.open("xb") as log:
         start = time.monotonic()
         proc = subprocess.Popen(command, cwd=expected_cwd, stdout=log, stderr=subprocess.STDOUT,
-                                stdin=subprocess.DEVNULL)
+                                stdin=subprocess.DEVNULL,
+                                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
         print("FUN_TRAIN_V5_CHILD="+str(proc.pid)+" STAGE="+log_path.stem, flush=True)
         reason = None
         peak_private = 0.0
@@ -202,9 +212,14 @@ def safe_run(command, log_path, max_seconds, expected_cwd=None, memory_watch=Tru
                     break
             time.sleep(0.5)
         if reason:
-            proc.terminate()
+            # Kill the isolated child's process tree, including compiler
+            # workers spawned by cmake; never kill the live llama-server.
+            # PID is obtained from the still-running Popen object.
+            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           timeout=15, check=False)
             try:
-                proc.wait(timeout=10)
+                proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 proc.kill()
                 proc.wait()
@@ -301,7 +316,7 @@ def main():
             "pinned_train_source_sha":PIN_SHA,
             "curriculum_rows":{k:len(v) for k,v in dataset.items()},
             "hardware":memory_before,
-            "actual_pretrained_qwen_weights_will_be_used":True,
+            "actual_pretrained_qwen_weights_will_be_used_if_training_runs":True,
             "live_qwen_model_replaced":False,
             "training_is_cpu_only":True,
             "target":"last_block_attention_query_value_low_rank_adapter",
