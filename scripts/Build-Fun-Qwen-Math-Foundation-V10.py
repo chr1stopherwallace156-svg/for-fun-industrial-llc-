@@ -106,6 +106,48 @@ def softmin_distribution(errors,temperature):
     total=sum(values.values())
     return {w:values[w]/total for w in WINDOWS}
 
+def brier_set_score(errors, probabilities):
+    """Mean squared calibration error for INDEPENDENT winner indicators.
+
+    A tie is represented by multiple positive labels; softmax winner
+    distributions are inappropriate if the exact tied set is required.
+    This is an offline metric, not a native ggml loss hook.
+    """
+    winners=argmin_set(errors)
+    if set(probabilities)!=set(WINDOWS):
+        raise ValueError("V10_PROBABILITIES_REQUIRE_ALL_WINDOWS")
+    if any(not isinstance(p,(int,float)) or not math.isfinite(p) or
+           not 0<=p<=1 for p in probabilities.values()):
+        raise ValueError("V10_PROBABILITIES_OUTSIDE_ZERO_ONE")
+    return sum((probabilities[w]-(1 if w in winners else 0))**2
+               for w in WINDOWS)/len(WINDOWS)
+
+def normalized_answer_nll(token_log_probabilities):
+    """Mean -log P(correct answer token | prompt, prior target tokens).
+
+    The current native perplexity tool does NOT expose this conditional
+    per-answer score; use as a mathematical specification only.
+    """
+    if not isinstance(token_log_probabilities,(tuple,list)) or \
+       not token_log_probabilities or \
+       any(not isinstance(p,(int,float)) or not math.isfinite(p) or p>0
+           for p in token_log_probabilities):
+        raise ValueError("V10_INVALID_TOKEN_LOG_PROBABILITIES")
+    return -sum(token_log_probabilities)/len(token_log_probabilities)
+
+def hard_negative_margin(correct_score, wrong_scores):
+    """Minimum margin to the strongest wrong candidate, not an accuracy claim.
+
+    Scores must be comparable conditional sequence log-probabilities
+    normalized for answer length. Supports exact tie-set labels.
+    """
+    if not isinstance(wrong_scores,(list,tuple)) or not wrong_scores or \
+       not isinstance(correct_score,(int,float)) or not math.isfinite(correct_score) or \
+       any(not isinstance(x,(int,float)) or not math.isfinite(x) for x in wrong_scores):
+        raise ValueError("V10_INVALID_LOG_SCORE_MARGIN")
+    return correct_score-max(wrong_scores)
+
+
 def make_case(split, pattern, ordinal):
     if split not in RANGES or pattern not in PATTERNS or not 0<=ordinal<COUNTS[split]:
         raise ValueError("V10_CASE_PARAMETERS_INVALID")
