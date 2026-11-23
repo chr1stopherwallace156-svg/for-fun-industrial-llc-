@@ -21,6 +21,19 @@ async function showOverview(){
  display('total-permits',count(info.counts?.permits));
  display('total-candidates',count(info.counts?.candidates));
  display('data-completeness','Not proven countywide');
+ const selection=info.selection||{};
+ display('selection-selected',count(selection.selected));
+ display('selection-held',count(selection.held));
+ display('selection-excluded',count(selection.excluded));
+ display('selection-state',selection.state==='READY'?'Filtered locally':
+   selection.state==='NO_DATABASE'?'Awaiting data':
+   selection.state==='NOT_RUN'?'Awaiting first import':'Needs review');
+ display('selection-receipt',selection.state==='READY'?
+   'Last validated: '+(selection.updated_utc||'unknown')+
+   ' · '+(selection.mode||'')+' · analyzed '+count(selection.source_rows_examined)+
+   ' parcel records. Permit coverage not proven countywide.':
+   'Selective index: '+String(selection.state||'not started')+
+   (selection.error?' · '+selection.error:'')+'. Imported source files remain available for audit.');
  const job=info.job;
  display('job-status',job?
   'Full data sync '+job.state.replace(/_/g,' ')+' · '+job.source+
@@ -85,7 +98,7 @@ async function renderMarkets(detail=false){
   body.append(row);
  }
  display('market-note',items.length+' '+(detail?'property':'market')+
-  ' rows shown. All ranks refer only to imported records, not confirmed roofing demand.');
+  ' rows shown from the filtered local index. Actual roof condition and complete permit history remain unverified.');
 }
 async function execute(button,callback){
  if(busy)return;busy=true;const all=[...document.querySelectorAll('button')];
