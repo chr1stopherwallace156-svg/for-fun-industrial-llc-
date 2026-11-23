@@ -215,6 +215,7 @@
   if(question.length<4||question.length>1200){status.textContent='Enter a question between 4 and 1200 characters.';return}
   let payload={question};
   if(byId('fi-fial53-math-evidence')?.checked)payload.useMathEvidence=true;
+  if(byId('fi-fial53-math-v3-evidence')?.checked)payload.useMathV3Evidence=true;
   const reaFollowUp=includeApprovedReaOnce;
   const computeFollowUp=includeApprovedComputeOnce;
   includeApprovedReaOnce=false;includeApprovedComputeOnce=false;
