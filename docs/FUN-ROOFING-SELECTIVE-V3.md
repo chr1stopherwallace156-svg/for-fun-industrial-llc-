@@ -370,6 +370,62 @@ status categories, ambiguity, COFO nonfinal inconsistency, future/invalid
 status date and refusal to copy private fields into output. The normal
 one-port service and Elektron are not affected by an audit.
 
+## V9 — roofing location research is the operational objective
+
+**Goal:** find the actual ZIP codes, 100-number street blocks, and publicly
+recorded property locations worth researching for roofing services, rather
+than requiring proof of completed roofing from a separate inspection dataset.
+Formulas A (existing older-property priority), B (real same-APN historical
+permit cycle), C (peer street-block recent permit activity) and independent
+optional D (status information) are preserved. V8 inspection matching is
+**optional and not part of this targeting workflow**. No homeowner contact
+data, messages, sales actions, automatic outreach or new scoring formula.
+
+Run `src/roofing/export_roofing_location_research_v9.py` against the
+existing qualified local SQLite data. It requires all four official-import
+receipts and read-only database access. It uses the *identical Formula C
+age-cohort and permit matching logic* used on the dashboard but collects
+**all** qualifying 100-number street blocks instead of only five preview
+examples per ZIP. The output is four ordinary UTF-8 CSV files, written
+only under `%LOCALAPPDATA%\FunIndustrial\RoofingBulkV2\research_exports`:
+
+1. `roofing_zip_market_summary_*.csv` — ZIP, number of qualified street
+   blocks and qualified unique property research candidates.
+2. `roofing_ranked_street_blocks_*.csv` — one row per qualifying street
+   block, sorted by number of independently qualified properties and
+   distinct recent roof-permit parcels; construction-year ranges.
+3. `roofing_qualified_property_research_*.csv` — the exact addresses,
+   public APNs, building construction year, existing A priority, most recent
+   *exact-APN* roof-related permit, years since permit, X-years threshold
+   check, and nearby age-matched properties with qualifying permit records.
+4. `roofing_recent_permit_locations_*.csv` — the separately matched
+   public property addresses of recent roofing-permit parcels in the
+   qualifying blocks, latest permit date and keyword classification.
+   This shows where **recorded activity** occurs, not verified installation.
+
+Configurable independent inputs: `--years X` (historical same-APN
+roof permit threshold, 10–50), `--min-building-age X` (20–100),
+`--recent-years R` (1–10 and smaller than historical X),
+`--permit-kind roof_related|replacement_like`,
+`--peer-years` (0–15) and `--min-peers` (3–30).
+The existing A scores are read from the verified V3 index and **not changed**.
+
+Recommended first batch:
+```powershell
+$r=Join-Path $HOME 'FunIndustrial-Roofing-Bulk-V2';$db=Join-Path $env:LOCALAPPDATA 'FunIndustrial\RoofingBulkV2\roofing.sqlite3';& python.exe -B (Join-Path $r 'src\roofing\export_roofing_location_research_v9.py') --db $db --zips 90037,90049,90731,90011 --years 20 --min-building-age 25 --recent-years 5 --permit-kind replacement_like --peer-years 5 --min-peers 5
+```
+
+The 100-number street block is a **same-street address-number proxy**,
+not geocoded geographic adjacency or confirmed walking proximity.
+A building built 30 years ago may have a brand-new roof.
+A permit containing `REROOF` is **not confirmation** of completed
+replacement; a missing permit match does **not** establish that no roofing
+work occurred. Older buildings and permit history indicate *where to
+research*, not roof damage, replacement need, or a probability of purchase.
+The LA City permit history does not cover every municipality in LA County.
+Always confirm before any commercial claims, and comply with local outreach
+rules. The CSVs are local-only; they are not uploaded to GitHub.
+
 ## Historical inspection eligibility cutoff after 12 newest permits had no matches
 
 The initial V8 12-permit sample across 90037, 90049, 90731 and 90011
