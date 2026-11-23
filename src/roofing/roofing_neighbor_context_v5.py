@@ -119,6 +119,13 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
         peers=x["peers_across_candidate_windows"]
         recent=len(recent_by_zip[z])
         selected=total[z]
+        peer_share=(100*x["peer_permits_across_candidate_windows"]/peers) if peers else None
+        zip_share=(100*recent/selected) if selected else None
+        # Context comparison is descriptive, *not* a calibrated likelihood.
+        # Small or empty ZIP baselines never produce inflated/infinite lift.
+        reference_lift=(round(peer_share/zip_share,2)
+                        if peer_share is not None and zip_share is not None
+                        and zip_share>0 and n>=min_peers else None)
         results[z]={
             "method":"same_100_number_street_block_and_build_year_cohort_proxy",
             "construction_age_tolerance_plus_minus_years":peer_years,
@@ -132,9 +139,11 @@ def neighbor_context(conn, *, zips, today, recent_years, min_building_age,
             "blocks_with_qualifying_age_cohort":
                 len(x["blocks_with_qualifying_age_cohort"]),
             "age_matched_peer_permit_window_share_pct":
-                round(100*x["peer_permits_across_candidate_windows"]/peers,2) if peers else None,
+                round(peer_share,2) if peer_share is not None else None,
             "zip_referenced_recent_apn_permit_share_pct":
-                round(100*recent/selected,2) if selected else None,
+                round(zip_share,2) if zip_share is not None else None,
+            "peer_activity_relative_to_zip_reference_ratio":reference_lift,
+            "repeat_window_observations_are_not_independent":True,
             "individual_property_damage_or_new_roof_need_verified":False,
             "physical_distance_measured":False,
         }
