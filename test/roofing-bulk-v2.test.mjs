@@ -29,7 +29,7 @@ test('bulk UI links only real local endpoints and has no automated actions',asyn
  assert.match(ROOF_BULK_PAGE,/No permit sample caps/);
  assert.match(js,/operator-sync-full-export/);
  assert.match(js,/confirm\(/);
- assert.match(js,/noPermit/);
+ assert.match(js,/onlyNoPermit/);
  assert.doesNotMatch(js,/setInterval|localStorage|WebSocket|new WebSocket|eval\(/);
  assert.doesNotMatch(ROOF_BULK_PAGE,/<script(?![^>]*src)[^>]*>/i);
  assert.match(style,/@media\(max-width:750px\)/);
