@@ -76,8 +76,10 @@ class PermitDescriptionAuditTests(unittest.TestCase):
             writer.writerows(rows)
 
     def audit(self,**kw):
-        return audit.local_audit(self.db,self.root,zips=("90037","90049"),
-            per_group=5,recent_years=5,min_building_age=25,today=TODAY,**kw)
+        filters=dict(zips=("90037","90049"),per_group=5,recent_years=5,
+                     min_building_age=25,today=TODAY)
+        filters.update(kw)
+        return audit.local_audit(self.db,self.root,**filters)
 
     def update_source_hash(self):
         with contextlib.closing(sqlite3.connect(self.db)) as c,c:
