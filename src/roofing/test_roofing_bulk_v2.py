@@ -13,10 +13,12 @@ from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).parent))
 import roofing_bulk_v2 as roof
 
-def captured(fn, arg):
+def captured(fn, arg, *extra_args):
+    # Candidates support a second positional parameter selecting market vs
+    # property output. Test both paths without changing production signatures.
     output = io.StringIO()
     with contextlib.redirect_stdout(output):
-        fn(arg)
+        fn(arg, *extra_args)
     return json.loads(output.getvalue().strip().splitlines()[-1])
 
 class RoofingBulkTests(unittest.TestCase):
