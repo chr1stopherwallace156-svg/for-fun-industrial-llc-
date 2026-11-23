@@ -25,19 +25,30 @@
  async function submit(){
   const question=query.value.trim();
   if(question.length<4||question.length>1200){status.textContent='Enter a question between 4 and 1200 characters.';return}
-  send.disabled=true;entry('You',question);query.value='';
+  let payload={question};
+  const code=byId('fi-fial53-code')?.value||'';
+  if(code.trim()){
+   const f=byId('fi-fial53-function')?.value?.trim()||'';
+   const ranges=(byId('fi-fial53-ranges')?.value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+   if(!f||ranges.length<1||ranges.length>16){
+    status.textContent='Enter a function name and 1–16 input ranges to analyze code.';return;
+   }
+   payload.fisre={source:code,function:f,ranges};
+  }
+  send.disabled=true;entry('You',question+(payload.fisre?'\n[Python source attached for local FISRE reasoning]':''));query.value='';
   status.textContent='Checking relevant memory and requesting one local Qwen response…';
   try{
    const response=await fetch('/api/fial/grounded/chat',{method:'POST',
     credentials:'same-origin',headers:{'content-type':'application/json',
      'x-fi-chat-click':'one-local-model-response'},
-    body:JSON.stringify({question})});
+    body:JSON.stringify(payload)});
    const result=await response.json();
    if(!response.ok)throw Error('HTTP '+response.status+': '+String(result.error||'request held'));
    if(result.state==='ANSWERED_BY_QWEN'){
-    entry('Qwen',String(result.answer||''));status.textContent=
-     'Qwen answered · Cognee: '+String(result.memory_state||'unknown')+
-     ' · excerpts: '+String(result.memory_excerpts_included||0)+' · no tools executed';
+    entry('Qwen',String(result.answer||''));
+    status.textContent='Qwen answered · Cognee: '+String(result.memory_state||'unknown')+
+     (result.fisre?.status?' · FISRE: '+String(result.fisre.status):'')+
+     ' · no external tools executed';
    }else if(result.state==='REFERENCE_ONLY_MODEL_EMPTY'){
     entry('Unverified stored memory (Qwen did not answer)',String(result.answer||''));
     status.textContent=String(result.warning||'Qwen returned empty text');
