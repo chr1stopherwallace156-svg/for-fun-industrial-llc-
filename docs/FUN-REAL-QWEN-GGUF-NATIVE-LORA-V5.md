@@ -139,6 +139,31 @@ operator run can encounter additional native compiler errors or a RAM guard
 hold; review the new cmake-configure-vs2022-noasm and
 cmake-build-vs2022-noasm run-specific logs if that occurs.
 
+## Live inference listener guard repair (November 23, 2026)
+
+After fixing the isolated MSVC no-ASM build overlay, the operator reran
+V5 and encountered `QWEN_8088_NOT_UNIQUELY_LIVE` before the offline tests
+or compilation. This check incorrectly required exactly one Windows TCP
+listener on 8088, even though isolated CPU training does not need a running
+Qwen inference service. There was **no evidence of a build failure or
+training outcome from this run**.
+
+The launcher now classifies port 8088 as follows:
+
+- **Zero listener owner PIDs:** records that Qwen inference is already stopped
+  and leaves it stopped. Training may continue independently; no restart.
+- **One distinct PID:** requires the listening process to be llama-server
+  with the expected Qwen3-4B Q4_K_M file in its command line. Multiple
+  IPv4/IPv6 listener records for the *same PID* are accepted.
+- **More than one distinct PID:** refuses ambiguous ownership and stops.
+- Captures protected service listeners before running and checks they are
+  unchanged on successful completion. Does not itself start or stop servers.
+
+This correction is independent of the CMake 4.4/MSVC assembly-language
+workaround, which still has to be validated by the next local execution.
+Resource guards remain active; an isolated training process might still
+hold if Windows memory limits are crossed.
+
 ## One-command execution (explicit external source approval)
 
 First, update your clean Git checkout to V5 and run the command in the
