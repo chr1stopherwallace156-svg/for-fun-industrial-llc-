@@ -120,7 +120,10 @@ function PreviewLive([string]$ExpectedRunner){
    $bulkPage.Content -notmatch 'id="formula-peer-years"' -or
    $bulkPage.Content -notmatch 'id="formula-min-peers"' -or
    $bulkPage.Content -notmatch 'id="neighbor-example-body"' -or
+   $bulkPage.Content -notmatch 'id="unique-block-body"' -or
    $bulkJs.Content -notmatch 'neighborhood_research_examples' -or
+   $bulkJs.Content -notmatch 'distinct_block_research_examples' -or
+   $bulkJs.Content -notmatch 'unique_street_blocks_with_two_or_more_age_matched_recent_peer_permits' -or
    $bulkJs.Content -notmatch 'renderParallelFormulas' -or
    $bulkStatus.elektronTouched -ne $false -or
    $bulkStatus.automatedOutreach -ne 0 -or
