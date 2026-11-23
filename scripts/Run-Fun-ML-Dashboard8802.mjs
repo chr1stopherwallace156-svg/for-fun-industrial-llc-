@@ -12,6 +12,8 @@ import {SHELL,UI_CSS,UI_CLIENT} from '../src/ui/integrated-hub-shell-v1.mjs';
 import {DASHBOARD_HTML,DASHBOARD_VERSION} from '../src/ui/oneport-dashboard-v1.mjs';
 import {FISRE_WORKSPACE_HTML} from '../src/ui/fisre-workspace-v4.mjs';
 import {FISRE_QWEN_CHAT_HTML} from '../src/ui/fisre-qwen-chat-v4.mjs';
+import {MATH_HTML} from '../src/ui/math-research-v2.mjs';
+import {mathSnapshot,mathEvidence} from '../src/math/math-report-bridge-v2.mjs';
 import {createFisreChatEvidence} from '../src/semantic/fisre-chat-evidence-v4.mjs';
 import {capabilityInventory} from '../src/intelligence/capability-fabric-v1.mjs';
 import {createReviewedDispatch} from '../src/intelligence/operator-reviewed-dispatch-v1.mjs';
@@ -49,6 +51,7 @@ const DEMAND_CLIENT=new URL('../src/demand/demand-console-v5-14.js',import.meta.
 const ONEPORT_CSS=new URL('../src/ui/oneport-dashboard-v1.css',import.meta.url);
 const ONEPORT_CLIENT=new URL('../src/ui/oneport-dashboard-v1.js',import.meta.url);
 const FISRE_CLIENT=new URL('../src/ui/fisre-workspace-v4.js',import.meta.url);
+const MATH_CLIENT=new URL('../src/ui/math-research-v2.js',import.meta.url);
 const ONEPORT_TILT=new URL('../src/ui/vendor/vanilla-tilt-1.8.1.js',import.meta.url);
 const ONEPORT_EMBED=new URL('../src/ui/oneport-embedded-v1.css',import.meta.url);
 const ONEPORT_EMBED_CLIENT=new URL('../src/ui/oneport-embedded-operations-v1.js',import.meta.url);
@@ -175,10 +178,11 @@ async function groundedChatBody(req){
   try{value=JSON.parse(Buffer.concat(parts).toString('utf8'))}
   catch{throw Error('FIAL53_CHAT_JSON_REQUIRED')}
   if(!value||typeof value!=='object'||Array.isArray(value)||
-    Object.keys(value).length<1||Object.keys(value).length>4||
-    Object.keys(value).some(k=>!['question','fisre','explainApprovedRea','explainApprovedCompute'].includes(k))||
+    Object.keys(value).length<1||Object.keys(value).length>5||
+    Object.keys(value).some(k=>!['question','fisre','explainApprovedRea','explainApprovedCompute','useMathEvidence'].includes(k))||
     (value.explainApprovedRea!==undefined&&value.explainApprovedRea!==true)||
     (value.explainApprovedCompute!==undefined&&value.explainApprovedCompute!==true)||
+    (value.useMathEvidence!==undefined&&value.useMathEvidence!==true)||
     typeof value.question!=='string'||
     value.question.length<4||value.question.length>1200)
     throw Error('FIAL53_CHAT_QUESTION_INVALID');
@@ -262,6 +266,16 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         return send(res,200,DASHBOARD_HTML,'text/html; charset=utf-8',
           {'content-security-policy':csp,'x-fi-dashboard-version':DASHBOARD_VERSION});
       }
+      if(req.method==='GET'&&u.pathname==='/math/'){
+        const csp="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'none'";
+        return send(res,200,MATH_HTML,'text/html; charset=utf-8',{'content-security-policy':csp,'x-fi-math-version':'fun-math-v2-readonly-8802'});
+      }
+      if(req.method==='GET'&&u.pathname==='/api/fun/math/client.js')
+        return send(res,200,await readFile(MATH_CLIENT,'utf8'),'text/javascript; charset=utf-8');
+      if(req.method==='GET'&&u.pathname==='/api/fun/math/status')
+        return send(res,200,await mathSnapshot());
+      if(u.pathname==='/math/'||u.pathname.startsWith('/api/fun/math/'))
+        return send(res,404,{error:'FUN_MATH_READONLY_ROUTE_ONLY'});
       if(req.method==='GET'&&u.pathname==='/control/'){
         // Dedicated optional visual UI. Original homepage remains identical.
         const csp="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'none'; font-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'; form-action 'none'";
@@ -594,6 +608,12 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
           return send(res,415,{error:'FIAL53_JSON_REQUIRED'});
         const body=await groundedChatBody(req);
         let approvedReaEvidence=null,approvedComputeEvidence=null;
+        let researchEvidence=null;
+        if(body.useMathEvidence===true){
+          const snapshot=await mathSnapshot();
+          if(!snapshot.ready)throw Error('FUN_MATH_V2_REPORT_NOT_VERIFIED_'+snapshot.state);
+          researchEvidence=mathEvidence(snapshot);
+        }
         if(body.explainApprovedRea===true){
           const receipt=dispatch.lastEvidence();
           if(!receipt||receipt.verified!==true)
@@ -609,14 +629,14 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         const reviewedToolSuggestion=dispatch.recommend(body.question);
         const reviewedComputeSuggestion=compute.recommend(body.question);
         if(body.fisre===undefined){
-          const answer=await activeGrounded.chat({question:body.question,reaEvidence:approvedReaEvidence,computeEvidence:approvedComputeEvidence});
+          const answer=await activeGrounded.chat({question:body.question,reaEvidence:approvedReaEvidence,computeEvidence:approvedComputeEvidence,mathEvidence:researchEvidence});
           return send(res,200,{...answer,reviewedToolSuggestion,reviewedComputeSuggestion});
         }
         // Operator-submitted source is analyzed, then this same Qwen responds.
         // Neither Qwen nor a model-derived plan may execute a compute operation.
         const analysis=await runFisrePython(body.fisre);
         const evidence=createFisreChatEvidence(analysis,body.fisre.source);
-        const answer=await activeGrounded.chat({question:body.question,fisreEvidence:evidence,reaEvidence:approvedReaEvidence,computeEvidence:approvedComputeEvidence});
+        const answer=await activeGrounded.chat({question:body.question,fisreEvidence:evidence,reaEvidence:approvedReaEvidence,computeEvidence:approvedComputeEvidence,mathEvidence:researchEvidence});
         return send(res,200,{...answer,reviewedToolSuggestion,reviewedComputeSuggestion,
           fisre:{status:analysis.proof.status,source_sha256:analysis.source.sha256,
             replay:analysis.replay.state,cognitive:'proposed_only',
