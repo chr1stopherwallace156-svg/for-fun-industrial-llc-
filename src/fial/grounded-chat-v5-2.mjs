@@ -9,6 +9,7 @@ import {commercialFitContextForQwen} from "../fit/commercial-fit-qwen-v5-11.mjs"
 import {bidReadinessContextForQwen} from "../bid-readiness/readiness-qwen-v5-12.mjs";
 import {buyerContextForQwen} from "../buyers/buyer-qwen-v5-13.mjs";
 import {demandContextForQwen} from "../demand/demand-qwen-v5-14.mjs";
+import {getCapabilityContext,FABRIC_VERSION} from "../intelligence/capability-fabric-v1.mjs";
 
 export const GROUNDED_CHAT_VERSION="fial5.2-grounded-chat-v1";
 export const COGNEE="http://127.0.0.1:8789/api/intelligence/memory/recall";
@@ -67,7 +68,7 @@ export function classifyQwenResponse(result,{memory=null,memoryPassages=[]}={}){
   warning:"Qwen returned empty content and no tool calls. A tool-call proposal was NOT observed.",
   actual_tool_proposals:[],tool_executions:0};
 }
-export function createGroundedChat({fetchImpl=fetch,now=()=>new Date()}={}){
+export function createGroundedChat({fetchImpl=fetch,now=()=>new Date(),capabilityReaders={}}={}){
  let busy=false,last={state:"not_used"};
  async function chat({question,fisreEvidence=null}={}){
   if(typeof question!=="string"||question.trim().length<4||
@@ -114,6 +115,8 @@ export function createGroundedChat({fetchImpl=fetch,now=()=>new Date()}={}){
    try{buyerContext=await buyerContextForQwen(q)}catch{/* read-only contextual evidence is optional */}
    let demandContext='';
    try{demandContext=await demandContextForQwen(q)}catch{/* no extra authority */}
+   let fabric={version:FABRIC_VERSION,selected:[],text:"",readOnly:true,actions:0,authorityGranted:false};
+   try{fabric=await getCapabilityContext(q,capabilityReaders)}catch{/* inability to read one module never blocks Qwen */}
    // Only local, server-generated static FISRE evidence is included. The model
    // interprets existing results; the model is never given a tool execution API.
    const fisreInstruction=fisreEvidence===null?"":
@@ -126,7 +129,7 @@ export function createGroundedChat({fetchImpl=fetch,now=()=>new Date()}={}){
    // Intentionally no tools or tool_choice in the Qwen API request.
    const payload={model:"local-model",stream:false,temperature:0.2,max_tokens:512,
     chat_template_kwargs:{enable_thinking:false},reasoning_effort:"none",
-    messages:[{role:"system",content:[sys,context,regulatoryContext,fleetContext,commercialFitContext,bidReadinessContext,buyerContext,demandContext,fisreInstruction].filter(Boolean).join("\n")},{role:"user",content:text}]};
+    messages:[{role:"system",content:[sys,context,regulatoryContext,fleetContext,commercialFitContext,bidReadinessContext,buyerContext,demandContext,fabric.text,fisreInstruction].filter(Boolean).join("\n")},{role:"user",content:text}]};
    let model;
    try{
     model=await boundedJson(QWEN,{body:payload,timeoutMs:180000},fetchImpl);
@@ -139,11 +142,14 @@ export function createGroundedChat({fetchImpl=fetch,now=()=>new Date()}={}){
    last={version:GROUNDED_CHAT_VERSION,...result,
     memory_state:recallStatus,memory_excerpts_included:memory.count,
     model_invocations:1,tool_executions:0,rea_executions:0,
-    memory_writes:0,utc:now().toISOString()};
+    memory_writes:0,capability_fabric_version:FABRIC_VERSION,
+    capabilities_referenced:fabric.selected,
+    capability_actions:0,utc:now().toISOString()};
    return last;
   }finally{busy=false}
  }
  return Object.freeze({chat,status:()=>({...last,busy,model_auto_retries:0,
   authority_added:false,model_interface:"fixed_local_qwen_8088",
-  memory_interface:"fixed_readonly_cognee_8789"})});
+  memory_interface:"fixed_readonly_cognee_8789",
+  capability_fabric_version:FABRIC_VERSION})});
 }
