@@ -6,6 +6,7 @@
   status=byId('fi-fial53-status');
  if(!box||!send||!query||!history||!status)return;
  let pendingReaToken=null,includeApprovedReaOnce=false,reaBusy=false;
+ let pendingComputeToken=null,includeApprovedComputeOnce=false,computeBusy=false;
  function entry(kind,text){
   const article=document.createElement('article');
   article.style.cssText='padding:12px;border:1px solid #345269;border-radius:10px;background:#0e1c2b;white-space:pre-wrap;overflow-wrap:anywhere';
@@ -109,15 +110,117 @@
    void submit();
   });
  }
+ const exampleData={
+  optuna_inventory:{demand:[3,4,3,6,7,4,5,8,5,4],holding_cost:1,shortage_cost:3,min_stock:0,max_stock:12,trials:48},
+  ortools_routing:{cost_matrix:[[0,3,4,5],[3,0,2,7],[4,2,0,3],[5,7,3,0]]},
+  ml_deals:{deals:Array.from({length:8},(_,i)=>({id:'example_'+(i+1),cost:15+i*3,sale_price:35+i*4,shipping:4,fees:2,return_allowance:1}))},
+  ml_history:{history:Array.from({length:16},(_,i)=>({visits:100+i*12,price:18+(i%4)*3,ad_spend:10+i*2,units_sold:3+(i%5)}))},
+  ml_candidates:{candidates:[{visits:200,price:25,ad_spend:12},{visits:350,price:35,ad_spend:20}]}
+ };
+ async function computeRequest(action,body){
+  const res=await fetch('/api/fun/compute/'+action,{method:'POST',credentials:'same-origin',
+   headers:{'content-type':'application/json','x-fi-compute-review':'operator-'+action},
+   body:JSON.stringify(body)});
+  const answer=await res.json();
+  if(!res.ok)throw Error('Compute '+action+': '+String(answer.error||res.status));
+  return answer;
+ }
+ function computeNotice(text){
+  const el=byId('fi-fial53-compute-review');
+  if(el)el.textContent=String(text).slice(0,9000);
+ }
+ function bindReviewedCompute(){
+  const panel=byId('fi-fial53-compute-panel');
+  const select=byId('fi-fial53-compute-kind'),data=byId('fi-fial53-compute-data');
+  const prompt=byId('fi-fial53-compute-prompt');
+  const prepare=byId('fi-fial53-compute-prepare');
+  const confirm=byId('fi-fial53-compute-confirm');
+  const cancel=byId('fi-fial53-compute-cancel');
+  const explain=byId('fi-fial53-compute-explain');
+  if(!panel||!select||!data||!prompt||!prepare||!confirm||!cancel||!explain)return;
+  const reset=v=>{computeBusy=v;prepare.disabled=v;cancel.disabled=v;confirm.disabled=v||!pendingComputeToken};
+  const example=()=>{
+   pendingComputeToken=null;confirm.disabled=true;explain.hidden=true;
+   data.value=JSON.stringify(exampleData[select.value]||{},null,2);
+   computeNotice('Synthetic example loaded. Replace with your own data, then Prepare. No computation has executed.');
+  };
+  select.addEventListener('change',example);
+  example();
+  for(const field of [data,prompt]){
+   field.addEventListener('input',()=>{
+    if(pendingComputeToken){
+     pendingComputeToken=null;confirm.disabled=true;
+     computeNotice('Input edited after preparation. Click Prepare again to review the new exact data.');
+    }
+   });
+  }
+  prepare.addEventListener('click',async()=>{
+   if(computeBusy)return;
+   pendingComputeToken=null;explain.hidden=true;reset(true);
+   try{
+    const spec=JSON.parse(data.value);
+    const value=await computeRequest('prepare',{kind:select.value,spec,prompt:prompt.value});
+    if(value.state!=='awaiting_separate_operator_confirmation'||typeof value.authorizationToken!=='string')
+     throw Error('Reviewed preparation not accepted');
+    pendingComputeToken=value.authorizationToken;
+    computeNotice('PREPARED — NOT EXECUTED\n'+JSON.stringify(value.preview,null,2)+
+      '\nConfirm is a separate click. The token expires in two minutes; edits require Prepare again.');
+   }catch(e){pendingComputeToken=null;computeNotice('Preparation held: '+String(e.message||e))}
+   finally{reset(false)}
+  });
+  confirm.addEventListener('click',async()=>{
+   if(computeBusy||!pendingComputeToken)return;
+   const token=pendingComputeToken;
+   pendingComputeToken=null;reset(true);
+   computeNotice('Submitting exactly one approved local computation. No automatic retry.');
+   try{
+    const result=await computeRequest('confirm',{authorizationToken:token,operatorConfirmed:true});
+    if(result.state==='verified_local_result'){
+     computeNotice('VERIFIED LOCAL RESULT — operator approved\n'+String(result.resultPreview||'')+
+       '\nReceipt: '+String(result.receipt?.receiptHash||'unknown')+
+       '\nQwen can explain this result; it cannot rerun or modify the job.');
+     explain.hidden=false;
+    }else{
+     explain.hidden=true;
+     computeNotice('COMPUTE OUTCOME UNCERTAIN — DO NOT RETRY AUTOMATICALLY\n'+
+       String(result.state||'unknown')+'\n'+String(result.reason||''));
+    }
+   }catch(e){
+    explain.hidden=true;
+    computeNotice('Compute submission failed or outcome unknown. Do not retry without review: '+String(e.message||e));
+   }finally{reset(false)}
+  });
+  cancel.addEventListener('click',async()=>{
+   if(computeBusy)return;
+   pendingComputeToken=null;reset(true);
+   try{await computeRequest('cancel',{});computeNotice('Pending compute cancelled. No computation submitted.')}
+   catch(e){computeNotice('Cancel hold: '+String(e.message||e))}
+   finally{explain.hidden=true;reset(false)}
+  });
+  explain.addEventListener('click',()=>{
+   if(send.disabled)return;
+   includeApprovedComputeOnce=true;
+   query.value='Explain the last operator-approved optimization or ML result, its limitations, and the decision implications.';
+   void submit();
+  });
+  // Status is observational; it never starts a solver or trains a model.
+  void fetch('/api/fun/compute/status',{method:'GET',cache:'no-store'})
+   .then(r=>r.ok?r.json():null).then(x=>{
+    if(x?.version==='fun-reviewed-compute-v1')
+     computeNotice('Reviewed ML + optimization available. One job per explicit confirmation. Synthetic example loaded.');
+   }).catch(()=>{});
+ }
  async function submit(){
   const question=query.value.trim();
   if(question.length<4||question.length>1200){status.textContent='Enter a question between 4 and 1200 characters.';return}
   let payload={question};
   const reaFollowUp=includeApprovedReaOnce;
-  includeApprovedReaOnce=false;
+  const computeFollowUp=includeApprovedComputeOnce;
+  includeApprovedReaOnce=false;includeApprovedComputeOnce=false;
   if(reaFollowUp)payload.explainApprovedRea=true;
+  if(computeFollowUp)payload.explainApprovedCompute=true;
   const code=byId('fi-fial53-code')?.value||'';
-  if(code.trim()&&!reaFollowUp){
+  if(code.trim()&&!reaFollowUp&&!computeFollowUp){
    const f=byId('fi-fial53-function')?.value?.trim()||'';
    const ranges=(byId('fi-fial53-ranges')?.value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
    if(!f||ranges.length<1||ranges.length>16){
@@ -144,12 +247,21 @@
       '\nSelect Prepare to validate the live provider and tool schema.');
     }
    }
+   if(result.reviewedComputeSuggestion?.kind){
+    const select=byId('fi-fial53-compute-kind'),panel=byId('fi-fial53-compute-panel');
+    if(select&&[...select.options].some(o=>o.value===result.reviewedComputeSuggestion.kind)){
+     select.value=result.reviewedComputeSuggestion.kind;
+     select.dispatchEvent(new Event('change'));
+     if(panel)panel.open=true;
+     computeNotice('SUGGESTED — NO COMPUTATION EXECUTED. Review or replace the synthetic input data, then Prepare and separately Confirm.');
+    }
+   }
    if(result.state==='ANSWERED_BY_QWEN'){
     entry('Qwen',String(result.answer||''));
     status.textContent='Qwen answered · Cognee: '+String(result.memory_state||'unknown')+
      (result.fisre?.status?' · FISRE: '+String(result.fisre.status):'')+
      ' · read-only contexts: '+String(result.capabilities_referenced?.length||0)+
-     (reaFollowUp?' · prior approved REA observation included':' · no external tools executed');
+     (reaFollowUp?' · prior approved REA observation included':computeFollowUp?' · prior approved compute result included':' · no tools executed from chat');
    }else if(result.state==='REFERENCE_ONLY_MODEL_EMPTY'){
     entry('Unverified stored memory (Qwen did not answer)',String(result.answer||''));
     status.textContent=String(result.warning||'Qwen returned empty text');
@@ -165,5 +277,6 @@
   e.preventDefault();if(!send.disabled)void submit();
  }});
  bindReviewedTools();
+ bindReviewedCompute();
  void check();
 })();
