@@ -68,8 +68,8 @@ export const ROOF_BULK_PAGE=String.raw`<!doctype html><html lang="en"><head><met
  <div class="notice"><strong>Not connected automatically:</strong> Other LA County cities and the county itself, plus San Bernardino municipal permit histories, require their own approved data feed. San Bernardino's official property characteristics ZIP uses a special format; a countywide govPIMS CSV can be imported after reviewing its columns.</div>
 </section>
 <section class="panel" id="parallel-roof-formulas">
- <div class="overline">04 / PARALLEL MATHEMATICAL MODELS</div><h2>Two ways to investigate roofing history</h2>
- <p class="readout">Formula A stays unchanged. Formula B separately measures historical-versus-recent roof-related permits on the same parcel within each ZIP. Neither formula predicts that a roof definitely needs replacing.</p>
+ <div class="overline">04 / PARALLEL MATHEMATICAL MODELS</div><h2>Three complementary ways to investigate roofing history</h2>
+ <p class="readout">Formula A keeps the existing property score. Formula B independently measures same-parcel permit intervals. Formula C compares recent roof-related permits among similar-age homes on the same street block. None proves leaks, worn shingles, or replacement need.</p>
  <div class="two-col">
   <div><h3>Formula A — Existing property research priority</h3>
    <div class="formula">S = clip(40 × age-relevance + 20 × old-permit indicator + 10 × no-record indicator + 15 × house-evidence + 15 × completeness, 0, 100)</div>
@@ -91,19 +91,30 @@ ZIP activity = 1,000 × recent permit parcels ÷ selected older parcels</div>
  </div>
  <label>Minimum construction age (years)
  <input type="number" id="formula-age" min="20" max="100" step="1" value="25"></label>
- <p><button id="run-dual-formulas" class="btn secondary" type="button">Calculate both formulas</button></p>
+ <div class="two-col">
+ <div><h3>Formula C — Similar-age neighbors with recent permit records</h3>
+ <div class="formula">Comparable neighbors = same named street and 100-number address block, construction years ± Y
+ Peer permit activity = comparable neighbor parcels with recent roofing permits ÷ qualifying peer parcels
+ Compare local peer activity with ZIP-wide recent roofing-permit frequency</div>
+ <p>The subject home's own permit is excluded. The street-block proxy is not measured physical distance; permits do not establish damage or why roofing work occurred.</p></div>
+ <div><div class="filter-grid">
+  <label>Similar construction year ± Y<input type="number" id="formula-peer-years" min="0" max="15" step="1" value="5"></label>
+  <label>Minimum comparable neighboring parcels<input type="number" id="formula-min-peers" min="3" max="30" step="1" value="5"></label>
+ </div><p class="foot">Too few neighbors → insufficient evidence, not a roofing risk assertion.</p></div>
+ </div>
+ <p><button id="run-dual-formulas" class="btn secondary" type="button">Calculate all three formulas</button></p>
  <p class="readout" id="formula-note" role="status">Choose ZIP codes and X years, then calculate. All data stays on this PC; this is a read-only computation.</p>
  <div class="table-wrap"><table><thead><tr>
  <th>ZIP</th><th>Formula A: older parcels</th><th>A: mean score</th>
  <th>B: exact APN matches</th><th>B: latest permit ≥ X years</th>
  <th>B: recent permit parcels</th><th>B: recent repeat after ≥ X years</th>
- <th>B: recent permits / 1,000</th></tr></thead>
- <tbody id="formula-body"><tr><td colspan="8">No comparison calculated yet.</td></tr></tbody>
+ <th>B: recent permits / 1,000</th><th>C: comparable-peer candidates</th><th>C: 2+ recent peer permits</th><th>C: local-to-ZIP activity ratio</th></tr></thead>
+ <tbody id="formula-body"><tr><td colspan="11">No comparison calculated yet.</td></tr></tbody>
  </table></div>
  <h3>Sample parcels with dated permit evidence</h3>
  <div class="table-wrap"><table><thead><tr><th>ZIP</th><th>Assessor parcel ID</th>
  <th>Existing V3 research score</th><th>Latest roof-related permit</th><th>Years since record</th><th>Recent long-gap repeat observed?</th></tr></thead>
  <tbody id="formula-samples"><tr><td colspan="6">Calculate to see up to 12 example parcel IDs.</td></tr></tbody></table></div>
- <p class="foot">Only exact parcel-ID matches feed Formula B. Formula A may also use supported address matching. Both are local research indicators, never roof-condition or marketing-conversion probabilities. Municipality coverage is incomplete and original permit details should be checked before any follow-up.</p>
+ <p class="foot">Only exact parcel-ID matches feed Formulas B and C. Formula A may also use supported address matching. The three methods provide separate research signals, never proof of leaks, worn shingles, roof age or commercial conversion. Municipal coverage is incomplete; verify original permit details before follow-up.</p>
 </section>
 </main></div></body></html>`;
