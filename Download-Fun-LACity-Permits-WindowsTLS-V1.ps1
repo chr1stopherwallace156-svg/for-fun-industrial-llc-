@@ -15,7 +15,7 @@ $sourceUrls=@{
  la_permits_2010_2019='https://data.lacity.org/api/v3/views/dyxf-7hc4/export.csv'
  la_permits_2020_present='https://data.lacity.org/api/v3/views/pi9x-tg5x/export.csv'
 }
-$remote=[Uri]$sourceUrls[$Source]
+$remote=[Uri]($sourceUrls[$Source])
 if($remote.Scheme -cne 'https' -or $remote.Host -cne 'data.lacity.org'){
  throw 'FUN_LACITY_FIXED_OFFICIAL_HTTPS_SOURCE_HOLD'
 }
@@ -32,10 +32,10 @@ if(Test-Path -LiteralPath $destination -PathType Leaf){
 # .NET Framework HttpClient uses Windows' OS-managed certificate validation,
 # unlike the previously failing CPython OpenSSL chain. Never relax TLS checking.
 Add-Type -AssemblyName System.Net.Http
-$handler=New-Object System.Net.Http.HttpClientHandler
+$handler=[System.Net.Http.HttpClientHandler]::new()
 $handler.AllowAutoRedirect=$false
 $handler.AutomaticDecompression=[System.Net.DecompressionMethods]::None
-$client=New-Object System.Net.Http.HttpClient($handler)
+$client=[System.Net.Http.HttpClient]::new($handler)
 $client.Timeout=[TimeSpan]::FromMinutes(60)
 $client.DefaultRequestHeaders.UserAgent.ParseAdd('FunIndustrial-Roofing-PublicData/3.0')
 $client.DefaultRequestHeaders.Accept.ParseAdd('text/csv')
@@ -83,7 +83,7 @@ try{
   throw 'FUN_LACITY_CSV_ABOVE_8GB_BOUND'
  }
  $stream=$response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
- $file=New-Object System.IO.FileStream($tempPath,
+ $file=[IO.FileStream]::new($tempPath,
   [IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
  $buffer=New-Object byte[] (1024*1024)
  $first=$true
