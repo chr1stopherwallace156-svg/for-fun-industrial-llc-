@@ -78,7 +78,7 @@ class SelectiveV3Tests(unittest.TestCase):
     def test_held_records_excluded_by_default(self):
         select(self.db)
         self.assertEqual(sum(x["candidates"] for x in markets(self.db)["rows"]),2)
-        self.assertEqual(sum(x["candidates"] for x in markets(self.db,include_holds=True)["rows"]),4)
+        self.assertEqual(sum(x["candidates"] for x in markets(self.db,include_holds=True,min_age=0)["rows"]),4)
         self.assertEqual(len(markets(self.db,county="Los Angeles",city="Los",min_age=20)["rows"]),1)
         self.assertEqual(len(markets(self.db,only_no_permit=True,detail=True)["rows"]),1)
         self.assertEqual(len(markets(self.db,detail=True,limit=1)["rows"]),1)
