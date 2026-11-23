@@ -16,8 +16,21 @@ const inventory='<details id="fi-fial53-capability-panel" style="margin:12px 0;p
  '<p style="color:#a8bac9">Qwen can use available read-only evidence from the existing modules. The list does not grant execution authority or imply every worker is online.</p>'+
  '<pre id="fi-fial53-capability-list" style="font:12px/1.6 Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;color:#bad3df">Checking local capability inventory…</pre>'+
  '</details>';
+const reaReview='<details id="fi-fial53-rea-panel" style="margin:12px 0;padding:13px;border:1px solid #3d5770;border-radius:12px;background:#0d1b29">'+
+ '<summary style="cursor:pointer;font-weight:700">Reviewed REA tools · separate approval</summary>'+
+ '<p style="color:#a8bac9">These two read-only tools use the existing 8797 REA service directly, not the degraded 8798 proxy. Prepare and confirm are two separate clicks. Nothing executes merely because Qwen suggests it.</p>'+
+ '<label for="fi-fial53-rea-select">Choose approved inspection</label>'+
+ '<select id="fi-fial53-rea-select" style="max-width:100%;width:100%;background:#102338;color:#e6edf5;border:1px solid #52718d;padding:9px;border-radius:8px">'+
+ '<option value="inspect_analysis_settings">Inspect REA analysis settings</option>'+
+ '<option value="binary_session">Inspect REA binary provider session</option></select>'+
+ '<p><button type="button" id="fi-fial53-rea-prepare">Prepare inspection</button> '+
+ '<button type="button" id="fi-fial53-rea-confirm" disabled>Confirm exact read-only call</button> '+
+ '<button type="button" id="fi-fial53-rea-cancel">Cancel</button></p>'+
+ '<pre id="fi-fial53-rea-review" role="status" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere;color:#d4e3f1;font:12px/1.5 Consolas,monospace">No REA inspection prepared.</pre>'+
+ '<p><button type="button" id="fi-fial53-rea-explain" hidden>Ask Qwen to explain the approved observation</button></p>'+
+ '<p style="font-size:12px;color:#aec5d2">No shell, file modification, REA configuration changes, or unapproved model-initiated calls. Provider and live REA status verified only at preparation.</p></details>';
 const panel=GROUNDED_PANEL
- .replace('<p><button id="fi-fial53-send"',inventory+extra+'<p><button id="fi-fial53-send"')
+ .replace('<p><button id="fi-fial53-send"',inventory+extra+reaReview+'<p><button id="fi-fial53-send"')
  .replace('No tools are requested or executed from this conversation.',
   'An optional local FISRE analyzer reads code as data; no arbitrary code execution or REA actions occur.')
  .replace('No model tool definitions, automatic retries, memory writes, or REA execution.',
