@@ -728,6 +728,48 @@ def inspect(args):
     emit({"version":VERSION,"file":path.name,"csv_members":info,
           "owner_data_not_extracted":True,"requires_explicit_ingest":True})
 
+def probe_assessor_archive(args):
+    """Read a small bounded LA public-data sample with production CSV policy.
+
+    Reports aggregated field coverage only: never names, address, APN, ZIP
+    values or other per-property data. This is a preview, not a full import.
+    """
+    from contextlib import closing
+    from itertools import islice
+    path=Path(args.file).expanduser().resolve()
+    if not path.is_file():
+        raise ValueError("PROBE_SOURCE_FILE_NOT_FOUND")
+    if not 100 <= args.sample_rows <= 10000:
+        raise ValueError("PROBE_SAMPLE_LIMIT_INVALID")
+    stats={"rows_sampled":0,"rows_with_apn":0,"rows_with_street":0,
+           "rows_with_year":0,"rows_with_site_zip":0,
+           "ambiguous_zip_rows":0,"situs_zip_recovered_rows":0,
+           "zip_unknown_rows":0,"classified_residential_rows":0}
+    with closing(input_members(path)) as files:
+        for name,binary in files:
+            with closing(csv_rows(binary,zip_conflict_policy="hold")) as rows:
+                for row in islice(rows,args.sample_rows):
+                    stats["rows_sampled"]+=1
+                    p=parse_property(row,"Los Angeles","la_assessor_2021_2025",None)
+                    if not p:
+                        continue
+                    stats["rows_with_apn"]+=int(bool(field(row,APN_FIELDS)))
+                    stats["rows_with_street"]+=int(bool(p[4]))
+                    stats["rows_with_year"]+=int(p[6] is not None)
+                    stats["rows_with_site_zip"]+=int(bool(p[3]))
+                    stats["classified_residential_rows"]+=int(p[7]==1)
+                    if row.get("_zip_conflict"):
+                        stats["ambiguous_zip_rows"]+=1
+                        stats["situs_zip_recovered_rows"]+=int(bool(p[3]))
+                        stats["zip_unknown_rows"]+=int(not p[3])
+            break
+    if not stats["rows_sampled"]:
+        raise ValueError("PROBE_NO_DATA_ROWS")
+    emit({"version":VERSION,"state":"SAMPLE_VALIDATED_NOT_FULL_IMPORT",
+          "source":"la_assessor_2021_2025",
+          "sample":stats,"no_individual_property_data_returned":True,
+          "full_import_completeness_unverified":True})
+
 def main():
     p=argparse.ArgumentParser(description="Full official property and permit data -> disk-backed SQLite. No scraping or outreach.")
     p.add_argument("--db",default=str(DEFAULT_ROOT/"roofing.sqlite3"))
@@ -737,6 +779,8 @@ def main():
     i=sub.add_parser("ingest");i.add_argument("--file",required=True);i.add_argument("--source-id",required=True)
     i.add_argument("--kind",choices=["la_properties","sb_properties","la_permits","municipal_permits"])
     i.add_argument("--county",default="");i.add_argument("--jurisdiction",default="");i.add_argument("--roll-year",type=int)
+    preview=sub.add_parser("probe-assessor");preview.add_argument("--file",required=True)
+    preview.add_argument("--sample-rows",type=int,default=1500)
     y=sub.add_parser("sync");y.add_argument("source",choices=sorted(SOURCES));y.add_argument("--root",default=str(DEFAULT_ROOT))
     y.add_argument("--replace",action="store_true");y.add_argument("--max-gb",type=float,default=8)
     y.add_argument("--max-pages",type=int,default=1600)
@@ -750,6 +794,7 @@ def main():
     if args.cmd=="download":
         if not 0.2<=args.max_gb<=32:raise ValueError("MAX_GB_INVALID")
         download(args)
+    elif args.cmd=="probe-assessor":probe_assessor_archive(args)
     elif args.cmd=="ingest":ingest(args)
     elif args.cmd=="sync":
         if not 0.2<=args.max_gb<=32 or not 1<=args.max_pages<=5000:
