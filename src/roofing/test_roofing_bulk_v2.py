@@ -234,6 +234,29 @@ class RoofingBulkTests(unittest.TestCase):
         with self.connect() as db:
             self.assertEqual(db.execute("SELECT zip FROM properties").fetchone()[0],"90001")
 
+    def test_privacy_safe_preflight_counts_zip_conflicts_not_property_values(self):
+        import csv
+        path=self.root/"sample_preview_assessor.csv"
+        with path.open("w",encoding="utf-8",newline="") as out:
+            w=csv.writer(out)
+            w.writerow(["AIN","Property Location","ZIP CODE","ZIP_CODE",
+                        "Year Built","Property Use Type"])
+            w.writerow(["0001002003","100 SAMPLE ST, LOS ANGELES, CA 90001",
+                        "90001","90210","1984","Single Family Residential"])
+            w.writerow(["0001002004","200 SAMPLE ST",
+                        "90001","90210","1976","Single Family Residential"])
+        preview=captured(roof.probe_assessor_archive,SimpleNamespace(
+            file=str(path),sample_rows=100))
+        self.assertEqual(preview["state"],"SAMPLE_VALIDATED_NOT_FULL_IMPORT")
+        self.assertEqual(preview["sample"]["rows_sampled"],2)
+        self.assertEqual(preview["sample"]["ambiguous_zip_rows"],2)
+        self.assertEqual(preview["sample"]["situs_zip_recovered_rows"],1)
+        self.assertEqual(preview["sample"]["zip_unknown_rows"],1)
+        self.assertNotIn("0001002003",str(preview))
+        self.assertNotIn("SAMPLE ST",str(preview))
+        self.assertNotIn("90001",str(preview))
+        self.assertTrue(preview["no_individual_property_data_returned"])
+
     def test_same_zip_five_digits_and_zip_four_agree(self):
         import csv
         path=self.root/"equivalent_zip_formats.csv"
