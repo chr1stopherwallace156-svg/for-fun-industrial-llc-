@@ -257,6 +257,20 @@ Conservative default reporting requires at least five comparable peers.
 Reports include a denominator, local peer permit share, ZIP-wide reference
 permit share, and an observational comparison ratio when there is enough
 evidence; overlapping neighbor windows are *not independent* observations.
+
+**Overlap control (V5 extension):** a ZIP-level
+`unique_street_blocks_with_two_or_more_age_matched_recent_peer_permits`
+counts a normalized same-street 100-number block **once** if at least one
+eligible subject property has two or more recent, exact-APN,
+age-comparable neighbor permit matches. This count is distinct from the
+number of eligible subject properties. An additional capped list of up to
+five unique qualifying street blocks **per ZIP** shows the block label,
+distinct selected older parcels on that block, distinct APNs with recent
+roofing permits, the number of qualifying subject windows, and the observed
+construction-year range. These ZIP-level block counts should not be added
+to the property counts. Multiple subjects within a block may share their
+same observed permit neighbors; this is not an independent statistical
+sample or proof of damage.
 No statistical significance or roof-replacement probability is inferred.
 
 Only official completed LA City permit sources and exact assessor APN joins
@@ -267,9 +281,9 @@ The module is `src/roofing/roofing_neighbor_context_v5.py`. The same
 **Calculate all three formulas** dashboard button calls it alongside V3 and
 V4 with read-only SQLite; no new job, automated outreach, Qwen, REA,
 Elektron access, database writes, or permanent raw data are introduced.
-Six isolated tests validate the street-block proxy, multiple recent peer
+Seven isolated tests validate the street-block proxy, multiple recent peer
 permits, construction-year tolerances, minimum peer counts, source isolation,
-and A/B/C integration.
+unique block deduplication, and A/B/C integration.
 
 ## Preflight
 
