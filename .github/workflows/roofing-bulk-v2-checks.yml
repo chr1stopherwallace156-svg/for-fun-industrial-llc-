@@ -24,6 +24,8 @@ jobs:
         run: python -c "import ast,pathlib; ast.parse(pathlib.Path('src/roofing/roofing_bulk_v2.py').read_text(encoding='utf-8')); print('ROOF_PYTHON_SYNTAX=PASS')"
       - name: Test roof matching and source failure handling
         run: python -B -W error::ResourceWarning src/roofing/test_roofing_bulk_v2.py
+      - name: Test selective extraction policy and transactional filtering
+        run: python -B -W error::ResourceWarning src/roofing/test_selective_v3.py
       - name: Validate server and browser JavaScript syntax
         run: |
           node --check scripts/Run-Fun-ML-Dashboard8802.mjs
