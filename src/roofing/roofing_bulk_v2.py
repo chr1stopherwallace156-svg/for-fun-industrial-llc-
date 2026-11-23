@@ -20,6 +20,7 @@ import time
 import urllib.request
 import zipfile
 from pathlib import Path
+from selective_extract_v3 import select as materialize_roof_targets
 
 VERSION = "fun-roofing-bulk-v2"
 DEFAULT_ROOT = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "FunIndustrial" / "RoofingBulkV2"
@@ -553,7 +554,9 @@ def sync_sb_arcgis(args):
       "total_features_reported":expected,"fetched":fetched,"accepted":accepted,"skipped":skipped,
       "owner_names_collected":False,"street_addresses_available":False,
       "year_built_available":False,"municipal_permit_coverage":False})
-    rebuild(SimpleNamespace(db=args.db))
+    summary=materialize_roof_targets(args.db,drop_irrelevant=True)
+    emit({"version":VERSION,"state":"FULL_SB_PARCELS_SELECTIVELY_FILTERED",
+          "selection":summary,"source":source,"complete_roof_permit_coverage":False})
 
 def sync(args):
     """Explicit operator sync: download one whole official file, ingest its rows, rebuild candidate indexes."""
@@ -574,10 +577,10 @@ def sync(args):
                           kind=kind, county="", jurisdiction="Los Angeles",
                           roll_year=2025 if args.source=="la_assessor_2021_2025" else None)
     ingest(ing)
-    rebuild(SimpleNamespace(db=args.db))
+    summary=materialize_roof_targets(args.db,drop_irrelevant=True)
     emit({"version":VERSION,"state":"SYNC_FINISHED_FROM_FULL_EXPORT",
           "source":args.source,"full_export_requested":True,
-          "countywide_permit_coverage":False})
+          "selection":summary,"countywide_permit_coverage":False})
 
 def inspect(args):
     path=Path(args.file)
