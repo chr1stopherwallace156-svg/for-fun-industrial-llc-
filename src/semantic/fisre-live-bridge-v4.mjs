@@ -110,5 +110,8 @@ export function fisreStatus(){
  return {version:FISRE_LIVE_VERSION,state:'available_operator_click_only',
   interface:'same_origin_8802',analysis:'python_ast_affine_rational_bound_replay',
   cognitive:'proposed_claim_only',sourceExecution:false,storage:false,
-  toolAuthorityAdded:false,newListener:false,externalActions:0};
+  toolAuthorityAdded:false,newListener:false,externalActions:0,
+  chatCodeReasoning:true,
+  qwenChatIntegration:'same_8802_grounded_8088_with_fisre_evidence',
+  additionalModels:0};
 }
