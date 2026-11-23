@@ -25,9 +25,9 @@ VERSION = "fun-roofing-bulk-v2"
 DEFAULT_ROOT = Path(os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))) / "FunIndustrial" / "RoofingBulkV2"
 SOURCES = {
     "la_assessor_2021_2025": ("https://apps.gis.lacounty.gov/static/hub/Assessor/Assessor_Parcel_Roll_2021_2025.zip", "la_properties"),
-    "la_permits_pre2010": ("https://data.lacity.org/api/v3/views/e67z-kt2n/export.csv?accessType=DOWNLOAD", "la_permits"),
-    "la_permits_2010_2019": ("https://data.lacity.org/api/v3/views/dyxf-7hc4/export.csv?accessType=DOWNLOAD", "la_permits"),
-    "la_permits_2020_present": ("https://data.lacity.org/api/v3/views/pi9x-tg5x/export.csv?accessType=DOWNLOAD", "la_permits"),
+    "la_permits_pre2010": ("https://data.lacity.org/api/views/e67z-kt2n/rows.csv?accessType=DOWNLOAD", "la_permits"),
+    "la_permits_2010_2019": ("https://data.lacity.org/api/views/dyxf-7hc4/rows.csv?accessType=DOWNLOAD", "la_permits"),
+    "la_permits_2020_present": ("https://data.lacity.org/api/views/pi9x-tg5x/rows.csv?accessType=DOWNLOAD", "la_permits"),
     "sb_assessor_characteristics": ("https://arc.sbcounty.gov/wp-content/uploads/sites/70/arcforms/PIMSPropertyCharacteristics_20260617_7928_205.zip", "sb_properties"),
 }
 ROOF = re.compile(r"\b(?:REROOF(?:ING)?|RE[\s-]ROOF(?:ING)?|ROOF(?:ING)?|SHINGLE|SHINGLES)\b", re.I)
@@ -35,13 +35,13 @@ REPLACED = re.compile(r"\b(?:REROOF(?:ING)?|RE[\s-]ROOF(?:ING)?|ROOF\s*(?:REPLAC
 RESIDENTIAL = re.compile(r"(?:SINGLE[\s_-]*FAMILY|^SFR$|^R1$|RESIDENTIAL|1[\s_-]*FAMILY|ONE[\s_-]*FAMILY)", re.I)
 COUNTY_MAP = {"LA": "Los Angeles", "LOS ANGELES": "Los Angeles",
               "SB": "San Bernardino", "SAN BERNARDINO": "San Bernardino"}
-ADDRESS_FIELDS = ("address", "situs", "site_address", "property_location", "primary_address", "street_address")
-APN_FIELDS = ("apn", "ain", "assessor_id", "assessor_parcel_number", "rec_parcel_nbr", "pin_nbr")
+ADDRESS_FIELDS = ("address", "situs", "site_address", "property_location", "primary_address", "street_address", "rec_parsit_street_name")
+APN_FIELDS = ("apn", "ain", "assessor_id", "assessor_parcel_number", "rec_parcel_nbr", "pin_nbr", "property_id")
 YEAR_FIELDS = ("year_built", "rec_sfrs_const_year", "building_year_built", "year_property_was_built")
 ZIP_FIELDS = ("zip", "zip_code", "zipcode", "site_address_zip_code", "rec_parsit_zip1")
-CITY_FIELDS = ("city", "site_city", "rec_parsit_city", "city_tax_rate_area")
-USE_FIELDS = ("property_use_type", "use_type", "property_type", "rec_land_type", "property_use_code")
-DATE_FIELDS = ("issue_date", "issue_dt", "issue_date_1", "issued", "permit_issue_date")
+CITY_FIELDS = ("city", "site_city", "rec_parsit_city")
+USE_FIELDS = ("classification", "use_code_1st_digit", "property_use_type", "use_type", "property_type", "rec_land_type", "property_use_code")
+DATE_FIELDS = ("issue_date", "issue_dt", "issue_date_1", "issued", "permit_issue_date", "issue_date_or_first_status")
 DESC_FIELDS = ("work_desc", "work_description", "description", "permit_description", "work_type")
 PERMIT_FIELDS = ("permit_nbr", "permit_number", "permit_no", "permit_id")
 
@@ -76,6 +76,12 @@ def parse_date(s):
     if match:
         try:
             return dt.date(int(match[1]), int(match[2]), int(match[3])).isoformat()
+        except ValueError:
+            pass
+    m = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})(?:\s|$)", clean(s, 32))
+    if m:
+        try:
+            return dt.date(int(m[3]), int(m[1]), int(m[2])).isoformat()
         except ValueError:
             pass
     return None
@@ -232,6 +238,12 @@ def ingest(args):
     conn.execute("INSERT INTO source_runs(source_id,kind,county,jurisdiction,state,updated) VALUES(?,?,?,?,?,?) ON CONFLICT(source_id) DO UPDATE SET state=excluded.state,updated=excluded.updated,ingested=0,skipped=0,coverage='NOT_VERIFIED'",
                  (args.source_id,kind,county,jurisdiction,"INGEST_IN_PROGRESS",started))
     conn.commit()
+    # Do not retain obsolete source rows across a full-file refresh.
+    if kind.endswith("_properties"):
+        conn.execute("DELETE FROM properties WHERE source_id=?", (args.source_id,))
+    else:
+        conn.execute("DELETE FROM permits WHERE source_id=?", (args.source_id,))
+    conn.commit()
     inserted = skipped = 0
     members = 0
     try:
@@ -281,13 +293,16 @@ def rebuild(args):
     c = db_open(Path(args.db))
     c.execute("DELETE FROM candidates")
     c.commit()
-    cursor = c.execute("SELECT county,apn,city,zip,address,address_key,year_built,residential FROM properties")
+    cursor = c.execute("""SELECT county,apn,city,zip,address,address_key,year_built,residential FROM properties
+      WHERE source_id IN (SELECT source_id FROM source_runs WHERE state='INGESTED_NOT_COMPLETENESS_VERIFIED')""")
     current_year = dt.date.today().year
     seen = 0
     while rows := cursor.fetchmany(1500):
         for r in rows:
-            by_apn = c.execute("SELECT MAX(issue_date) AS d FROM permits WHERE county=? AND apn=?", (r["county"],r["apn"])).fetchone()["d"] if not r["apn"].startswith("ADDRESS-") else None
-            by_address = c.execute("SELECT MAX(issue_date) AS d FROM permits WHERE county=? AND zip=? AND address_key=?", 
+            by_apn = c.execute("SELECT MAX(issue_date) AS d FROM permits WHERE county=? AND apn=? AND
+             source_id IN (SELECT source_id FROM source_runs WHERE state='INGESTED_NOT_COMPLETENESS_VERIFIED')", (r["county"],r["apn"])).fetchone()["d"] if not r["apn"].startswith("ADDRESS-") else None
+            by_address = c.execute("SELECT MAX(issue_date) AS d FROM permits WHERE county=? AND zip=? AND address_key=? AND
+                                   source_id IN (SELECT source_id FROM source_runs WHERE state='INGESTED_NOT_COMPLETENESS_VERIFIED')", 
                                    (r["county"],r["zip"],r["address_key"])).fetchone()["d"] if r["zip"] and r["address_key"] else None
             permit = max(filter(None,(by_apn,by_address)),default=None)
             year = r["year_built"]
