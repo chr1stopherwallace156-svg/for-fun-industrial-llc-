@@ -199,9 +199,10 @@ def analyze():
                 sign_errors[k]+=1
         rows.append({"id":record["id"],"pattern":list(reference["pattern"]),
                      "grade":scoring})
-    if len(pattern_score)!=EXPECTED_PATTERN_COUNT*2 and \
-       len(set(k for k,_ in pattern_score))!=EXPECTED_PATTERN_COUNT:
-        raise RuntimeError("V102_PATTERN_GROUP_COUNTS_UNEXPECTED")
+    for pattern in v10.PATTERNS:
+        key=",".join(map(str,pattern))
+        if pattern_score[(key,"total")]!=CASES_PER_PATTERN:
+            raise RuntimeError("V102_PATTERN_GROUP_COUNTS_UNEXPECTED_"+key)
     # Preserve the original report unchanged and fingerprint it again.
     if hashlib.sha256(REPORT.read_bytes()).hexdigest()!=v["sha256"]:
         raise RuntimeError("V102_ORIGINAL_REPORT_CHANGED_DURING_AUDIT")
