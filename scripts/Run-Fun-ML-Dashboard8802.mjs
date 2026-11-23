@@ -22,7 +22,7 @@ import {previewQwenHealth} from '../src/ui/organized-preview-health-v1.mjs';
 import {ROOF_UI_HTML} from '../src/ui/roofing-opportunity-v1.mjs';
 import {roofingSnapshot,roofingLeads,importRoofData,refreshLaCity,refreshNws} from '../src/roofing/roofing-intelligence-v1.mjs';
 import {ROOF_BULK_PAGE} from '../src/ui/roofing-bulk-page-v2.mjs';
-import {BULK_VERSION,bulkOverview,bulkMarkets,startBulkSync} from '../src/roofing/roofing-bulk-bridge-v2.mjs';
+import {BULK_VERSION,bulkOverview,bulkMarkets,bulkDualFormulas,startBulkSync} from '../src/roofing/roofing-bulk-bridge-v2.mjs';
 import {createFisreChatEvidence} from '../src/semantic/fisre-chat-evidence-v4.mjs';
 import {capabilityInventory} from '../src/intelligence/capability-fabric-v1.mjs';
 import {createReviewedDispatch} from '../src/intelligence/operator-reviewed-dispatch-v1.mjs';
@@ -317,6 +317,30 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
           return send(res,422,{error:'ROOF_BULK_FILTER_VALIDATION_HOLD'});
         return send(res,200,await bulkMarkets({county:area,city,minAge,onlyNoPermit,
           includeUnclassified,detail:u.pathname.endsWith('/candidates')}));
+      }
+      if(req.method==='GET'&&u.pathname==='/api/fun/roofing/bulk/formulas'){
+        if(u.searchParams.size>5) return send(res,422,{error:'ROOF_DUAL_FORMULA_TOO_MANY_FILTERS'});
+        const allowed=new Set(['zips','years','recentYears','minBuildingAge','permitKind']);
+        for(const key of u.searchParams.keys())if(!allowed.has(key))
+          return send(res,422,{error:'ROOF_DUAL_FORMULA_UNKNOWN_FILTER'});
+        const integer=(name,def)=>{
+          const raw=u.searchParams.get(name);
+          if(raw===null)return def;
+          return /^\d+$/.test(raw)&&raw.length<=3?Number(raw):NaN;
+        };
+        const zips=u.searchParams.get('zips')||'90011,90049,90731,90037';
+        const years=integer('years',20),recentYears=integer('recentYears',5);
+        const minBuildingAge=integer('minBuildingAge',25);
+        const permitKind=u.searchParams.get('permitKind')||'roof_related';
+        if(zips.length>60||!/^\d{5}(,\d{5}){0,9}$/.test(zips)||
+          !Number.isSafeInteger(years)||years<10||years>50||
+          !Number.isSafeInteger(recentYears)||recentYears<1||recentYears>10||
+          recentYears>=years||!Number.isSafeInteger(minBuildingAge)||
+          minBuildingAge<20||minBuildingAge>100||
+          !['roof_related','replacement_like'].includes(permitKind))
+          return send(res,422,{error:'ROOF_DUAL_FORMULA_FILTER_VALIDATION_HOLD'});
+        return send(res,200,await bulkDualFormulas({zips,years,recentYears,
+          minBuildingAge,permitKind}));
       }
       if(req.method==='POST'&&u.pathname==='/api/fun/roofing/bulk/sync'){
         if(!acceptedActionOrigin(req)||req.headers['x-fi-roofing-bulk-click']!=='operator-sync-full-export'||
