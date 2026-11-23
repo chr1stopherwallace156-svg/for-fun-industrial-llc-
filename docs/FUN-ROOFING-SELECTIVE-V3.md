@@ -55,8 +55,21 @@ No owner names, emails, or phone numbers are stored or enriched.
 ## Data safety
 
 - The importer validates required field names, recognized parsed rows and
-  sanity thresholds for LA assessor year/address completeness. Unknown
-  formats fail with a HOLD, rather than silently representing zero roofs.
+  sanity thresholds for LA assessor building-year and street-address completeness.
+  Source ZIP fields can collide after column-name normalization. For property
+  records, conflicting ZIPs are resolved **only** when the official Property
+  Location contains a full explicit situs ZIP; otherwise the parcel remains
+  in an enrichment HOLD with ZIP unknown. Even a single column ZIP cannot
+  override an explicit situs ZIP. Roof permit imports with conflicting ZIPs
+  continue to fail closed. Unknown formats are held rather than counted as
+  verified roofing data.
+- On the already-downloaded LA assessor archive, `inspect` exposes only
+  mapped column names and original duplicate ZIP header labels. A separate
+  bounded `probe-assessor` examines up to 1,500 rows for **aggregate counts
+  only**: rows with valid identifiers, address/year, ambiguous ZIPs, and ZIPs
+  recovered directly from situs addresses. It never outputs individual
+  owner details, addresses, ZIP values, or parcel IDs. This is sample-quality
+  evidence, **not a successful full import**.
 - Selection builds indexed temporary tables with bounded batches (~2,000
   rows); it validates KEEP+HOLD+DROP counts before a transactional swap.
 - The current official source must have a completed ingest state; interrupted
