@@ -17,6 +17,7 @@ import {mathSnapshot,mathEvidence} from '../src/math/math-report-bridge-v2.mjs';
 import {researchV3Snapshot,researchV3Evidence as researchV3EvidenceAdapter,researchV3Candidates} from '../src/math/math-report-bridge-v3.mjs';
 import {MATH_V3_HTML} from '../src/ui/math-v3-page.mjs';
 import {PREVIEW_HTML,PREVIEW_VERSION} from '../src/ui/organized-preview-v1.mjs';
+import {PROCUREMENT_FOCUS_HTML,PROCUREMENT_FOCUS_VERSION} from '../src/ui/procurement-focus-v1.mjs';
 import {previewQwenHealth} from '../src/ui/organized-preview-health-v1.mjs';
 import {ROOF_UI_HTML} from '../src/ui/roofing-opportunity-v1.mjs';
 import {roofingSnapshot,roofingLeads,importRoofData,refreshLaCity,refreshNws} from '../src/roofing/roofing-intelligence-v1.mjs';
@@ -501,6 +502,12 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         const csp=unified?"default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'none'; base-uri 'none'; frame-ancestors "+(embedded?"'self'":"'none'")+"; form-action 'none'":
           "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors "+(embedded?"'self'":"'none'");
         return send(res,200,html,'text/html; charset=utf-8',{'content-security-policy':csp});
+      }
+      if(req.method==='GET'&&u.pathname==='/procurement/'){
+        // Focused, bounded local-only view backed by existing procurement API.
+        const csp="default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'";
+        return send(res,200,PROCUREMENT_FOCUS_HTML,'text/html; charset=utf-8',
+          {'content-security-policy':csp,'x-fi-procurement-view':PROCUREMENT_FOCUS_VERSION});
       }
       if(req.method==='GET'&&u.pathname==='/operations/'){
         const embedded=u.searchParams.get('embedded')==='1';
