@@ -80,7 +80,8 @@ class GGUFProvenanceTests(unittest.TestCase):
     def test_truncated_metadata(self):
         with tempfile.TemporaryDirectory() as t:
             p = Path(t) / "truncated.gguf"
-            p.write_bytes(b"GGUF"+struct.pack("<IQQ", 3, 1, 3)+bytes(1024))
+            p.write_bytes(b"GGUF"+struct.pack("<IQQ", 3, 1, 1)+
+                          struct.pack("<Q", mod.MAX_METADATA_BYTES + 1)+bytes(1024))
             with self.assertRaises(ValueError):
                 mod.inspect(p)
 
