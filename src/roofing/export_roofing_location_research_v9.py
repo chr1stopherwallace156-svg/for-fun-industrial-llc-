@@ -271,6 +271,7 @@ def write_reports(result,output_dir):
     folder.mkdir(parents=True,exist_ok=True)
     stamp=dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
     files={}
+    created=[]
     datasets=(
         ("zip_market_summary",ZIP_FIELDS,result["zip_rows"]),
         ("ranked_street_blocks",BLOCK_FIELDS,result["blocks"]),
@@ -281,14 +282,15 @@ def write_reports(result,output_dir):
         for title,fields,rows in datasets:
             path=folder/(f"roofing_{title}_{stamp}.csv")
             with path.open("x",encoding="utf-8-sig",newline="") as handle:
+                created.append(path)
                 writer=csv.DictWriter(handle,fieldnames=fields,extrasaction="raise")
                 writer.writeheader()
                 writer.writerows(rows)
             files[title]=str(path)
     except Exception:
         # Only remove report files successfully created by this invocation.
-        for name in files.values():
-            Path(name).unlink(missing_ok=True)
+        for name in created:
+            name.unlink(missing_ok=True)
         raise
     return files
 
