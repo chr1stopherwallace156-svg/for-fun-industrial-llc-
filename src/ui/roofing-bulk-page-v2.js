@@ -1,7 +1,7 @@
 // Full export research UI. Only explicit clicks trigger official downloads.
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
-let busy=false,overview=null;
+let busy=false,overview=null,opportunitiesReady=false;
 function node(tag,value,cls){const e=document.createElement(tag);if(value!==undefined)e.textContent=String(value);if(cls)e.className=cls;return e}
 function display(id,v){const e=$(id);if(e)e.textContent=String(v)}
 function count(n){return Number.isSafeInteger(n)?n.toLocaleString():'—'}
@@ -203,10 +203,12 @@ async function loadOpportunities(){
  let d;
  try{d=await request('/api/fun/roofing/bulk/opportunities');}
  catch(error){
+  opportunitiesReady=false;
   display('roof-opportunity-status','Local opportunity summary unavailable: '+String(error.message||error).slice(0,180));
   return;
  }
  const ready=d.state==='READY_FROM_RECONCILED_LOCAL_V9_REPORTS';
+ opportunitiesReady=ready;
  for(const id of ['roof-opportunity-historical-button','roof-opportunity-no-match-button',
                    'roof-opportunity-other-button'])$(id).disabled=!ready;
  if(!ready){
@@ -260,6 +262,9 @@ async function execute(button,callback){
  const previous=button?.textContent;if(button)button.textContent='Working…';
  try{await callback()}catch(e){display('job-status','Action not completed: '+String(e.message||e).slice(0,230))}
  finally{busy=false;for(const b of all)b.disabled=false;if(button)button.textContent=previous;
+  if(!opportunitiesReady)for(const id of [
+   'roof-opportunity-historical-button','roof-opportunity-no-match-button',
+   'roof-opportunity-other-button'])$(id).disabled=true;
   if(overview?.job?.state==='RUNNING'){
    for(const b of document.querySelectorAll('button[data-source]'))b.disabled=true;
   }
