@@ -9,6 +9,8 @@ const exec=promisify(execFile);
 const SCRIPT=fileURLToPath(new URL('./roofing_bulk_v2.py',import.meta.url));
 const SELECTIVE_SCRIPT=fileURLToPath(new URL('./selective_extract_v3.py',import.meta.url));
 const DUAL_SCRIPT=fileURLToPath(new URL('./roofing_dual_formulas_v4.py',import.meta.url));
+const OPPORTUNITIES_SCRIPT=fileURLToPath(new URL('./roofing_opportunities_v10.py',import.meta.url));
+export const ROOFING_OPPORTUNITIES_VERSION='fun-roofing-opportunity-offers-v10';
 export const DUAL_FORMULA_VERSION='fun-roofing-parallel-formulas-v4';
 export const SELECTIVE_VERSION='fun-roofing-selective-v3';
 const ROOT=process.env.LOCALAPPDATA?join(process.env.LOCALAPPDATA,'FunIndustrial','RoofingBulkV2'):null;
@@ -100,6 +102,25 @@ export async function bulkDualFormulas({zips='90011,90049,90731,90037',
  if(parsed.version!==DUAL_FORMULA_VERSION||parsed.state!=='PARALLEL_INDEPENDENT_FORMULAS_READY')
    throw Error('ROOF_BULK_DUAL_FORMULA_RESULT_UNVERIFIED');
  return {...parsed,...holds()};
+}
+export async function roofingOpportunities({pathway=null}={}){
+ if(!ROOT||!DB)throw Error('ROOF_OPPORTUNITIES_LOCALAPPDATA_NOT_CONFIGURED');
+ if(pathway!==null&&!['HISTORICAL','NO_MATCH','OTHER'].includes(pathway))
+   throw Error('ROOF_OPPORTUNITIES_PATHWAY_INVALID');
+ if(!existsSync(OPPORTUNITIES_SCRIPT))throw Error('ROOF_OPPORTUNITIES_SCRIPT_NOT_INSTALLED');
+ const args=[OPPORTUNITIES_SCRIPT,'--root',ROOT];
+ if(pathway!==null)args.push('--pathway',pathway);
+ const {stdout}=await exec(python(),args,{
+    windowsHide:true,timeout:25000,maxBuffer:256*1024,
+    env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});
+ const text=stdout.trim().split(/\r?\n/).filter(Boolean).at(-1);
+ if(!text||text.length>256*1024)throw Error('ROOF_OPPORTUNITIES_RESULT_INVALID');
+ const result=JSON.parse(text);
+ if(result.version!==ROOFING_OPPORTUNITIES_VERSION||
+    !['READY_FROM_VERIFIED_LOCAL_V9_REPORTS','AWAITING_LOCAL_V9_REPORTS',
+      'LOCAL_V9_REPORT_INCOMPLETE_HOLD'].includes(result.state))
+   throw Error('ROOF_OPPORTUNITIES_RESULT_NOT_VERIFIED');
+ return {...result,...holds()};
 }
 export async function bulkOverview(){
  let db;
