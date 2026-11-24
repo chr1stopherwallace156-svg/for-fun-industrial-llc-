@@ -70,7 +70,7 @@ Never allow freeform "repair" to bypass the host trust boundary.
 
 ## Test coverage
 
-Thirteen offline unit tests include:
+Fifteen offline unit tests include:
 - exact, one trailing brace diagnosis;
 - raw valid case not normalized;
 - two extra braces, prose and malformed surrounding text rejected;
@@ -110,3 +110,41 @@ to a single extra brace, next evaluate either:
 Any new isolated inference needs separate consent. Live Fun,
 REA/MCP registration, main dashboards, Elektron and model weights
 remain untouched until separately authorized and tested.
+
+
+## V10.8.1 local test repair
+
+The first operator run reported 3 failed unit tests out of 13; the
+read-only saved-report audit was not executed because the launcher
+stopped on unit-test failure.
+
+Root cause A: The V10.6 synthetic fixture serializes JSON with
+sort_keys=True, so the last top-level field is a SCALAR and valid
+JSON ends with one "}". Appending one invalid extra "}" yields
+two closing braces. The initial V10.8 forensic check mistakenly
+required "}}}" in all cases, assuming the last field would be
+the nested arguments object as it was in Qwen's actual V10.7
+generated requests. That assumption is incorrect because JSON key
+ordering is not semantically meaningful.
+
+Fixed: The raw body must start with "{" and end in "}", be
+rejected by the existing V10.6 strict parser with the specific
+V106_PROPOSAL_NOT_STRICT_JSON error, and then the forensic audit
+tries removing exactly ONE final character IN MEMORY. The unchanged
+strict parser, exact source identity, exact integer checks and
+deterministic math dispatcher must ALL accept the resulting candidate.
+This is analysis only: V10.7's raw requests remain invalid and 0/7.
+
+Root cause B: A duplicate-key test expected the specific underlying
+reason in the forensic summary, but the generic diagnostic hid it.
+Fixed: The diagnostic reports the strict parser's rejection reason
+without treating it as a salvageable trailing-brace case.
+
+Two regression tests now cover (1) the sorted fixture ending in one
+valid brace and (2) the actual Qwen field ordering where nested
+arguments are last. Total offline unit tests: 15.
+
+This does not modify the V10.6 strict contract, V10.7 model output,
+previous results, frozen test, model weights, production tools or
+Elektron. The changed source and tests require execution on the
+operator's Windows PC to confirm successful completion.
