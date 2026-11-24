@@ -250,7 +250,7 @@ function renderRoofZipReferences(points,unmapped=[]){
   'Exact street and parcel coordinates are not provided.');
 }
 function selectRoofGeoZip(zip){
- roofGeo.zip=zip;roofGeo.offset=0;roofGeo.block=null;roofGeo.propertyOffset=0;
+ roofGeo.zip=zip;roofGeo.offset=0;resetRoofPropertyView();
  $('roof-geo-zip').value=zip;
  loadRoofGeoBlocks().catch(e=>display('roof-geo-state','Location lookup unavailable: '+String(e.message||e).slice(0,160)));
 }
