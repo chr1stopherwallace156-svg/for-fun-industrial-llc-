@@ -199,6 +199,158 @@ function fillOpportunityTable(id,rows,fields,empty){
   body.append(tr);
  }
 }
+const roofGeo={zip:'',pathway:'',offset:0,total:0,
+ block:null,propertyOffset:0,propertyTotal:0,ready:false,initialized:false};
+const SVG_NS='http://www.w3.org/2000/svg';
+function roofSvg(tag,attrs={},label=null){
+ const el=document.createElementNS(SVG_NS,tag);
+ for(const [k,v] of Object.entries(attrs))el.setAttribute(k,String(v));
+ if(label!==null)el.textContent=String(label);
+ return el;
+}
+function renderRoofZipReferences(points,unmapped=[]){
+ const svg=$('roof-geo-svg');svg.replaceChildren();
+ svg.append(roofSvg('rect',{x:0,y:0,width:700,height:390,rx:15,fill:'#0c1e2e'}));
+ for(let i=0;i<=7;i++){
+  const x=55+i*84;
+  svg.append(roofSvg('line',{x1:x,y1:30,x2:x,y2:360,stroke:'#254053','stroke-width':1}));
+ }
+ for(let i=0;i<=5;i++){
+  const y=40+i*62;
+  svg.append(roofSvg('line',{x1:35,y1:y,x2:660,y2:y,stroke:'#254053','stroke-width':1}));
+ }
+ svg.append(roofSvg('text',{x:36,y:25,fill:'#9cbbcc','font-size':12},'NORTH ↑  ·  ZIP reference positions'));
+ svg.append(roofSvg('text',{x:35,y:380,fill:'#7c9aaa','font-size':11},'WEST'));
+ svg.append(roofSvg('text',{x:630,y:380,fill:'#7c9aaa','font-size':11},'EAST'));
+ for(const p of points||[]){
+  if(!Number.isFinite(p.lon)||!Number.isFinite(p.lat))continue;
+  // Fixed LA postal-reference frame: no block, parcel or roof coordinates.
+  const x=35+((p.lon+118.57)/0.37)*610;
+  const y=40+((34.10-p.lat)/0.40)*312;
+  if(x<30||x>665||y<30||y>360)continue;
+  const g=roofSvg('g',{role:'button',tabindex:0,
+   'aria-label':'Select ZIP '+p.zip+' (postal reference only)'});
+  const selected=p.zip===roofGeo.zip;
+  g.append(roofSvg('circle',{cx:x,cy:y,r:selected?20:16,
+   fill:selected?'#44bfb0':'#276b7e',stroke:'#d9eff3','stroke-width':1.8}));
+  g.append(roofSvg('text',{x,y:y+4,'text-anchor':'middle',
+   fill:'#fff','font-size':10,'font-weight':'bold'},String(p.qualified_properties)));
+  const shift=p.zip==='90037'?-50:0;
+  g.append(roofSvg('text',{x:x+shift,y:y-24,'text-anchor':'middle',
+   'font-size':14,'font-weight':'bold',fill:'#eef9fd'},p.zip));
+  g.addEventListener('click',()=>selectRoofGeoZip(p.zip));
+  g.addEventListener('keydown',ev=>{
+   if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();selectRoofGeoZip(p.zip);}
+  });
+  svg.append(g);
+ }
+ display('roof-geo-caption','Postal ZIP reference locations only — '+(points||[]).length+
+  ' ZIP dots with qualifying property counts. GeoNames US postal codes, CC BY 4.0. '+
+  (unmapped.length?'No coordinates available for '+unmapped.join(', ')+'. ':'')+
+  'Exact street and parcel coordinates are not provided.');
+}
+function selectRoofGeoZip(zip){
+ roofGeo.zip=zip;roofGeo.offset=0;roofGeo.block=null;roofGeo.propertyOffset=0;
+ $('roof-geo-zip').value=zip;
+ loadRoofGeoBlocks().catch(e=>display('roof-geo-state','Location lookup unavailable: '+String(e.message||e).slice(0,160)));
+}
+function resetRoofPropertyView(){
+ roofGeo.block=null;roofGeo.propertyOffset=0;roofGeo.propertyTotal=0;
+ $('roof-geo-properties').replaceChildren();
+ const tr=node('tr'),td=node('td','Select a street block to inspect recorded research locations.');
+ td.colSpan=7;tr.append(td);$('roof-geo-properties').append(tr);
+ $('roof-geo-property-prev').disabled=true;$('roof-geo-property-next').disabled=true;
+ display('roof-geo-property-page','No block selected');
+ display('roof-geo-block-selection','Select any block below. Map dots are ZIP references, not property pins.');
+}
+async function loadRoofGeoBlocks(){
+ if(!opportunitiesReady){
+  display('roof-geo-state','Local V9 research report is not ready.');return;
+ }
+ display('roof-geo-state','Reading local street block inventory (no network or model)…');
+ const query=new URLSearchParams({mode:'blocks',offset:String(roofGeo.offset),limit:'25'});
+ if(roofGeo.zip)query.set('zip',roofGeo.zip);
+ if(roofGeo.pathway)query.set('pathway',roofGeo.pathway);
+ const result=await request('/api/fun/roofing/bulk/geo?'+query);
+ if(result.state!=='ZIP_STREET_RESEARCH_READY')throw Error('Geographic report not ready');
+ roofGeo.total=result.total;roofGeo.ready=true;
+ if(!roofGeo.initialized){
+  const zipSelect=$('roof-geo-zip');
+  for(const item of result.zip_reference_points||[]){
+   if(![...zipSelect.options].some(x=>x.value===item.zip)){
+    const option=document.createElement('option');option.value=item.zip;
+    option.textContent=item.zip+' · '+count(item.qualified_properties)+' properties';
+    zipSelect.append(option);
+   }
+  }
+  for(const zip of result.unmapped_zips||[]){
+   if(![...zipSelect.options].some(x=>x.value===zip)){
+    const option=document.createElement('option');option.value=zip;
+    option.textContent=zip+' · no reference point';zipSelect.append(option);
+   }
+  }
+  roofGeo.initialized=true;
+ }
+ renderRoofZipReferences(result.zip_reference_points,result.unmapped_zips);
+ const tbody=$('roof-geo-blocks');tbody.replaceChildren();
+ for(const b of result.rows||[]){
+  const tr=node('tr');
+  for(const value of [b.zip,b.street_number_block,b.qualified_in_view,b.historical,
+    b.no_match,b.recent_permit_parcels])tr.append(node('td',value));
+  const action=node('td');const btn=node('button','Inspect properties','btn secondary');
+  btn.type='button';btn.addEventListener('click',()=>{
+   roofGeo.block={zip:b.zip,name:b.street_number_block};roofGeo.propertyOffset=0;
+   loadRoofGeoProperties().catch(e=>display('roof-geo-block-selection','Property lookup unavailable: '+String(e.message||e).slice(0,160)));
+  });action.append(btn);tr.append(action);tbody.append(tr);
+ }
+ if(!tbody.childElementCount){
+  const tr=node('tr'),cell=node('td','No street blocks matched this ZIP and pathway.');
+  cell.colSpan=7;tr.append(cell);tbody.append(tr);
+ }
+ $('roof-geo-prev').disabled=roofGeo.offset<=0;
+ $('roof-geo-next').disabled=!result.has_more;
+ display('roof-geo-page',result.total?String(roofGeo.offset+1)+'–'+
+   String(Math.min(roofGeo.offset+25,result.total))+' of '+count(result.total)+' blocks':'0 blocks');
+ display('roof-geo-state','Showing '+count(result.total)+' qualifying street blocks '+
+  (roofGeo.zip?'in ZIP '+roofGeo.zip:'across report ZIPs')+
+  (roofGeo.pathway?' · '+roofGeo.pathway:' · all pathways')+
+  '. Select a row to see local recorded property addresses.');
+}
+async function loadRoofGeoProperties(){
+ if(!roofGeo.block)return;
+ const selected=roofGeo.block;
+ display('roof-geo-block-selection','Reading '+selected.name+' · '+selected.zip+'…');
+ const query=new URLSearchParams({mode:'properties',zip:selected.zip,block:selected.name,
+  offset:String(roofGeo.propertyOffset),limit:'25'});
+ if(roofGeo.pathway)query.set('pathway',roofGeo.pathway);
+ const result=await request('/api/fun/roofing/bulk/geo?'+query);
+ if(result.state!=='ZIP_STREET_RESEARCH_READY')throw Error('Property report unavailable');
+ roofGeo.propertyTotal=result.total;
+ const tbody=$('roof-geo-properties');tbody.replaceChildren();
+ for(const p of result.rows||[]){
+  const row=node('tr');
+  for(const value of [p.address,p.construction_year,p.existing_formula_a_priority,
+    p.last_recorded_exact_parcel_roof_permit||'No matching permit',
+    p.recent_age_matched_peer_permit_parcels,p.pathway])row.append(node('td',value));
+  const cell=node('td');const link=node('a','Search address ↗');
+  // External map lookup occurs only after operator clicks a link.
+  link.href='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(p.address);
+  link.target='_blank';link.rel='noopener noreferrer';
+  cell.append(link);row.append(cell);tbody.append(row);
+ }
+ if(!tbody.childElementCount){
+  const tr=node('tr'),td=node('td','No property records match this pathway and block.');
+  td.colSpan=7;tr.append(td);tbody.append(tr);
+ }
+ display('roof-geo-block-selection',selected.name+' · '+selected.zip+
+   ' · '+count(result.total)+' recorded property research candidates'+
+   (roofGeo.pathway?' · '+roofGeo.pathway:''));
+ $('roof-geo-property-prev').disabled=roofGeo.propertyOffset===0;
+ $('roof-geo-property-next').disabled=!result.has_more;
+ display('roof-geo-property-page',result.total?
+  String(roofGeo.propertyOffset+1)+'–'+String(Math.min(roofGeo.propertyOffset+25,result.total))+
+   ' of '+count(result.total)+' properties':'0 properties');
+}
 async function loadOpportunities(){
  display('roof-opportunity-status','Checking existing local V9 roofing reports (read-only)…');
  let d;
@@ -253,6 +405,8 @@ async function loadOpportunities(){
    'historical_permit_properties','no_matching_permit_properties'],
    'No qualifying street-block evidence.');
  await loadOpportunityPathway('HISTORICAL');
+ await loadRoofGeoBlocks().catch(error=>
+  display('roof-geo-state','Location explorer unavailable: '+String(error.message||error).slice(0,160)));
 }
 function roofRefreshFilters(){
  const zips=$('roof-refresh-zips').value.trim();
@@ -347,6 +501,29 @@ async function sync(source){
 }
 $('roof-opportunity-refresh').addEventListener('click',e=>execute(e.currentTarget,loadOpportunities));
 $('roof-opportunity-recalculate-button').addEventListener('click',e=>execute(e.currentTarget,recalculateRoofingOpportunities));
+$('roof-geo-filter').addEventListener('click',e=>execute(e.currentTarget,async()=>{
+ roofGeo.zip=$('roof-geo-zip').value;roofGeo.pathway=$('roof-geo-pathway').value;
+ roofGeo.offset=0;resetRoofPropertyView();await loadRoofGeoBlocks();
+}));
+$('roof-geo-clear').addEventListener('click',e=>execute(e.currentTarget,async()=>{
+ roofGeo.zip='';roofGeo.pathway='';roofGeo.offset=0;
+ $('roof-geo-zip').value='';$('roof-geo-pathway').value='';
+ resetRoofPropertyView();await loadRoofGeoBlocks();
+}));
+$('roof-geo-prev').addEventListener('click',e=>execute(e.currentTarget,async()=>{
+ roofGeo.offset=Math.max(0,roofGeo.offset-25);resetRoofPropertyView();await loadRoofGeoBlocks();
+}));
+$('roof-geo-next').addEventListener('click',e=>execute(e.currentTarget,async()=>{
+ if(roofGeo.offset+25<roofGeo.total)roofGeo.offset+=25;
+ resetRoofPropertyView();await loadRoofGeoBlocks();
+}));
+$('roof-geo-property-prev').addEventListener('click',e=>execute(e.currentTarget,async()=>{
+ roofGeo.propertyOffset=Math.max(0,roofGeo.propertyOffset-25);await loadRoofGeoProperties();
+}));
+$('roof-geo-property-next').addEventListener('click',e=>execute(e.currentTarget,async()=>{
+ if(roofGeo.propertyOffset+25<roofGeo.propertyTotal)roofGeo.propertyOffset+=25;
+ await loadRoofGeoProperties();
+}));
 $('roof-opportunity-historical-button').addEventListener('click',e=>execute(e.currentTarget,()=>loadOpportunityPathway('HISTORICAL')));
 $('roof-opportunity-no-match-button').addEventListener('click',e=>execute(e.currentTarget,()=>loadOpportunityPathway('NO_MATCH')));
 $('roof-opportunity-other-button').addEventListener('click',e=>execute(e.currentTarget,()=>loadOpportunityPathway('OTHER')));
