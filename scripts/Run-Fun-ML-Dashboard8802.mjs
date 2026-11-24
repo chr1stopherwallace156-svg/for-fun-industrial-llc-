@@ -22,7 +22,8 @@ import {previewQwenHealth} from '../src/ui/organized-preview-health-v1.mjs';
 import {ROOF_UI_HTML} from '../src/ui/roofing-opportunity-v1.mjs';
 import {roofingSnapshot,roofingLeads,importRoofData,refreshLaCity,refreshNws} from '../src/roofing/roofing-intelligence-v1.mjs';
 import {ROOF_BULK_PAGE} from '../src/ui/roofing-bulk-page-v2.mjs';
-import {BULK_VERSION,bulkOverview,bulkMarkets,bulkDualFormulas,roofingOpportunities,startBulkSync} from '../src/roofing/roofing-bulk-bridge-v2.mjs';
+import {BULK_VERSION,bulkOverview,bulkMarkets,bulkDualFormulas,roofingOpportunities,
+ validateRoofingRecalculation,recalculateRoofingLocations,startBulkSync} from '../src/roofing/roofing-bulk-bridge-v2.mjs';
 import {createFisreChatEvidence} from '../src/semantic/fisre-chat-evidence-v4.mjs';
 import {capabilityInventory} from '../src/intelligence/capability-fabric-v1.mjs';
 import {createReviewedDispatch} from '../src/intelligence/operator-reviewed-dispatch-v1.mjs';
@@ -278,7 +279,8 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
  procurementStatus=readProcurementStatus,fitStatus=readFitStatus,
  bidStatus=readReadinessStatus,buyerStatus=readBuyerStatus,demandStatus=readDemandStatus,
  readUiClient=()=>readFile(UI_CLIENT,'utf8'),readUiStyle=()=>readFile(UI_CSS,'utf8'),
- roofingOpportunityReader=roofingOpportunities}={}){
+ roofingOpportunityReader=roofingOpportunities,
+ roofingRecalculationRunner=recalculateRoofingLocations}={}){
   const dispatch=reviewedDispatch??createReviewedDispatch();
   const compute=reviewedCompute??createReviewedCompute({ml});
   const activeGrounded=grounded??createGroundedChat({capabilityReaders:{
@@ -355,6 +357,19 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
           return send(res,422,{error:'ROOF_DUAL_FORMULA_FILTER_VALIDATION_HOLD'});
         return send(res,200,await bulkDualFormulas({zips,years,recentYears,
           minBuildingAge,permitKind,peerYears,minPeers}));
+      }
+      if(req.method==='POST'&&u.pathname==='/api/fun/roofing/bulk/recalculate'){
+        if(u.searchParams.size>0)return send(res,422,{error:'ROOF_LOCATION_REFRESH_QUERY_HOLD'});
+        if(!acceptedActionOrigin(req)||
+           req.headers['x-fi-roofing-bulk-click']!=='operator-recalculate-location-v11'||
+           (req.headers['sec-fetch-site']&&!['same-origin','none'].includes(req.headers['sec-fetch-site'])))
+          return send(res,403,{error:'ROOF_LOCATION_REFRESH_OPERATOR_CLICK_REQUIRED'});
+        if(req.headers['content-type']!=='application/json')
+          return send(res,415,{error:'ROOF_LOCATION_REFRESH_JSON_REQUIRED'});
+        const body=await roofingBody(req,512);
+        try{validateRoofingRecalculation(body)}
+        catch{return send(res,422,{error:'ROOF_LOCATION_REFRESH_FILTER_VALIDATION_HOLD'})}
+        return send(res,200,await roofingRecalculationRunner(body));
       }
       if(req.method==='POST'&&u.pathname==='/api/fun/roofing/bulk/sync'){
         if(!acceptedActionOrigin(req)||req.headers['x-fi-roofing-bulk-click']!=='operator-sync-full-export'||
