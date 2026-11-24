@@ -95,6 +95,7 @@ function PreviewLive([string]$ExpectedRunner){
    $page.Headers['x-fi-preview-version'] -cne 'fun-industrial-organized-ui-preview-v1' -or
    $page.Content -notmatch 'Everything in its place' -or
    $page.Content -notmatch 'data-view="chat"' -or
+   $page.Content -notmatch 'href="/roofing/bulk/#roof-opportunities"' -or
    $css.StatusCode -ne 200 -or $css.Content -notmatch 'home-hero-grid' -or
    $client.StatusCode -ne 200 -or $client.Content -notmatch "useMathV3Evidence" -or
    $qwen.version -cne 'fun-ui-preview-qwen-health-v1' -or $qwen.modelStart -ne $false -or
@@ -119,8 +120,11 @@ function PreviewLive([string]$ExpectedRunner){
    $bulkPage.Content -notmatch 'id="selection-selected"' -or
    $bulkPage.Content -notmatch 'id="roof-opportunities"' -or
    $bulkPage.Content -notmatch 'id="roof-opportunity-historical-button"' -or
+   $bulkPage.Content -notmatch 'id="roof-opportunity-recalculate-button"' -or
+   $bulkPage.Content -notmatch 'id="roof-refresh-zips"' -or
    $bulkPage.Content -notmatch 'id="roof-opportunity-no-match-button"' -or
    $bulkJs.Content -notmatch 'loadOpportunities' -or
+   $bulkJs.Content -notmatch 'recalculateRoofingOpportunities' -or
    $roofOpportunities.version -cne 'fun-roofing-opportunity-offers-v10' -or
    $roofOpportunities.read_only -ne $true -or
    $roofOpportunities.no_outreach_or_model_execution -ne $true -or
