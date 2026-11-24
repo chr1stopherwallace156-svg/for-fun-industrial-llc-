@@ -22,7 +22,7 @@ import {previewQwenHealth} from '../src/ui/organized-preview-health-v1.mjs';
 import {ROOF_UI_HTML} from '../src/ui/roofing-opportunity-v1.mjs';
 import {roofingSnapshot,roofingLeads,importRoofData,refreshLaCity,refreshNws} from '../src/roofing/roofing-intelligence-v1.mjs';
 import {ROOF_BULK_PAGE} from '../src/ui/roofing-bulk-page-v2.mjs';
-import {BULK_VERSION,bulkOverview,bulkMarkets,bulkDualFormulas,startBulkSync} from '../src/roofing/roofing-bulk-bridge-v2.mjs';
+import {BULK_VERSION,bulkOverview,bulkMarkets,bulkDualFormulas,roofingOpportunities,startBulkSync} from '../src/roofing/roofing-bulk-bridge-v2.mjs';
 import {createFisreChatEvidence} from '../src/semantic/fisre-chat-evidence-v4.mjs';
 import {capabilityInventory} from '../src/intelligence/capability-fabric-v1.mjs';
 import {createReviewedDispatch} from '../src/intelligence/operator-reviewed-dispatch-v1.mjs';
@@ -303,6 +303,15 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         return send(res,200,await readFile(ROOF_BULK_CLIENT,'utf8'),'text/javascript; charset=utf-8');
       if(req.method==='GET'&&u.pathname==='/api/fun/roofing/bulk/status')
         return send(res,200,await bulkOverview());
+      if(req.method==='GET'&&u.pathname==='/api/fun/roofing/bulk/opportunities'){
+        if(u.searchParams.size>1||[...u.searchParams.keys()].some(k=>k!=='pathway')||
+           (u.searchParams.has('pathway')&&
+            !['HISTORICAL','NO_MATCH','OTHER'].includes(u.searchParams.get('pathway'))))
+          return send(res,422,{error:'ROOF_OPPORTUNITIES_FILTER_HOLD'});
+        return send(res,200,await roofingOpportunities({
+          pathway:u.searchParams.get('pathway')||null
+        }));
+      }
       if(req.method==='GET'&&['/api/fun/roofing/bulk/markets','/api/fun/roofing/bulk/candidates'].includes(u.pathname)){
         const area=u.searchParams.get('county')||'all';
         const city=u.searchParams.get('city')||'';
