@@ -187,6 +187,73 @@ async function renderParallelFormulas(){
   +peerYears+' and at least '+minPeers+' peers. This is a proxy, not measured '
   +'physical distance or evidence of roof damage.');
 }
+function fillOpportunityTable(id,rows,fields,empty){
+ const body=$(id);body.replaceChildren();
+ if(!Array.isArray(rows)||!rows.length){
+  const tr=node('tr'),td=node('td',empty);td.colSpan=fields.length;tr.append(td);body.append(tr);return;
+ }
+ for(const item of rows){
+  const tr=node('tr');
+  for(const key of fields)tr.append(node('td',item[key]??'—'));
+  body.append(tr);
+ }
+}
+async function loadOpportunities(){
+ display('roof-opportunity-status','Checking existing local V9 roofing reports (read-only)…');
+ let d;
+ try{d=await request('/api/fun/roofing/bulk/opportunities');}
+ catch(error){
+  display('roof-opportunity-status','Local opportunity summary unavailable: '+String(error.message||error).slice(0,180));
+  return;
+ }
+ const ready=d.state==='READY_FROM_VERIFIED_LOCAL_V9_REPORTS';
+ for(const id of ['roof-opportunity-historical-button','roof-opportunity-no-match-button',
+                   'roof-opportunity-other-button'])$(id).disabled=!ready;
+ if(!ready){
+  display('roof-opportunity-status',d.state==='AWAITING_LOCAL_V9_REPORTS'?
+   'No completed local V9 report yet. Once available, this section will offer both pathways automatically.':
+   'Latest V9 report set is incomplete; no stale reports have been substituted.');
+  return;
+ }
+ const totals=d.totals||{};
+ display('roof-opportunity-blocks',count(totals.qualified_street_blocks));
+ display('roof-opportunity-properties',count(totals.qualified_properties));
+ display('roof-opportunity-historical',count(totals.historical));
+ display('roof-opportunity-no-match',count(totals.no_match));
+ const f=d.filters||{};
+ display('roof-opportunity-filters','Report '+(d.report_snapshot||'unknown')+
+  ' · building age ≥ '+f.min_building_age+' years · historical permit ≥ '+
+  f.historical_x_years+' years · recent window '+f.recent_years+' years · '+
+  (f.permit_kind||'unknown')+' · same-street construction cohort ± '+
+  f.age_cohort_tolerance+' years');
+ display('roof-opportunity-status','Ready: '+count(totals.qualified_properties)+
+  ' research properties across '+count(totals.qualified_street_blocks)+
+  ' qualifying street blocks. Automatically loaded from your existing local V9 reports.');
+ fillOpportunityTable('roof-opportunity-block-body',d.top_street_blocks,
+  ['zip','street_number_block','qualified_properties','recent_permit_parcels',
+   'historical_permit_properties','no_matching_permit_properties'],
+   'No qualifying street-block evidence.');
+ await loadOpportunityPathway('HISTORICAL');
+}
+async function loadOpportunityPathway(pathway){
+ if(!['HISTORICAL','NO_MATCH','OTHER'].includes(pathway))return;
+ display('roof-opportunity-pathway-title',pathway==='HISTORICAL'?
+   '— older recorded permit':pathway==='NO_MATCH'?
+   '— no matching permit':'— intermediate or recent recorded permit');
+ const res=await request('/api/fun/roofing/bulk/opportunities?pathway='+encodeURIComponent(pathway));
+ if(res.state!=='READY_FROM_VERIFIED_LOCAL_V9_REPORTS')
+  throw Error('LOCAL_OPPORTUNITY_REPORT_NOT_READY');
+ const rows=(res.property_examples||[]).map(row=>({
+  zip:row.zip,address:row.address,year_built:row.year_built,
+  formula_a_existing_priority:row.formula_a_existing_priority,
+  last_exact_apn_permit:row.last_exact_apn_permit||'No exact match in chosen records',
+  recent_peer_permit_parcels:row.recent_peer_permit_parcels
+ }));
+ fillOpportunityTable('roof-opportunity-property-body',rows,
+  ['zip','address','year_built','formula_a_existing_priority',
+   'last_exact_apn_permit','recent_peer_permit_parcels'],
+  'No research properties matched this pathway.');
+}
 async function execute(button,callback){
  if(busy)return;busy=true;const all=[...document.querySelectorAll('button')];
  for(const b of all)b.disabled=true;
@@ -214,6 +281,12 @@ async function sync(source){
   await showOverview();
  });
 }
+$('roof-opportunity-refresh').addEventListener('click',e=>execute(e.currentTarget,loadOpportunities));
+$('roof-opportunity-historical-button').addEventListener('click',e=>execute(e.currentTarget,()=>loadOpportunityPathway('HISTORICAL')));
+$('roof-opportunity-no-match-button').addEventListener('click',e=>execute(e.currentTarget,()=>loadOpportunityPathway('NO_MATCH')));
+$('roof-opportunity-other-button').addEventListener('click',e=>execute(e.currentTarget,()=>loadOpportunityPathway('OTHER')));
+loadOpportunities().catch(error=>
+ display('roof-opportunity-status','Local opportunity view unavailable: '+String(error.message||error).slice(0,180)));
 $('load-markets').addEventListener('click',e=>execute(e.currentTarget,()=>renderMarkets(false)));
 $('run-dual-formulas').addEventListener('click',e=>execute(e.currentTarget,
  async()=>{try{await renderParallelFormulas()}catch(error){
