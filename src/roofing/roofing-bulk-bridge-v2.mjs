@@ -11,6 +11,7 @@ const SELECTIVE_SCRIPT=fileURLToPath(new URL('./selective_extract_v3.py',import.
 const DUAL_SCRIPT=fileURLToPath(new URL('./roofing_dual_formulas_v4.py',import.meta.url));
 const OPPORTUNITIES_SCRIPT=fileURLToPath(new URL('./roofing_opportunities_v10.py',import.meta.url));
 const LOCATION_EXPORT_SCRIPT=fileURLToPath(new URL('./export_roofing_location_research_v9.py',import.meta.url));
+const ZIP_EXPLORER_SCRIPT=fileURLToPath(new URL('./roofing_geo_explorer_v12.py',import.meta.url));
 export const ROOFING_OPPORTUNITIES_VERSION='fun-roofing-opportunity-offers-v10';
 export const DUAL_FORMULA_VERSION='fun-roofing-parallel-formulas-v4';
 export const SELECTIVE_VERSION='fun-roofing-selective-v3';
@@ -104,6 +105,35 @@ export async function bulkDualFormulas({zips='90011,90049,90731,90037',
  if(parsed.version!==DUAL_FORMULA_VERSION||parsed.state!=='PARALLEL_INDEPENDENT_FORMULAS_READY')
    throw Error('ROOF_BULK_DUAL_FORMULA_RESULT_UNVERIFIED');
  return {...parsed,...holds()};
+}
+export async function roofingZipExplorer({zip=null,pathway=null,block=null,
+ mode='blocks',offset=0,limit=25}={}){
+ if(!ROOT||!DB)throw Error('ROOF_ZIP_EXPLORER_LOCALAPPDATA_NOT_CONFIGURED');
+ if(zip!==null&&(typeof zip!=='string'||!/^\d{5}$/.test(zip))||
+    pathway!==null&&!['HISTORICAL','NO_MATCH','OTHER'].includes(pathway)||
+    block!==null&&(typeof block!=='string'||block.length>180||
+      !/^[A-Za-z0-9 .,&'()\/#-]+$/.test(block))||
+    !['blocks','properties'].includes(mode)||
+    !Number.isSafeInteger(offset)||offset<0||offset>20000||
+    !Number.isSafeInteger(limit)||limit<1||limit>50)
+   throw Error('ROOF_ZIP_EXPLORER_FILTER_HOLD');
+ if(mode==='properties'&&(!zip||!block))throw Error('ROOF_ZIP_EXPLORER_SCOPE_HOLD');
+ const args=[ZIP_EXPLORER_SCRIPT,'--root',ROOT,
+   '--mode',mode,'--offset',String(offset),'--limit',String(limit)];
+ if(zip!==null)args.push('--zip',zip);
+ if(pathway!==null)args.push('--pathway',pathway);
+ if(block!==null)args.push('--block',block);
+ const {stdout}=await exec(python(),args,{
+    windowsHide:true,timeout:25000,maxBuffer:256*1024,
+    env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});
+ const raw=stdout.trim().split(/\r?\n/).filter(Boolean).at(-1);
+ if(!raw||raw.length>256*1024)throw Error('ROOF_ZIP_EXPLORER_RESPONSE_INVALID');
+ const result=JSON.parse(raw);
+ if(result.version!=='fun-roofing-zip-street-explorer-v12'||!
+   ['ZIP_STREET_RESEARCH_READY','AWAITING_LOCAL_V9_REPORTS',
+     'LOCAL_V9_REPORT_INCOMPLETE_HOLD'].includes(result.state))
+   throw Error('ROOF_ZIP_EXPLORER_RESULT_UNVERIFIED');
+ return {...result,...holds()};
 }
 export async function roofingOpportunities({pathway=null}={}){
  if(!ROOT||!DB)throw Error('ROOF_OPPORTUNITIES_LOCALAPPDATA_NOT_CONFIGURED');
