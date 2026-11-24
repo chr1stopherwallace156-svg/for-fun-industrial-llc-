@@ -27,6 +27,32 @@ export const ROOF_BULK_PAGE=String.raw`<!doctype html><html lang="en"><head><met
  <article class="metric"><span>Candidates indexed</span><strong id="total-candidates">—</strong><small>Ranked, not confirmed roofing needs</small></article>
  <article class="metric"><span>Data completeness</span><strong id="data-completeness">Not verified</strong><small>Varies by jurisdiction and source history</small></article>
 </section>
+<section class="panel" id="roof-opportunities" aria-labelledby="roof-opportunity-heading">
+ <div class="section-header"><div><div class="overline">AUTOMATIC LOCAL CAPABILITY / ROOFING RESEARCH</div>
+ <h2 id="roof-opportunity-heading">Roofing opportunities by ZIP and street</h2>
+ <p>When a complete local V9 report exists, Fun Industrial automatically offers two independent research pathways. No permit, roof-damage, or customer-interest assertion is made.</p></div>
+ <button class="btn secondary" type="button" id="roof-opportunity-refresh">Check local reports ↻</button></div>
+ <p class="readout" id="roof-opportunity-status" role="status">Looking for your completed local roofing research reports…</p>
+ <div class="metrics" aria-label="Automatically detected location research">
+  <article class="metric"><span>Qualifying street blocks</span><strong id="roof-opportunity-blocks">—</strong><small>Same-street 100-number address proxies</small></article>
+  <article class="metric"><span>Qualified research properties</span><strong id="roof-opportunity-properties">—</strong><small>Not confirmed roofing jobs</small></article>
+  <article class="metric"><span>Historical-permit pathway</span><strong id="roof-opportunity-historical">—</strong><small>Last recorded permit ≥ selected X years</small></article>
+  <article class="metric"><span>No-matching-permit pathway</span><strong id="roof-opportunity-no-match">—</strong><small>No exact-APN match in selected records</small></article>
+ </div>
+ <div class="opportunity-actions" aria-label="Choose roofing research pathway">
+  <button type="button" class="btn secondary" id="roof-opportunity-historical-button">Review historical-permit properties</button>
+  <button type="button" class="btn secondary" id="roof-opportunity-no-match-button">Review no-match properties</button>
+  <button type="button" class="btn secondary" id="roof-opportunity-other-button">Review intermediate-permit records</button>
+ </div>
+ <p class="readout" id="roof-opportunity-filters">Waiting for source-report parameters.</p>
+ <h3>Automatically ranked street blocks</h3>
+ <div class="table-wrap"><table><thead><tr><th>ZIP</th><th>Street block</th><th>Qualified properties</th><th>Recent permit parcels</th><th>Historical-path properties</th><th>No-match properties</th></tr></thead>
+ <tbody id="roof-opportunity-block-body"><tr><td colspan="6">Reading verified local reports…</td></tr></tbody></table></div>
+ <h3>Property research pathway <span id="roof-opportunity-pathway-title">—</span></h3>
+ <div class="table-wrap"><table><thead><tr><th>ZIP</th><th>Address</th><th>Construction year</th><th>Existing A score</th><th>Last exact-APN permit</th><th>Recent peer permit parcels</th></tr></thead>
+ <tbody id="roof-opportunity-property-body"><tr><td colspan="6">Select a pathway for property research locations.</td></tr></tbody></table></div>
+ <p class="foot">Source: the latest complete and internally reconciled local V9 CSV set. Loading this page reads existing reports only; no model calls, automatic downloads, scraping, marketing, or outreach. Formula D remains optional status information and V8 inspection matching is not required. Construction age ≠ roof age; a permit record ≠ completed replacement; no matching permit ≠ no work.</p>
+</section>
 <section class="panel" id="selection-status">
  <div class="section-header"><div><div class="overline">SELECTIVE EXTRACTION / V3</div><h2>Keep what matters. Hold unknowns. Discard verified irrelevance.</h2>
  <p>Automatic after each successful full-source import. Only necessary parcel identifiers, locality, construction year and roof permit match enter the targeting index.</p></div></div>
