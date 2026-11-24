@@ -141,9 +141,13 @@ test('automatic roofing opportunity cards load on the separate page from read-on
  assert.match(clientSource,/loadOpportunityPathway\('HISTORICAL'\)/);
  assert.doesNotMatch(clientSource,/setInterval|localStorage|WebSocket|eval\(/);
  assert.match(bridge,/export async function roofingOpportunities/);
- assert.match(pySource,/PRAGMA query_only=ON/);
+ // V10 reads completed CSV snapshots only; SQLite PRAGMA belongs to V9.
+ assert.match(pySource,/def read_offers\(/);
+ assert.match(pySource,/research_exports/);
+ assert.match(pySource,/csv\.DictReader/);
+ assert.match(pySource,/LOCAL_V9_REPORT_INCOMPLETE_HOLD/);
  assert.match(pySource,/NO_MATCH/);
- assert.doesNotMatch(pySource,/urllib|requests\.|INSERT INTO|DELETE FROM|UPDATE roofing/);
+ assert.doesNotMatch(pySource,/sqlite3|PRAGMA|urllib|requests\.|INSERT INTO|DELETE FROM|UPDATE roofing|open\("w"/);
  const requested=[];
  const stub=async({pathway=null}={})=>{
   requested.push(pathway);
