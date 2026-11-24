@@ -370,6 +370,49 @@ status categories, ambiguity, COFO nonfinal inconsistency, future/invalid
 status date and refusal to copy private fields into output. The normal
 one-port service and Elektron are not affected by an audit.
 
+## V12 — offline ZIP reference map and full street/property research
+
+V12 is a geographic navigation **addition**, not another lead formula.
+The existing `http://127.0.0.1:8802/roofing/bulk/#roof-opportunities`
+now includes a local-first interactive SVG reference view, plus paginated
+lists of **all** qualifying street blocks and individual qualified
+properties. The user can click a ZIP dot, filter the saved snapshot by
+ZIP and independent `HISTORICAL`/`NO_MATCH`/`OTHER` pathway, inspect
+a block, and page through its recorded property addresses. This avoids
+the prior ten-block display limit and does not load 3,339 rows into the
+browser simultaneously. A click on a property offers an optional Google
+Maps *address search*; the page itself never calls an external geocoder,
+map SDK, map tiles, Qwen, REA, mailer, dialer or marketing service.
+
+**Geographic integrity:** The four supported ZIP dots are postal ZIP
+reference coordinates from the GeoNames US postal-code data, CC BY 4.0
+(`https://download.geonames.org/export/zip/US.zip` as independently
+published in the 2026-08-15 snapshot). Dots are **not parcel coordinates,
+street locations, boundaries or verified centroids**. ZIPs outside the
+four grounded postal references still appear in the filtered street
+lists but are explicitly unmapped. No street/parcel dot is guessed, no
+GPS coordinates are derived from the 100-number block proxy, and
+nothing is presented as a roof inspection.
+
+Server-side read-only endpoint:
+`GET /api/fun/roofing/bulk/geo`, accepting at most one each of
+`zip`, `pathway`, `mode=blocks|properties`, `block`,
+`offset` and `limit` (1–50). Property mode requires both exact ZIP
+and exact street-block research key. The Python V12 reader uses only the
+latest internally reconciled four-part V9 report set, never SQLite
+writes or external requests. It fails closed if a file is missing,
+ZIP/parcel counts conflict, the filter is malformed, or a block is
+outside the saved report. Browsing shows only bounded records; the
+original ZIP-based numerical formulas A–D and selective index are
+untouched.
+
+V12 offline regressions and Node.js request tests are part of the
+protected one-port preflight. Live activation validates the geographic
+endpoint, map element, street block table, and property table before
+reporting PASS. No background polling or automatic recalculation:
+running the previous V11 manual research-refresh updates the local
+snapshot, and the V12 explorer then reads the new report.
+
 ## V11 — discoverable Roofing Opportunities and operator-clicked recalculation
 
 **Where it is:** the production control center `http://127.0.0.1:8802/`
