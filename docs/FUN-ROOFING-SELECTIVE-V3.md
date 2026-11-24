@@ -370,6 +370,58 @@ status categories, ambiguity, COFO nonfinal inconsistency, future/invalid
 status date and refusal to copy private fields into output. The normal
 one-port service and Elektron are not affected by an audit.
 
+## V10 — automatic Roofing Opportunities offers on the existing roofing page
+
+The separate roofing research page `http://127.0.0.1:8802/roofing/bulk/`
+now includes a **Roofing Opportunities by ZIP and street** section. On page
+open, the UI makes bounded, read-only, same-origin requests to
+`/api/fun/roofing/bulk/opportunities` and, if a complete V9 report exists,
+automatically displays aggregate counts, top street blocks, historical
+permit candidates, and a small historical property-address preview.
+Operator-clicked buttons show the **no-matching-permit** pathway or
+**other recent/intermediate permit** pathway. The page can refresh the
+local research snapshot on demand without downloading permits, recomputing
+the model, or changing the stored data.
+
+The V10 Python reader `src/roofing/roofing_opportunities_v10.py` selects
+the most recent `roofing_qualified_property_research_*.csv` timestamp
+under `%LOCALAPPDATA%\FunIndustrial\RoofingBulkV2\research_exports`
+and opens only a **complete quartet with that identical timestamp**:
+ZIP summary, ranked street blocks, property research and recent
+permit locations. If any component is missing, V10 returns a hold,
+never borrowing stale files from another run. It validates ZIP, street
+block, distinct public parcel IDs, property counts and recent-permit
+location totals. Source provenance is limited to the previously generated
+V9 reports; **internally reconciled** does not imply independent proof
+of an actual new roof or exhaustive city coverage.
+
+Displayed pathways stay independent:
+
+- **HISTORICAL**: selected public property has a last recorded exact-APN
+  permit of the chosen keyword kind at least X years old.
+- **NO_MATCH**: no matching exact-APN record of that chosen keyword kind
+  in the imported LA City sources. This is **not** evidence of no roofing
+  work.
+- **OTHER**: selected property has an intermediate/other recorded permit
+  outside the strict X-year old/absent groups.
+
+All are already members of the V9 same-street, similar-age,
+recent-peer-permit research cohort. V10 *does not change* Formula A–D or
+add a predictive roofing-condition score. Roof age, damages, sales intent,
+owner identity and contacts are not inferred or retrieved.
+
+No scheduled background tasks, cross-site queries, local model
+inferences, alerts, messages, mail, calls, exports or outreach are
+performed by dashboard reads. The original `/` homepage and other
+services are unchanged. The updated server route requires a controlled
+redeployment of only the reviewed 8802 service; copying new GitHub files
+to disk does **not** instantly update a currently running Node process.
+The standard `Activate-Fun-Roofing-Bulk-V2.ps1` verifies existing
+homepage and interfaces, new opportunity route and security holds before
+reporting activation; its `-CheckOnly` mode changes no processes.
+A failed live update should restore the previous 8802 process using
+the existing rollback.
+
 ## V9 — roofing location research is the operational objective
 
 **Goal:** find the actual ZIP codes, 100-number street blocks, and publicly
