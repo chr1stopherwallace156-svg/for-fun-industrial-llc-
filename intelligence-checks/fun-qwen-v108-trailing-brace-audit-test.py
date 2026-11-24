@@ -46,6 +46,38 @@ class V108TrailingBraceTests(unittest.TestCase):
         self.assertEqual(d["simulated_tool_answer"],
                          v.v104.verify(c["errors"])["verified_answer"])
 
+    def test_one_extra_brace_with_scalar_last_field(self):
+        # V10.6 fixture uses sort_keys=True; source_id or tool can be last.
+        # Valid body ends in one brace, malformed body in two.
+        c=case()
+        valid=valid_proposal(c)
+        self.assertTrue(valid.endswith("}"))
+        malformed=valid+"}"
+        self.assertTrue(malformed.endswith("}}"))
+        self.assertFalse(malformed.endswith("}}}"))
+        d=v.inspect_request(c,malformed)
+        self.assertTrue(d["one_brace_candidate"])
+        self.assertTrue(d["would_pass_full_host_contract_after_one_brace"])
+        self.assertFalse(d["raw_json_accepted"])
+
+    def test_one_extra_brace_with_object_last_field_real_qwen_order(self):
+        # This field order matches the actual V10.7 Qwen report sample,
+        # not the sort_keys=True synthetic fixture.
+        c=case()
+        raw=(
+            '{"schema":"fun-math-tool-proposal-v1",'
+            '"tool":"verify_window_math",'
+            '"source_id":"FixtureV108",'
+            '"arguments":{"e3":236,"e5":240,"e8":238}}}'
+        )
+        self.assertTrue(raw.endswith("}}}"))
+        d=v.inspect_request(c,raw)
+        self.assertFalse(d["raw_json_accepted"])
+        self.assertTrue(d["one_brace_candidate"])
+        self.assertTrue(d["would_pass_full_host_contract_after_one_brace"])
+        self.assertEqual(d["diagnostic"],
+            "HYPOTHETICAL_HOST_VALID_NOT_ACTUALLY_DISPATCHED_IN_V107")
+
     def test_raw_valid_request_needs_no_normalization(self):
         c=case()
         d=v.inspect_request(c,valid_proposal(c))
