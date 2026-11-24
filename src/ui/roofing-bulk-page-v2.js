@@ -232,7 +232,8 @@ async function loadOpportunities(){
    ['roof-refresh-years',f.historical_x_years],
    ['roof-refresh-recent',f.recent_years],
    ['roof-refresh-kind',f.permit_kind],
-   ['roof-refresh-peer-years',f.age_cohort_tolerance]]){
+   ['roof-refresh-peer-years',f.age_cohort_tolerance],
+   ['roof-refresh-min-peers',f.min_similar_age_neighbors]]){
    if(value!==undefined&&value!==null)$(id).value=String(value);
   }
   opportunityFiltersInitialized=true;
@@ -241,7 +242,7 @@ async function loadOpportunities(){
   ' · building age ≥ '+f.min_building_age+' years · historical permit ≥ '+
   f.historical_x_years+' years · recent window '+f.recent_years+' years · '+
   (f.permit_kind||'unknown')+' · same-street construction cohort ± '+
-  f.age_cohort_tolerance+' years');
+  f.age_cohort_tolerance+' years · at least '+f.min_similar_age_neighbors+' comparable neighbors');
  display('roof-opportunity-status',
   (d.local_import_db_newer_than_report?'Cached report may be outdated after a recent source import. Regenerate V9 to update; ':'Ready: ')+
   count(totals.qualified_properties)+' research properties across '+
