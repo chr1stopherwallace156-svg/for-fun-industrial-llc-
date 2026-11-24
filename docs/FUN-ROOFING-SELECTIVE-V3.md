@@ -370,6 +370,51 @@ status categories, ambiguity, COFO nonfinal inconsistency, future/invalid
 status date and refusal to copy private fields into output. The normal
 one-port service and Elektron are not affected by an audit.
 
+## V11 — discoverable Roofing Opportunities and operator-clicked recalculation
+
+**Where it is:** the production control center `http://127.0.0.1:8802/`
+remains untouched, by design. Open
+`http://127.0.0.1:8802/roofing/bulk/#roof-opportunities` directly,
+or select **Roofing Opportunities** in the organized workspace
+`http://127.0.0.1:8802/ui-preview/`. The roofing page also contains
+a highlighted sidebar link and a top-page shortcut to the section.
+
+The separate V10 research section now includes independent controls for
+ZIPs (1–10 comma-separated US five-digit ZIPs), minimum house construction
+age (20–100), historical permit X-years (10–50), recent neighborhood
+permit years (1–10 and below X), permit kind (`replacement_like` or
+`roof_related`), same-age cohort ± years (0–15), and minimum peers (3–30).
+
+**No recalculation occurs automatically when the UI opens.** Reading a
+saved report is read-only. The only way to request refreshed output
+through the UI is an explicit click on **Recalculate these locations**.
+It calls a same-origin, operator-click protected POST
+`/api/fun/roofing/bulk/recalculate` with exactly seven validated
+fields. The reviewed backend runs the existing V9 local analysis over
+SQLite `mode=ro`, writing only *new uniquely timestamped local CSV
+research exports*. It then verifies the freshly completed report set
+before showing the new ZIP, street, property and historical/no-match
+counts. It never modifies assessor/permit sources, Formula A–D, or
+the source DB. No Qwen, REA, email, paid actions or outreach occurs.
+
+A bounded single-recalculation gate avoids concurrent operator runs;
+a source import and research recalculation cannot overlap. The button
+disables during the request, the browser presents progress/error text,
+and existing completed V9 exports remain available if a new run fails.
+There is no recurrent polling or automated high-CPU refresh. Local
+recomputation is bounded by a 120-second backend deadline, 1–10 ZIPs,
+the existing 1,000-block-per-ZIP/20,000-property limits and a strict
+timeout; large requests fail closed rather than changing background
+system work. The frontend timeout is 135 seconds.
+
+A protected update of only the already-reviewed `8802` service is
+required for new routes to appear in a running Node process. Standard
+`Activate-Fun-Roofing-Bulk-V2.ps1 -CheckOnly` tests and static syntax
+validation run before process changes; the full activation uses guarded
+8802 replacement with rollback and checks that the direct links,
+refresh controls and saved-data endpoint are present. The original
+homepage, unrelated local services and Elektron are out of scope.
+
 ## V10 — automatic Roofing Opportunities offers on the existing roofing page
 
 The separate roofing research page `http://127.0.0.1:8802/roofing/bulk/`
