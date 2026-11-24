@@ -117,7 +117,7 @@ export async function roofingOpportunities({pathway=null}={}){
  if(!text||text.length>256*1024)throw Error('ROOF_OPPORTUNITIES_RESULT_INVALID');
  const result=JSON.parse(text);
  if(result.version!==ROOFING_OPPORTUNITIES_VERSION||
-    !['READY_FROM_VERIFIED_LOCAL_V9_REPORTS','AWAITING_LOCAL_V9_REPORTS',
+    !['READY_FROM_RECONCILED_LOCAL_V9_REPORTS','AWAITING_LOCAL_V9_REPORTS',
       'LOCAL_V9_REPORT_INCOMPLETE_HOLD'].includes(result.state))
    throw Error('ROOF_OPPORTUNITIES_RESULT_NOT_VERIFIED');
  return {...result,...holds()};
