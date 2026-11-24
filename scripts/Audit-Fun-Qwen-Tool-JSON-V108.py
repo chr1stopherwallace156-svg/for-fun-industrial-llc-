@@ -61,9 +61,13 @@ def inspect_request(case,raw):
             "one_brace_candidate":False,
             "would_pass_full_host_contract_after_one_brace":False,
             "simulated_tool_answer":None,
-            "diagnostic":"NON_SYNTAX_OR_AMBIGUOUS_FAILURE",
+            "diagnostic":"NON_SYNTAX_OR_AMBIGUOUS_FAILURE_"+str(reason)[:160],
         }
-    if not isinstance(raw,str) or not raw.startswith("{") or not raw.endswith("}}}") or \
+    # JSON object key order is irrelevant: the final field may be scalar
+    # (one closing brace) or an object (two). Require the raw string to
+    # be invalid and end in a closing brace, then remove EXACTLY ONE byte.
+    # The UNCHANGED V10.6 strict parser and host authority check must pass.
+    if not isinstance(raw,str) or not raw.startswith("{") or not raw.endswith("}") or \
        len(raw.encode("utf-8"))>v106.MAX_REQUEST_BYTES:
         return {
             "raw_json_accepted":False,
