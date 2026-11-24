@@ -168,6 +168,7 @@ export async function recalculateRoofingLocations(filters){
     result.filters.min_building_age!==f.minBuildingAge||
     result.filters.permit_kind!==f.permitKind||
     result.filters.age_cohort_tolerance!==f.peerYears||
+    result.filters.min_similar_age_neighbors!==f.minPeers||
     result.zips.length!==f.zips.split(',').length||
     !f.zips.split(',').every(z=>result.zips.some(x=>x.zip===z)))
     throw Error('ROOF_LOCATION_REFRESH_RECONCILIATION_HOLD');
