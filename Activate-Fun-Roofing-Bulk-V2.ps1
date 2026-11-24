@@ -86,6 +86,7 @@ function PreviewLive([string]$ExpectedRunner){
  $bulkJs=Invoke-WebRequest ($URL+'/api/fun/roofing/bulk/client.js') -UseBasicParsing -TimeoutSec 8
  $bulkStatus=Invoke-RestMethod ($URL+'/api/fun/roofing/bulk/status') -TimeoutSec 8
  $roofOpportunities=Invoke-RestMethod ($URL+'/api/fun/roofing/bulk/opportunities') -TimeoutSec 12
+ $zipGeo=Invoke-RestMethod ($URL+'/api/fun/roofing/bulk/geo?mode=blocks&limit=5') -TimeoutSec 12
  $procPage=Invoke-WebRequest ($URL+'/procurement/') -UseBasicParsing -TimeoutSec 8
  $procClient=Invoke-WebRequest ($URL+'/api/operator/procurement/client.js') -UseBasicParsing -TimeoutSec 8
  if($homepageResponse.StatusCode -ne 200 -or
@@ -121,11 +122,19 @@ function PreviewLive([string]$ExpectedRunner){
    $bulkPage.Content -notmatch 'id="roof-opportunities"' -or
    $bulkPage.Content -notmatch 'id="roof-opportunity-historical-button"' -or
    $bulkPage.Content -notmatch 'id="roof-opportunity-recalculate-button"' -or
+   $bulkPage.Content -notmatch 'id="roof-geo-svg"' -or
+   $bulkPage.Content -notmatch 'id="roof-geo-blocks"' -or
+   $bulkPage.Content -notmatch 'id="roof-geo-properties"' -or
    $bulkPage.Content -notmatch 'id="roof-refresh-zips"' -or
    $bulkPage.Content -notmatch 'id="roof-opportunity-no-match-button"' -or
    $bulkJs.Content -notmatch 'loadOpportunities' -or
    $bulkJs.Content -notmatch 'recalculateRoofingOpportunities' -or
+   $bulkJs.Content -notmatch 'renderRoofZipReferences' -or
    $roofOpportunities.version -cne 'fun-roofing-opportunity-offers-v10' -or
+   $zipGeo.version -cne 'fun-roofing-zip-street-explorer-v12' -or
+   $zipGeo.read_only -ne $true -or
+   $zipGeo.no_outreach -ne $true -or
+   @('ZIP_STREET_RESEARCH_READY','AWAITING_LOCAL_V9_REPORTS','LOCAL_V9_REPORT_INCOMPLETE_HOLD') -cnotcontains [string]$zipGeo.state -or
    $roofOpportunities.read_only -ne $true -or
    $roofOpportunities.no_outreach_or_model_execution -ne $true -or
    @('READY_FROM_RECONCILED_LOCAL_V9_REPORTS','AWAITING_LOCAL_V9_REPORTS','LOCAL_V9_REPORT_INCOMPLETE_HOLD') -cnotcontains [string]$roofOpportunities.state -or
@@ -220,7 +229,9 @@ foreach($file in @(
  'src\roofing\export_roofing_location_research_v9.py',
  'src\roofing\test_export_roofing_location_research_v9.py',
  'src\roofing\roofing_opportunities_v10.py',
- 'src\roofing\test_roofing_opportunities_v10.py'
+ 'src\roofing\test_roofing_opportunities_v10.py',
+ 'src\roofing\roofing_geo_explorer_v12.py',
+ 'src\roofing\test_roofing_geo_explorer_v12.py'
 )){
  $path=Join-Path $Root $file
  RequireFile $path
@@ -233,7 +244,7 @@ foreach($file in @(
 & $Node --test (Join-Path $Root 'test\organized-ui-preview-v1.test.mjs') (Join-Path $Root 'test\roofing-opportunity-v1.test.mjs') (Join-Path $Root 'test\roofing-bulk-v2.test.mjs') (Join-Path $Root 'test\procurement-focus-v1.test.mjs') (Join-Path $Root 'test\roofing-selective-v3.test.mjs')
 if($LASTEXITCODE -ne 0){Hold 'ROOFING_NODE_TESTS_FAILED_NO_PORT_CHANGE'}
 $Python=(Get-Command python.exe -ErrorAction Stop).Source
-& $Python -B -c "import ast,pathlib,sys; [ast.parse(pathlib.Path(p).read_text(encoding='utf-8')) for p in sys.argv[1:]]; print('ROOFING_PYTHON_SYNTAX=PASS')" (Join-Path $Root 'src\roofing\roofing_bulk_v2.py') (Join-Path $Root 'src\roofing\selective_policy_v3.py') (Join-Path $Root 'src\roofing\selective_extract_v3.py') (Join-Path $Root 'src\roofing\test_selective_v3.py') (Join-Path $Root 'src\roofing\export_roofing_pilot_v1.py') (Join-Path $Root 'src\roofing\test_export_roofing_pilot_v1.py') (Join-Path $Root 'src\roofing\roofing_dual_formulas_v4.py') (Join-Path $Root 'src\roofing\test_roofing_dual_formulas_v4.py') (Join-Path $Root 'src\roofing\roofing_neighbor_context_v5.py') (Join-Path $Root 'src\roofing\test_roofing_neighbor_context_v5.py') (Join-Path $Root 'src\roofing\audit_roofing_permit_descriptions_v6.py') (Join-Path $Root 'src\roofing\test_audit_roofing_permit_descriptions_v6.py') (Join-Path $Root 'src\roofing\audit_roofing_permit_status_v7.py') (Join-Path $Root 'src\roofing\test_audit_roofing_permit_status_v7.py') (Join-Path $Root 'src\roofing\probe_ladbs_inspections_v8.py') (Join-Path $Root 'src\roofing\test_probe_ladbs_inspections_v8.py') (Join-Path $Root 'src\roofing\diagnose_inspection_permit_shapes_v8.py') (Join-Path $Root 'src\roofing\test_diagnose_inspection_permit_shapes_v8.py') (Join-Path $Root 'src\roofing\export_roofing_location_research_v9.py') (Join-Path $Root 'src\roofing\test_export_roofing_location_research_v9.py') (Join-Path $Root 'src\roofing\roofing_opportunities_v10.py') (Join-Path $Root 'src\roofing\test_roofing_opportunities_v10.py')
+& $Python -B -c "import ast,pathlib,sys; [ast.parse(pathlib.Path(p).read_text(encoding='utf-8')) for p in sys.argv[1:]]; print('ROOFING_PYTHON_SYNTAX=PASS')" (Join-Path $Root 'src\roofing\roofing_bulk_v2.py') (Join-Path $Root 'src\roofing\selective_policy_v3.py') (Join-Path $Root 'src\roofing\selective_extract_v3.py') (Join-Path $Root 'src\roofing\test_selective_v3.py') (Join-Path $Root 'src\roofing\export_roofing_pilot_v1.py') (Join-Path $Root 'src\roofing\test_export_roofing_pilot_v1.py') (Join-Path $Root 'src\roofing\roofing_dual_formulas_v4.py') (Join-Path $Root 'src\roofing\test_roofing_dual_formulas_v4.py') (Join-Path $Root 'src\roofing\roofing_neighbor_context_v5.py') (Join-Path $Root 'src\roofing\test_roofing_neighbor_context_v5.py') (Join-Path $Root 'src\roofing\audit_roofing_permit_descriptions_v6.py') (Join-Path $Root 'src\roofing\test_audit_roofing_permit_descriptions_v6.py') (Join-Path $Root 'src\roofing\audit_roofing_permit_status_v7.py') (Join-Path $Root 'src\roofing\test_audit_roofing_permit_status_v7.py') (Join-Path $Root 'src\roofing\probe_ladbs_inspections_v8.py') (Join-Path $Root 'src\roofing\test_probe_ladbs_inspections_v8.py') (Join-Path $Root 'src\roofing\diagnose_inspection_permit_shapes_v8.py') (Join-Path $Root 'src\roofing\test_diagnose_inspection_permit_shapes_v8.py') (Join-Path $Root 'src\roofing\export_roofing_location_research_v9.py') (Join-Path $Root 'src\roofing\test_export_roofing_location_research_v9.py') (Join-Path $Root 'src\roofing\roofing_opportunities_v10.py') (Join-Path $Root 'src\roofing\test_roofing_opportunities_v10.py') (Join-Path $Root 'src\roofing\roofing_geo_explorer_v12.py') (Join-Path $Root 'src\roofing\test_roofing_geo_explorer_v12.py')
 if($LASTEXITCODE -ne 0){Hold 'ROOFING_PYTHON_SYNTAX_FAILED_NO_PORT_CHANGE'}
 & $Python -B (Join-Path $Root 'src\roofing\test_roofing_bulk_v2.py')
 if($LASTEXITCODE -ne 0){Hold 'ROOFING_PYTHON_TESTS_FAILED_NO_PORT_CHANGE'}
@@ -257,6 +268,8 @@ if($LASTEXITCODE -ne 0){Hold 'ROOFING_INSPECTION_SHAPE_V8_TESTS_FAILED_NO_PORT_C
 if($LASTEXITCODE -ne 0){Hold 'ROOFING_LOCATION_RESEARCH_V9_TESTS_FAILED_NO_PORT_CHANGE'}
 & $Python -B (Join-Path $Root 'src\roofing\test_roofing_opportunities_v10.py')
 if($LASTEXITCODE -ne 0){Hold 'ROOFING_AUTO_OPPORTUNITIES_V10_TESTS_FAILED_NO_PORT_CHANGE'}
+& $Python -B (Join-Path $Root 'src\roofing\test_roofing_geo_explorer_v12.py')
+if($LASTEXITCODE -ne 0){Hold 'ROOFING_ZIP_GEO_EXPLORER_V12_TESTS_FAILED_NO_PORT_CHANGE'}
 foreach($port in $Protected){$Before[$port]=Snapshot $port}
 $PreviousProcess=Owner
 if($PreviousProcess){
