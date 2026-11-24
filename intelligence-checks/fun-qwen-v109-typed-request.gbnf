@@ -1,0 +1,8 @@
+# Fun Industrial V10.9 — structural GBNF constraint, original GGUF only.
+# The model STILL must choose source_id and e3/e5/e8 correctly from the prompt.
+# This grammar never hardcodes trusted host numbers or source IDs.
+# Every raw output MUST ALSO PASS the unchanged V10.6 host contract.
+root ::= "{" ws "\"schema\"" ws ":" ws "\"fun-math-tool-proposal-v1\"" ws "," ws "\"tool\"" ws ":" ws "\"verify_window_math\"" ws "," ws "\"source_id\"" ws ":" ws source-id ws "," ws "\"arguments\"" ws ":" ws "{" ws "\"e3\"" ws ":" ws uint ws "," ws "\"e5\"" ws ":" ws uint ws "," ws "\"e8\"" ws ":" ws uint ws "}" ws "}"
+source-id ::= "\"" [A-Za-z] [A-Za-z0-9_-]{0,63} "\""
+uint ::= "0" | [1-9] [0-9]{0,9}
+ws ::= [ \t\n]{0,16}
