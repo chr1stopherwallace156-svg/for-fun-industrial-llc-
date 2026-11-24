@@ -40,9 +40,9 @@ export const ROOF_BULK_PAGE=String.raw`<!doctype html><html lang="en"><head><met
   <article class="metric"><span>No-matching-permit pathway</span><strong id="roof-opportunity-no-match">—</strong><small>No exact-APN match in selected records</small></article>
  </div>
  <div class="opportunity-actions" aria-label="Choose roofing research pathway">
-  <button type="button" class="btn secondary" id="roof-opportunity-historical-button">Review historical-permit properties</button>
-  <button type="button" class="btn secondary" id="roof-opportunity-no-match-button">Review no-match properties</button>
-  <button type="button" class="btn secondary" id="roof-opportunity-other-button">Review intermediate-permit records</button>
+  <button type="button" class="btn secondary" id="roof-opportunity-historical-button" disabled>Review historical-permit properties</button>
+  <button type="button" class="btn secondary" id="roof-opportunity-no-match-button" disabled>Review no-match properties</button>
+  <button type="button" class="btn secondary" id="roof-opportunity-other-button" disabled>Review intermediate-permit records</button>
  </div>
  <p class="readout" id="roof-opportunity-filters">Waiting for source-report parameters.</p>
  <h3>Automatically ranked street blocks</h3>
