@@ -147,7 +147,8 @@ test('automatic roofing opportunity cards load on the separate page from read-on
  assert.match(pySource,/csv\.DictReader/);
  assert.match(pySource,/LOCAL_V9_REPORT_INCOMPLETE_HOLD/);
  assert.match(pySource,/NO_MATCH/);
- assert.doesNotMatch(pySource,/sqlite3|PRAGMA|urllib|requests\.|INSERT INTO|DELETE FROM|UPDATE roofing|open\("w"/);
+ // A read-only stat of roofing.sqlite3 is allowed for staleness detection.
+ assert.doesNotMatch(pySource,/import sqlite3|sqlite3\.connect|PRAGMA|urllib|requests\.|INSERT INTO|DELETE FROM|UPDATE roofing|open\("w"/);
  const requested=[];
  const stub=async({pathway=null}={})=>{
   requested.push(pathway);
