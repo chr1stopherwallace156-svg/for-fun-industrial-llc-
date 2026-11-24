@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {ROOF_BULK_PAGE} from '../src/ui/roofing-bulk-page-v2.mjs';
-import {BULK_VERSION,bulkCatalog,startBulkSync,bulkMarkets} from '../src/roofing/roofing-bulk-bridge-v2.mjs';
+import {BULK_VERSION,bulkCatalog,startBulkSync,bulkMarkets,
+ validateRoofingRecalculation} from '../src/roofing/roofing-bulk-bridge-v2.mjs';
 import {createUnifiedMlHub} from '../scripts/Run-Fun-ML-Dashboard8802.mjs';
 import {DASHBOARD_HTML} from '../src/ui/oneport-dashboard-v1.mjs';
 const css=new URL('../src/ui/roofing-bulk-page-v2.css',import.meta.url);
@@ -189,5 +190,68 @@ test('automatic roofing opportunity cards load on the separate page from read-on
   }
   assert.equal((await call('/api/fun/roofing/bulk/opportunities','POST')).status,404);
   assert.deepEqual(requested,[null,'HISTORICAL']);
+ }finally{await new Promise(resolve=>server.close(resolve))}
+});
+
+
+test('V11 explicit-click roofing research refresh validates independent filters and never changes the original homepage',async()=>{
+ const html=ROOF_BULK_PAGE;
+ const clientSrc=await readFile(client,'utf8');
+ const previewSrc=await readFile(new URL('../src/ui/organized-preview-v1.mjs',import.meta.url),'utf8');
+ for(const id of ['roof-refresh-zips','roof-refresh-years','roof-refresh-age',
+   'roof-refresh-recent','roof-refresh-kind','roof-refresh-peer-years',
+   'roof-refresh-min-peers','roof-opportunity-recalculate-button']){
+  assert.ok(html.includes('id="'+id+'"'),id);
+ }
+ assert.match(html,/href="#roof-opportunities"/);
+ assert.match(previewSrc,/href="\/roofing\/bulk\/#roof-opportunities"/);
+ assert.match(clientSrc,/recalculateRoofingOpportunities/);
+ assert.match(clientSrc,/operator-recalculate-location-v11/);
+ assert.doesNotMatch(clientSrc,/setInterval|localStorage|WebSocket|eval\(/);
+ const f={zips:'90037,90049,90731,90011',years:20,recentYears:5,
+  minBuildingAge:25,permitKind:'replacement_like',peerYears:5,minPeers:5};
+ assert.deepEqual(validateRoofingRecalculation(f),f);
+ for(const bad of [{...f,years:5},{...f,zips:'90037,90037'},
+  {...f,permitKind:'INVALID'}, {...f,unexpected:true}]){
+  assert.throws(()=>validateRoofingRecalculation(bad),/ROOF_LOCATION_REFRESH_FILTER_/);
+ }
+ const calls=[];
+ const server=createUnifiedMlHub({
+  ml:{},commerce:{},grounded:{status:()=>({})},reviewedDispatch:{},reviewedCompute:{},
+  roofingRecalculationRunner:async opts=>{
+   calls.push(opts);
+   return {version:'fun-roofing-local-refresh-v11',
+    state:'OPERATOR_CLICK_LOCAL_V9_REPORT_REFRESHED',totals:{qualified_properties:3339},
+    noAutomaticImportOrOutreach:true};
+  }
+ });
+ await new Promise((resolve,reject)=>server.once('error',reject).listen(0,'127.0.0.1',resolve));
+ const port=server.address().port;
+ const sendReq=(path,body,headers={},method='POST')=>new Promise((resolve,reject)=>{
+  const req=http.request({host:'127.0.0.1',port,path,method,
+   headers:{host:'127.0.0.1:8802','content-type':'application/json',...headers}},
+   res=>{let result='';res.setEncoding('utf8');res.on('data',x=>result+=x);
+    res.on('end',()=>resolve({status:res.statusCode,body:result}));});
+  req.on('error',reject);req.end(body);
+ });
+ const authorized={'origin':'http://127.0.0.1:8802',
+  'x-fi-roofing-bulk-click':'operator-recalculate-location-v11'};
+ try{
+  assert.equal((await sendReq('/api/fun/roofing/bulk/recalculate',JSON.stringify(f))).status,403);
+  assert.equal((await sendReq('/api/fun/roofing/bulk/recalculate',
+   JSON.stringify(f),{'x-fi-roofing-bulk-click':'operator-recalculate-location-v11',
+    origin:'https://untrusted.example'})).status,403);
+  assert.equal((await sendReq('/api/fun/roofing/bulk/recalculate',
+    JSON.stringify({...f,minBuildingAge:5}),authorized)).status,422);
+  assert.equal((await sendReq('/api/fun/roofing/bulk/recalculate?extra=true',
+    JSON.stringify(f),authorized)).status,422);
+  const ok=await sendReq('/api/fun/roofing/bulk/recalculate',JSON.stringify(f),authorized);
+  assert.equal(ok.status,200);
+  assert.equal(JSON.parse(ok.body).state,'OPERATOR_CLICK_LOCAL_V9_REPORT_REFRESHED');
+  assert.deepEqual(calls,[f]);
+  assert.equal((await sendReq('/api/fun/roofing/bulk/recalculate','','', 'GET')).status,404);
+  const original=await sendReq('/',undefined,{},'GET');
+  assert.equal(original.status,200);
+  assert.equal(original.body,DASHBOARD_HTML);
  }finally{await new Promise(resolve=>server.close(resolve))}
 });
