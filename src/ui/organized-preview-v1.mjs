@@ -24,6 +24,7 @@ export const PREVIEW_HTML=String.raw`<!doctype html>
  <p class="nav-label nav-label-spaced">MANAGEMENT</p>
  <nav class="main-nav" aria-label="Management">
   <a href="#tools" data-route="tools"><span class="nav-symbol" aria-hidden="true">⬡</span><span>Tools &amp; ML</span></a>
+  <a href="/roofing/bulk/#roof-opportunities"><span class="nav-symbol" aria-hidden="true">⌂</span><span>Roofing Opportunities</span></a>
   <a href="#system" data-route="system"><span class="nav-symbol" aria-hidden="true">◉</span><span>System</span></a>
  </nav>
  <div class="sidebar-bottom">
@@ -61,7 +62,7 @@ export const PREVIEW_HTML=String.raw`<!doctype html>
     <article class="pulse"><div class="pulse-label">ML Services <span aria-hidden="true">◈</span></div><strong data-status="ml">Not checked</strong><small>Existing analytic capability</small></article>
    </div>
    <div class="section-heading section-heading-spaced"><div><span class="eyebrow">KEEP MOVING</span><h2>Common destinations</h2></div></div>
-   <div class="simple-links"><a href="/roofing/bulk/"><span>Roofing opportunities</span><span>Full LA &amp; San Bernardino parcel intelligence ↗</span></a>
+   <div class="simple-links"><a href="/roofing/bulk/#roof-opportunities"><span>Roofing opportunities</span><span>ZIP, street and property research ↗</span></a>
    <a href="#operations?area=buyers"><span>Fleet buyers</span><span>Find verified demand ↗</span></a>
     <a href="#operations?area=procurement"><span>Procurement</span><span>Review sourced opportunities ↗</span></a>
     <a href="#commerce"><span>Commerce intelligence</span><span>Trends and product analysis ↗</span></a>
