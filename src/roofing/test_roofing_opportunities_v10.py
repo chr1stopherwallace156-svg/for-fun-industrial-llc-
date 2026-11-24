@@ -43,6 +43,7 @@ class AutomaticRoofingOffersTests(unittest.TestCase):
         self.assertEqual(o["zips"][0]["historical"],1)
         self.assertEqual(o["zips"][0]["no_match"],3)
         self.assertEqual(o["filters"]["historical_x_years"],20)
+        self.assertEqual(o["filters"]["min_similar_age_neighbors"],3)
         self.assertTrue(o["no_matching_permit_is_not_no_roof_work"])
         self.assertEqual(before,self.fi.db.read_bytes())
 
