@@ -32,3 +32,11 @@ tr:hover td{background:#1c3143}.foot{color:#839fae;font-size:11px;margin:14px 0 
 #parallel-roof-formulas>label select,#parallel-roof-formulas>label input{display:block;width:100%;min-height:42px;margin-top:6px;background:#0b1b2b;color:var(--text);border:1px solid #456173;border-radius:9px;padding:9px}
 #parallel-roof-formulas .table-wrap+ h3{margin-top:24px;font-size:14px}
 #parallel-roof-formulas .table-wrap td{font-variant-numeric:tabular-nums}
+
+/* Automatic local roofing opportunity pathways. No remote assets or effects. */
+#roof-opportunities .opportunity-actions{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0 17px}
+#roof-opportunities h3{font-size:14px;margin:23px 0 10px}
+#roof-opportunities .metrics{margin:18px 0}
+#roof-opportunities .table-wrap{max-height:390px}
+#roof-opportunities .foot{margin-top:16px}
+@media(max-width:750px){#roof-opportunities .opportunity-actions .btn{width:100%;white-space:normal}}
