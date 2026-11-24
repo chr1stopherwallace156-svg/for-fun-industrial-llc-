@@ -209,6 +209,7 @@ export function startBulkSync(sourceId){
  const source=ALLOWED_SOURCES.find(s=>s.id===sourceId);
  if(!source||source.mode!=='FULL_EXPORT_SYNC')throw Error('ROOF_BULK_SOURCE_NOT_AUTOMATABLE');
  if(active)throw Error('ROOF_BULK_ONE_SYNC_AT_A_TIME');
+ if(locationRecalculationActive)throw Error('ROOF_BULK_SOURCE_SYNC_BLOCKED_DURING_LOCATION_REFRESH');
  if(!ROOT)throw Error('FUN_BULK_LOCALAPPDATA_NOT_CONFIGURED');
  mkdirSync(ROOT,{recursive:true});
  const logs=join(ROOT,'logs');mkdirSync(logs,{recursive:true});
