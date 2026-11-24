@@ -172,7 +172,7 @@ def read_offers(root,*,pathway=None):
             b["zip"],b["street_number_block"]))
         return candidates[:limit]
     summary={
-        "version":VERSION,"state":"READY_FROM_VERIFIED_LOCAL_V9_REPORTS",
+        "version":VERSION,"state":"READY_FROM_RECONCILED_LOCAL_V9_REPORTS",
         "auto_discovered":True,"read_only":True,
         "source":"LOCAL_V9_REPORTS_ONLY",
         "report_snapshot":stamp,
