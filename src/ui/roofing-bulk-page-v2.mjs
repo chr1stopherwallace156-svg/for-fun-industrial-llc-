@@ -13,6 +13,7 @@ export const ROOF_BULK_PAGE=String.raw`<!doctype html><html lang="en"><head><met
     <a href="/ui-preview/#chat">✧ &nbsp; Local AI</a>
     <a href="/ui-preview/#operations">▤ &nbsp; Operations</a>
     <a href="/math/v3/">∑ &nbsp; Math Research</a>
+    <a href="#roof-opportunities" class="roofing-nav-priority">▤ &nbsp; Roofing Opportunities</a>
   </nav>
   <div class="side-bottom"><span class="statusdot"></span> Local research workspace<p>Public records. No automated marketing, purchasing, credential changes, or external tool execution.</p></div>
 </aside>
@@ -20,7 +21,7 @@ export const ROOF_BULK_PAGE=String.raw`<!doctype html><html lang="en"><head><met
 <header class="hero"><div class="hero-text"><div class="overline">MARKET INTELLIGENCE / PROPERTY RECORDS</div><h1>Roofing Opportunity Intelligence</h1>
   <p>Actual countywide parcel files, complete published building-permit exports, and jurisdiction-aware matching. No permit sample caps.</p>
   <div class="chips"><span>LOS ANGELES COUNTY</span><span>SAN BERNARDINO COUNTY</span><span>LOCAL SQLITE</span></div>
-</div><a class="btn secondary" href="/ui-preview/">Workspace home</a></header>
+</div><a class="btn secondary" href="#roof-opportunities">View Roofing Opportunities ↓</a></header>
 <section class="metrics" aria-label="Indexed inventory statistics">
  <article class="metric"><span>Properties indexed</span><strong id="total-properties">—</strong><small>Unique assessed parcels, not individually verified homes</small></article>
  <article class="metric"><span>Roof permit records</span><strong id="total-permits">—</strong><small>Matching roof-related permit descriptions</small></article>
