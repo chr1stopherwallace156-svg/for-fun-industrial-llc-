@@ -40,3 +40,11 @@ tr:hover td{background:#1c3143}.foot{color:#839fae;font-size:11px;margin:14px 0 
 #roof-opportunities .table-wrap{max-height:390px}
 #roof-opportunities .foot{margin-top:16px}
 @media(max-width:750px){#roof-opportunities .opportunity-actions .btn{width:100%;white-space:normal}}
+
+/* Discoverable roofing research and explicit local-recompute controls. */
+.sidebar nav .roofing-nav-priority{border:1px solid #4d8f88;background:#1b383d;color:#c9f5e9}
+#roof-opportunities{scroll-margin-top:20px}
+#roof-opportunities .opportunity-refresh{border:1px solid #43646a;background:#102638;border-radius:12px;margin:18px 0;padding:18px}
+#roof-opportunities .opportunity-refresh h3{margin:0 0 4px}
+#roof-opportunities .opportunity-refresh .filter-grid{margin:16px 0}
+#roof-opportunities #roof-opportunity-recalculate-button{white-space:normal}
