@@ -48,3 +48,19 @@ tr:hover td{background:#1c3143}.foot{color:#839fae;font-size:11px;margin:14px 0 
 #roof-opportunities .opportunity-refresh h3{margin:0 0 4px}
 #roof-opportunities .opportunity-refresh .filter-grid{margin:16px 0}
 #roof-opportunities #roof-opportunity-recalculate-button{white-space:normal}
+
+/* V12 geographic ZIP-reference display — SVG and local data only, no map tiles. */
+#roof-geo-explorer{border-top:1px solid #3d5967;margin-top:24px;padding-top:22px;scroll-margin-top:22px}
+#roof-geo-explorer .roof-geo-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(240px,.55fr);gap:16px;margin:16px 0}
+#roof-geo-explorer .roof-geo-map-panel,#roof-geo-explorer .roof-geo-control-panel{border:1px solid #385363;border-radius:12px;padding:14px;background:#112536}
+#roof-geo-svg{display:block;width:100%;height:auto;aspect-ratio:700/390;max-height:450px}
+#roof-geo-svg g[role="button"]{cursor:pointer;outline-offset:4px}
+#roof-geo-svg g[role="button"]:focus circle,#roof-geo-svg g[role="button"]:hover circle{stroke:#a8fff1;stroke-width:3}
+#roof-geo-explorer .roof-geo-control-panel{display:flex;flex-direction:column;gap:12px}
+#roof-geo-explorer .roof-geo-control-panel label{display:flex;flex-direction:column;gap:6px;font-size:13px}
+#roof-geo-explorer .roof-geo-pager{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0 25px;flex-wrap:wrap}
+#roof-geo-explorer .roof-geo-pager span{font-size:12px;color:#a5c1d2}
+#roof-geo-explorer button:disabled{opacity:.5;cursor:not-allowed}
+#roof-geo-explorer .table-wrap{max-height:450px}
+#roof-geo-explorer .foot{font-size:12px}
+@media(max-width:800px){#roof-geo-explorer .roof-geo-layout{grid-template-columns:1fr}}
