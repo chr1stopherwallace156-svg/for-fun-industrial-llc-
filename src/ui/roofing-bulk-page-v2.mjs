@@ -61,6 +61,33 @@ export const ROOF_BULK_PAGE=String.raw`<!doctype html><html lang="en"><head><met
   <p><button class="btn" type="button" id="roof-opportunity-recalculate-button">Recalculate these locations</button></p>
   <p class="readout" role="status" id="roof-opportunity-recalculate-status">No recalculation requested. Existing verified-import records remain unchanged.</p>
  </div>
+ <div id="roof-geo-explorer" class="roof-geo-explorer">
+  <div class="section-header"><div><div class="overline">GEOGRAPHIC RESEARCH / LOCAL-FIRST</div>
+   <h3>Explore ZIPs, street blocks and property records</h3>
+   <p class="foot">ZIP dots mark published postal reference coordinates, <strong>not</strong> individual streets, parcels or roofs. The street and property explorer uses exact local research records; open an external map only by choosing a location.</p></div></div>
+  <div class="roof-geo-layout">
+   <div class="roof-geo-map-panel"><svg id="roof-geo-svg" viewBox="0 0 700 390" role="img" aria-label="ZIP postal reference points plotted by latitude and longitude. No street or property geocoding.">
+    <title>ZIP reference locations only</title><text x="30" y="200">Reading local geographic references…</text>
+   </svg><p class="foot" id="roof-geo-caption">Offline reference map. Coordinates: GeoNames US postal codes (CC BY 4.0), not parcel coordinates.</p></div>
+   <div class="roof-geo-control-panel">
+    <label>Area ZIP<select id="roof-geo-zip"><option value="">All report ZIPs</option></select></label>
+    <label>Research pathway<select id="roof-geo-pathway"><option value="">All pathways</option><option value="HISTORICAL">Old recorded permit</option><option value="NO_MATCH">No exact-APN permit match</option><option value="OTHER">Intermediate permit history</option></select></label>
+    <button class="btn secondary" type="button" id="roof-geo-filter">Apply location filters</button>
+    <button class="btn secondary" type="button" id="roof-geo-clear">Show all report ZIPs</button>
+    <p class="readout" id="roof-geo-state" role="status">Checking complete local V9 location inventory…</p>
+    <p class="foot">Only ZIP reference dots are plotted. No neighborhood distance, roof damage or replacement probability is inferred.</p>
+   </div>
+  </div>
+  <div class="table-wrap"><table><thead><tr><th>ZIP</th><th>Street block</th><th>Qualified in view</th><th>Historical</th><th>No match</th><th>Recent permit parcels</th><th>Action</th></tr></thead>
+   <tbody id="roof-geo-blocks"><tr><td colspan="7">Choose a ZIP reference or use the filters.</td></tr></tbody></table></div>
+  <div class="roof-geo-pager"><button class="btn secondary" type="button" id="roof-geo-prev" disabled>Previous blocks</button><span id="roof-geo-page">No blocks loaded</span><button class="btn secondary" type="button" id="roof-geo-next" disabled>Next blocks</button></div>
+  <h3>Selected block property research</h3>
+  <p class="readout" id="roof-geo-block-selection">Select a street block above to see its actual recorded property addresses.</p>
+  <div class="table-wrap"><table><thead><tr><th>Address</th><th>Built</th><th>A score</th><th>Last recorded permit</th><th>Nearby peer permits</th><th>Pathway</th><th>External map</th></tr></thead>
+   <tbody id="roof-geo-properties"><tr><td colspan="7">No block selected.</td></tr></tbody></table></div>
+  <div class="roof-geo-pager"><button class="btn secondary" type="button" id="roof-geo-property-prev" disabled>Previous properties</button><span id="roof-geo-property-page">No properties loaded</span><button class="btn secondary" type="button" id="roof-geo-property-next" disabled>Next properties</button></div>
+  <p class="foot">External map links require an explicit click and may send the chosen public address to Google Maps. The local map itself makes no external requests, and street-block ZIP references are not precise roof or property locations.</p>
+ </div>
  <h3>Automatically ranked street blocks</h3>
  <div class="table-wrap"><table><thead><tr><th>ZIP</th><th>Street block</th><th>Qualified properties</th><th>Recent permit parcels</th><th>Historical-path properties</th><th>No-match properties</th></tr></thead>
  <tbody id="roof-opportunity-block-body"><tr><td colspan="6">Reading verified local reports…</td></tr></tbody></table></div>
