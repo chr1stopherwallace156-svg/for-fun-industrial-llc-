@@ -32,7 +32,8 @@ EXPECTED={
                           "age_cohort_tolerance"),
     "ranked_street_blocks":("rank","zip","street_number_block",
                              "qualified_properties",
-                             "recent_permit_parcels_in_street_block"),
+                             "recent_permit_parcels_in_street_block",
+                             "min_similar_age_neighbors"),
     "qualified_property_research":("zip","street_number_block","address","apn",
                                    "construction_year","formula_a_existing_priority",
                                    "last_recorded_exact_apn_roof_permit",
@@ -122,7 +123,12 @@ def read_offers(root,*,pathway=None):
             tuple(row.get(f) for f in filters)!=expected_filters for row in zips[1:]):
         raise ValueError("OPPORTUNITIES_INCONSISTENT_ZIP_FILTERS_HOLD")
     block_map={}
+    min_peers=_integer(blocks[0]["min_similar_age_neighbors"])
+    if not 3<=min_peers<=30:
+        raise ValueError("OPPORTUNITIES_MIN_PEERS_INVALID")
     for row in blocks:
+        if _integer(row["min_similar_age_neighbors"])!=min_peers:
+            raise ValueError("OPPORTUNITIES_MIXED_PEER_THRESHOLDS_HOLD")
         key=(row["zip"],row["street_number_block"])
         if key in block_map or key[0] not in valid_zips:
             raise ValueError("OPPORTUNITIES_INVALID_BLOCK_ID")
@@ -201,6 +207,7 @@ def read_offers(root,*,pathway=None):
             "recent_years":_integer(zips[0]["recent_years"]),
             "permit_kind":zips[0]["permit_kind"],
             "age_cohort_tolerance":_integer(zips[0]["age_cohort_tolerance"]),
+            "min_similar_age_neighbors":min_peers,
         },
         "totals":{
             "qualified_street_blocks":len(blocks),
