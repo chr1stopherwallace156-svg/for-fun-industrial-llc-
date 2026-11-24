@@ -45,6 +45,21 @@ export const ROOF_BULK_PAGE=String.raw`<!doctype html><html lang="en"><head><met
   <button type="button" class="btn secondary" id="roof-opportunity-other-button" disabled>Review intermediate-permit records</button>
  </div>
  <p class="readout" id="roof-opportunity-filters">Waiting for source-report parameters.</p>
+ <div class="opportunity-refresh" id="roof-opportunity-recalculation">
+  <h3>Recalculate location research</h3>
+  <p class="foot">Change the independent age and permit-history settings, then click once to generate a new local research report. No source download, messaging, or AI actions.</p>
+  <div class="filter-grid">
+   <label>ZIP codes (comma separated)<input id="roof-refresh-zips" maxlength="60" value="90037,90049,90731,90011" inputmode="numeric"></label>
+   <label>Minimum house construction age<input type="number" id="roof-refresh-age" min="20" max="100" step="1" value="25"></label>
+   <label>Historical permit gap X years<input type="number" id="roof-refresh-years" min="10" max="50" step="1" value="20"></label>
+   <label>Recent neighborhood window years<input type="number" id="roof-refresh-recent" min="1" max="10" step="1" value="5"></label>
+   <label>Permit description kind<select id="roof-refresh-kind"><option value="replacement_like">Replacement-like permits</option><option value="roof_related">All roof-related permits</option></select></label>
+   <label>Comparable build-year tolerance ±<input type="number" id="roof-refresh-peer-years" min="0" max="15" step="1" value="5"></label>
+   <label>Minimum similar-age neighbors<input type="number" id="roof-refresh-min-peers" min="3" max="30" step="1" value="5"></label>
+  </div>
+  <p><button class="btn" type="button" id="roof-opportunity-recalculate-button">Recalculate these locations</button></p>
+  <p class="readout" role="status" id="roof-opportunity-recalculate-status">No recalculation requested. Existing verified-import records remain unchanged.</p>
+ </div>
  <h3>Automatically ranked street blocks</h3>
  <div class="table-wrap"><table><thead><tr><th>ZIP</th><th>Street block</th><th>Qualified properties</th><th>Recent permit parcels</th><th>Historical-path properties</th><th>No-match properties</th></tr></thead>
  <tbody id="roof-opportunity-block-body"><tr><td colspan="6">Reading verified local reports…</td></tr></tbody></table></div>
