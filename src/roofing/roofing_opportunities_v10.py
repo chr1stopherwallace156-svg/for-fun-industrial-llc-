@@ -108,8 +108,14 @@ def read_offers(root,*,pathway=None):
         raise ValueError("OPPORTUNITIES_EMPTY_READY_REPORT_HOLD")
     valid_zips={row["zip"] for row in zips}
     if len(valid_zips)!=len(zips) or len(valid_zips)>10 or any(
-            not ZIP.fullmatch(z) for z in valid_zips):
+            not isinstance(z,str) or not ZIP.fullmatch(z) for z in valid_zips):
         raise ValueError("OPPORTUNITIES_ZIP_SET_INVALID")
+    filters=("permit_kind","historical_x_years","recent_years",
+             "min_house_age","age_cohort_tolerance")
+    expected_filters=tuple(zips[0].get(f) for f in filters)
+    if zips[0]["permit_kind"] not in ("replacement_like","roof_related") or any(
+            tuple(row.get(f) for f in filters)!=expected_filters for row in zips[1:]):
+        raise ValueError("OPPORTUNITIES_INCONSISTENT_ZIP_FILTERS_HOLD")
     block_map={}
     for row in blocks:
         key=(row["zip"],row["street_number_block"])
@@ -171,11 +177,19 @@ def read_offers(root,*,pathway=None):
             -b["qualified_properties"],-b["recent_permit_parcels"],
             b["zip"],b["street_number_block"]))
         return candidates[:limit]
+    # This report can become outdated if the local import database changes.
+    # Do not silently present a cached report as a new recomputation.
+    db=root/"roofing.sqlite3"
+    db_newer=(db.is_file() and not db.is_symlink() and
+              db.stat().st_mtime>min(file.stat().st_mtime for file in names.values())+1)
     summary={
         "version":VERSION,"state":"READY_FROM_RECONCILED_LOCAL_V9_REPORTS",
         "auto_discovered":True,"read_only":True,
         "source":"LOCAL_V9_REPORTS_ONLY",
         "report_snapshot":stamp,
+        "local_import_db_newer_than_report":bool(db_newer),
+        "freshness":"CHECK_SOURCE_CHANGES_AND_REGENERATE_V9" if db_newer
+                    else "CACHED_LOCAL_REPORT_NO_LIVE_REFRESH",
         "filters":{
             "historical_x_years":_integer(zips[0]["historical_x_years"]),
             "min_building_age":_integer(zips[0]["min_house_age"]),
