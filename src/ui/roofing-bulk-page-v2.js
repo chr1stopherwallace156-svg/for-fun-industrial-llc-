@@ -206,7 +206,7 @@ async function loadOpportunities(){
   display('roof-opportunity-status','Local opportunity summary unavailable: '+String(error.message||error).slice(0,180));
   return;
  }
- const ready=d.state==='READY_FROM_VERIFIED_LOCAL_V9_REPORTS';
+ const ready=d.state==='READY_FROM_RECONCILED_LOCAL_V9_REPORTS';
  for(const id of ['roof-opportunity-historical-button','roof-opportunity-no-match-button',
                    'roof-opportunity-other-button'])$(id).disabled=!ready;
  if(!ready){
@@ -241,7 +241,7 @@ async function loadOpportunityPathway(pathway){
    '— older recorded permit':pathway==='NO_MATCH'?
    '— no matching permit':'— intermediate or recent recorded permit');
  const res=await request('/api/fun/roofing/bulk/opportunities?pathway='+encodeURIComponent(pathway));
- if(res.state!=='READY_FROM_VERIFIED_LOCAL_V9_REPORTS')
+ if(res.state!=='READY_FROM_RECONCILED_LOCAL_V9_REPORTS')
   throw Error('LOCAL_OPPORTUNITY_REPORT_NOT_READY');
  const rows=(res.property_examples||[]).map(row=>({
   zip:row.zip,address:row.address,year_built:row.year_built,
