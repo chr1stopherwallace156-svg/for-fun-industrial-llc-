@@ -1,12 +1,13 @@
 // Full export research UI. Only explicit clicks trigger official downloads.
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
-let busy=false,overview=null,opportunitiesReady=false;
+let busy=false,overview=null,opportunitiesReady=false,opportunityFiltersInitialized=false;
 function node(tag,value,cls){const e=document.createElement(tag);if(value!==undefined)e.textContent=String(value);if(cls)e.className=cls;return e}
 function display(id,v){const e=$(id);if(e)e.textContent=String(v)}
 function count(n){return Number.isSafeInteger(n)?n.toLocaleString():'—'}
 async function request(path,init={}){
- const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),path.startsWith('/api/fun/roofing/bulk/formulas')?95000:22000);
+ const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),path.startsWith('/api/fun/roofing/bulk/recalculate')?135000:
+   path.startsWith('/api/fun/roofing/bulk/formulas')?95000:22000);
  try{const res=await fetch(path,{credentials:'same-origin',cache:'no-store',
    headers:{accept:'application/json',...init.headers},...init,signal:ctrl.signal});
   const d=await res.json();
@@ -223,6 +224,19 @@ async function loadOpportunities(){
  display('roof-opportunity-historical',count(totals.historical));
  display('roof-opportunity-no-match',count(totals.no_match));
  const f=d.filters||{};
+ if(!opportunityFiltersInitialized){
+  $('roof-refresh-zips').value=(d.zips||[]).map(row=>row.zip).join(',')||
+   '90037,90049,90731,90011';
+  for(const [id,value] of [
+   ['roof-refresh-age',f.min_building_age],
+   ['roof-refresh-years',f.historical_x_years],
+   ['roof-refresh-recent',f.recent_years],
+   ['roof-refresh-kind',f.permit_kind],
+   ['roof-refresh-peer-years',f.age_cohort_tolerance]]){
+   if(value!==undefined&&value!==null)$(id).value=String(value);
+  }
+  opportunityFiltersInitialized=true;
+ }
  display('roof-opportunity-filters','Report '+(d.report_snapshot||'unknown')+
   ' · building age ≥ '+f.min_building_age+' years · historical permit ≥ '+
   f.historical_x_years+' years · recent window '+f.recent_years+' years · '+
@@ -238,6 +252,48 @@ async function loadOpportunities(){
    'historical_permit_properties','no_matching_permit_properties'],
    'No qualifying street-block evidence.');
  await loadOpportunityPathway('HISTORICAL');
+}
+function roofRefreshFilters(){
+ const zips=$('roof-refresh-zips').value.trim();
+ const years=Number($('roof-refresh-years').value);
+ const recentYears=Number($('roof-refresh-recent').value);
+ const minBuildingAge=Number($('roof-refresh-age').value);
+ const permitKind=$('roof-refresh-kind').value;
+ const peerYears=Number($('roof-refresh-peer-years').value);
+ const minPeers=Number($('roof-refresh-min-peers').value);
+ if(!/^\d{5}(,\d{5}){0,9}$/.test(zips)||
+    new Set(zips.split(',')).size!==zips.split(',').length||
+    !Number.isSafeInteger(years)||years<10||years>50||
+    !Number.isSafeInteger(recentYears)||recentYears<1||recentYears>10||recentYears>=years||
+    !Number.isSafeInteger(minBuildingAge)||minBuildingAge<20||minBuildingAge>100||
+    !Number.isSafeInteger(peerYears)||peerYears<0||peerYears>15||
+    !Number.isSafeInteger(minPeers)||minPeers<3||minPeers>30||
+    !['roof_related','replacement_like'].includes(permitKind))
+   throw Error('Check ZIPs (1–10 unique), building age (20–100), historical years (10–50), recent years (1–10, below historical years), and neighborhood settings.');
+ return {zips,years,recentYears,minBuildingAge,permitKind,peerYears,minPeers};
+}
+async function recalculateRoofingOpportunities(){
+ try{
+  const selected=roofRefreshFilters();
+  display('roof-opportunity-recalculate-status','Recalculating only the selected public-record roofing research. Existing formulas and database remain unchanged…');
+  const res=await request('/api/fun/roofing/bulk/recalculate',{
+   method:'POST',headers:{'content-type':'application/json',
+     'x-fi-roofing-bulk-click':'operator-recalculate-location-v11'},
+   body:JSON.stringify(selected)
+  });
+  if(res.state!=='OPERATOR_CLICK_LOCAL_V9_REPORT_REFRESHED')
+   throw Error('Unexpected recalculation result');
+  await loadOpportunities();
+  display('roof-opportunity-recalculate-status',
+   'Updated local research: '+count(res.totals?.qualified_street_blocks)+
+   ' street blocks, '+count(res.totals?.qualified_properties)+
+   ' qualifying property observations · new snapshot '+(res.report_snapshot||'unknown')+
+   '. These are research locations, not confirmed roof conditions.');
+ }catch(error){
+  display('roof-opportunity-recalculate-status',
+   'Recalculation not completed: '+String(error.message||error).slice(0,210)+
+   '. Existing local reports remain available.');
+ }
 }
 async function loadOpportunityPathway(pathway){
  if(!['HISTORICAL','NO_MATCH','OTHER'].includes(pathway))return;
@@ -289,6 +345,7 @@ async function sync(source){
  });
 }
 $('roof-opportunity-refresh').addEventListener('click',e=>execute(e.currentTarget,loadOpportunities));
+$('roof-opportunity-recalculate-button').addEventListener('click',e=>execute(e.currentTarget,recalculateRoofingOpportunities));
 $('roof-opportunity-historical-button').addEventListener('click',e=>execute(e.currentTarget,()=>loadOpportunityPathway('HISTORICAL')));
 $('roof-opportunity-no-match-button').addEventListener('click',e=>execute(e.currentTarget,()=>loadOpportunityPathway('NO_MATCH')));
 $('roof-opportunity-other-button').addEventListener('click',e=>execute(e.currentTarget,()=>loadOpportunityPathway('OTHER')));
