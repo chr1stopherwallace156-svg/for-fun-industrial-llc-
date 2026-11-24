@@ -53,7 +53,7 @@ def checked_grammar():
     source=GRAMMAR.read_text("utf-8")
     required=(
         "root ::=", "source-id ::=", "uint ::=", "ws ::=",
-        '"fun-math-tool-proposal-v1"', '"verify_window_math"',
+        r'"\"fun-math-tool-proposal-v1\""', r'"\"verify_window_math\""',
         r'"\"source_id\""',r'"\"arguments\""',
         r'"\"e3\""',r'"\"e5\""',r'"\"e8\""',
     )
