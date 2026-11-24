@@ -44,12 +44,14 @@ jobs:
         run: python -B -W error::ResourceWarning src/roofing/test_export_roofing_location_research_v9.py
       - name: V10 automatic local roofing opportunity offers offline regression
         run: python -B -W error::ResourceWarning src/roofing/test_roofing_opportunities_v10.py
+      - name: V12 ZIP-reference geographic research explorer offline regression
+        run: python -B -W error::ResourceWarning src/roofing/test_roofing_geo_explorer_v12.py
       - name: Validate server and browser JavaScript syntax
         run: |
           node --check scripts/Run-Fun-ML-Dashboard8802.mjs
           node --check src/ui/roofing-bulk-page-v2.js
           node --check src/roofing/roofing-bulk-bridge-v2.mjs
-          python -c "import ast,pathlib; [ast.parse(pathlib.Path(p).read_text()) for p in ('src/roofing/selective_policy_v3.py','src/roofing/selective_extract_v3.py','src/roofing/export_roofing_pilot_v1.py','src/roofing/test_export_roofing_pilot_v1.py','src/roofing/roofing_dual_formulas_v4.py','src/roofing/test_roofing_dual_formulas_v4.py','src/roofing/roofing_neighbor_context_v5.py','src/roofing/test_roofing_neighbor_context_v5.py','src/roofing/audit_roofing_permit_descriptions_v6.py','src/roofing/test_audit_roofing_permit_descriptions_v6.py','src/roofing/audit_roofing_permit_status_v7.py','src/roofing/test_audit_roofing_permit_status_v7.py','src/roofing/probe_ladbs_inspections_v8.py','src/roofing/test_probe_ladbs_inspections_v8.py','src/roofing/diagnose_inspection_permit_shapes_v8.py','src/roofing/test_diagnose_inspection_permit_shapes_v8.py','src/roofing/export_roofing_location_research_v9.py','src/roofing/test_export_roofing_location_research_v9.py','src/roofing/roofing_opportunities_v10.py','src/roofing/test_roofing_opportunities_v10.py')]"
+          python -c "import ast,pathlib; [ast.parse(pathlib.Path(p).read_text()) for p in ('src/roofing/selective_policy_v3.py','src/roofing/selective_extract_v3.py','src/roofing/export_roofing_pilot_v1.py','src/roofing/test_export_roofing_pilot_v1.py','src/roofing/roofing_dual_formulas_v4.py','src/roofing/test_roofing_dual_formulas_v4.py','src/roofing/roofing_neighbor_context_v5.py','src/roofing/test_roofing_neighbor_context_v5.py','src/roofing/audit_roofing_permit_descriptions_v6.py','src/roofing/test_audit_roofing_permit_descriptions_v6.py','src/roofing/audit_roofing_permit_status_v7.py','src/roofing/test_audit_roofing_permit_status_v7.py','src/roofing/probe_ladbs_inspections_v8.py','src/roofing/test_probe_ladbs_inspections_v8.py','src/roofing/diagnose_inspection_permit_shapes_v8.py','src/roofing/test_diagnose_inspection_permit_shapes_v8.py','src/roofing/export_roofing_location_research_v9.py','src/roofing/test_export_roofing_location_research_v9.py','src/roofing/roofing_opportunities_v10.py','src/roofing/test_roofing_opportunities_v10.py','src/roofing/roofing_geo_explorer_v12.py','src/roofing/test_roofing_geo_explorer_v12.py')]"
           node --check src/ui/procurement-focus-v1.mjs
           node --check src/ui/organized-preview-v1.js
           node --check src/ui/oneport-dashboard-v1.js
