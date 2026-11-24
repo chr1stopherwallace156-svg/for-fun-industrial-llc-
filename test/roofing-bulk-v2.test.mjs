@@ -126,3 +126,63 @@ test('parallel rooftop formulas preserve existing V3 equation and use distinct r
  assert.doesNotMatch(street,/requests\.|urllib\.|INSERT INTO|UPDATE properties|DELETE FROM/);
  assert.doesNotMatch(clientSrc,/setInterval|localStorage|WebSocket|eval\(/);
 });
+
+test('automatic roofing opportunity cards load on the separate page from read-only validated local reports',async()=>{
+ const clientSource=await readFile(client,'utf8');
+ const pySource=await readFile(new URL('../src/roofing/roofing_opportunities_v10.py',import.meta.url),'utf8');
+ const bridge=await readFile(new URL('../src/roofing/roofing-bulk-bridge-v2.mjs',import.meta.url),'utf8');
+ for(const id of ['roof-opportunities','roof-opportunity-block-body','roof-opportunity-property-body',
+                  'roof-opportunity-historical-button','roof-opportunity-no-match-button',
+                  'roof-opportunity-other-button','roof-opportunity-status']){
+  assert.ok(ROOF_BULK_PAGE.includes('id="'+id+'"'),id);
+ }
+ assert.match(clientSource,/loadOpportunities\(\)\.catch/);
+ assert.match(clientSource,/\/api\/fun\/roofing\/bulk\/opportunities/);
+ assert.match(clientSource,/loadOpportunityPathway\('HISTORICAL'\)/);
+ assert.doesNotMatch(clientSource,/setInterval|localStorage|WebSocket|eval\(/);
+ assert.match(bridge,/export async function roofingOpportunities/);
+ assert.match(pySource,/PRAGMA query_only=ON/);
+ assert.match(pySource,/NO_MATCH/);
+ assert.doesNotMatch(pySource,/urllib|requests\.|INSERT INTO|DELETE FROM|UPDATE roofing/);
+ const requested=[];
+ const stub=async({pathway=null}={})=>{
+  requested.push(pathway);
+  return {version:'fun-roofing-opportunity-offers-v10',
+          state:'READY_FROM_RECONCILED_LOCAL_V9_REPORTS',
+          pathway,totals:{historical:338,no_match:2500,other:501},
+          no_outreach_or_model_execution:true};
+ };
+ const server=createUnifiedMlHub({
+  ml:{},commerce:{},grounded:{status:()=>({})},reviewedDispatch:{},reviewedCompute:{},
+  roofingOpportunityReader:stub
+ });
+ await new Promise((resolve,reject)=>server.once('error',reject).listen(0,'127.0.0.1',resolve));
+ const port=server.address().port;
+ const call=(path,method='GET')=>new Promise((resolve,reject)=>{
+  const request=http.request({host:'127.0.0.1',port,path,method,
+    headers:{host:'127.0.0.1:8802'}},res=>{
+      let body='';res.setEncoding('utf8');res.on('data',c=>body+=c);
+      res.on('end',()=>resolve({status:res.statusCode,body}));
+  });
+  request.on('error',reject);request.end();
+ });
+ try{
+  const home=await call('/');
+  assert.equal(home.body,DASHBOARD_HTML);
+  const valid=await call('/api/fun/roofing/bulk/opportunities');
+  assert.equal(valid.status,200);
+  assert.equal(JSON.parse(valid.body).totals.historical,338);
+  const hist=await call('/api/fun/roofing/bulk/opportunities?pathway=HISTORICAL');
+  assert.equal(hist.status,200);
+  assert.equal(JSON.parse(hist.body).pathway,'HISTORICAL');
+  for(const path of [
+   '/api/fun/roofing/bulk/opportunities?pathway=FORGED',
+   '/api/fun/roofing/bulk/opportunities?random=1',
+   '/api/fun/roofing/bulk/opportunities?pathway=HISTORICAL&pathway=NO_MATCH'
+  ]){
+   assert.equal((await call(path)).status,422,path);
+  }
+  assert.equal((await call('/api/fun/roofing/bulk/opportunities','POST')).status,404);
+  assert.deepEqual(requested,[null,'HISTORICAL']);
+ }finally{await new Promise(resolve=>server.close(resolve))}
+});
