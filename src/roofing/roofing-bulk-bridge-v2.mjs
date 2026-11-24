@@ -10,6 +10,7 @@ const SCRIPT=fileURLToPath(new URL('./roofing_bulk_v2.py',import.meta.url));
 const SELECTIVE_SCRIPT=fileURLToPath(new URL('./selective_extract_v3.py',import.meta.url));
 const DUAL_SCRIPT=fileURLToPath(new URL('./roofing_dual_formulas_v4.py',import.meta.url));
 const OPPORTUNITIES_SCRIPT=fileURLToPath(new URL('./roofing_opportunities_v10.py',import.meta.url));
+const LOCATION_EXPORT_SCRIPT=fileURLToPath(new URL('./export_roofing_location_research_v9.py',import.meta.url));
 export const ROOFING_OPPORTUNITIES_VERSION='fun-roofing-opportunity-offers-v10';
 export const DUAL_FORMULA_VERSION='fun-roofing-parallel-formulas-v4';
 export const SELECTIVE_VERSION='fun-roofing-selective-v3';
@@ -43,6 +44,7 @@ const ALLOWED_SOURCES=Object.freeze([
 ]);
 let active=null;
 let latest=null;
+let locationRecalculationActive=false;
 const python=()=>process.env.FUN_ROOFING_PYTHON||'python.exe';
 function holds(){return {modelExecutions:0,reaExecutions:0,automatedOutreach:0,externalPayments:0,elektronTouched:false}}
 export function bulkCatalog(){return {version:BULK_VERSION,sources:ALLOWED_SOURCES,
@@ -121,6 +123,59 @@ export async function roofingOpportunities({pathway=null}={}){
       'LOCAL_V9_REPORT_INCOMPLETE_HOLD'].includes(result.state))
    throw Error('ROOF_OPPORTUNITIES_RESULT_NOT_VERIFIED');
  return {...result,...holds()};
+}
+export function validateRoofingRecalculation(filters){
+ if(!filters||typeof filters!=='object'||Array.isArray(filters)||
+    Object.keys(filters).length!==7||
+    Object.keys(filters).some(k=>!['zips','years','recentYears','minBuildingAge',
+      'permitKind','peerYears','minPeers'].includes(k)))
+   throw Error('ROOF_LOCATION_REFRESH_FILTER_SCHEMA');
+ const {zips,years,recentYears,minBuildingAge,permitKind,peerYears,minPeers}=filters;
+ if(typeof zips!=='string'||zips.length>60||
+    !/^\d{5}(,\d{5}){0,9}$/.test(zips)||
+    new Set(zips.split(',')).size!==zips.split(',').length||
+    !Number.isSafeInteger(years)||years<10||years>50||
+    !Number.isSafeInteger(recentYears)||recentYears<1||recentYears>10||
+    recentYears>=years||
+    !Number.isSafeInteger(minBuildingAge)||minBuildingAge<20||minBuildingAge>100||
+    !Number.isSafeInteger(peerYears)||peerYears<0||peerYears>15||
+    !Number.isSafeInteger(minPeers)||minPeers<3||minPeers>30||
+    !['roof_related','replacement_like'].includes(permitKind))
+   throw Error('ROOF_LOCATION_REFRESH_FILTER_VALIDATION_HOLD');
+ return {zips,years,recentYears,minBuildingAge,permitKind,peerYears,minPeers};
+}
+export async function recalculateRoofingLocations(filters){
+ const f=validateRoofingRecalculation(filters);
+ if(locationRecalculationActive)throw Error('ROOF_LOCATION_REFRESH_ALREADY_RUNNING');
+ if(active)throw Error('ROOF_LOCATION_REFRESH_BLOCKED_DURING_SOURCE_IMPORT');
+ if(!ROOT||!DB||!existsSync(DB))throw Error('ROOF_LOCATION_REFRESH_LOCAL_DATABASE_REQUIRED');
+ locationRecalculationActive=true;
+ try{
+  const args=[LOCATION_EXPORT_SCRIPT,'--db',DB,
+   '--zips',f.zips,'--years',String(f.years),'--recent-years',String(f.recentYears),
+   '--min-building-age',String(f.minBuildingAge),'--permit-kind',f.permitKind,
+   '--peer-years',String(f.peerYears),'--min-peers',String(f.minPeers)];
+  const {stdout}=await exec(python(),args,{
+   windowsHide:true,timeout:120000,maxBuffer:8192,
+   env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});
+  if(!stdout.includes('ROOFING_LOCATION_REPORT=ROOFING_LOCATION_RESEARCH_READY')||
+     !stdout.includes('REPORT_RECENT_PERMIT_LOCATIONS='))
+   throw Error('ROOF_LOCATION_REFRESH_REPORT_NOT_COMPLETED');
+  const result=await roofingOpportunities();
+  if(result.state!=='READY_FROM_RECONCILED_LOCAL_V9_REPORTS'||
+    result.filters.historical_x_years!==f.years||
+    result.filters.recent_years!==f.recentYears||
+    result.filters.min_building_age!==f.minBuildingAge||
+    result.filters.permit_kind!==f.permitKind||
+    result.filters.age_cohort_tolerance!==f.peerYears||
+    result.zips.length!==f.zips.split(',').length||
+    !f.zips.split(',').every(z=>result.zips.some(x=>x.zip===z)))
+    throw Error('ROOF_LOCATION_REFRESH_RECONCILIATION_HOLD');
+  return {version:'fun-roofing-local-refresh-v11',
+    state:'OPERATOR_CLICK_LOCAL_V9_REPORT_REFRESHED',
+    report_snapshot:result.report_snapshot,totals:result.totals,
+    noAutomaticImportOrOutreach:true,...holds()};
+ }finally{locationRecalculationActive=false}
 }
 export async function bulkOverview(){
  let db;
