@@ -85,6 +85,7 @@ function PreviewLive([string]$ExpectedRunner){
  $bulkCss=Invoke-WebRequest ($URL+'/api/fun/roofing/bulk/style.css') -UseBasicParsing -TimeoutSec 8
  $bulkJs=Invoke-WebRequest ($URL+'/api/fun/roofing/bulk/client.js') -UseBasicParsing -TimeoutSec 8
  $bulkStatus=Invoke-RestMethod ($URL+'/api/fun/roofing/bulk/status') -TimeoutSec 8
+ $roofOpportunities=Invoke-RestMethod ($URL+'/api/fun/roofing/bulk/opportunities') -TimeoutSec 12
  $procPage=Invoke-WebRequest ($URL+'/procurement/') -UseBasicParsing -TimeoutSec 8
  $procClient=Invoke-WebRequest ($URL+'/api/operator/procurement/client.js') -UseBasicParsing -TimeoutSec 8
  if($homepageResponse.StatusCode -ne 200 -or
@@ -116,6 +117,14 @@ function PreviewLive([string]$ExpectedRunner){
    $bulkStatus.version -cne 'fun-roofing-bulk-v2' -or
    $bulkStatus.selection.version -cne 'fun-roofing-selective-v3' -or
    $bulkPage.Content -notmatch 'id="selection-selected"' -or
+   $bulkPage.Content -notmatch 'id="roof-opportunities"' -or
+   $bulkPage.Content -notmatch 'id="roof-opportunity-historical-button"' -or
+   $bulkPage.Content -notmatch 'id="roof-opportunity-no-match-button"' -or
+   $bulkJs.Content -notmatch 'loadOpportunities' -or
+   $roofOpportunities.version -cne 'fun-roofing-opportunity-offers-v10' -or
+   $roofOpportunities.read_only -ne $true -or
+   $roofOpportunities.no_outreach_or_model_execution -ne $true -or
+   @('READY_FROM_RECONCILED_LOCAL_V9_REPORTS','AWAITING_LOCAL_V9_REPORTS','LOCAL_V9_REPORT_INCOMPLETE_HOLD') -cnotcontains [string]$roofOpportunities.state -or
    $bulkPage.Content -notmatch 'id="parallel-roof-formulas"' -or
    $bulkPage.Content -notmatch 'id="formula-peer-years"' -or
    $bulkPage.Content -notmatch 'id="formula-min-peers"' -or
