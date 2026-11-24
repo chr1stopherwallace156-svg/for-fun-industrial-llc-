@@ -58,7 +58,11 @@ class GrammarRequestV109Tests(unittest.TestCase):
                   if line.startswith("root ::= "))
         self.assertTrue(root.rstrip().endswith('ws "}"'))
         self.assertNotIn('"}}"',root)
-        self.assertNotIn(' ws "}" ws "}"',root)
+        # One brace closes arguments, the second closes the root object.
+        # A third literal closing brace must not be permitted.
+        self.assertTrue(root.rstrip().endswith('ws uint ws "}" ws "}"'))
+        self.assertEqual(root.count('ws "}"'),2)
+        self.assertNotIn(' ws "}" ws "}" ws "}"',root)
         self.assertNotIn(".*",root)
 
     def test_same_v107_prompt_not_changed(self):
