@@ -74,6 +74,11 @@ def _pathway(row):
         raise ValueError("OPPORTUNITIES_BOOLEAN_FIELD_INVALID")
     if h=="True" and n=="True":
         raise ValueError("OPPORTUNITIES_INCONSISTENT_HISTORY_FLAGS")
+    last=row.get("last_recorded_exact_apn_roof_permit") or ""
+    if ((h=="True" and not re.fullmatch(r"\d{4}-\d{2}-\d{2}",last))
+            or (n=="True" and last)
+            or (h=="False" and n=="False" and not last)):
+        raise ValueError("OPPORTUNITIES_PERMIT_HISTORY_FLAGS_NOT_RECONCILED")
     return "HISTORICAL" if h=="True" else "NO_MATCH" if n=="True" else "OTHER"
 
 def read_offers(root,*,pathway=None):
