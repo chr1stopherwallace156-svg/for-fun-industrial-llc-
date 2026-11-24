@@ -255,3 +255,63 @@ test('V11 explicit-click roofing research refresh validates independent filters 
   assert.equal(original.body,DASHBOARD_HTML);
  }finally{await new Promise(resolve=>server.close(resolve))}
 });
+
+
+test('V12 offline ZIP reference map and paginated, exact-scope property drilldown remain read-only',async()=>{
+ const clientSource=await readFile(client,'utf8');
+ const geoSource=await readFile(new URL('../src/roofing/roofing_geo_explorer_v12.py',import.meta.url),'utf8');
+ const bridge=await readFile(new URL('../src/roofing/roofing-bulk-bridge-v2.mjs',import.meta.url),'utf8');
+ for(const id of ['roof-geo-svg','roof-geo-zip','roof-geo-pathway',
+   'roof-geo-blocks','roof-geo-properties','roof-geo-next','roof-geo-property-next']){
+  assert.ok(ROOF_BULK_PAGE.includes('id="'+id+'"'),id);
+ }
+ assert.match(clientSource,/function renderRoofZipReferences/);
+ assert.match(clientSource,/\/api\/fun\/roofing\/bulk\/geo/);
+ assert.match(clientSource,/external map links|Google Maps|www\.google\.com\/maps\/search/);
+ assert.match(geoSource,/ZIP_POSTAL_REFERENCE_ONLY_NOT_STREET_OR_PARCEL/);
+ assert.match(geoSource,/GeoNames US postal codes, CC BY 4\.0/);
+ assert.match(bridge,/export async function roofingZipExplorer/);
+ assert.doesNotMatch(geoSource,/sqlite3\.connect|urllib|requests\.|INSERT INTO|DELETE FROM/);
+ const captured=[];
+ const server=createUnifiedMlHub({
+  ml:{},commerce:{},grounded:{status:()=>({})},reviewedDispatch:{},reviewedCompute:{},
+  roofingZipExplorerReader:async opts=>{
+   captured.push(opts);
+   return {version:'fun-roofing-zip-street-explorer-v12',
+     state:'ZIP_STREET_RESEARCH_READY',read_only:true,no_outreach:true,
+     total:1,rows:[],coordinate_meaning:'ZIP_POSTAL_REFERENCE_ONLY_NOT_STREET_OR_PARCEL'};
+  }
+ });
+ await new Promise((resolve,reject)=>server.once('error',reject).listen(0,'127.0.0.1',resolve));
+ const port=server.address().port;
+ const call=(path,method='GET')=>new Promise((resolve,reject)=>{
+  const req=http.request({host:'127.0.0.1',port,path,method,
+   headers:{host:'127.0.0.1:8802'}},res=>{
+    let body='';res.setEncoding('utf8');res.on('data',c=>body+=c);
+    res.on('end',()=>resolve({status:res.statusCode,body}));});
+  req.on('error',reject);req.end();
+ });
+ try{
+  const a=await call('/api/fun/roofing/bulk/geo?mode=blocks&zip=90037&pathway=HISTORICAL&offset=0&limit=25');
+  assert.equal(a.status,200);
+  assert.equal(JSON.parse(a.body).coordinate_meaning,'ZIP_POSTAL_REFERENCE_ONLY_NOT_STREET_OR_PARCEL');
+  const b=await call('/api/fun/roofing/bulk/geo?mode=properties&zip=90037&block=100-199%20OAK%20ST&pathway=NO_MATCH');
+  assert.equal(b.status,200);
+  assert.equal(captured.length,2);
+  assert.equal(captured[0].zip,'90037');
+  assert.equal(captured[1].mode,'properties');
+  assert.equal(captured[1].block,'100-199 OAK ST');
+  for(const path of [
+   '/api/fun/roofing/bulk/geo?mode=properties&zip=90037',
+   '/api/fun/roofing/bulk/geo?pathway=FORGED',
+   '/api/fun/roofing/bulk/geo?zip=90037&zip=90049',
+   '/api/fun/roofing/bulk/geo?limit=999',
+   '/api/fun/roofing/bulk/geo?unknown=x',
+  ]){
+    assert.equal((await call(path)).status,422,path);
+  }
+  assert.equal((await call('/api/fun/roofing/bulk/geo','POST')).status,404);
+  assert.equal((await call('/')).body,DASHBOARD_HTML);
+  assert.equal(captured.length,2);
+ }finally{await new Promise(resolve=>server.close(resolve))}
+});
