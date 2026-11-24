@@ -200,7 +200,7 @@ function fillOpportunityTable(id,rows,fields,empty){
  }
 }
 const roofGeo={zip:'',pathway:'',offset:0,total:0,
- block:null,propertyOffset:0,propertyTotal:0,ready:false,initialized:false};
+ block:null,propertyOffset:0,propertyTotal:0,ready:false,initialized:false,snapshot:null};
 const SVG_NS='http://www.w3.org/2000/svg';
 function roofSvg(tag,attrs={},label=null){
  const el=document.createElementNS(SVG_NS,tag);
@@ -276,6 +276,9 @@ async function loadRoofGeoBlocks(){
  roofGeo.total=result.total;roofGeo.ready=true;
  if(!roofGeo.initialized){
   const zipSelect=$('roof-geo-zip');
+  zipSelect.replaceChildren();
+  const all=document.createElement('option');all.value='';all.textContent='All report ZIPs';
+  zipSelect.append(all);
   for(const item of result.zip_reference_points||[]){
    if(![...zipSelect.options].some(x=>x.value===item.zip)){
     const option=document.createElement('option');option.value=item.zip;
@@ -362,6 +365,12 @@ async function loadOpportunities(){
  }
  const ready=d.state==='READY_FROM_RECONCILED_LOCAL_V9_REPORTS';
  opportunitiesReady=ready;
+ if(ready&&roofGeo.snapshot!==d.report_snapshot){
+  roofGeo.snapshot=d.report_snapshot;roofGeo.initialized=false;
+  roofGeo.zip='';roofGeo.pathway='';roofGeo.offset=0;
+  $('roof-geo-pathway').value='';
+  resetRoofPropertyView();
+ }
  for(const id of ['roof-opportunity-historical-button','roof-opportunity-no-match-button',
                    'roof-opportunity-other-button'])$(id).disabled=!ready;
  if(!ready){
