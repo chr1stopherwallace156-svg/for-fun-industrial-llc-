@@ -277,7 +277,8 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
  outcomeStatus=readOutcomeStatus,regulatoryStatus=readRegulatoryStatus,fleetStatus=readFleetStatus,
  procurementStatus=readProcurementStatus,fitStatus=readFitStatus,
  bidStatus=readReadinessStatus,buyerStatus=readBuyerStatus,demandStatus=readDemandStatus,
- readUiClient=()=>readFile(UI_CLIENT,'utf8'),readUiStyle=()=>readFile(UI_CSS,'utf8')}={}){
+ readUiClient=()=>readFile(UI_CLIENT,'utf8'),readUiStyle=()=>readFile(UI_CSS,'utf8'),
+ roofingOpportunityReader=roofingOpportunities}={}){
   const dispatch=reviewedDispatch??createReviewedDispatch();
   const compute=reviewedCompute??createReviewedCompute({ml});
   const activeGrounded=grounded??createGroundedChat({capabilityReaders:{
@@ -308,7 +309,7 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
            (u.searchParams.has('pathway')&&
             !['HISTORICAL','NO_MATCH','OTHER'].includes(u.searchParams.get('pathway'))))
           return send(res,422,{error:'ROOF_OPPORTUNITIES_FILTER_HOLD'});
-        return send(res,200,await roofingOpportunities({
+        return send(res,200,await roofingOpportunityReader({
           pathway:u.searchParams.get('pathway')||null
         }));
       }
