@@ -110,7 +110,7 @@ class V108TrailingBraceTests(unittest.TestCase):
         d=v.inspect_request(c,json.dumps(raw)+"}")
         self.assertTrue(d["one_brace_candidate"])
         self.assertFalse(d["would_pass_full_host_contract_after_one_brace"])
-        self.assertIn("UNTRUSTED",d["diagnostic"])
+        self.assertEqual(d["diagnostic"],"CANDIDATE_REJECTED_V108_HOST_AUTHORITY_MISMATCH")
         self.assertIsNone(d["simulated_tool_answer"])
 
     def test_wrong_source_id_not_accepted(self):
