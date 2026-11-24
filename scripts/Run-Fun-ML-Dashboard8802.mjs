@@ -23,7 +23,7 @@ import {ROOF_UI_HTML} from '../src/ui/roofing-opportunity-v1.mjs';
 import {roofingSnapshot,roofingLeads,importRoofData,refreshLaCity,refreshNws} from '../src/roofing/roofing-intelligence-v1.mjs';
 import {ROOF_BULK_PAGE} from '../src/ui/roofing-bulk-page-v2.mjs';
 import {BULK_VERSION,bulkOverview,bulkMarkets,bulkDualFormulas,roofingOpportunities,
- validateRoofingRecalculation,recalculateRoofingLocations,startBulkSync} from '../src/roofing/roofing-bulk-bridge-v2.mjs';
+ validateRoofingRecalculation,recalculateRoofingLocations,roofingZipExplorer,startBulkSync} from '../src/roofing/roofing-bulk-bridge-v2.mjs';
 import {createFisreChatEvidence} from '../src/semantic/fisre-chat-evidence-v4.mjs';
 import {capabilityInventory} from '../src/intelligence/capability-fabric-v1.mjs';
 import {createReviewedDispatch} from '../src/intelligence/operator-reviewed-dispatch-v1.mjs';
@@ -280,7 +280,8 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
  bidStatus=readReadinessStatus,buyerStatus=readBuyerStatus,demandStatus=readDemandStatus,
  readUiClient=()=>readFile(UI_CLIENT,'utf8'),readUiStyle=()=>readFile(UI_CSS,'utf8'),
  roofingOpportunityReader=roofingOpportunities,
- roofingRecalculationRunner=recalculateRoofingLocations}={}){
+ roofingRecalculationRunner=recalculateRoofingLocations,
+ roofingZipExplorerReader=roofingZipExplorer}={}){
   const dispatch=reviewedDispatch??createReviewedDispatch();
   const compute=reviewedCompute??createReviewedCompute({ml});
   const activeGrounded=grounded??createGroundedChat({capabilityReaders:{
@@ -306,6 +307,29 @@ export function createUnifiedMlHub({ml=createMlDashboardBridge(),commerce=create
         return send(res,200,await readFile(ROOF_BULK_CLIENT,'utf8'),'text/javascript; charset=utf-8');
       if(req.method==='GET'&&u.pathname==='/api/fun/roofing/bulk/status')
         return send(res,200,await bulkOverview());
+      if(req.method==='GET'&&u.pathname==='/api/fun/roofing/bulk/geo'){
+        const allowed=new Set(['zip','pathway','block','mode','offset','limit']);
+        if(u.searchParams.size>6||[...u.searchParams.keys()].some(k=>!allowed.has(k))||
+           [...allowed].some(k=>u.searchParams.getAll(k).length>1))
+          return send(res,422,{error:'ROOF_ZIP_EXPLORER_QUERY_HOLD'});
+        const zip=u.searchParams.get('zip'),pathway=u.searchParams.get('pathway');
+        const block=u.searchParams.get('block'),mode=u.searchParams.get('mode')||'blocks';
+        const num=(key,def)=>{
+          const raw=u.searchParams.get(key);
+          return raw===null?def:/^\d{1,5}$/.test(raw)?Number(raw):NaN;
+        };
+        const offset=num('offset',0),limit=num('limit',25);
+        if(zip!==null&&!/^\d{5}$/.test(zip)||
+           pathway!==null&&!['HISTORICAL','NO_MATCH','OTHER'].includes(pathway)||
+           block!==null&&(block.length>180||!/^[A-Za-z0-9 .,&'()\/#-]+$/.test(block))||
+           !['blocks','properties'].includes(mode)||
+           !Number.isSafeInteger(offset)||offset<0||offset>20000||
+           !Number.isSafeInteger(limit)||limit<1||limit>50||
+           (mode==='properties'&&(!zip||!block)))
+          return send(res,422,{error:'ROOF_ZIP_EXPLORER_FILTER_HOLD'});
+        return send(res,200,await roofingZipExplorerReader({
+          zip,pathway,block,mode,offset,limit}));
+      }
       if(req.method==='GET'&&u.pathname==='/api/fun/roofing/bulk/opportunities'){
         if(u.searchParams.size>1||[...u.searchParams.keys()].some(k=>k!=='pathway')||
            (u.searchParams.has('pathway')&&
