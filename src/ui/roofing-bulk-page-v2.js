@@ -228,9 +228,11 @@ async function loadOpportunities(){
   f.historical_x_years+' years · recent window '+f.recent_years+' years · '+
   (f.permit_kind||'unknown')+' · same-street construction cohort ± '+
   f.age_cohort_tolerance+' years');
- display('roof-opportunity-status','Ready: '+count(totals.qualified_properties)+
-  ' research properties across '+count(totals.qualified_street_blocks)+
-  ' qualifying street blocks. Automatically loaded from your existing local V9 reports.');
+ display('roof-opportunity-status',
+  (d.local_import_db_newer_than_report?'Cached report may be outdated after a recent source import. Regenerate V9 to update; ':'Ready: ')+
+  count(totals.qualified_properties)+' research properties across '+
+  count(totals.qualified_street_blocks)+
+  ' qualifying street blocks. Automatically loaded from existing local V9 files (not recomputed).');
  fillOpportunityTable('roof-opportunity-block-body',d.top_street_blocks,
   ['zip','street_number_block','qualified_properties','recent_permit_parcels',
    'historical_permit_properties','no_matching_permit_properties'],
